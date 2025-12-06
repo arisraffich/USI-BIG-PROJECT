@@ -62,10 +62,16 @@ export async function PATCH(
         story_text?: string
         scene_description?: string | null
         description_auto_generated?: boolean
+        is_customer_edited_story_text?: boolean
+        is_customer_edited_scene_description?: boolean
+        original_story_text?: string
+        original_scene_description?: string | null
       } = {}
 
       if (update.story_text !== undefined) {
         updateData.story_text = update.story_text
+        // Admin edit overrides customer edit flag -> turns Blue
+        updateData.is_customer_edited_story_text = false
       }
 
       if (update.scene_description !== undefined) {
@@ -74,6 +80,8 @@ export async function PATCH(
         if (update.scene_description) {
           updateData.description_auto_generated = false
         }
+        // Admin edit overrides customer edit flag -> turns Blue
+        updateData.is_customer_edited_scene_description = false
       }
 
       const { data: page, error } = await supabase

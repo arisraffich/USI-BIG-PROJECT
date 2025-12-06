@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useRef, useCallback } from 'react'
+import { useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CustomerCharacterCard } from './CustomerCharacterCard'
 import { CustomerAddCharacterButton } from './CustomerAddCharacterButton'
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 interface CustomerProjectTabsContentProps {
   projectId: string
@@ -37,6 +38,78 @@ export function CustomerProjectTabsContent({
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+
+  // Local state for pages to support instant realtime updates
+  const [localPages, setLocalPages] = useState<Page[]>(pages || [])
+
+  // Sync local state when server props update, but respect newer local versions (from realtime)
+  useEffect(() => {
+    if (pages) {
+      setLocalPages(currentLocal => {
+        // If we have no local state yet, just take server state
+        if (currentLocal.length === 0) return pages
+
+        // Merge strategy: Keep local version if it's newer (from realtime) than the incoming server prop (potentially stale)
+        return pages.map(serverPage => {
+          const localPage = currentLocal.find(p => p.id === serverPage.id)
+
+          // Check if local page exists and has a valid updated_at timestamp that is newer than server's
+          if (localPage?.updated_at && serverPage.updated_at) {
+            const localTime = new Date(localPage.updated_at).getTime()
+            const serverTime = new Date(serverPage.updated_at).getTime()
+
+            // If local state is ahead of server state (race condition), keep local
+            if (localTime > serverTime) {
+              return localPage
+            }
+          }
+
+          // Otherwise trust server state
+          return serverPage
+        })
+      })
+    }
+  }, [pages])
+
+  // Realtime Subscription for Pages
+  useEffect(() => {
+    const supabase = createClient()
+    const channelName = `customer-project-pages-${projectId}`
+
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'pages',
+          filter: `project_id=eq.${projectId}`
+        },
+        (payload) => {
+          // 1. Instant Local Update
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            const updatedPage = payload.new as Page
+
+            setLocalPages(prev => prev.map(p => p.id === updatedPage.id ? { ...p, ...updatedPage } : p))
+
+            toast.info('Page content updated', {
+              description: 'The author has modified the manuscript.'
+            })
+          } else if (payload.eventType === 'INSERT' && payload.new) {
+            setLocalPages(prev => [...prev, payload.new as Page])
+          }
+
+          // 2. Background Server Sync
+          router.refresh()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [projectId, router])
 
   // Store manuscript editor edits
   const [manuscriptEdits, setManuscriptEdits] = useState<{ [pageId: string]: { story_text?: string; scene_description?: string } }>({})
@@ -148,7 +221,7 @@ export function CustomerProjectTabsContent({
         {/* Pages Tab Content */}
         <div className={activeTab === 'pages' ? 'block' : 'hidden'}>
           <CustomerManuscriptEditor
-            pages={pages as any}
+            pages={localPages as any}
             projectId={projectId}
             onEditsChange={setManuscriptEdits}
           />
@@ -178,19 +251,22 @@ export function CustomerProjectTabsContent({
                       character={character}
                     />
                   ))}
+
+                  {/* Add Character Ghost Card - Always at the end */}
+                  <div className="h-full">
+                    <CustomerAddCharacterButton
+                      mode="card"
+                      projectId={projectId}
+                      mainCharacterName={sortedCharacters.main?.name || sortedCharacters.main?.role || null}
+                      onCharacterAdded={handleCharacterAdded}
+                    />
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-gray-500 text-center py-8">
                   No characters yet. Characters will appear here after story parsing.
                 </p>
               )}
-              <div className="fixed bottom-[45px] right-[50px]">
-                <CustomerAddCharacterButton
-                  projectId={projectId}
-                  mainCharacterName={sortedCharacters.main?.name || sortedCharacters.main?.role || null}
-                  onCharacterAdded={handleCharacterAdded}
-                />
-              </div>
             </>
           )}
 

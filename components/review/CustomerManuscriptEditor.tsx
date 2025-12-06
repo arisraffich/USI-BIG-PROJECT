@@ -110,12 +110,17 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange }: Cu
 
   const handleStoryTextChange = useCallback((pageId: string, value: string) => {
     setPageEdits((prev) => {
-      const originalPage = baselinePagesRef.current.find((p) => p.id === pageId)
-      const originalStoryText = originalPage?.story_text || ''
-      const originalSceneDesc = originalPage?.scene_description || ''
+      // Get current page state (which holds the LATEST SAVED version)
+      // This is what we check against to see if the form is dirty
+      const currentPage = displayedPages.find(p => p.id === pageId)
+      const currentSavedStoryText = currentPage?.story_text || ''
 
-      // If value matches original, remove from edits
-      if (value === originalStoryText) {
+      const originalPage = baselinePagesRef.current.find((p) => p.id === pageId)
+      const originalSceneDesc = originalPage?.scene_description || ''
+      const currentSavedSceneDesc = currentPage?.scene_description || ''
+
+      // If value matches the LATEST SAVED version, this matches DB, so no pending edit
+      if (value === currentSavedStoryText) {
         const newEdits = { ...prev }
         if (newEdits[pageId]) {
           delete newEdits[pageId].story_text
@@ -136,20 +141,25 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange }: Cu
         ...prev,
         [pageId]: {
           story_text: value,
-          scene_description: prev[pageId]?.scene_description || originalSceneDesc,
+          // Use existing edit OR current saved value OR original fallback
+          scene_description: prev[pageId]?.scene_description ?? currentSavedSceneDesc ?? originalSceneDesc,
         },
       }
     })
-  }, [])
+  }, [displayedPages])
 
   const handleSceneDescriptionChange = useCallback((pageId: string, value: string) => {
     setPageEdits((prev) => {
+      // Get current page state (which holds the LATEST SAVED version)
+      const currentPage = displayedPages.find(p => p.id === pageId)
+      const currentSavedSceneDesc = currentPage?.scene_description || ''
+
       const originalPage = baselinePagesRef.current.find((p) => p.id === pageId)
       const originalStoryText = originalPage?.story_text || ''
-      const originalSceneDesc = originalPage?.scene_description || ''
+      const currentSavedStoryText = currentPage?.story_text || ''
 
-      // If value matches original, remove from edits
-      if (value === originalSceneDesc) {
+      // If value matches the LATEST SAVED version, this matches DB, so no pending edit
+      if (value === currentSavedSceneDesc) {
         const newEdits = { ...prev }
         if (newEdits[pageId]) {
           delete newEdits[pageId].scene_description
@@ -169,12 +179,13 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange }: Cu
       return {
         ...prev,
         [pageId]: {
-          story_text: prev[pageId]?.story_text || originalStoryText,
+          // Use existing edit OR current saved value OR original fallback
+          story_text: prev[pageId]?.story_text ?? currentSavedStoryText ?? originalStoryText,
           scene_description: value,
         },
       }
     })
-  }, [])
+  }, [displayedPages])
 
   const handlePageClick = (pageId: string) => {
     const element = document.getElementById(`page-${pageId}`)

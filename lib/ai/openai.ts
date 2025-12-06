@@ -2,17 +2,18 @@ import OpenAI from 'openai'
 
 export const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    })
+    apiKey: process.env.OPENAI_API_KEY,
+  })
   : null
 
 export async function parseCharacterForm(pdfBuffer: Buffer) {
   // Import PDF parser utility
   const { parsePdf } = await import('@/lib/utils/pdf-parser')
-  
+
   let rawText: string
   try {
     rawText = await parsePdf(pdfBuffer)
+    console.log('[parseCharacterForm] PDF extracted text length:', rawText.length)
   } catch (pdfError: any) {
     console.error('Error extracting PDF text:', pdfError.message)
     throw new Error(`Failed to extract text from PDF: ${pdfError.message}`)
@@ -30,6 +31,7 @@ ${rawText}
 
 Look for these fields in the form (they may be labeled as):
 - Character Name / Character's Name / Name
+- Character Description / Biography / About Character / Background / Summary
 - Character's Age / Age
 - Character's Gender / Gender
 - Character's Ethnicity / Ethnicity
@@ -44,6 +46,7 @@ Look for these fields in the form (they may be labeled as):
 Extract these exact fields (use null if field is missing, empty, or says "N/A"):
 
 - name: character's name (string or null)
+- biography: shorter character description or biography (string or null). Keep it under 2 sentences if possible, summarizing role and personality.
 - age: character's age (string or null)
 - ethnicity: character's ethnicity (string or null)
 - skin_color: skin color description (string or null)
@@ -59,13 +62,14 @@ Rules:
 - If a field says "N/A", "n/a", "N.A.", or similar, return null
 - If a field says "Illustrator's choice", return that exact text
 - If a field is blank/empty, return null
-- Keep original text exactly as written (don't modify or interpret)
+- Keep original text exactly as written (don't modify or interpret) unless summarizing biography
 - Extract the actual values, not the field labels
 - For "Mixed" ethnicity, include the full description (e.g., "Mixed - Indian and African American")
 
 Return valid JSON only with this structure:
 {
   "name": "...",
+  "biography": "...",
   "age": "...",
   "ethnicity": "...",
   "skin_color": "...",
@@ -79,39 +83,64 @@ Return valid JSON only with this structure:
 }`
 
   if (!openai) {
-    throw new Error('OpenAI API key is not configured')
+    console.error('[parseCharacterForm] OpenAI API key is missing')
+    // Return empty result instead of crashing
+    return createEmptyCharacterData()
   }
 
   try {
+    console.log('[parseCharacterForm] Sending request to OpenAI...')
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini', // Using gpt-4o-mini for reliable JSON extraction
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
       temperature: 0, // For consistent extraction
     })
-    
+
+    console.log('[parseCharacterForm] OpenAI response received')
     const result = await processCompletion(completion)
+    console.log('[parseCharacterForm] Extraction result:', JSON.stringify(result, null, 2))
     return result
   } catch (error: any) {
-    console.error('OpenAI API Error in parseCharacterForm:', error.message)
-    throw error
+    console.error('[parseCharacterForm] OpenAI API Error:', error.message)
+    // Return empty data on failure so process can continue
+    return createEmptyCharacterData()
+  }
+}
+
+function createEmptyCharacterData() {
+  return {
+    name: null,
+    biography: null,
+    age: null,
+    ethnicity: null,
+    skin_color: null,
+    hair_color: null,
+    hair_style: null,
+    eye_color: null,
+    clothing: null,
+    accessories: null,
+    special_features: null,
+    gender: null,
   }
 }
 
 async function processCompletion(completion: any) {
   const content = completion.choices[0].message.content || '{}'
-  
+
   let result
   try {
     result = JSON.parse(content)
   } catch (parseError: any) {
     console.error('Failed to parse OpenAI JSON response:', parseError.message)
-    throw new Error(`Failed to parse OpenAI response: ${parseError.message}`)
+    // Return empty on parse error
+    return createEmptyCharacterData()
   }
 
   // Validate required structure
   const requiredFields = [
     'name',
+    'biography',
     'age',
     'ethnicity',
     'skin_color',

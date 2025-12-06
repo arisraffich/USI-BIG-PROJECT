@@ -175,22 +175,14 @@ export function ManuscriptEditor({ pages, projectId }: ManuscriptEditorProps) {
 
       const result = await response.json()
 
-      // Update original pages ref with saved data
-      result.pages.forEach((savedPage: Page) => {
-        const index = originalPagesRef.current.findIndex((p) => p.id === savedPage.id)
-        if (index !== -1) {
-          originalPagesRef.current[index] = savedPage
-        }
-      })
-
       // Clear edits
       setPageEdits({})
 
       // Show success toast
       toast.success('Changes saved!')
 
-      // Refresh the page data
-      window.location.reload()
+      // No reload needed - Realtime subscription in parent will update the UI
+      // window.location.reload()
     } catch (error: any) {
       console.error('Error saving pages:', error)
       toast.error(error.message || 'Failed to save changes')

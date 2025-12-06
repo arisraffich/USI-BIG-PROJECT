@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData()
     const supabase = createAdminClient()
-    
+
     if (!supabase) {
       console.error('Failed to initialize Supabase client')
       return NextResponse.json(
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     let mainCharacterBuffer: Buffer
     let pdfBuffer: Buffer
     let storyBuffer: Buffer
-    
+
     try {
       mainCharacterBuffer = Buffer.from(await mainCharacterImage.arrayBuffer())
       pdfBuffer = Buffer.from(await characterFormPdf.arrayBuffer())
@@ -178,6 +178,7 @@ export async function POST(request: NextRequest) {
     // Parse character form PDF
     let characterData = {
       name: null,
+      biography: null,
       age: null,
       ethnicity: null,
       skin_color: null,
@@ -217,6 +218,7 @@ export async function POST(request: NextRequest) {
         project_id: projectId,
         name: characterData.name,
         role: 'Main Character',
+        story_role: characterData.biography,
         is_main: true,
         age: characterData.age,
         ethnicity: characterData.ethnicity,
@@ -261,7 +263,7 @@ export async function POST(request: NextRequest) {
 
       // Parse story file
       const storyText = await parseStoryFile(storyBuffer, fileType)
-      
+
       // Parse into pages using AI (with fallback to pattern-based)
       let pages
       try {
@@ -271,62 +273,62 @@ export async function POST(request: NextRequest) {
         pages = parsePages(storyText)
       }
 
-        if (pages.length > 0) {
-          // Generate descriptions for pages that don't have them
-          const pagesWithDescriptions = await Promise.all(
-            pages.map(async (page) => {
-              if (!page.scene_description && page.story_text) {
-                try {
-                  const response = await fetch(
-                    `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/ai/generate-description`,
-                    {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        story_text: page.story_text,
-                        character_names: [], // Will be populated after character identification
-                      }),
-                    }
-                  )
-                  
-                  if (response.ok) {
-                    const { description } = await response.json()
-                    return {
-                      ...page,
-                      scene_description: description,
-                      description_auto_generated: true,
-                    }
+      if (pages.length > 0) {
+        // Generate descriptions for pages that don't have them
+        const pagesWithDescriptions = await Promise.all(
+          pages.map(async (page) => {
+            if (!page.scene_description && page.story_text) {
+              try {
+                const response = await fetch(
+                  `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/ai/generate-description`,
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      story_text: page.story_text,
+                      character_names: [], // Will be populated after character identification
+                    }),
                   }
-                } catch (error: any) {
-                  // Silently fail - description can be generated later
+                )
+
+                if (response.ok) {
+                  const { description } = await response.json()
+                  return {
+                    ...page,
+                    scene_description: description,
+                    description_auto_generated: true,
+                  }
                 }
+              } catch (error: any) {
+                // Silently fail - description can be generated later
               }
-              return {
-                ...page,
-                description_auto_generated: false,
-              }
-            })
-          )
+            }
+            return {
+              ...page,
+              description_auto_generated: false,
+            }
+          })
+        )
 
-          // Create page records in database
-          const pagesToInsert = pagesWithDescriptions.map(page => ({
-            project_id: projectId,
-            page_number: page.page_number,
-            story_text: page.story_text,
-            scene_description: page.scene_description,
-            description_auto_generated: page.description_auto_generated,
-            character_ids: [],
-          }))
+        // Create page records in database
+        const pagesToInsert = pagesWithDescriptions.map(page => ({
+          project_id: projectId,
+          page_number: page.page_number,
+          story_text: page.story_text,
+          scene_description: page.scene_description,
+          description_auto_generated: page.description_auto_generated,
+          character_ids: [],
+        }))
 
-          const { error: insertError } = await supabase
-            .from('pages')
-            .insert(pagesToInsert)
+        const { error: insertError } = await supabase
+          .from('pages')
+          .insert(pagesToInsert)
 
-          if (insertError) {
-            console.error('Error creating pages:', insertError.message)
-            throw new Error(`Failed to create pages: ${insertError.message}`)
-          }
+        if (insertError) {
+          console.error('Error creating pages:', insertError.message)
+          throw new Error(`Failed to create pages: ${insertError.message}`)
         }
+      }
     } catch (parseError: any) {
       console.error('Error parsing story:', parseError.message)
       // Don't fail the entire project creation, but log the error
@@ -347,25 +349,25 @@ export async function POST(request: NextRequest) {
       // Don't fail the entire project creation, but log the error
     })
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
-      project_id: projectId 
+      project_id: projectId
     }, { status: 200 })
   } catch (error: any) {
     console.error('Error creating project:', error.message)
-    
+
     // Check if it's a formData parsing error
     if (error?.message?.includes('form-data') || error?.message?.includes('Content-Type')) {
       return NextResponse.json(
-        { 
-          error: 'Failed to parse form data', 
+        {
+          error: 'Failed to parse form data',
           details: error.message,
           hint: 'Make sure the request is sent as multipart/form-data'
         },
         { status: 400 }
       )
     }
-    
+
     const errorResponse = {
       error: 'Failed to create project',
       details: error?.message || String(error) || 'Unknown error',
@@ -373,7 +375,7 @@ export async function POST(request: NextRequest) {
         stack: error?.stack,
       })
     }
-    
+
     return NextResponse.json(
       errorResponse,
       { status: 500 }
