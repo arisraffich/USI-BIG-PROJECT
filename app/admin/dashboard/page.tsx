@@ -8,10 +8,19 @@ export default async function DashboardPage() {
   try {
     const supabase = await createAdminClient()
 
+    // DEBUG LOGGING
+    console.log("----------------------------------------")
+    console.log("DEBUG: Dashboard Page Load")
+    console.log("DEBUG: SUPABASE_URL Env =", process.env.NEXT_PUBLIC_SUPABASE_URL)
+    console.log("----------------------------------------")
+
     const { data: projects, error: projectsError } = await supabase
       .from('projects')
       .select('*')
       .order('created_at', { ascending: false })
+
+    console.log("DEBUG: Projects Found =", projects?.length)
+    console.log("----------------------------------------")
 
     if (projectsError) {
       console.error('Error fetching projects:', projectsError)
@@ -35,18 +44,18 @@ export default async function DashboardPage() {
     }
 
     let projectsWithCounts: Array<any> = []
-    
+
     try {
       // Fetch all page counts in a single query to avoid N+1 problem
       const projectIds = (projects || []).map(p => p.id)
       let pageCountsMap: Record<string, number> = {}
-      
+
       if (projectIds.length > 0) {
         const { data: pages, error: pagesError } = await supabase
           .from('pages')
           .select('project_id')
           .in('project_id', projectIds)
-        
+
         if (!pagesError && pages) {
           // Count pages per project
           pageCountsMap = pages.reduce((acc, page) => {
@@ -55,7 +64,7 @@ export default async function DashboardPage() {
           }, {} as Record<string, number>)
         }
       }
-      
+
       // Map projects with their page counts
       projectsWithCounts = (projects || []).map((project) => ({
         ...project,
