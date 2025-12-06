@@ -4,24 +4,42 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { MessageSquarePlus, Save, Loader2, CheckCircle2, Info } from 'lucide-react'
-import { toast } from 'sonner'
+import { MessageSquarePlus, Save, Loader2, CheckCircle2, Info, Download } from 'lucide-react'
 
-interface CustomerCharacterGalleryCardProps {
-    character: Character
-    isMain?: boolean
-}
+// ... existing imports ...
 
 export function CustomerCharacterGalleryCard({ character, isMain = false }: CustomerCharacterGalleryCardProps) {
-    const [isEditing, setIsEditing] = useState(false)
-    const [notes, setNotes] = useState(character.feedback_notes || '')
-    const [isSaving, setIsSaving] = useState(false)
-    const [showImage, setShowImage] = useState(false)
-    const [showTooltip, setShowTooltip] = useState(false)
+    // ... existing state ...
 
     const displayName = isMain
         ? 'Main Character'
         : (character.name || character.role || 'Unnamed Character')
+
+    const handleDownload = async (e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (!character.image_url) return
+
+        try {
+            const response = await fetch(character.image_url)
+            const blob = await response.blob()
+            const url = window.URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            const cleanName = `${character.name || character.role || 'Character'}.png`
+            link.download = cleanName
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            window.URL.revokeObjectURL(url)
+            toast.success('Image downloaded')
+        } catch (error) {
+            console.error('Download failed:', error)
+            toast.error('Failed to download image')
+        }
+    }
+
+    // ... handleSaveNotes ...
+
 
     const handleSaveNotes = async () => {
         if (!notes.trim()) {
@@ -77,22 +95,35 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
                         <h3 className="font-bold text-lg text-gray-900 leading-tight">
                             {displayName.length > 14 ? `${displayName.slice(0, 14)}...` : displayName}
                         </h3>
-                        {(character.story_role || character.role) && (
-                            <div
-                                className="relative flex-shrink-0"
-                                onMouseEnter={() => setShowTooltip(true)}
-                                onMouseLeave={() => setShowTooltip(false)}
-                            >
-                                <Info className="w-5 h-5 fill-slate-900 text-white hover:fill-slate-700 cursor-help transition-colors" />
-                                {showTooltip && (
-                                    <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-md shadow-xl z-50">
-                                        <div className="absolute bottom-[-4px] right-1 w-2 h-2 bg-slate-800 rotate-45"></div>
-                                        <p className="font-bold mb-1 text-sm">{isMain ? `${character.name || character.role || 'Character'} | Main Character` : displayName}</p>
-                                        <p className="leading-relaxed whitespace-pre-wrap select-text">{character.story_role || character.role}</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {/* Download Button */}
+                            {character.image_url && (
+                                <div
+                                    className="relative flex-shrink-0 cursor-pointer group rounded-full hover:bg-slate-100 p-1 transition-colors"
+                                    onClick={handleDownload}
+                                    title="Download image"
+                                >
+                                    <Download className="w-5 h-5 text-slate-400 group-hover:text-slate-700" />
+                                </div>
+                            )}
+
+                            {(character.story_role || character.role) && (
+                                <div
+                                    className="relative flex-shrink-0"
+                                    onMouseEnter={() => setShowTooltip(true)}
+                                    onMouseLeave={() => setShowTooltip(false)}
+                                >
+                                    <Info className="w-5 h-5 fill-slate-900 text-white hover:fill-slate-700 cursor-help transition-colors" />
+                                    {showTooltip && (
+                                        <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-md shadow-xl z-50">
+                                            <div className="absolute bottom-[-4px] right-1 w-2 h-2 bg-slate-800 rotate-45"></div>
+                                            <p className="font-bold mb-1 text-sm">{isMain ? `${character.name || character.role || 'Character'} | Main Character` : displayName}</p>
+                                            <p className="leading-relaxed whitespace-pre-wrap select-text">{character.story_role || character.role}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </CardContent>
             </Card>
