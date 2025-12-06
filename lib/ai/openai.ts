@@ -1,0 +1,136 @@
+import OpenAI from 'openai'
+
+export const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
+  : null
+
+export async function parseCharacterForm(pdfBuffer: Buffer) {
+  // Import PDF parser utility
+  const { parsePdf } = await import('@/lib/utils/pdf-parser')
+  
+  let rawText: string
+  try {
+    rawText = await parsePdf(pdfBuffer)
+  } catch (pdfError: any) {
+    console.error('Error extracting PDF text:', pdfError.message)
+    throw new Error(`Failed to extract text from PDF: ${pdfError.message}`)
+  }
+
+  if (!rawText || rawText.trim().length < 10) {
+    console.error('PDF text is too short or empty')
+    throw new Error('PDF appears to be empty or unreadable')
+  }
+
+  const prompt = `You are extracting character information from a Character Form PDF. Extract the following fields from the form text.
+
+PDF Form Text:
+${rawText}
+
+Look for these fields in the form (they may be labeled as):
+- Character Name / Character's Name / Name
+- Character's Age / Age
+- Character's Gender / Gender
+- Character's Ethnicity / Ethnicity
+- Character's Skin Color / Skin Color
+- Character's Hair Color / Hair Color
+- Character's Hair Style / Hair Style
+- Character's Eye Color / Eye Color
+- Character's Clothing / Clothing
+- Accessories (if mentioned separately)
+- Special Features / Any Special Features
+
+Extract these exact fields (use null if field is missing, empty, or says "N/A"):
+
+- name: character's name (string or null)
+- age: character's age (string or null)
+- ethnicity: character's ethnicity (string or null)
+- skin_color: skin color description (string or null)
+- hair_color: hair color description (string or null)
+- hair_style: hair style description (string or null)
+- eye_color: eye color description (string or null)
+- clothing: clothing description with style and color (string or null)
+- accessories: accessories description (string or null) - if not mentioned separately, can be null
+- special_features: any special features or notes (string or null)
+- gender: character's gender (string or null)
+
+Rules:
+- If a field says "N/A", "n/a", "N.A.", or similar, return null
+- If a field says "Illustrator's choice", return that exact text
+- If a field is blank/empty, return null
+- Keep original text exactly as written (don't modify or interpret)
+- Extract the actual values, not the field labels
+- For "Mixed" ethnicity, include the full description (e.g., "Mixed - Indian and African American")
+
+Return valid JSON only with this structure:
+{
+  "name": "...",
+  "age": "...",
+  "ethnicity": "...",
+  "skin_color": "...",
+  "hair_color": "...",
+  "hair_style": "...",
+  "eye_color": "...",
+  "clothing": "...",
+  "accessories": "...",
+  "special_features": "...",
+  "gender": "..."
+}`
+
+  if (!openai) {
+    throw new Error('OpenAI API key is not configured')
+  }
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini', // Using gpt-4o-mini for reliable JSON extraction
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+      temperature: 0, // For consistent extraction
+    })
+    
+    const result = await processCompletion(completion)
+    return result
+  } catch (error: any) {
+    console.error('OpenAI API Error in parseCharacterForm:', error.message)
+    throw error
+  }
+}
+
+async function processCompletion(completion: any) {
+  const content = completion.choices[0].message.content || '{}'
+  
+  let result
+  try {
+    result = JSON.parse(content)
+  } catch (parseError: any) {
+    console.error('Failed to parse OpenAI JSON response:', parseError.message)
+    throw new Error(`Failed to parse OpenAI response: ${parseError.message}`)
+  }
+
+  // Validate required structure
+  const requiredFields = [
+    'name',
+    'age',
+    'ethnicity',
+    'skin_color',
+    'hair_color',
+    'hair_style',
+    'eye_color',
+    'clothing',
+    'accessories',
+    'special_features',
+    'gender',
+  ]
+
+  for (const field of requiredFields) {
+    if (!(field in result)) {
+      result[field] = null
+    }
+  }
+
+  return result
+}
+
+

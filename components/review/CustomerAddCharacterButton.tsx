@@ -1,0 +1,154 @@
+'use client'
+
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Plus } from 'lucide-react'
+import { toast } from 'sonner'
+import { useState } from 'react'
+
+interface CustomerAddCharacterButtonProps {
+  projectId: string
+  mainCharacterName: string | null
+  onCharacterAdded: () => void
+}
+
+export function CustomerAddCharacterButton({ 
+  projectId, 
+  mainCharacterName,
+  onCharacterAdded 
+}: CustomerAddCharacterButtonProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [isAddingCharacter, setIsAddingCharacter] = useState(false)
+  const [nameRole, setNameRole] = useState('')
+  const [description, setDescription] = useState('')
+
+  const nameRolePlaceholder = mainCharacterName 
+    ? `e.g., Mom, ${mainCharacterName}'s mother, or Character Name`
+    : 'e.g., Mom, Character Name, or Role'
+  const descriptionPlaceholder = mainCharacterName
+    ? `${mainCharacterName}'s mother, who narrates the story of ${mainCharacterName}'s early life and achievements, providing love and support.`
+    : "The main character's mother, who narrates the story of their early life and achievements, providing love and support."
+
+  async function handleCreateCharacter() {
+    if (!projectId) return
+
+    if (!nameRole.trim()) {
+      toast.error('Name/Role is required')
+      return
+    }
+
+    setIsAddingCharacter(true)
+    try {
+      const response = await fetch('/api/review/characters', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: projectId,
+          name: nameRole.trim() || null,
+          role: nameRole.trim() || null,
+          story_role: description.trim() || null,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create character')
+      }
+
+      toast.success('Character added successfully')
+      setIsOpen(false)
+      setNameRole('')
+      setDescription('')
+      onCharacterAdded()
+    } catch (error: any) {
+      toast.error('Failed to add character', {
+        description: error.message || 'An error occurred',
+      })
+    } finally {
+      setIsAddingCharacter(false)
+    }
+  }
+
+  function handleCancel() {
+    setIsOpen(false)
+    setNameRole('')
+    setDescription('')
+  }
+
+  return (
+    <>
+      <Button
+        onClick={() => setIsOpen(true)}
+        className="flex items-center gap-2 m-[15px] h-[47px] px-[calc(1rem+15px)]"
+      >
+        <Plus className="w-4 h-4" />
+        Add Character
+      </Button>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Character</DialogTitle>
+            <DialogDescription>
+              Enter the character's name or role and a brief description.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name-role">Name/Role</Label>
+              <Input
+                id="name-role"
+                placeholder={nameRolePlaceholder}
+                value={nameRole}
+                onChange={(e) => setNameRole(e.target.value)}
+                disabled={isAddingCharacter}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder={descriptionPlaceholder}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                disabled={isAddingCharacter}
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleCancel}
+              disabled={isAddingCharacter}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateCharacter}
+              disabled={isAddingCharacter || !nameRole.trim()}
+            >
+              {isAddingCharacter ? 'Creating...' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+
+
+
+
+
