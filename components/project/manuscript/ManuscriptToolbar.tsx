@@ -29,9 +29,6 @@ export function ManuscriptToolbar({
 }: ManuscriptToolbarProps) {
   const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null)
 
-  // If not visible, do not render anything (prevents portal button from appearing)
-  if (!isVisible) return null
-
   useEffect(() => {
     // Find the portal target in the header (ProjectHeader.tsx)
     // For Customer View in Edit Mode, we move actions to the right to cover the Submit button
@@ -42,6 +39,9 @@ export function ManuscriptToolbar({
     const element = document.getElementById(targetId)
     setPortalContainer(element)
   }, [isCustomerView, isEditMode])
+
+  // If not visible, do not render anything (prevents portal button from appearing)
+  if (!isVisible) return null
 
   const handleDownloadClick = () => {
     toast.info('Download feature coming soon!')
