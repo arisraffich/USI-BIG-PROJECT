@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { ProjectCard } from '@/components/project/ProjectCard'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
-import { deleteAllProjects } from '@/app/actions/delete-projects'
+
 
 export const dynamic = 'force-dynamic'
 
@@ -97,19 +97,7 @@ export default async function DashboardPage() {
               <ProjectCard key={project.id} project={project} pageCount={project.pageCount} />
             ))}
 
-            <div className="pt-12 border-t mt-12 bg-red-50 p-6 rounded-lg border border-red-200">
-              <h3 className="text-red-700 font-bold mb-4 flex items-center gap-2">
-                ⚠️ Danger Zone
-              </h3>
-              <p className="text-sm text-red-600 mb-4">
-                These projects seem stubborn? Click below to forcefully delete EVERYTHING from the database.
-              </p>
-              <form action={deleteAllProjects}>
-                <Button variant="destructive" type="submit" className="w-full">
-                  DELETE ALL PROJECTS (Emergency Fix)
-                </Button>
-              </form>
-            </div>
+
           </div>
         )}
       </div>
