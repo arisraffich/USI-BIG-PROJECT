@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useEffect, useState } from 'react'
+import { useMemo, useEffect, useState, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
@@ -30,6 +30,7 @@ export function ProjectTabsContent({
 
   // Local state for pages to support instant realtime updates
   const [localPages, setLocalPages] = useState<Page[]>(pages || [])
+  const lastToastTimeRef = useRef(0)
 
   // Sync local state when server props update, but respect newer local versions (from realtime)
   useEffect(() => {
@@ -144,9 +145,14 @@ export function ProjectTabsContent({
 
             setLocalPages(prev => prev.map(p => p.id === updatedPage.id ? { ...p, ...updatedPage } : p))
 
-            toast.info('Page content updated', {
-              description: 'The customer has modified the manuscript.'
-            })
+            // Debounce toast to prevent flood during bulk updates (e.g. AI analysis)
+            const now = Date.now()
+            if (now - lastToastTimeRef.current > 2000) {
+              toast.info('Manuscript updated', {
+                description: 'Page content has been modified.'
+              })
+              lastToastTimeRef.current = now
+            }
           } else if (payload.eventType === 'INSERT' && payload.new) {
             setLocalPages(prev => [...prev, payload.new as Page])
           }

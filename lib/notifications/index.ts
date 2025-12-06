@@ -89,7 +89,7 @@ export async function notifyProjectSentToCustomer(options: {
   }
 
   // Send SMS to customer if phone number is provided
-  if (authorPhone) {
+  if (false && authorPhone) { // Temporarily disabled request by user
     try {
       console.log(`[Notification] Attempting to send SMS to ${authorPhone}`)
       await sendSMS({

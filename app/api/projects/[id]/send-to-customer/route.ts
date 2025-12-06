@@ -61,8 +61,10 @@ export async function POST(
     // Process "Resend" logic: Resolve feedback for regenerated characters
     const { data: characters } = await supabase
       .from('characters')
-      .select('id, feedback_notes, feedback_history, is_resolved')
+      .select('id, feedback_notes, feedback_history, is_resolved, image_url')
       .eq('project_id', id)
+
+    const hasImages = characters?.some(c => c.image_url && c.image_url.trim() !== '') || false
 
     if (characters) {
       const charUpdates = characters.map(async (char) => {
@@ -89,13 +91,13 @@ export async function POST(
       await Promise.all(charUpdates)
     }
 
-    // Update project status to character_review, increment send count, and ensure review_token exists
+    // Update project status to character_review, increment send count only if sending images
     const { error: updateError } = await supabase
       .from('projects')
       .update({
         status: 'character_review',
         review_token: reviewToken,
-        character_send_count: (project.character_send_count || 0) + 1
+        character_send_count: hasImages ? (project.character_send_count || 0) + 1 : (project.character_send_count || 0)
       })
       .eq('id', id)
 

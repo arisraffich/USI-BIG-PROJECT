@@ -48,7 +48,8 @@ export function buildCharacterPrompt(character: Character): string {
   const basePrompt = parts.join(', ')
 
   // Add style instructions
-  return `${basePrompt}, children's book character illustration, COLORED, hand-drawn style, warm and inviting, NOT photorealistic, NOT digital art looking, professional children's book quality, in the style of the reference character illustration provided`
+  // Add style instructions
+  return `${basePrompt}, children's book character illustration, COLORED, hand-drawn style, warm and inviting, NOT photorealistic, NOT digital art looking, professional children's book quality`
 }
 
 export function buildSketchPrompt(

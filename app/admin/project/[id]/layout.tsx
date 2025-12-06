@@ -28,15 +28,18 @@ export default async function ProjectLayout({
 
     let pageCount = 0
     let characterCount = 0
+    let hasImages = false
 
     try {
       const counts = await getProjectCounts(supabase, id)
       pageCount = counts.pageCount
       characterCount = counts.characterCount
+      hasImages = counts.hasImages
     } catch (countError) {
       console.error('Error fetching counts:', countError)
       pageCount = 0
       characterCount = 0
+      hasImages = false
     }
 
     return (
@@ -54,6 +57,7 @@ export default async function ProjectLayout({
           }}
           pageCount={pageCount}
           characterCount={characterCount}
+          hasImages={hasImages}
         />
         <main className="pt-16 min-h-screen bg-gray-50">{children}</main>
       </>

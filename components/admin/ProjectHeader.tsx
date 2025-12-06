@@ -24,9 +24,10 @@ interface ProjectHeaderProps {
   projectInfo: ProjectInfo
   pageCount: number
   characterCount: number
+  hasImages?: boolean
 }
 
-export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount }: ProjectHeaderProps) {
+export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false }: ProjectHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -34,7 +35,15 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const [isSendingToCustomer, setIsSendingToCustomer] = useState(false)
 
   const sendCount = projectInfo.character_send_count || 0
-  const isResend = sendCount > 0 || !!projectInfo.review_token
+  const isResend = sendCount > 0
+
+  const buttonLabel = isSendingToCustomer
+    ? 'Sending...'
+    : !hasImages
+      ? 'Request Characters'
+      : isResend
+        ? 'Resend Characters'
+        : 'Send Characters'
 
   // Poll project status to detect when character identification completes
   const { status: currentStatus, isLoading: isCharactersLoading } = useProjectStatus(
@@ -191,7 +200,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
                   className="px-3 bg-green-600 hover:bg-green-700 text-white border-0 shadow-md hover:shadow-lg font-semibold transition-all duration-75 rounded-md whitespace-nowrap flex items-center justify-center h-9"
                 >
                   <Send className="w-4 h-4 mr-2" />
-                  <span>{isSendingToCustomer ? 'Sending...' : (isResend ? 'Resend Characters' : 'Send Characters')}</span>
+                  <span>{buttonLabel}</span>
                   {isResend && !isSendingToCustomer && sendCount > 0 && (
                     <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
                       {sendCount}
@@ -221,7 +230,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
                 className="hidden md:flex px-3 md:px-4 bg-green-600 hover:bg-green-700 text-white border-0 shadow-md hover:shadow-lg font-semibold transition-all duration-75 rounded-md whitespace-nowrap items-center justify-center h-9"
               >
                 <Send className="w-4 h-4 md:mr-2" />
-                <span className="ml-2 md:ml-0">{isSendingToCustomer ? 'Sending...' : (isResend ? 'Resend Characters' : 'Send Characters')}</span>
+                <span className="ml-2 md:ml-0">{buttonLabel}</span>
                 {isResend && !isSendingToCustomer && sendCount > 0 && (
                   <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
                     {sendCount}

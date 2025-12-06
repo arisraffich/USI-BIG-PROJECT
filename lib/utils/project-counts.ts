@@ -3,6 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 export interface ProjectCounts {
   pageCount: number
   characterCount: number
+  hasImages: boolean
 }
 
 /**
@@ -12,7 +13,7 @@ export async function getProjectCounts(
   supabase: SupabaseClient,
   projectId: string
 ): Promise<ProjectCounts> {
-  const [pagesResult, charactersResult] = await Promise.all([
+  const [pagesResult, charactersResult, imagesResult] = await Promise.all([
     supabase
       .from('pages')
       .select('id', { count: 'exact', head: true })
@@ -21,11 +22,18 @@ export async function getProjectCounts(
       .from('characters')
       .select('id', { count: 'exact', head: true })
       .eq('project_id', projectId),
+    supabase
+      .from('characters')
+      .select('id', { count: 'exact', head: true })
+      .eq('project_id', projectId)
+      .not('image_url', 'is', null)
+      .neq('image_url', '')
   ])
 
   return {
     pageCount: pagesResult.count || 0,
     characterCount: charactersResult.count || 0,
+    hasImages: (imagesResult.count || 0) > 0
   }
 }
 

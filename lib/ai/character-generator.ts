@@ -11,7 +11,7 @@ const replicate = new Replicate({
 
 export async function generateCharacterImage(
     character: Character,
-    mainCharacterImageUrl: string,
+    mainCharacterImageUrl: string | null | undefined,
     projectId: string,
     customPrompt?: string
 ) {
@@ -20,17 +20,23 @@ export async function generateCharacterImage(
 
         console.log(`Generating image for character ${character.id} using google/nano-banana-pro...`)
 
+        // Construct input parameters
+        // Only include image_input if a reference image is explicitly provided
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const input: any = {
+            prompt: prompt,
+            aspect_ratio: '9:16',
+            resolution: '2K',
+            output_format: 'png',
+            safety_filter_level: 'block_only_high',
+        }
+
+        if (mainCharacterImageUrl) {
+            input.image_input = [mainCharacterImageUrl]
+        }
+
         // Using 'google/nano-banana-pro' as requested by user. Supports image reference.
-        const output = await replicate.run('google/nano-banana-pro', {
-            input: {
-                prompt: prompt,
-                image_input: [mainCharacterImageUrl],
-                aspect_ratio: '9:16',
-                resolution: '2K',
-                output_format: 'png',
-                safety_filter_level: 'block_only_high',
-            },
-        })
+        const output = await replicate.run('google/nano-banana-pro', { input })
 
         // Handle Replicate output (which might be string or array of strings)
         let imageUrl: string
@@ -59,9 +65,24 @@ export async function generateCharacterImage(
 
         const cleanedImage = await removeMetadata(imageBuffer)
 
-        const filename = `${projectId}/characters/${sanitizeFilename(
-            character.name || character.role || `character-${character.id}`
-        )}.png`
+        const baseName = sanitizeFilename(character.name || character.role || `character-${character.id}`)
+        let version = 1
+
+        if (character.image_url) {
+            // Try to extract version from existing URL
+            // Look for -Number.png at the end
+            const matches = character.image_url.match(/-(\d+)\.png$/)
+            if (matches && matches[1]) {
+                const currentVersion = parseInt(matches[1], 10)
+                // If version is a timestamp (large number like 1765...), reset to 1
+                // Otherwise increment
+                if (currentVersion < 1000000) {
+                    version = currentVersion + 1
+                }
+            }
+        }
+
+        const filename = `${projectId}/characters/${baseName}-${version}.png`
         const supabase = await createAdminClient()
         const { error: uploadError } = await supabase.storage
             .from('character-images')
@@ -90,6 +111,23 @@ export async function generateCharacterImage(
 
         if (updateError) {
             throw new Error(`Failed to update character: ${updateError.message}`)
+        }
+
+        // Cleanup old image to avoid storage clutter and ensure clean replacement
+        if (character.image_url) {
+            try {
+                // Extract path from public URL
+                // Format: .../storage/v1/object/public/character-images/PATH
+                const pathParts = character.image_url.split('/character-images/')
+                if (pathParts.length > 1) {
+                    const oldPath = pathParts[1]
+                    await supabase.storage
+                        .from('character-images')
+                        .remove([oldPath])
+                }
+            } catch (cleanupError) {
+                console.warn('Failed to cleanup old character image:', cleanupError)
+            }
         }
 
         return { success: true, imageUrl: publicUrl, error: null }
