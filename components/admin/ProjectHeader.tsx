@@ -64,6 +64,9 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
 
   // Format status for display
   const formatStatus = (status: ProjectStatus): string => {
+    if (status === 'character_generation_complete') {
+      return 'Character Generated'
+    }
     return status
       .split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
@@ -127,67 +130,103 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   }
 
   return (
-    <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-b-2 border-blue-200 shadow-lg pl-8 fixed top-0 left-0 right-0 z-50 pt-[16px] pr-[42px] pb-[16px]">
-      <div className="flex items-center justify-between relative">
-        <div className="flex items-center gap-4">
-          <Link href="/admin/dashboard" className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-2">
-            <Home className="w-4 h-4" />
-            Dashboard
-          </Link>
-          <span className="text-gray-300">/</span>
-          <p className="text-sm font-medium text-gray-900">
-            {projectInfo.author_firstname || ''} {projectInfo.author_lastname || ''}'s project
-          </p>
-        </div>
-        <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 flex items-center -mt-[16px] -mb-[16px]">
-          <Button
-            variant="outline"
-            onClick={(e) => handleTabClick('pages', e)}
-            className={`h-full rounded-none w-[140px] m-0 ${isPagesActive ? 'bg-blue-600 hover:bg-blue-700 text-white hover:text-white border-0 shadow-lg hover:shadow-xl' : 'bg-white border-0 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 text-blue-700 hover:text-blue-800'} box-border font-semibold text-base transition-colors duration-75 cursor-pointer`}
-          >
-            <span>Pages</span>
-            <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${isPagesActive ? 'bg-white/30 text-white hover:text-white' : 'bg-blue-100 text-blue-700'}`}>{pageCount ?? 0}</span>
-          </Button>
-          <Button
-            variant="outline"
-            onClick={(e) => handleTabClick('characters', e)}
-            disabled={isCharactersLoading}
-            className={`h-full rounded-none w-[140px] m-0 ${isCharactersLoading ? 'opacity-70 cursor-not-allowed bg-yellow-50 border-yellow-300' : ''} ${isCharactersActive && !isCharactersLoading ? 'bg-blue-600 hover:bg-blue-700 text-white hover:text-white border-0 shadow-lg hover:shadow-xl' : isCharactersActive && isCharactersLoading ? 'bg-yellow-100 border-yellow-400' : 'bg-white border-0 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 text-blue-700 hover:text-blue-800'} box-border font-semibold text-base transition-colors duration-75 ${isCharactersLoading ? '' : 'cursor-pointer'}`}
-          >
-            <span className="flex items-center gap-1.5">
-              {isCharactersLoading && (
-                <Loader2 className="w-4 h-4 animate-spin text-yellow-600" />
-              )}
-              Characters
-              {isCharactersLoading && (
-                <span className="text-xs text-yellow-700 font-normal">(Loading...)</span>
-              )}
-            </span>
-            <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${isCharactersActive && !isCharactersLoading ? 'bg-white/30 text-white hover:text-white' : isCharactersLoading ? 'bg-yellow-200 text-yellow-800' : 'bg-blue-100 text-blue-700'}`}>
-              {isCharactersLoading ? '...' : (characterCount ?? 0)}
-            </span>
-          </Button>
-        </div>
-        <div className="flex items-center gap-4">
-          <span
-            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${getStatusStyles(projectInfo.status)} shadow-sm`}
-          >
-            {formatStatus(projectInfo.status)}
-          </span>
-
-          {canSendToCustomer && (
+    <>
+      <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-b-2 border-blue-200 shadow-lg pl-8 fixed top-0 left-0 right-0 z-50 pt-[16px] pr-[42px] pb-[16px]">
+        <div className="flex items-center justify-between relative">
+          <div className="flex items-center gap-2 md:gap-4">
+            <Link href="/admin/dashboard" className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-2">
+              <Home className="w-4 h-4" />
+              <span className="hidden md:inline">Dashboard</span>
+            </Link>
+            <span className="text-gray-300 hidden md:inline">/</span>
+            <p className="text-sm font-medium text-gray-900 hidden md:block">
+              {projectInfo.author_firstname || ''} {projectInfo.author_lastname || ''}'s project
+            </p>
+          </div>
+          <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 hidden md:flex items-center -mt-[16px] -mb-[16px]">
             <Button
-              onClick={handleSendToCustomer}
-              disabled={isSendingToCustomer}
-              size="sm"
-              className="px-4 bg-green-600 hover:bg-green-700 text-white border-0 shadow-md hover:shadow-lg font-semibold transition-all duration-75 rounded-md whitespace-nowrap flex items-center justify-center h-9"
+              variant="outline"
+              onClick={(e) => handleTabClick('pages', e)}
+              className={`h-full rounded-none w-[140px] m-0 ${isPagesActive ? 'bg-blue-600 hover:bg-blue-700 text-white hover:text-white border-0 shadow-lg hover:shadow-xl' : 'bg-white border-0 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 text-blue-700 hover:text-blue-800'} box-border font-semibold text-lg transition-colors duration-75 cursor-pointer`}
             >
-              <Send className="w-4 h-4 mr-2" />
-              {isSendingToCustomer ? 'Sending...' : 'Send Characters'}
+              <span>Pages</span>
+              <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${isPagesActive ? 'bg-white/30 text-white hover:text-white' : 'bg-blue-100 text-blue-700'}`}>{pageCount ?? 0}</span>
             </Button>
-          )}
+            <Button
+              variant="outline"
+              onClick={(e) => handleTabClick('characters', e)}
+              disabled={isCharactersLoading}
+              className={`h-full rounded-none w-[140px] m-0 ${isCharactersLoading ? 'opacity-70 cursor-not-allowed bg-yellow-50 border-yellow-300' : ''} ${isCharactersActive && !isCharactersLoading ? 'bg-blue-600 hover:bg-blue-700 text-white hover:text-white border-0 shadow-lg hover:shadow-xl' : isCharactersActive && isCharactersLoading ? 'bg-yellow-100 border-yellow-400' : 'bg-white border-0 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 text-blue-700 hover:text-blue-800'} box-border font-semibold text-lg transition-colors duration-75 ${isCharactersLoading ? '' : 'cursor-pointer'}`}
+            >
+              <span className="flex items-center gap-1.5">
+                {isCharactersLoading && (
+                  <Loader2 className="w-4 h-4 animate-spin text-yellow-600" />
+                )}
+                Characters
+                {isCharactersLoading && (
+                  <span className="text-xs text-yellow-700 font-normal">(Loading...)</span>
+                )}
+              </span>
+              <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${isCharactersActive && !isCharactersLoading ? 'bg-white/30 text-white hover:text-white' : isCharactersLoading ? 'bg-yellow-200 text-yellow-800' : 'bg-blue-100 text-blue-700'}`}>
+                {isCharactersLoading ? '...' : (characterCount ?? 0)}
+              </span>
+            </Button>
+          </div>
+          <div className="flex items-center gap-2 md:gap-4">
+            <span
+              className={`hidden md:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${getStatusStyles(projectInfo.status)} shadow-sm`}
+            >
+              {formatStatus(projectInfo.status)}
+            </span>
+
+            {/* Portal Target for Mobile Actions (like Edit Manuscript) */}
+            <div id="mobile-header-portal" className="flex md:hidden items-center gap-2" />
+
+            {canSendToCustomer && (
+              <Button
+                onClick={handleSendToCustomer}
+                disabled={isSendingToCustomer}
+                size="sm"
+                className="px-3 md:px-4 bg-green-600 hover:bg-green-700 text-white border-0 shadow-md hover:shadow-lg font-semibold transition-all duration-75 rounded-md whitespace-nowrap flex items-center justify-center h-9"
+              >
+                <Send className="w-4 h-4 md:mr-2" />
+                <span className="ml-2 md:ml-0">{isSendingToCustomer ? 'Sending...' : 'Send Characters'}</span>
+              </Button>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Mobile Bottom Navigation Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 md:hidden flex h-16 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+        <Button
+          variant="ghost"
+          onClick={(e) => handleTabClick('pages', e)}
+          className={`flex-1 h-full rounded-none flex flex-col items-center justify-center gap-1 ${isPagesActive ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700 hover:text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
+        >
+          <div className="flex items-center gap-1.5">
+            <span className="text-base font-semibold">Pages</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isPagesActive ? 'bg-white text-blue-600' : 'bg-blue-100 text-blue-700'}`}>
+              {pageCount ?? 0}
+            </span>
+          </div>
+        </Button>
+        <div className="w-px bg-blue-100 h-8 self-center"></div>
+        <Button
+          variant="ghost"
+          onClick={(e) => handleTabClick('characters', e)}
+          disabled={isCharactersLoading}
+          className={`flex-1 h-full rounded-none flex flex-col items-center justify-center gap-1 ${isCharactersActive ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700 hover:text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'} ${isCharactersLoading ? 'opacity-70 bg-gray-50' : ''}`}
+        >
+          <div className="flex items-center gap-1.5">
+            {isCharactersLoading && <Loader2 className={`w-3 h-3 animate-spin ${isCharactersActive ? 'text-white' : ''}`} />}
+            <span className="text-base font-semibold">Characters</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isCharactersActive ? 'bg-white text-blue-600' : 'bg-blue-100 text-blue-700'}`}>
+              {isCharactersLoading ? '...' : (characterCount ?? 0)}
+            </span>
+          </div>
+        </Button>
+      </div>
+    </>
   )
 }

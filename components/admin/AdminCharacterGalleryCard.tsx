@@ -56,7 +56,7 @@ export function AdminCharacterGalleryCard({ character, projectId }: AdminCharact
 
     return (
         <>
-            <Card className="flex flex-col h-full overflow-hidden">
+            <Card className="flex flex-col h-full overflow-hidden p-0 gap-0 border-0 shadow-md">
                 <div
                     className="relative aspect-[9/16] w-full bg-gray-100 cursor-pointer hover:opacity-95 transition-opacity"
                     onClick={() => setShowImage(true)}
@@ -74,8 +74,8 @@ export function AdminCharacterGalleryCard({ character, projectId }: AdminCharact
                     )}
                 </div>
 
-                <CardContent className="flex-1 flex flex-col p-4 space-y-4">
-                    <div>
+                <CardContent className="flex-1 flex flex-col p-4">
+                    <div className="space-y-2 mb-4">
                         <h3 className="font-bold text-lg">{displayName}</h3>
                         {character.story_role && (
                             <p className="text-sm text-gray-500 line-clamp-2">{character.story_role}</p>
@@ -84,7 +84,7 @@ export function AdminCharacterGalleryCard({ character, projectId }: AdminCharact
 
                     {/* Feedback Notes Display */}
                     {character.feedback_notes && (
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
                             <div className="flex items-start gap-2">
                                 <MessageSquare className="w-4 h-4 text-yellow-600 mt-0.5" />
                                 <div>
@@ -95,7 +95,7 @@ export function AdminCharacterGalleryCard({ character, projectId }: AdminCharact
                         </div>
                     )}
 
-                    <div className="mt-auto pt-4">
+                    <div className="mt-auto">
                         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                             <DialogTrigger asChild>
                                 <Button className="w-full" variant="outline" disabled={character.is_main}>

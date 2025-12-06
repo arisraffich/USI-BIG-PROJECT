@@ -6,6 +6,7 @@ import { CustomerCharacterCard } from './CustomerCharacterCard'
 import { CustomerAddCharacterButton } from './CustomerAddCharacterButton'
 import { CustomerManuscriptEditor } from './CustomerManuscriptEditor'
 import { CustomerProjectHeader } from './CustomerProjectHeader'
+import { SubmissionStatusModal } from './SubmissionStatusModal'
 import { CustomerCharacterGallery } from './CustomerCharacterGallery'
 import { Page } from '@/types/page'
 import { Character } from '@/types/character'
@@ -38,6 +39,7 @@ export function CustomerProjectTabsContent({
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'loading' | 'success'>('idle')
 
   // Local state for pages to support instant realtime updates
   const [localPages, setLocalPages] = useState<Page[]>(pages || [])
@@ -71,7 +73,7 @@ export function CustomerProjectTabsContent({
     }
   }, [pages])
 
-  // Realtime Subscription for Pages
+  // Realtime Subscription for pages
   useEffect(() => {
     const supabase = createClient()
     const channelName = `customer-project-pages-${projectId}`
@@ -162,6 +164,8 @@ export function CustomerProjectTabsContent({
     }
 
     setIsSubmitting(true)
+    setSubmissionStatus('loading')
+
     try {
       const response = await fetch(`/api/review/${reviewToken}/submit`, {
         method: 'POST',
@@ -176,20 +180,20 @@ export function CustomerProjectTabsContent({
         throw new Error(error.error || 'Failed to submit changes')
       }
 
-      // Redirect to success page
-      router.push(`/review/${reviewToken}/submitted`)
+      // Success! Show success modal state
+      setSubmissionStatus('success')
+      // Note: We do NOT redirect. The modal stays open as the "Thank You" screen.
+
     } catch (error: any) {
       console.error('Error submitting changes:', error)
       toast.error(error.message || 'Failed to submit changes')
-    } finally {
+      setSubmissionStatus('idle')
       setIsSubmitting(false)
     }
   }
 
   // Guard Clause: Block access if locked AND NOT in gallery mode
   // If in Gallery mode (Stage 2), we allow viewing even if "locked" (or if admin put it back to review)
-  // Actually, if status is 'character_generation_complete', isLocked is true.
-  // We want to show Gallery.
   if (isLocked && !showGallery) {
     return (
       <div className="p-8 flex items-center justify-center min-h-screen">
@@ -251,7 +255,6 @@ export function CustomerProjectTabsContent({
                       character={character}
                     />
                   ))}
-
                   {/* Add Character Ghost Card - Always at the end */}
                   <div className="h-full">
                     <CustomerAddCharacterButton
@@ -272,6 +275,10 @@ export function CustomerProjectTabsContent({
 
         </div>
       </div>
+      <SubmissionStatusModal
+        isOpen={submissionStatus !== 'idle'}
+        status={submissionStatus}
+      />
     </>
   )
 }
