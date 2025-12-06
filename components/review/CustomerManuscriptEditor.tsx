@@ -13,6 +13,7 @@ interface CustomerManuscriptEditorProps {
   onEditsChange?: (edits: PageEdits) => void
   isEditMode: boolean
   onEditModeChange: (isEditMode: boolean) => void
+  isVisible?: boolean
 }
 
 type PageEdits = {
@@ -22,7 +23,7 @@ type PageEdits = {
   }
 }
 
-export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEditMode, onEditModeChange }: CustomerManuscriptEditorProps) {
+export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEditMode, onEditModeChange, isVisible = true }: CustomerManuscriptEditorProps) {
   const [activePageId, setActivePageId] = useState<string | null>(null)
   const isManualScrollRef = useRef(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -401,6 +402,7 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEd
         <div className="px-4 md:px-8 py-8 pb-24 md:pb-8">
           {/* Floating Command Bar */}
           <ManuscriptToolbar
+            isVisible={isVisible}
             isEditMode={isEditMode}
             onEditClick={() => onEditModeChange(true)}
             onCancelClick={() => onEditModeChange(false)}

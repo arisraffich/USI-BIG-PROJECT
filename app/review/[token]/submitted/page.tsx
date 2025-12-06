@@ -37,6 +37,15 @@ export default async function SubmittedPage({ params }: { params: Promise<{ toke
             Our illustrators will now create the character illustrations based on your specifications.
             You will be notified once the illustrations are complete.
           </p>
+
+          <div className="mt-8">
+            <a
+              href={`/review/${token}`}
+              className="text-blue-600 hover:text-blue-800 font-medium hover:underline transition-colors"
+            >
+              Return to Project View
+            </a>
+          </div>
         </div>
       </div>
     )

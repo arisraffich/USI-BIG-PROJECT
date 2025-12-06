@@ -25,11 +25,6 @@ export interface Project {
   text_integration?: string | null
   created_at: string
   updated_at: string
+  character_send_count?: number
 }
-
-
-
-
-
-
 

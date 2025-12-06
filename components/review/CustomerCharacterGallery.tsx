@@ -20,16 +20,15 @@ export function CustomerCharacterGallery({ characters, mainCharacter }: Customer
     return (
         <div className="w-full max-w-7xl mx-auto py-8 px-4">
             <div className="text-center mb-10">
-                <h2 className="text-3xl font-bold text-gray-900 mb-3 font-serif">Character Implementation</h2>
+                <h2 className="text-3xl font-bold text-gray-900 mb-3 font-serif">Character Design</h2>
                 <p className="text-gray-600 max-w-2xl mx-auto">
-                    Here are the generated illustrations for your characters.
-                    Please review them. If you need any adjustments, use the "Request Changes" button below the character.
+                    Here are the illustrations for your book's main and secondary characters. Please review them. If you need any adjustments, use the "Request Changes" button below the character.
                 </p>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-8">
+            <div className="flex flex-wrap justify-center gap-6">
                 {displayList.map((char) => (
-                    <div key={char.id} className="w-full max-w-[400px] flex-grow-0 flex-shrink-0">
+                    <div key={char.id} className="w-full max-w-[220px]">
                         <CustomerCharacterGalleryCard
                             character={char}
                             isMain={char.is_main}

@@ -22,7 +22,7 @@ export async function POST(
     // Get project to check current status and ensure it exists
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id, status, review_token, book_title, author_firstname, author_lastname, author_email, author_phone')
+      .select('id, status, review_token, book_title, author_firstname, author_lastname, author_email, author_phone, character_send_count')
       .eq('id', id)
       .single()
 
@@ -58,12 +58,44 @@ export async function POST(
       console.error('Error fetching pages:', pagesError)
     }
 
-    // Update project status to character_review and ensure review_token exists
+    // Process "Resend" logic: Resolve feedback for regenerated characters
+    const { data: characters } = await supabase
+      .from('characters')
+      .select('id, feedback_notes, feedback_history, is_resolved')
+      .eq('project_id', id)
+
+    if (characters) {
+      const charUpdates = characters.map(async (char) => {
+        // Resolve feedback if marked resolved (regenerated)
+        if (char.is_resolved && char.feedback_notes) {
+          const currentHistory = Array.isArray(char.feedback_history) ? char.feedback_history : []
+          const newHistory = [
+            ...currentHistory,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            { note: char.feedback_notes, created_at: new Date().toISOString() } as any
+          ]
+
+          return supabase
+            .from('characters')
+            .update({
+              feedback_history: newHistory,
+              feedback_notes: null,
+              is_resolved: false
+            })
+            .eq('id', char.id)
+        }
+        return Promise.resolve()
+      })
+      await Promise.all(charUpdates)
+    }
+
+    // Update project status to character_review, increment send count, and ensure review_token exists
     const { error: updateError } = await supabase
       .from('projects')
       .update({
         status: 'character_review',
         review_token: reviewToken,
+        character_send_count: (project.character_send_count || 0) + 1
       })
       .eq('id', id)
 
@@ -109,7 +141,7 @@ export async function POST(
     console.log(`[Send to Customer] Sending notifications for project ${id}`)
     console.log(`[Send to Customer] Customer email: ${project.author_email || 'not provided'}`)
     console.log(`[Send to Customer] Customer phone: ${project.author_phone || 'not provided'}`)
-    
+
     // Only send notifications if customer email is available
     if (!project.author_email) {
       console.warn(`[Send to Customer] No customer email found for project ${id}, skipping notifications`)
@@ -122,12 +154,12 @@ export async function POST(
         reviewUrl,
         projectUrl,
       }).catch((error) => {
-      console.error('[Send to Customer] Error sending notifications:', error)
-      console.error('[Send to Customer] Error details:', {
-        message: error.message,
-        stack: error.stack,
-      })
-      // Don't fail the request if notification fails
+        console.error('[Send to Customer] Error sending notifications:', error)
+        console.error('[Send to Customer] Error details:', {
+          message: error.message,
+          stack: error.stack,
+        })
+        // Don't fail the request if notification fails
       })
     }
 

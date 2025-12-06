@@ -179,12 +179,13 @@ export function ProjectTabsContent({
   }
 
   return (
-    <div className="p-8 relative min-h-screen">
+    <div className="p-8 pb-32 relative min-h-screen">
       {/* Pages Tab Content - Keep rendered, use CSS for instant switching */}
       <div className={activeTab === 'pages' ? 'block' : 'hidden'}>
         <ManuscriptEditor
           pages={localPages as any}
           projectId={projectId}
+          isVisible={activeTab === 'pages'}
         />
       </div>
 

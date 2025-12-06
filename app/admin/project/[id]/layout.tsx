@@ -11,13 +11,13 @@ export default async function ProjectLayout({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  
+
   try {
     const supabase = await createAdminClient()
 
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id, book_title, author_firstname, author_lastname, status')
+      .select('id, book_title, author_firstname, author_lastname, status, character_send_count')
       .eq('id', id)
       .single()
 
@@ -41,14 +41,15 @@ export default async function ProjectLayout({
 
     return (
       <>
-        <ProjectHeader 
-          projectId={id} 
+        <ProjectHeader
+          projectId={id}
           projectInfo={{
             id: project.id,
             book_title: project.book_title,
             author_firstname: project.author_firstname || '',
             author_lastname: project.author_lastname || '',
             status: project.status || 'draft',
+            character_send_count: project.character_send_count || 0
           }}
           pageCount={pageCount}
           characterCount={characterCount}

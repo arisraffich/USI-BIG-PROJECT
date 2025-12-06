@@ -29,6 +29,7 @@ interface Page {
 interface ManuscriptEditorProps {
   pages: Page[] | null
   projectId: string
+  isVisible?: boolean
 }
 
 type PageEdits = {
@@ -38,7 +39,7 @@ type PageEdits = {
   }
 }
 
-export function ManuscriptEditor({ pages, projectId }: ManuscriptEditorProps) {
+export function ManuscriptEditor({ pages, projectId, isVisible = true }: ManuscriptEditorProps) {
   const [isEditMode, setIsEditMode] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [showDiscardWarning, setShowDiscardWarning] = useState(false)
@@ -342,6 +343,7 @@ export function ManuscriptEditor({ pages, projectId }: ManuscriptEditorProps) {
               onSaveClick={handleSave}
               isSaving={isSaving}
               isDirty={isDirty}
+              isVisible={isVisible}
             />
 
             {/* Page Cards */}

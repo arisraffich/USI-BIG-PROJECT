@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useRef, useCallback, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, usePathname } from 'next/navigation'
 import { CustomerCharacterCard } from './CustomerCharacterCard'
 import { CustomerAddCharacterButton } from './CustomerAddCharacterButton'
 import { CustomerManuscriptEditor } from './CustomerManuscriptEditor'
@@ -37,6 +37,7 @@ export function CustomerProjectTabsContent({
 }: CustomerProjectTabsContentProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const pathname = usePathname()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'loading' | 'success'>('idle')
@@ -209,6 +210,14 @@ export function CustomerProjectTabsContent({
     )
   }
 
+  // Redirect to characters tab by default if in gallery mode
+  useEffect(() => {
+    if (showGallery && !searchParams?.get('tab')) {
+      // Use replace to avoid history stack buildup
+      router.replace(`${pathname}?tab=characters`)
+    }
+  }, [showGallery, searchParams, pathname, router])
+
   const pageCount = pages?.length || 0
   const characterCount = characters?.length || 0
 
@@ -222,8 +231,9 @@ export function CustomerProjectTabsContent({
         isSubmitting={isSubmitting}
         onSubmit={handleSubmitChanges}
         showSubmitButton={!showGallery && !isLocked && !isEditMode}
+        hideOnMobile={activeTab === 'characters' && showGallery}
       />
-      <div className="p-8 pt-24 relative min-h-screen">
+      <div className={`p-8 pb-32 relative min-h-screen ${activeTab === 'characters' && showGallery ? 'pt-8 md:pt-24' : 'pt-24'}`}>
         {/* Pages Tab Content */}
         <div className={activeTab === 'pages' ? 'block' : 'hidden'}>
           <CustomerManuscriptEditor
@@ -232,6 +242,7 @@ export function CustomerProjectTabsContent({
             onEditsChange={setManuscriptEdits}
             isEditMode={isEditMode}
             onEditModeChange={setIsEditMode}
+            isVisible={activeTab === 'pages'}
           />
         </div>
 

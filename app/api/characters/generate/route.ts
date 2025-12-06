@@ -94,7 +94,11 @@ export async function POST(request: NextRequest) {
         // Pass custom_prompt only if generating a single character (implied by this loop structure if simple)
         // But logical safety: if bulk, we probably don't want same prompt for all.
         // But for single character (character_id present), custom_prompt is valid.
-        const result = await generateCharacterImage(character, mainCharacter.image_url, project_id, custom_prompt)
+        // Use current character image as reference if available (refining/editing), 
+        // otherwise fall back to main character image (initial creation relative to main char).
+        const referenceImage = character.image_url || mainCharacter.image_url
+
+        const result = await generateCharacterImage(character, referenceImage, project_id, custom_prompt)
 
         results.push({
           character_id: character.id,

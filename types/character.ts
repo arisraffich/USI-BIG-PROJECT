@@ -18,14 +18,13 @@ export interface Character {
   gender?: string | null
   image_url?: string | null
   feedback_notes?: string | null
+  feedback_history?: Array<{ note: string; created_at: string }> | null
+  is_resolved?: boolean
   form_pdf_url?: string | null
   generation_prompt?: string | null
   created_at: string
   updated_at: string
 }
-
-
-
 
 
 

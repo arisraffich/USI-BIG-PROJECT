@@ -10,61 +10,51 @@ export default async function ReviewPage({ params }: { params: Promise<{ token: 
     notFound()
   }
 
-  try {
-    const supabase = await createAdminClient()
+  const supabase = await createAdminClient()
 
-    // Fetch project by review token
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('id, book_title, author_firstname, author_lastname, status, review_token')
-      .eq('review_token', token)
-      .single()
+  // Fetch project by review token
+  const { data: project, error: projectError } = await supabase
+    .from('projects')
+    .select('id, book_title, author_firstname, author_lastname, status, review_token')
+    .eq('review_token', token)
+    .single()
 
-    if (projectError || !project) {
-      notFound()
-    }
-
-    // If project is already submitted, redirect to submitted page
-    if (project.status !== 'character_review') {
-      redirect(`/review/${token}/submitted`)
-    }
-
-    // Fetch pages and characters in parallel
-    const [pagesResult, charactersResult] = await Promise.all([
-      supabase
-        .from('pages')
-        .select('*')
-        .eq('project_id', project.id)
-        .order('page_number', { ascending: true }),
-      supabase
-        .from('characters')
-        .select('*')
-        .eq('project_id', project.id)
-        .order('is_main', { ascending: false }),
-    ])
-
-    const pages = pagesResult.data || null
-    const characters = charactersResult.data || null
-
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Suspense fallback={<div className="p-8">Loading...</div>}>
-          <CustomerProjectTabsContent
-            projectId={project.id}
-            pages={pages}
-            characters={characters}
-            projectStatus={project.status}
-            reviewToken={token}
-            projectTitle={project.book_title}
-            authorName={`${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Author'}
-          />
-        </Suspense>
-      </div>
-    )
-  } catch (error: any) {
-    console.error('Error in ReviewPage:', error)
+  if (projectError || !project) {
     notFound()
   }
+
+  // Fetch pages and characters in parallel
+  const [pagesResult, charactersResult] = await Promise.all([
+    supabase
+      .from('pages')
+      .select('*')
+      .eq('project_id', project.id)
+      .order('page_number', { ascending: true }),
+    supabase
+      .from('characters')
+      .select('*')
+      .eq('project_id', project.id)
+      .order('is_main', { ascending: false }),
+  ])
+
+  const pages = pagesResult.data || null
+  const characters = charactersResult.data || null
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Suspense fallback={<div className="p-8">Loading...</div>}>
+        <CustomerProjectTabsContent
+          projectId={project.id}
+          pages={pages}
+          characters={characters}
+          projectStatus={project.status}
+          reviewToken={token}
+          projectTitle={project.book_title}
+          authorName={`${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Author'}
+        />
+      </Suspense>
+    </div>
+  )
 }
 
 

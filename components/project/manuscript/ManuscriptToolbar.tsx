@@ -14,6 +14,7 @@ interface ManuscriptToolbarProps {
   isSaving: boolean
   isDirty: boolean
   isCustomerView?: boolean // Hide Download button for customer views
+  isVisible?: boolean
 }
 
 export function ManuscriptToolbar({
@@ -24,8 +25,12 @@ export function ManuscriptToolbar({
   isSaving,
   isDirty,
   isCustomerView = false,
+  isVisible = true,
 }: ManuscriptToolbarProps) {
   const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null)
+
+  // If not visible, do not render anything (prevents portal button from appearing)
+  if (!isVisible) return null
 
   useEffect(() => {
     // Find the portal target in the header (ProjectHeader.tsx)

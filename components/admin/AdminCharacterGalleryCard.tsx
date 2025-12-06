@@ -1,11 +1,9 @@
-'use client'
-
 import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
-import { Loader2, RefreshCw, MessageSquare } from 'lucide-react'
+import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { Character } from '@/types/character'
 import { useRouter } from 'next/navigation'
@@ -21,9 +19,20 @@ export function AdminCharacterGalleryCard({ character, projectId }: AdminCharact
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [customPrompt, setCustomPrompt] = useState(character.generation_prompt || '')
     const [showImage, setShowImage] = useState(false)
+    const [showTooltip, setShowTooltip] = useState(false)
+
+    const handleOpenRegenerate = () => {
+        let prompt = character.generation_prompt || ''
+        if (character.feedback_notes && !character.is_resolved) {
+            prompt = `CUSTOMER REQUEST: ${character.feedback_notes}\n\n${prompt}`
+        }
+        setCustomPrompt(prompt)
+        setIsDialogOpen(true)
+    }
 
     const handleRegenerate = async () => {
-        setIsRegenerating(true)
+        setIsDialogOpen(false) // Close immediately
+        setIsRegenerating(true) // Show card loader
         try {
             const response = await fetch('/api/characters/generate', {
                 method: 'POST',
@@ -31,8 +40,7 @@ export function AdminCharacterGalleryCard({ character, projectId }: AdminCharact
                 body: JSON.stringify({
                     project_id: projectId,
                     character_id: character.id,
-                    custom_prompt: customPrompt.trim() || undefined // If empty, backend uses auto-prompt? Wait, backend uses custom if present. If undefined, uses builds.
-                    // If user clears it, we might want auto.
+                    custom_prompt: customPrompt.trim() || undefined
                 }),
             })
 
@@ -42,23 +50,33 @@ export function AdminCharacterGalleryCard({ character, projectId }: AdminCharact
                 throw new Error(data.error || 'Failed to regenerate character')
             }
 
-            toast.success('Character regeneration started/completed')
-            setIsDialogOpen(false)
+            toast.success('Character regeneration started')
             router.refresh()
         } catch (error: any) {
             toast.error(error.message || 'Failed to regenerate')
+            // Re-open dialog on error? Or just show error? Just error is fine.
         } finally {
             setIsRegenerating(false)
         }
     }
 
-    const displayName = character.name || character.role || 'Unnamed Character'
+    const displayName = character.is_main
+        ? 'Main Character'
+        : (character.name || character.role || 'Unnamed Character')
 
     return (
-        <>
-            <Card className="flex flex-col h-full overflow-hidden p-0 gap-0 border-0 shadow-md">
+        <div className="flex flex-col w-full gap-4">
+            <Card className="flex flex-col w-full p-0 gap-0 border-0 shadow-md relative">
+                {isRegenerating && (
+                    <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-50 rounded-lg">
+                        <div className="flex flex-col items-center gap-2 bg-white p-3 rounded-lg shadow-sm border">
+                            <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                            <span className="text-xs font-semibold text-blue-700">Regenerating...</span>
+                        </div>
+                    </div>
+                )}
                 <div
-                    className="relative aspect-[9/16] w-full bg-gray-100 cursor-pointer hover:opacity-95 transition-opacity"
+                    className="relative aspect-[9/16] w-full bg-gray-100 cursor-pointer hover:opacity-95 transition-opacity rounded-t-lg overflow-hidden"
                     onClick={() => setShowImage(true)}
                 >
                     {character.image_url ? (
@@ -74,65 +92,113 @@ export function AdminCharacterGalleryCard({ character, projectId }: AdminCharact
                     )}
                 </div>
 
-                <CardContent className="flex-1 flex flex-col p-4">
-                    <div className="space-y-2 mb-4">
-                        <h3 className="font-bold text-lg">{displayName}</h3>
-                        {character.story_role && (
-                            <p className="text-sm text-gray-500 line-clamp-2">{character.story_role}</p>
-                        )}
-                    </div>
+                <CardContent className="flex-1 flex flex-col p-4 bg-white rounded-b-lg">
+                    <div className="flex justify-between items-center gap-2 relative">
+                        <h3 className="font-bold text-lg text-gray-900 leading-tight">
+                            {displayName.length > 14 ? `${displayName.slice(0, 14)}...` : displayName}
+                        </h3>
 
-                    {/* Feedback Notes Display */}
-                    {character.feedback_notes && (
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
-                            <div className="flex items-start gap-2">
-                                <MessageSquare className="w-4 h-4 text-yellow-600 mt-0.5" />
-                                <div>
-                                    <span className="text-xs font-semibold text-yellow-800 uppercase block mb-1">Customer Feedback</span>
-                                    <p className="text-sm text-yellow-900">{character.feedback_notes}</p>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            {/* Regenerate Dialog Trigger - Icon Only */}
+                            {!character.is_main && (
+                                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <div
+                                            className="cursor-pointer bg-violet-600 text-white p-2 rounded-lg hover:bg-violet-700 hover:scale-105 transition-all shadow-md flex items-center justify-center"
+                                            onClick={handleOpenRegenerate}
+                                            title="Regenerate"
+                                        >
+                                            <RefreshCw className="w-5 h-5" />
+                                        </div>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Regenerate {displayName}</DialogTitle>
+                                        </DialogHeader>
+                                        <div className="py-4 space-y-4">
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium">Generation Prompt</label>
+                                                <Textarea
+                                                    value={customPrompt}
+                                                    onChange={(e) => setCustomPrompt(e.target.value)}
+                                                    placeholder="Enter a custom prompt..."
+                                                    className="min-h-[150px]"
+                                                />
+                                                <p className="text-xs text-gray-500">
+                                                    Includes customer feedback if available.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <DialogFooter>
+                                            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                                            <Button onClick={handleRegenerate} disabled={isRegenerating}>
+                                                {isRegenerating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                                Regenerate
+                                            </Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                            )}
+
+                            {character.story_role && (
+                                <div
+                                    className="relative flex-shrink-0"
+                                    onMouseEnter={() => setShowTooltip(true)}
+                                    onMouseLeave={() => setShowTooltip(false)}
+                                >
+                                    <Info className="w-5 h-5 fill-slate-900 text-white hover:fill-slate-700 cursor-help transition-colors" />
+                                    {showTooltip && (
+                                        <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-md shadow-xl z-50 text-left">
+                                            <div className="absolute bottom-[-4px] right-1 w-2 h-2 bg-slate-800 rotate-45"></div>
+                                            <p className="font-bold mb-1 text-sm">{displayName}</p>
+                                            <p className="leading-relaxed whitespace-pre-wrap select-text">{character.story_role}</p>
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
+                            )}
                         </div>
-                    )}
-
-                    <div className="mt-auto">
-                        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                            <DialogTrigger asChild>
-                                <Button className="w-full" variant="outline" disabled={character.is_main}>
-                                    <RefreshCw className="w-4 h-4 mr-2" />
-                                    Regenerate
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Regenerate {displayName}</DialogTitle>
-                                </DialogHeader>
-                                <div className="py-4 space-y-4">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Generation Prompt</label>
-                                        <Textarea
-                                            value={customPrompt}
-                                            onChange={(e) => setCustomPrompt(e.target.value)}
-                                            placeholder="Enter a custom prompt or leave empty to use auto-generated prompt based on attributes..."
-                                            className="min-h-[150px]"
-                                        />
-                                        <p className="text-xs text-gray-500">
-                                            If you leave this empty, the system will construct a prompt based on the character's attributes.
-                                        </p>
-                                    </div>
-                                </div>
-                                <DialogFooter>
-                                    <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                                    <Button onClick={handleRegenerate} disabled={isRegenerating}>
-                                        {isRegenerating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                        Generate
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Actions & Feedback Section - Outside Card */}
+            <div className="w-full space-y-3">
+
+
+                {/* Current Feedback (Resolved or Pending) */}
+                {character.feedback_notes && character.is_resolved && (
+                    <div className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-900 relative animate-in fade-in">
+                        <div className="flex items-center gap-1.5 mb-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                            <span className="font-semibold text-xs text-green-700 uppercase">Resolved (RESEND)</span>
+                        </div>
+                        <p className="text-green-800">{character.feedback_notes}</p>
+                    </div>
+                )}
+
+                {character.feedback_notes && !character.is_resolved && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 text-sm text-yellow-900 relative animate-in fade-in">
+                        <div className="flex items-start gap-2">
+                            <MessageSquare className="w-4 h-4 text-yellow-600 mt-0.5" />
+                            <div>
+                                <span className="text-xs font-semibold text-yellow-800 uppercase block mb-1">Customer Feedback</span>
+                                <p>{character.feedback_notes}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Resolved History */}
+                {character.feedback_history?.map((item, index) => (
+                    <div key={index} className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-900 relative">
+                        <div className="flex items-center gap-1.5 mb-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                            <span className="font-semibold text-xs text-green-700 uppercase">Resolved</span>
+                        </div>
+                        <p className="text-green-800 opacity-90">{item.note}</p>
+                    </div>
+                ))}
+            </div>
 
             {/* Full View Lightbox */}
             <Dialog open={showImage} onOpenChange={setShowImage}>
@@ -147,6 +213,6 @@ export function AdminCharacterGalleryCard({ character, projectId }: AdminCharact
                     )}
                 </DialogContent>
             </Dialog>
-        </>
+        </div>
     )
 }

@@ -13,6 +13,7 @@ interface CustomerProjectHeaderProps {
   isSubmitting: boolean
   onSubmit: () => void
   showSubmitButton?: boolean
+  hideOnMobile?: boolean
 }
 
 export function CustomerProjectHeader({
@@ -22,7 +23,8 @@ export function CustomerProjectHeader({
   characterCount,
   isSubmitting,
   onSubmit,
-  showSubmitButton = true
+  showSubmitButton = true,
+  hideOnMobile = false
 }: CustomerProjectHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -51,7 +53,7 @@ export function CustomerProjectHeader({
 
   return (
     <>
-      <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-b-2 border-blue-200 shadow-lg pl-8 fixed top-0 left-0 right-0 z-50 pt-[16px] pr-[42px] pb-[16px]">
+      <div className={`bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-b-2 border-blue-200 shadow-lg pl-8 fixed top-0 left-0 right-0 z-50 pt-[16px] pr-[42px] pb-[16px] ${hideOnMobile ? 'hidden md:block' : ''}`}>
         <div className="flex items-center justify-between relative">
           <div className="flex items-center gap-2">
             <div id="mobile-header-portal" className="flex md:hidden items-center gap-2"></div>

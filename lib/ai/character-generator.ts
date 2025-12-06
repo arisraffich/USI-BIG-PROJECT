@@ -84,6 +84,7 @@ export async function generateCharacterImage(
             .update({
                 image_url: publicUrl,
                 generation_prompt: prompt,
+                is_resolved: true,
             })
             .eq('id', character.id)
 

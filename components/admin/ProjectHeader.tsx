@@ -15,6 +15,7 @@ interface ProjectInfo {
   author_firstname: string
   author_lastname: string
   status: ProjectStatus
+  character_send_count?: number
 }
 
 interface ProjectHeaderProps {
@@ -30,6 +31,9 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const pathname = usePathname()
   const [isPending, startTransition] = useTransition()
   const [isSendingToCustomer, setIsSendingToCustomer] = useState(false)
+
+  const sendCount = projectInfo.character_send_count || 0
+  const isResend = sendCount > 0
 
   // Poll project status to detect when character identification completes
   const { status: currentStatus, isLoading: isCharactersLoading } = useProjectStatus(
@@ -113,7 +117,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
 
       const data = await response.json()
-      toast.success('Project sent to customer review', {
+      toast.success(isResend ? 'Project resent to customer' : 'Project sent to customer review', {
         description: `Review URL: ${data.reviewUrl}`,
       })
 
@@ -143,35 +147,60 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
               {projectInfo.author_firstname || ''} {projectInfo.author_lastname || ''}'s project
             </p>
           </div>
-          <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 hidden md:flex items-center -mt-[16px] -mb-[16px]">
-            <Button
-              variant="outline"
-              onClick={(e) => handleTabClick('pages', e)}
-              className={`h-full rounded-none w-[140px] m-0 ${isPagesActive ? 'bg-blue-600 hover:bg-blue-700 text-white hover:text-white border-0 shadow-lg hover:shadow-xl' : 'bg-white border-0 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 text-blue-700 hover:text-blue-800'} box-border font-semibold text-lg transition-colors duration-75 cursor-pointer`}
-            >
-              <span>Pages</span>
-              <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${isPagesActive ? 'bg-white/30 text-white hover:text-white' : 'bg-blue-100 text-blue-700'}`}>{pageCount ?? 0}</span>
-            </Button>
-            <Button
-              variant="outline"
-              onClick={(e) => handleTabClick('characters', e)}
-              disabled={isCharactersLoading}
-              className={`h-full rounded-none w-[140px] m-0 ${isCharactersLoading ? 'opacity-70 cursor-not-allowed bg-yellow-50 border-yellow-300' : ''} ${isCharactersActive && !isCharactersLoading ? 'bg-blue-600 hover:bg-blue-700 text-white hover:text-white border-0 shadow-lg hover:shadow-xl' : isCharactersActive && isCharactersLoading ? 'bg-yellow-100 border-yellow-400' : 'bg-white border-0 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 text-blue-700 hover:text-blue-800'} box-border font-semibold text-lg transition-colors duration-75 ${isCharactersLoading ? '' : 'cursor-pointer'}`}
-            >
-              <span className="flex items-center gap-1.5">
-                {isCharactersLoading && (
-                  <Loader2 className="w-4 h-4 animate-spin text-yellow-600" />
-                )}
-                Characters
-                {isCharactersLoading && (
-                  <span className="text-xs text-yellow-700 font-normal">(Loading...)</span>
-                )}
-              </span>
-              <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${isCharactersActive && !isCharactersLoading ? 'bg-white/30 text-white hover:text-white' : isCharactersLoading ? 'bg-yellow-200 text-yellow-800' : 'bg-blue-100 text-blue-700'}`}>
-                {isCharactersLoading ? '...' : (characterCount ?? 0)}
-              </span>
-            </Button>
+
+          <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 flex items-center -mt-[16px] -mb-[16px]">
+            {/* Desktop Tabs */}
+            <div className="hidden md:flex h-full items-center">
+              <Button
+                variant="outline"
+                onClick={(e) => handleTabClick('pages', e)}
+                className={`h-full rounded-none w-[140px] m-0 ${isPagesActive ? 'bg-blue-600 hover:bg-blue-700 text-white hover:text-white border-0 shadow-lg hover:shadow-xl' : 'bg-white border-0 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 text-blue-700 hover:text-blue-800'} box-border font-semibold text-lg transition-colors duration-75 cursor-pointer`}
+              >
+                <span>Pages</span>
+                <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${isPagesActive ? 'bg-white/30 text-white hover:text-white' : 'bg-blue-100 text-blue-700'}`}>{pageCount ?? 0}</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={(e) => handleTabClick('characters', e)}
+                disabled={isCharactersLoading}
+                className={`h-full rounded-none w-[140px] m-0 ${isCharactersLoading ? 'opacity-70 cursor-not-allowed bg-yellow-50 border-yellow-300' : ''} ${isCharactersActive && !isCharactersLoading ? 'bg-blue-600 hover:bg-blue-700 text-white hover:text-white border-0 shadow-lg hover:shadow-xl' : isCharactersActive && isCharactersLoading ? 'bg-yellow-100 border-yellow-400' : 'bg-white border-0 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 text-blue-700 hover:text-blue-800'} box-border font-semibold text-lg transition-colors duration-75 ${isCharactersLoading ? '' : 'cursor-pointer'}`}
+              >
+                <span className="flex items-center gap-1.5">
+                  {isCharactersLoading && (
+                    <Loader2 className="w-4 h-4 animate-spin text-yellow-600" />
+                  )}
+                  Characters
+                  {isCharactersLoading && (
+                    <span className="text-xs text-yellow-700 font-normal">(Loading...)</span>
+                  )}
+                </span>
+                <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${isCharactersActive && !isCharactersLoading ? 'bg-white/30 text-white hover:text-white' : isCharactersLoading ? 'bg-yellow-200 text-yellow-800' : 'bg-blue-100 text-blue-700'}`}>
+                  {isCharactersLoading ? '...' : (characterCount ?? 0)}
+                </span>
+              </Button>
+            </div>
+
+            {/* Mobile Centered Send Button */}
+            <div className="md:hidden flex items-center">
+              {canSendToCustomer && (
+                <Button
+                  onClick={handleSendToCustomer}
+                  disabled={isSendingToCustomer}
+                  size="sm"
+                  className="px-3 bg-green-600 hover:bg-green-700 text-white border-0 shadow-md hover:shadow-lg font-semibold transition-all duration-75 rounded-md whitespace-nowrap flex items-center justify-center h-9"
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  <span>{isSendingToCustomer ? 'Sending...' : (isResend ? 'Resend Characters' : 'Send Characters')}</span>
+                  {isResend && !isSendingToCustomer && (
+                    <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
+                      {sendCount}
+                    </span>
+                  )}
+                </Button>
+              )}
+            </div>
           </div>
+
           <div className="flex items-center gap-2 md:gap-4">
             <span
               className={`hidden md:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${getStatusStyles(projectInfo.status)} shadow-sm`}
@@ -182,15 +211,21 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
             {/* Portal Target for Mobile Actions (like Edit Manuscript) */}
             <div id="mobile-header-portal" className="flex md:hidden items-center gap-2" />
 
+            {/* Desktop Send Button */}
             {canSendToCustomer && (
               <Button
                 onClick={handleSendToCustomer}
                 disabled={isSendingToCustomer}
                 size="sm"
-                className="px-3 md:px-4 bg-green-600 hover:bg-green-700 text-white border-0 shadow-md hover:shadow-lg font-semibold transition-all duration-75 rounded-md whitespace-nowrap flex items-center justify-center h-9"
+                className="hidden md:flex px-3 md:px-4 bg-green-600 hover:bg-green-700 text-white border-0 shadow-md hover:shadow-lg font-semibold transition-all duration-75 rounded-md whitespace-nowrap items-center justify-center h-9"
               >
                 <Send className="w-4 h-4 md:mr-2" />
-                <span className="ml-2 md:ml-0">{isSendingToCustomer ? 'Sending...' : 'Send Characters'}</span>
+                <span className="ml-2 md:ml-0">{isSendingToCustomer ? 'Sending...' : (isResend ? 'Resend Characters' : 'Send Characters')}</span>
+                {isResend && !isSendingToCustomer && (
+                  <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
+                    {sendCount}
+                  </span>
+                )}
               </Button>
             )}
           </div>
