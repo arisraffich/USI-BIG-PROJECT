@@ -9,7 +9,11 @@ import { MessageSquarePlus, Save, Loader2, CheckCircle2, Info, Download } from '
 // ... existing imports ...
 
 export function CustomerCharacterGalleryCard({ character, isMain = false }: CustomerCharacterGalleryCardProps) {
-    // ... existing state ...
+    const [isEditing, setIsEditing] = useState(false)
+    const [notes, setNotes] = useState(character.feedback_notes || '')
+    const [isSaving, setIsSaving] = useState(false)
+    const [showImage, setShowImage] = useState(false)
+    const [showTooltip, setShowTooltip] = useState(false)
 
     const displayName = isMain
         ? 'Main Character'
