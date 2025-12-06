@@ -22,7 +22,10 @@ export default async function ProjectLayout({
       .single()
 
     if (projectError || !project) {
-      console.error('Error fetching project:', projectError)
+      // Only log actual errors, not "Row not found" (PGRST116)
+      if (projectError && projectError.code !== 'PGRST116') {
+        console.error('Error fetching project:', projectError)
+      }
       notFound()
     }
 
