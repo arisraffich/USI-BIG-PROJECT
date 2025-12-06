@@ -3,14 +3,14 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-export async function deleteAllProjects() {
+export async function deleteAllProjects(formData: FormData) {
     const supabase = await createAdminClient()
 
     // First, get all project IDs
     const { data: projects } = await supabase.from('projects').select('id')
 
     if (!projects || projects.length === 0) {
-        return { success: true, count: 0 }
+        return
     }
 
     // Delete all
@@ -26,6 +26,4 @@ export async function deleteAllProjects() {
 
     revalidatePath('/admin/dashboard')
     revalidatePath('/')
-
-    return { success: true, count: projects.length }
 }
