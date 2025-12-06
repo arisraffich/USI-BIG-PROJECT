@@ -77,7 +77,7 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
                         <h3 className="font-bold text-lg text-gray-900 leading-tight">
                             {displayName.length > 14 ? `${displayName.slice(0, 14)}...` : displayName}
                         </h3>
-                        {!isMain && (character.story_role || character.role) && (
+                        {(character.story_role || character.role) && (
                             <div
                                 className="relative flex-shrink-0"
                                 onMouseEnter={() => setShowTooltip(true)}
@@ -87,7 +87,7 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
                                 {showTooltip && (
                                     <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-md shadow-xl z-50">
                                         <div className="absolute bottom-[-4px] right-1 w-2 h-2 bg-slate-800 rotate-45"></div>
-                                        <p className="font-bold mb-1 text-sm">{displayName}</p>
+                                        <p className="font-bold mb-1 text-sm">{isMain ? `${character.name || character.role || 'Character'} | Main Character` : displayName}</p>
                                         <p className="leading-relaxed whitespace-pre-wrap select-text">{character.story_role || character.role}</p>
                                     </div>
                                 )}
@@ -100,17 +100,6 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
             {/* Actions & Feedback Section - Outside Card */}
             {!isMain && (
                 <div className="w-full space-y-3">
-                    {/* Resolved History */}
-                    {character.feedback_history?.map((item, index) => (
-                        <div key={index} className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-900 relative">
-                            <div className="flex items-center gap-1.5 mb-1">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-                                <span className="font-semibold text-xs text-green-700 uppercase">Resolved</span>
-                            </div>
-                            <p className="text-green-800 opacity-90">{item.note}</p>
-                        </div>
-                    ))}
-
                     {/* Pending Request (Yellow) */}
                     {!isEditing && character.feedback_notes && (
                         <div className="bg-amber-50 border border-amber-100 rounded-md p-3 text-sm text-amber-900 relative group animate-in fade-in zoom-in-95 duration-200">
@@ -177,6 +166,17 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
                             </Button>
                         )
                     )}
+
+                    {/* Resolved History */}
+                    {character.feedback_history?.map((item, index) => (
+                        <div key={index} className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-900 relative">
+                            <div className="flex items-center gap-1.5 mb-1">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                                <span className="font-semibold text-xs text-green-700 uppercase">Resolved</span>
+                            </div>
+                            <p className="text-green-800 opacity-90">{item.note}</p>
+                        </div>
+                    ))}
                 </div>
             )}
 

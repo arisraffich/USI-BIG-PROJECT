@@ -16,6 +16,7 @@ interface ProjectInfo {
   author_lastname: string
   status: ProjectStatus
   character_send_count?: number
+  review_token?: string | null
 }
 
 interface ProjectHeaderProps {
@@ -33,7 +34,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const [isSendingToCustomer, setIsSendingToCustomer] = useState(false)
 
   const sendCount = projectInfo.character_send_count || 0
-  const isResend = sendCount > 0
+  const isResend = sendCount > 0 || !!projectInfo.review_token
 
   // Poll project status to detect when character identification completes
   const { status: currentStatus, isLoading: isCharactersLoading } = useProjectStatus(
@@ -191,7 +192,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
                 >
                   <Send className="w-4 h-4 mr-2" />
                   <span>{isSendingToCustomer ? 'Sending...' : (isResend ? 'Resend Characters' : 'Send Characters')}</span>
-                  {isResend && !isSendingToCustomer && (
+                  {isResend && !isSendingToCustomer && sendCount > 0 && (
                     <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
                       {sendCount}
                     </span>
@@ -221,7 +222,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
               >
                 <Send className="w-4 h-4 md:mr-2" />
                 <span className="ml-2 md:ml-0">{isSendingToCustomer ? 'Sending...' : (isResend ? 'Resend Characters' : 'Send Characters')}</span>
-                {isResend && !isSendingToCustomer && (
+                {isResend && !isSendingToCustomer && sendCount > 0 && (
                   <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
                     {sendCount}
                   </span>

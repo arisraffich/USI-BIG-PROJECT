@@ -150,7 +150,7 @@ export function AdminCharacterGalleryCard({ character, projectId }: AdminCharact
                                     {showTooltip && (
                                         <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-md shadow-xl z-50 text-left">
                                             <div className="absolute bottom-[-4px] right-1 w-2 h-2 bg-slate-800 rotate-45"></div>
-                                            <p className="font-bold mb-1 text-sm">{displayName}</p>
+                                            <p className="font-bold mb-1 text-sm">{character.is_main ? `${character.name || character.role || 'Character'} | Main Character` : displayName}</p>
                                             <p className="leading-relaxed whitespace-pre-wrap select-text">{character.story_role}</p>
                                         </div>
                                     )}

@@ -17,7 +17,7 @@ export default async function ProjectLayout({
 
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id, book_title, author_firstname, author_lastname, status, character_send_count')
+      .select('id, book_title, author_firstname, author_lastname, status, character_send_count, review_token')
       .eq('id', id)
       .single()
 
@@ -49,7 +49,8 @@ export default async function ProjectLayout({
             author_firstname: project.author_firstname || '',
             author_lastname: project.author_lastname || '',
             status: project.status || 'draft',
-            character_send_count: project.character_send_count || 0
+            character_send_count: project.character_send_count || 0,
+            review_token: project.review_token
           }}
           pageCount={pageCount}
           characterCount={characterCount}

@@ -25,14 +25,6 @@ export async function PATCH(
       )
     }
 
-    // Don't allow editing main character
-    if (character.is_main) {
-      return NextResponse.json(
-        { error: 'Cannot edit main character' },
-        { status: 403 }
-      )
-    }
-
     // Verify project is in correct status
     const { data: project, error: projectError } = await supabase
       .from('projects')
@@ -68,6 +60,7 @@ export async function PATCH(
         accessories: body.accessories || null,
         special_features: body.special_features || null,
         feedback_notes: body.feedback_notes || null,
+        is_resolved: false,
       })
       .eq('id', characterId)
       .select()
