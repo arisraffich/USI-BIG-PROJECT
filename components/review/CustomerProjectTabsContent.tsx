@@ -40,6 +40,8 @@ export function CustomerProjectTabsContent({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'loading' | 'success'>('idle')
+  // Lifted state for Edit Mode to coordinate Header and Editor
+  const [isEditMode, setIsEditMode] = useState(false)
 
   // Local state for pages to support instant realtime updates
   const [localPages, setLocalPages] = useState<Page[]>(pages || [])
@@ -219,7 +221,7 @@ export function CustomerProjectTabsContent({
         characterCount={characterCount}
         isSubmitting={isSubmitting}
         onSubmit={handleSubmitChanges}
-        showSubmitButton={!showGallery && !isLocked}
+        showSubmitButton={!showGallery && !isLocked && !isEditMode}
       />
       <div className="p-8 pt-24 relative min-h-screen">
         {/* Pages Tab Content */}
@@ -228,6 +230,8 @@ export function CustomerProjectTabsContent({
             pages={localPages as any}
             projectId={projectId}
             onEditsChange={setManuscriptEdits}
+            isEditMode={isEditMode}
+            onEditModeChange={setIsEditMode}
           />
         </div>
 

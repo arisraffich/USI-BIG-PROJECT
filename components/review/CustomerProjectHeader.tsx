@@ -53,8 +53,9 @@ export function CustomerProjectHeader({
     <>
       <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-b-2 border-blue-200 shadow-lg pl-8 fixed top-0 left-0 right-0 z-50 pt-[16px] pr-[42px] pb-[16px]">
         <div className="flex items-center justify-between relative">
-          <div className="flex items-center">
-            <h1 className="text-lg font-semibold text-gray-900">{authorName}'s project</h1>
+          <div className="flex items-center gap-2">
+            <div id="mobile-header-portal" className="flex md:hidden items-center gap-2"></div>
+            <h1 className="text-lg font-semibold text-gray-900 hidden md:block">{authorName}'s project</h1>
           </div>
           <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 hidden md:flex -mt-[16px] -mb-[16px]">
             <Button
@@ -74,12 +75,13 @@ export function CustomerProjectHeader({
               <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${isCharactersActive ? 'bg-white/30 text-white hover:text-white' : 'bg-blue-100 text-blue-700'}`}>{characterCount ?? 0}</span>
             </Button>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 pl-4">
+            <div id="mobile-header-portal-right" className="flex md:hidden items-center gap-2"></div>
             {showSubmitButton && (
               <Button
                 onClick={onSubmit}
                 disabled={isSubmitting}
-                className="pl-1.5 pr-3 bg-green-600 hover:bg-green-700 text-white font-medium shadow-sm transition-all"
+                className="pl-2 pr-3 bg-green-600 hover:bg-green-700 text-white font-medium shadow-sm transition-all"
               >
                 {isSubmitting ? (
                   <>

@@ -11,6 +11,8 @@ interface CustomerManuscriptEditorProps {
   pages: Page[] | null
   projectId: string
   onEditsChange?: (edits: PageEdits) => void
+  isEditMode: boolean
+  onEditModeChange: (isEditMode: boolean) => void
 }
 
 type PageEdits = {
@@ -20,8 +22,7 @@ type PageEdits = {
   }
 }
 
-export function CustomerManuscriptEditor({ pages, projectId, onEditsChange }: CustomerManuscriptEditorProps) {
-  const [isEditMode, setIsEditMode] = useState(false)
+export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEditMode, onEditModeChange }: CustomerManuscriptEditorProps) {
   const [activePageId, setActivePageId] = useState<string | null>(null)
   const isManualScrollRef = useRef(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -276,7 +277,7 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange }: Cu
       // Clear local edits
       setPageEdits({})
       // Exit edit mode to return to read-only view with red highlighting
-      setIsEditMode(false)
+      onEditModeChange(false)
       toast.success('Changes saved successfully')
     } catch (error: any) {
       console.error('Error saving changes:', error)
@@ -401,8 +402,8 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange }: Cu
           {/* Floating Command Bar */}
           <ManuscriptToolbar
             isEditMode={isEditMode}
-            onEditClick={() => setIsEditMode(true)}
-            onCancelClick={() => setIsEditMode(false)}
+            onEditClick={() => onEditModeChange(true)}
+            onCancelClick={() => onEditModeChange(false)}
             onSaveClick={handleSave}
             isSaving={isSaving}
             isDirty={Object.keys(pageEdits).length > 0}

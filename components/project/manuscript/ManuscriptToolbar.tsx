@@ -29,9 +29,14 @@ export function ManuscriptToolbar({
 
   useEffect(() => {
     // Find the portal target in the header (ProjectHeader.tsx)
-    const element = document.getElementById('mobile-header-portal')
+    // For Customer View in Edit Mode, we move actions to the right to cover the Submit button
+    const targetId = (isCustomerView && isEditMode)
+      ? 'mobile-header-portal-right'
+      : 'mobile-header-portal'
+
+    const element = document.getElementById(targetId)
     setPortalContainer(element)
-  }, [])
+  }, [isCustomerView, isEditMode])
 
   const handleDownloadClick = () => {
     toast.info('Download feature coming soon!')
@@ -46,8 +51,8 @@ export function ManuscriptToolbar({
           onClick={onEditClick}
           className="bg-gray-900 hover:bg-gray-800 text-white h-9 px-3 shadow-sm"
         >
-          <Edit2 className="w-4 h-4 mr-2" />
-          <span className="inline">Edit</span>
+          <Edit2 className="w-4 h-4 mr-1.5" />
+          <span className="inline">{isCustomerView ? 'Edit Manuscript' : 'Edit'}</span>
         </Button>
       ) : (
         <>
@@ -56,10 +61,10 @@ export function ManuscriptToolbar({
             size="sm"
             onClick={onCancelClick}
             disabled={isSaving}
-            className="text-gray-500 hover:text-gray-900 h-9 px-2"
+            className={`text-gray-500 hover:text-gray-900 h-9 ${isCustomerView ? 'px-3' : 'px-2'}`}
           >
             <X className="w-4 h-4" />
-            <span className="sr-only">Cancel</span>
+            <span className={isCustomerView ? 'ml-2 inline' : 'sr-only'}>Cancel</span>
           </Button>
           <Button
             variant="default"
@@ -73,7 +78,7 @@ export function ManuscriptToolbar({
             ) : (
               <Save className="w-4 h-4" />
             )}
-            <span className="ml-2 inline">Save</span>
+            <span className="ml-2 inline">{isCustomerView ? 'Save Changes' : 'Save'}</span>
           </Button>
         </>
       )}
