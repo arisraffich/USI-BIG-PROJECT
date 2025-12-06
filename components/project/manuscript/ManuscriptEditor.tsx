@@ -177,6 +177,7 @@ export function ManuscriptEditor({ pages, projectId }: ManuscriptEditorProps) {
 
       // Clear edits
       setPageEdits({})
+      setIsEditMode(false)
 
       // Show success toast
       toast.success('Changes saved!')

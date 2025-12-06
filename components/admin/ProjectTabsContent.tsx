@@ -208,16 +208,16 @@ export function ProjectTabsContent({
 
                   {/* Scanning Indicator Card - Shows next to main character when only 1 character exists */}
                   {characters.length <= 1 && (
-                    <div className="bg-blue-50/50 border border-blue-100 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-4 text-center min-h-[300px] animate-pulse">
+                    <div className="bg-[#f65952]/5 border border-[#f65952]/20 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-4 text-center min-h-[300px] animate-pulse">
                       <div className="relative">
-                        <div className="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-75"></div>
-                        <div className="relative bg-white rounded-full p-3 shadow-sm border border-blue-50">
-                          <Sparkles className="w-6 h-6 text-blue-500" />
+                        <div className="absolute inset-0 bg-[#f65952] rounded-full animate-ping opacity-20"></div>
+                        <div className="relative bg-white rounded-full p-3 shadow-sm border border-[#f65952]/20">
+                          <Sparkles className="w-6 h-6 text-[#f65952]" />
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <h3 className="font-semibold text-blue-900">Analysing Story...</h3>
-                        <p className="text-sm text-blue-600/80 max-w-[200px]">
+                        <h3 className="font-semibold text-[#f65952]">Analysing Story...</h3>
+                        <p className="text-sm text-[#f65952]/80 max-w-[200px]">
                           AI is reading your manuscript to identify more characters.
                         </p>
                       </div>
@@ -228,13 +228,15 @@ export function ProjectTabsContent({
                     <CharacterCard key={character.id} character={character} />
                   ))}
 
-                  {/* Add Character Ghost Card - Always at the end */}
-                  <div className="h-full">
-                    <AddCharacterButton
-                      mode="card"
-                      mainCharacterName={sortedCharacters.main?.name || sortedCharacters.main?.role || null}
-                    />
-                  </div>
+                  {/* Add Character Ghost Card - Shown only after scanning is complete (more than 1 char) */}
+                  {characters.length > 1 && (
+                    <div className="h-full">
+                      <AddCharacterButton
+                        mode="card"
+                        mainCharacterName={sortedCharacters.main?.name || sortedCharacters.main?.role || null}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (

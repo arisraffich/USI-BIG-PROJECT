@@ -1,8 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import TextareaAutosize from 'react-textarea-autosize'
-
+import { RichTextEditor } from '@/components/shared/RichTextEditor'
 
 interface Page {
   id: string
@@ -52,9 +51,8 @@ export function CustomerManuscriptPage({
     onSceneDescriptionChange(page.id, value)
   }
 
-  // CRITICAL: Flag is the source of truth for persistence after refresh
-  // If flag is set, we MUST highlight ONLY the differences
-  // No highlighting logic needed. Just simple text.
+  // Customer View - Always uses role="customer" for current user editing
+  // Admin edits (Blue) will be preserved in the HTML. Customer types in Red.
 
   return (
     <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-sm mb-8">
@@ -68,18 +66,23 @@ export function CustomerManuscriptPage({
       {/* Block A: Story Text */}
       <div className="px-8 pb-6 min-h-[100px]">
         {isEditMode ? (
-          <TextareaAutosize
-            value={localStoryText}
-            onChange={(e) => handleStoryTextChange(e.target.value)}
+          <RichTextEditor
+            initialContent={localStoryText}
+            onChange={handleStoryTextChange}
+            role="customer"
             placeholder="Type story text..."
-            minRows={3}
-            className="w-full font-serif text-xl leading-relaxed text-gray-900 placeholder:text-gray-300 border-0 focus:outline-none focus:ring-0 resize-none p-0"
-            spellCheck={false}
+            className="font-serif text-xl leading-relaxed text-gray-900"
           />
         ) : (
           <div className="font-serif text-xl leading-relaxed text-gray-900">
             {localStoryText.trim() ? (
-              <p className="whitespace-pre-wrap">{localStoryText}</p>
+              <RichTextEditor
+                initialContent={localStoryText}
+                onChange={() => { }}
+                role="customer"
+                readOnly={true}
+                className="font-serif text-xl leading-relaxed text-gray-900"
+              />
             ) : (
               <p className="italic text-gray-400">[No story text]</p>
             )}
@@ -96,18 +99,23 @@ export function CustomerManuscriptPage({
           <span className="text-xs font-medium text-gray-600">🎨 Illustration Notes</span>
         </div>
         {isEditMode ? (
-          <TextareaAutosize
-            value={localSceneDescription}
-            onChange={(e) => handleSceneDescriptionChange(e.target.value)}
+          <RichTextEditor
+            initialContent={localSceneDescription}
+            onChange={handleSceneDescriptionChange}
+            role="customer"
             placeholder="Describe the scene for the illustrator..."
-            minRows={3}
-            className="w-full font-sans text-base text-gray-600 placeholder:text-gray-400 bg-transparent border-0 focus:outline-none focus:ring-0 resize-none p-0"
-            spellCheck={false}
+            className="font-sans text-base text-gray-600"
           />
         ) : (
           <div className="font-sans text-base text-gray-600">
             {localSceneDescription.trim() ? (
-              <p className="whitespace-pre-wrap">{localSceneDescription}</p>
+              <RichTextEditor
+                initialContent={localSceneDescription}
+                onChange={() => { }}
+                role="customer"
+                readOnly={true}
+                className="font-sans text-base text-gray-600"
+              />
             ) : (
               <p className="text-gray-400">[No illustration instructions]</p>
             )}
@@ -117,9 +125,3 @@ export function CustomerManuscriptPage({
     </div>
   )
 }
-
-
-
-
-
-
