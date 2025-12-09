@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { Character } from '@/types/character'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -7,6 +8,11 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { MessageSquarePlus, Save, Loader2, CheckCircle2, Info, Download } from 'lucide-react'
 
 // ... existing imports ...
+
+interface CustomerCharacterGalleryCardProps {
+    character: Character
+    isMain?: boolean
+}
 
 export function CustomerCharacterGalleryCard({ character, isMain = false }: CustomerCharacterGalleryCardProps) {
     const [isEditing, setIsEditing] = useState(false)
