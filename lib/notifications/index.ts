@@ -93,7 +93,7 @@ export async function notifyProjectSentToCustomer(options: {
     try {
       console.log(`[Notification] Attempting to send SMS to ${authorPhone}`)
       await sendSMS({
-        to: authorPhone,
+        to: authorPhone as string,
         message: `Hi ${authorFirstName}, your project "${projectTitle}" is ready for review! Check your email (including spam) for the review link: ${reviewUrl} - US Illustrations`,
       })
       console.log(`[Notification] SMS sent successfully to ${authorPhone}`)
