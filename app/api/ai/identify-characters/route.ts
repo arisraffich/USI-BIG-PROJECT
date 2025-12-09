@@ -5,12 +5,12 @@ import { openai } from '@/lib/ai/openai'
 // Hybrid filtering function to remove plural characters programmatically
 function isPluralCharacter(nameOrRole: string | null): boolean {
   if (!nameOrRole) return false
-  
+
   const text = nameOrRole.toLowerCase().trim()
-  
+
   // Common plural endings
   const pluralEndings = ['s', 'es', 'ies']
-  
+
   // Check if it ends with plural indicators
   if (pluralEndings.some(ending => text.endsWith(ending))) {
     // But exclude common singular words that end in 's'
@@ -18,18 +18,18 @@ function isPluralCharacter(nameOrRole: string | null): boolean {
     if (singularExceptions.includes(text)) {
       return false
     }
-    
+
     // Check for plural indicators in the text
     const pluralIndicators = [
       'many', 'several', 'group of', 'groups of', 'crowd of', 'crowds of',
       'people', 'children', 'kids', 'adults', 'teachers', 'doctors', 'nurses',
       'animals', 'dogs', 'cats', 'birds', 'friends', 'neighbors', 'family members'
     ]
-    
+
     if (pluralIndicators.some(indicator => text.includes(indicator))) {
       return true
     }
-    
+
     // If it's a role and ends in 's', likely plural (e.g., "Teachers", "Doctors")
     // But "Mom" or "Dad" are singular even though they could be plural contextually
     if (text.endsWith('s') && text.length > 3) {
@@ -40,7 +40,7 @@ function isPluralCharacter(nameOrRole: string | null): boolean {
       }
     }
   }
-  
+
   return false
 }
 
@@ -187,11 +187,10 @@ Respond in JSON format:
     let completion
     try {
       completion = await openai.chat.completions.create({
-        model: 'gpt-5.1', // Updated to GPT-5.1 with medium reasoning
+        model: 'gpt-4o', // Reverting to proven model for reliable identification
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
-        reasoning_effort: 'medium', // Medium reasoning for better character identification
-        // Note: temperature is not supported with reasoning_effort other than 'none'
+        temperature: 0.5, // Balanced creativity for identification
       })
     } catch (error: any) {
       console.error('OpenAI API Error in identify-characters:', error.message)
@@ -233,34 +232,34 @@ Respond in JSON format:
     const newCharacters = identified.characters.filter((char: any) => {
       const charName = char.name?.toLowerCase().trim() || null
       const charRole = char.role?.toLowerCase().trim() || null
-      
+
       // Skip if no identifier
       if (!charName && !charRole) {
         return false
       }
-      
+
       // CRITICAL: Skip if this character's name matches the main character's name
       // This prevents "Zara" from being added as a new character when main character is already "Zara"
       if (mainCharName && charName && charName === mainCharName) {
         return false
       }
-      
+
       // Skip if name already exists in any character
       if (charName && existingNames.has(charName)) {
         return false
       }
-      
+
       // Skip if role already exists (but allow if it's a generic role like "Mom")
       // Only skip if it's a specific role that already exists
       if (charRole && existingRoles.has(charRole) && charRole !== 'mom' && charRole !== 'dad') {
         return false
       }
-      
+
       // HYBRID FILTER: Check if character name/role is plural
       if (isPluralCharacter(char.name || char.role)) {
         return false
       }
-      
+
       return true
     })
 

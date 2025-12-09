@@ -91,10 +91,10 @@ Return valid JSON only with this structure:
   try {
     console.log('[parseCharacterForm] Sending request to OpenAI...')
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // Using gpt-4o-mini for reliable JSON extraction
+      model: 'gpt-4o', // Reverting to proven model (GPT-4o) that handles PDF text reliably
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
-      temperature: 0, // For consistent extraction
+      temperature: 0, // Standard deterministic setting for GPT-4o
     })
 
     console.log('[parseCharacterForm] OpenAI response received')
