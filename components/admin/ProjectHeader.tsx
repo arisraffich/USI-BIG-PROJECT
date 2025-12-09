@@ -27,6 +27,16 @@ interface ProjectHeaderProps {
   hasImages?: boolean
 }
 
+// Define clear stage configuration
+interface StageConfig {
+  tag: string
+  tagStyle: string
+  buttonLabel: string
+  showCount: boolean
+  isResend: boolean
+  buttonDisabled: boolean
+}
+
 export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false }: ProjectHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -35,15 +45,77 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const [isSendingToCustomer, setIsSendingToCustomer] = useState(false)
 
   const sendCount = projectInfo.character_send_count || 0
-  const isResend = sendCount > 0
 
-  const buttonLabel = isSendingToCustomer
-    ? 'Sending...'
-    : !hasImages
-      ? 'Request Characters'
-      : isResend
-        ? 'Resend Characters'
-        : 'Send Characters'
+  // ------------------------------------------------------------------
+  // STAGE CONFIGURATION LOGIC
+  // ------------------------------------------------------------------
+  const getStageConfig = (): StageConfig => {
+    const status = projectInfo.status
+
+    // STAGE 5: Characters Approved
+    if (status === 'characters_approved') {
+      return {
+        tag: 'Characters Approved',
+        tagStyle: 'bg-green-100 text-green-800 border-green-300',
+        buttonLabel: 'Create Illustrations',
+        showCount: false,
+        isResend: false,
+        buttonDisabled: true
+      }
+    }
+
+    // STAGE 4: Characters Regenerated (Ready to Resend)
+    if (status === 'characters_regenerated') {
+      return {
+        tag: 'Characters Regenerated',
+        tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        buttonLabel: 'Resend Characters',
+        showCount: true,
+        isResend: true,
+        buttonDisabled: false
+      }
+    }
+
+    // STAGE 3: Revision Needed
+    // (Customer requested changes, or we are in revision loop)
+    if (status === 'character_revision_needed') {
+      return {
+        tag: 'Regenerate Characters',
+        tagStyle: 'bg-red-100 text-red-800 border-red-300',
+        buttonLabel: 'Resend Characters',
+        showCount: true,
+        isResend: true,
+        buttonDisabled: false
+      }
+    }
+
+    // STAGE 2: Images Ready (First Time)
+    // Condition: Has images, but never sent (count 0)
+    if (hasImages && sendCount === 0) {
+      return {
+        tag: 'Characters Generated',
+        tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        buttonLabel: 'Send Characters',
+        showCount: false,
+        isResend: false,
+        buttonDisabled: false
+      }
+    }
+
+    // STAGE 1: Project Creation / Setup (Default)
+    // Condition: No images yet
+    return {
+      tag: 'Project Setup',
+      tagStyle: 'bg-gray-100 text-gray-800 border-gray-300',
+      buttonLabel: 'Request Input',
+      showCount: false,
+      isResend: false,
+      buttonDisabled: false
+    }
+  }
+
+  const stage = getStageConfig()
+  const buttonDisplayLabel = isSendingToCustomer ? 'Sending...' : stage.buttonLabel
 
   // Poll project status to detect when character identification completes
   const { status: currentStatus, isLoading: isCharactersLoading } = useProjectStatus(
@@ -76,43 +148,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     })
   }
 
-  // Format status for display
-  const formatStatus = (status: ProjectStatus): string => {
-    if (status === 'character_generation_complete') {
-      return 'Character Generated'
-    }
-    return status
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ')
-  }
-
-  // Get status badge styling based on status
-  const getStatusStyles = (status: ProjectStatus): string => {
-    if (status === 'completed') {
-      return 'bg-green-100 text-green-800 border-green-300'
-    }
-    if (status === 'character_revision_needed') {
-      return 'bg-red-100 text-red-800 border-red-300'
-    }
-    if (status.includes('approved') || status === 'sketch_ready') {
-      return 'bg-blue-100 text-blue-800 border-blue-300'
-    }
-    if (status === 'character_review' || status === 'character_generation') {
-      return 'bg-yellow-100 text-yellow-800 border-yellow-300'
-    }
-    return 'bg-gray-100 text-gray-800 border-gray-300'
-  }
-
-  // Check if project can be sent to customer
-  // Show button when project has characters and is not actively generating or completed
-  // Allow sending for draft, character_review (resend), and other intermediate statuses
-  const canSendToCustomer = characterCount > 0 &&
-    projectInfo.status !== 'character_generation' &&
-    projectInfo.status !== 'completed'
-
   const handleSendToCustomer = async () => {
-    if (!canSendToCustomer || isSendingToCustomer) return
+    if (stage.buttonDisabled || isSendingToCustomer) return
 
     setIsSendingToCustomer(true)
     try {
@@ -127,7 +164,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
 
       const data = await response.json()
-      toast.success(isResend ? 'Project resent to customer' : 'Project sent to customer review', {
+      toast.success(stage.isResend ? 'Project resent to customer' : 'Project sent to customer review', {
         description: `Review URL: ${data.reviewUrl}`,
       })
 
@@ -192,7 +229,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
 
             {/* Mobile Centered Send Button */}
             <div className="md:hidden flex items-center">
-              {canSendToCustomer && (
+              {!stage.buttonDisabled && (
                 <Button
                   onClick={handleSendToCustomer}
                   disabled={isSendingToCustomer}
@@ -200,8 +237,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
                   className="px-3 bg-green-600 hover:bg-green-700 text-white border-0 shadow-md hover:shadow-lg font-semibold transition-all duration-75 rounded-md whitespace-nowrap flex items-center justify-center h-9"
                 >
                   <Send className="w-4 h-4 mr-2" />
-                  <span>{buttonLabel}</span>
-                  {isResend && !isSendingToCustomer && sendCount > 0 && (
+                  <span>{buttonDisplayLabel}</span>
+                  {stage.showCount && !isSendingToCustomer && sendCount > 0 && (
                     <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
                       {sendCount}
                     </span>
@@ -213,31 +250,29 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
 
           <div className="flex items-center gap-2 md:gap-4">
             <span
-              className={`hidden md:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${getStatusStyles(projectInfo.status)} shadow-sm`}
+              className={`hidden md:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${stage.tagStyle} shadow-sm`}
             >
-              {formatStatus(projectInfo.status)}
+              {stage.tag}
             </span>
 
             {/* Portal Target for Mobile Actions (like Edit Manuscript) */}
             <div id="mobile-header-portal" className="flex md:hidden items-center gap-2" />
 
             {/* Desktop Send Button */}
-            {canSendToCustomer && (
-              <Button
-                onClick={handleSendToCustomer}
-                disabled={isSendingToCustomer}
-                size="sm"
-                className="hidden md:flex px-3 md:px-4 bg-green-600 hover:bg-green-700 text-white border-0 shadow-md hover:shadow-lg font-semibold transition-all duration-75 rounded-md whitespace-nowrap items-center justify-center h-9"
-              >
-                <Send className="w-4 h-4 md:mr-2" />
-                <span className="ml-2 md:ml-0">{buttonLabel}</span>
-                {isResend && !isSendingToCustomer && sendCount > 0 && (
-                  <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
-                    {sendCount}
-                  </span>
-                )}
-              </Button>
-            )}
+            <Button
+              onClick={handleSendToCustomer}
+              disabled={isSendingToCustomer || stage.buttonDisabled}
+              size="sm"
+              className={`hidden md:flex px-3 md:px-4 ${stage.buttonDisabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} text-white border-0 shadow-md hover:shadow-lg font-semibold transition-all duration-75 rounded-md whitespace-nowrap items-center justify-center h-9`}
+            >
+              <Send className="w-4 h-4 md:mr-2" />
+              <span className="ml-2 md:ml-0">{buttonDisplayLabel}</span>
+              {stage.showCount && !isSendingToCustomer && sendCount > 0 && (
+                <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
+                  {sendCount}
+                </span>
+              )}
+            </Button>
           </div>
         </div>
       </div>

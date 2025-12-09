@@ -120,9 +120,20 @@ export async function POST(request: NextRequest) {
     // Update project status if all succeeded
     const allSucceeded = results.every((r) => r.success)
     if (allSucceeded && results.length > 0) {
+      // Determine appropriate status based on whether this is first generation or regeneration
+      const { data: project } = await supabase
+        .from('projects')
+        .select('character_send_count')
+        .eq('id', project_id)
+        .single()
+
+      const newStatus = (project?.character_send_count || 0) > 0
+        ? 'characters_regenerated'
+        : 'character_generation_complete'
+
       await supabase
         .from('projects')
-        .update({ status: 'character_generation_complete' })
+        .update({ status: newStatus })
         .eq('id', project_id)
     }
 

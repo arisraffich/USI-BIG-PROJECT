@@ -38,9 +38,11 @@ export async function POST(
     }
 
     // Check if project is in correct status
-    if (project.status !== 'character_review') {
+    // Allow submission if in review or if revision needed (re-submitting?)
+    // Strictly speaking, should be 'character_review'.
+    if (project.status !== 'character_review' && project.status !== 'character_revision_needed') {
       return NextResponse.json(
-        { error: 'Project has already been submitted' },
+        { error: 'Project is not in review status' },
         { status: 403 }
       )
     }
@@ -72,28 +74,66 @@ export async function POST(
       }
     }
 
-    // Get ALL secondary characters for generation (regenerate ensuring consistency)
-    const { data: secondaryCharacters, error: charsError } = await supabase
+    // Fetch characters to determine flow (Generation vs Revision vs Approval)
+    const { data: characters, error: charsError } = await supabase
       .from('characters')
       .select('*')
       .eq('project_id', project.id)
-      .eq('is_main', false)
 
     if (charsError) {
       console.error('Error fetching characters:', charsError)
+      return NextResponse.json({ error: 'Failed to fetch characters' }, { status: 500 })
     }
 
-    // Update project status
-    const { error: statusError } = await supabase
-      .from('projects')
-      .update({ status: 'character_generation' })
-      .eq('id', project.id)
+    const hasImages = characters?.some(c => c.image_url && c.image_url.trim() !== '') || false
+    const hasFeedback = characters?.some(c => c.feedback_notes && !c.is_resolved) || false
 
-    if (statusError) {
-      console.error('Error updating project status:', statusError)
+    // SCENARIO A: Revision or Approval (Images already exist)
+    if (hasImages) {
+      let newStatus = 'characters_approved'
+      let message = 'Characters approved successfully'
+
+      if (hasFeedback) {
+        newStatus = 'character_revision_needed'
+        message = 'Feedback submitted successfully'
+      }
+
+      const { error: statusError } = await supabase
+        .from('projects')
+        .update({ status: newStatus })
+        .eq('id', project.id)
+
+      if (statusError) {
+        console.error('Error updating status:', statusError)
+        throw new Error('Failed to update project status')
+      }
+
+      // Notify Admin
+      try {
+        await notifyCustomerSubmission({
+          projectId: project.id,
+          projectTitle: project.book_title,
+          authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim(),
+          projectUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/project/${project.id}`,
+        })
+      } catch (notifError) {
+        console.error('Error sending notification:', notifError)
+      }
+
+      return NextResponse.json({
+        success: true,
+        message,
+        status: newStatus
+      })
     }
 
-    // Send notification (non-blocking)
+    // SCENARIO B: First Time Generation (No images yet)
+    // Proceed with existing generation logic
+
+    // Update project status to generating
+    await supabase.from('projects').update({ status: 'character_generation' }).eq('id', project.id)
+
+    // Send notification for generation start (non-blocking)
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
     const projectUrl = `${baseUrl}/admin/project/${project.id}`
 
@@ -108,20 +148,25 @@ export async function POST(
       console.error('Error sending notification:', notifError)
     }
 
-    // Generate characters synchronously (awaiting results)
+    // Identify/Generate secondary characters (Wait, logic usually generates ALL characters including Main?)
+    // Existing logic fetched "secondary" only? 
+    // "Get ALL secondary characters for generation" - Line 76 of original.
+    // If we only generate secondary, what about main? 
+    // Assuming Main is handled separately or this is a specific flow. 
+    // I will stick to "Generate secondary" as per original logic, but double check if Main needs generation.
+    // If Main has no image, we should probably generate it too?
+    // But original code filtered `is_main: false`. 
+    // I will respect original logic for now to avoid breaking Generation.
+
+    const secondaryCharacters = characters.filter(c => !c.is_main)
     const generationResults = []
-    if (secondaryCharacters && secondaryCharacters.length > 0) {
-      // Import generator dynamically or use top-level if possible
+
+    if (secondaryCharacters.length > 0) {
+      // Import generator dynamically
       const { generateCharacterImage } = await import('@/lib/ai/character-generator')
 
-      // Get main character for context/style if needed (though Flux ignores img input currently, we pass it for future proofing)
-      const { data: mainCharacter } = await supabase
-        .from('characters')
-        .select('*')
-        .eq('project_id', project.id)
-        .eq('is_main', true)
-        .single()
-
+      // Get main character image for style reference if available
+      const mainCharacter = characters.find(c => c.is_main)
       const mainCharImage = mainCharacter?.image_url || ''
 
       // Run in parallel
@@ -131,12 +176,12 @@ export async function POST(
 
       generationResults.push(...results)
 
-      // If successful, update status to complete
+      // If successful, update status to complete (Stage 2)
       const allSucceeded = results.every(r => r.success)
       if (allSucceeded) {
         await supabase
           .from('projects')
-          .update({ status: 'character_generation_complete' })
+          .update({ status: 'character_generation_complete' }) // Maps to "Characters Generated"
           .eq('id', project.id)
       }
 

@@ -11,6 +11,7 @@ export type ProjectStatus =
   | 'character_approval_pending'
   | 'characters_approved'
   | 'character_revision_needed'
+  | 'characters_regenerated'
 
 export interface Project {
   id: string
