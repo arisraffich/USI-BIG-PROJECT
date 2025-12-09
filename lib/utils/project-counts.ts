@@ -28,6 +28,7 @@ export async function getProjectCounts(
       .eq('project_id', projectId)
       .not('image_url', 'is', null)
       .neq('image_url', '')
+      .eq('is_resolved', true)
   ])
 
   return {
