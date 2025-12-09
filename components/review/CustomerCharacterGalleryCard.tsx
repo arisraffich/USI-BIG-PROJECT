@@ -4,7 +4,7 @@ import { Character } from '@/types/character'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { MessageSquarePlus, Save, Loader2, CheckCircle2, Info, Download } from 'lucide-react'
 
 // ... existing imports ...
@@ -225,6 +225,7 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
             <Dialog open={showImage} onOpenChange={setShowImage}>
                 <DialogContent className="max-w-[95vw] max-h-[95vh] w-auto h-auto p-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none">
                     <DialogTitle className="sr-only">{displayName}</DialogTitle>
+                    <DialogDescription className="sr-only">Full size preview of {displayName}</DialogDescription>
                     {character.image_url && (
                         <img
                             src={character.image_url}
