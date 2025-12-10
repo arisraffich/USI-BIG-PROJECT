@@ -11,7 +11,7 @@ import { CustomerCharacterGallery } from './CustomerCharacterGallery'
 import { Page } from '@/types/page'
 import { Character } from '@/types/character'
 import { Button } from '@/components/ui/button'
-import { Send } from 'lucide-react'
+import { Send, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -195,16 +195,30 @@ export function CustomerProjectTabsContent({
     }
   }
 
-  // Guard Clause: Block access if locked AND NOT in gallery mode
-  // If in Gallery mode (Stage 2), we allow viewing even if "locked" (or if admin put it back to review)
-  if (isLocked && !showGallery) {
+  // Guard Clause: Block access if locked AND (NOT in gallery mode OR Generation is pending/complete but not approved)
+  // Logic Update: If status is 'character_generation' or 'character_generation_complete', we MUST hide the gallery
+  // and show the "Submitted/Processing" screen, regardless of whether images exist.
+  // The gallery only unlocks when Admin sends it back (status becomes 'character_review' or 'characters_approved')
+
+  const isHiddenGenerationState =
+    projectStatus === 'character_generation' ||
+    projectStatus === 'character_generation_complete'
+
+  if ((isLocked && !showGallery) || isHiddenGenerationState) {
     return (
       <div className="p-8 flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Project Already Submitted</h2>
-          <p className="text-gray-600">
-            This project has already been submitted and is being processed by our illustrators.
+        <div className="text-center max-w-md">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 mb-4">
+            <Check className="h-6 w-6 text-green-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Changes Submitted Successfully</h2>
+          <p className="text-gray-600 mb-6">
+            Thank you for submitting your character details and manuscript updates.
           </p>
+          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm text-blue-800">
+            <p className="font-semibold mb-1">What happens next?</p>
+            <p>Our illustrators are now creating your character illustrations based on your specifications. You will be notified once they are ready for review.</p>
+          </div>
         </div>
       </div>
     )

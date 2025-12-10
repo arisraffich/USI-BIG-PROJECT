@@ -136,7 +136,7 @@ export async function POST(
 
     // Generate review URL
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-    const reviewUrl = `${baseUrl}/review/${reviewToken}`
+    const reviewUrl = `${baseUrl}/review/${reviewToken}?tab=characters`
     const projectUrl = `${baseUrl}/admin/project/${id}`
 
     // Send notifications (don't await - send in background)
