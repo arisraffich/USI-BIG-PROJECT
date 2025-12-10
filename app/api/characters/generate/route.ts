@@ -123,18 +123,25 @@ export async function POST(request: NextRequest) {
       // Determine appropriate status based on whether this is first generation or regeneration
       const { data: project } = await supabase
         .from('projects')
-        .select('character_send_count')
+        .select('status, character_send_count')
         .eq('id', project_id)
         .single()
 
-      const newStatus = (project?.character_send_count || 0) > 0
-        ? 'characters_regenerated'
-        : 'character_generation_complete'
+      if (project) {
+        const sendCount = project.character_send_count || 0
+        const newStatus = sendCount > 0
+          ? 'characters_regenerated'
+          : 'character_generation_complete'
 
-      await supabase
-        .from('projects')
-        .update({ status: newStatus })
-        .eq('id', project_id)
+        // Only update if status implies a change to avoid UI flicker or side effects
+        if (project.status !== newStatus) {
+          console.log(`Updating project status from ${project.status} to ${newStatus}`)
+          await supabase
+            .from('projects')
+            .update({ status: newStatus })
+            .eq('id', project_id)
+        }
+      }
     }
 
     return NextResponse.json({

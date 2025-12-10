@@ -50,11 +50,19 @@ export function AdminCharacterGalleryCard({ character, projectId }: AdminCharact
                 throw new Error(data.error || 'Failed to regenerate character')
             }
 
-            toast.success('Character regeneration started')
+            // Check for functional failures even if HTTP 200
+            const result = data.results?.find((r: any) => r.character_id === character.id)
+            if (data.failed > 0 || (result && !result.success)) {
+                throw new Error(result?.error || 'Generation failed on server')
+            }
+
+            toast.success('Character generated successfully')
             router.refresh()
         } catch (error: any) {
+            console.error('Regeneration error:', error)
             toast.error(error.message || 'Failed to regenerate')
-            // Re-open dialog on error? Or just show error? Just error is fine.
+            // Don't close dialog on error so user keeps their prompt
+            setIsDialogOpen(true)
         } finally {
             setIsRegenerating(false)
         }
