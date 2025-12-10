@@ -3,6 +3,8 @@ import { notFound, redirect } from 'next/navigation'
 import { CustomerProjectTabsContent } from '@/components/review/CustomerProjectTabsContent'
 import { Suspense } from 'react'
 
+export const dynamic = 'force-dynamic'
+
 export default async function ReviewPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
 

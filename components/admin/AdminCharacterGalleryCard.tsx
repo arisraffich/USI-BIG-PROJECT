@@ -11,15 +11,17 @@ import { useRouter } from 'next/navigation'
 interface AdminCharacterGalleryCardProps {
     character: Character
     projectId: string
+    isGenerating?: boolean
 }
 
-export function AdminCharacterGalleryCard({ character, projectId }: AdminCharacterGalleryCardProps) {
+export function AdminCharacterGalleryCard({ character, projectId, isGenerating = false }: AdminCharacterGalleryCardProps) {
     const router = useRouter()
     const [isRegenerating, setIsRegenerating] = useState(false)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [customPrompt, setCustomPrompt] = useState(character.generation_prompt || '')
     const [showImage, setShowImage] = useState(false)
     const [showTooltip, setShowTooltip] = useState(false)
+    const [optimisticImage, setOptimisticImage] = useState<string | null>(null)
 
     const handleOpenRegenerate = () => {
         let prompt = character.generation_prompt || ''
@@ -56,6 +58,17 @@ export function AdminCharacterGalleryCard({ character, projectId }: AdminCharact
                 throw new Error(result?.error || 'Generation failed on server')
             }
 
+            // Preload new image to prevent flicker
+            if (result?.image_url) {
+                await new Promise((resolve) => {
+                    const img = new Image()
+                    img.onload = resolve
+                    img.onerror = resolve // Don't block indefinitely
+                    img.src = result.image_url
+                })
+                setOptimisticImage(result.image_url)
+            }
+
             toast.success('Character generated successfully')
             router.refresh()
         } catch (error: any) {
@@ -72,14 +85,22 @@ export function AdminCharacterGalleryCard({ character, projectId }: AdminCharact
         ? 'Main Character'
         : (character.name || character.role || 'Unnamed Character')
 
+    // Use optimistic image if available, otherwise use character image
+    const displayImageUrl = optimisticImage || character.image_url
+
+    // Show loading overlay if explicitly regenerating OR if project is generating and this card has no image
+    const showLoadingOverlay = isRegenerating || (isGenerating && !displayImageUrl)
+
     return (
         <div className="flex flex-col w-full gap-4">
             <Card className="flex flex-col w-full p-0 gap-0 border-0 shadow-md relative">
-                {isRegenerating && (
+                {showLoadingOverlay && (
                     <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-50 rounded-lg">
                         <div className="flex flex-col items-center gap-2 bg-white p-3 rounded-lg shadow-sm border">
                             <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                            <span className="text-xs font-semibold text-blue-700">Regenerating...</span>
+                            <span className="text-xs font-semibold text-blue-700">
+                                {isRegenerating ? 'Regenerating...' : 'Generating...'}
+                            </span>
                         </div>
                     </div>
                 )}
@@ -87,9 +108,9 @@ export function AdminCharacterGalleryCard({ character, projectId }: AdminCharact
                     className="relative aspect-[9/16] w-full bg-gray-100 cursor-pointer hover:opacity-95 transition-opacity rounded-t-lg overflow-hidden"
                     onClick={() => setShowImage(true)}
                 >
-                    {character.image_url ? (
+                    {displayImageUrl ? (
                         <img
-                            src={character.image_url}
+                            src={displayImageUrl}
                             alt={displayName}
                             className="w-full h-full object-cover"
                         />
@@ -112,11 +133,11 @@ export function AdminCharacterGalleryCard({ character, projectId }: AdminCharact
                                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                                     <DialogTrigger asChild>
                                         <div
-                                            className="cursor-pointer bg-violet-600 text-white p-2 rounded-lg hover:bg-violet-700 hover:scale-105 transition-all shadow-md flex items-center justify-center"
+                                            className="cursor-pointer bg-violet-600 text-white w-[25px] h-[25px] rounded-md hover:bg-violet-700 hover:scale-105 transition-all shadow-sm flex items-center justify-center"
                                             onClick={handleOpenRegenerate}
                                             title="Regenerate"
                                         >
-                                            <RefreshCw className="w-5 h-5" />
+                                            <RefreshCw className="w-3.5 h-3.5" />
                                         </div>
                                     </DialogTrigger>
                                     <DialogContent>
@@ -212,9 +233,9 @@ export function AdminCharacterGalleryCard({ character, projectId }: AdminCharact
             <Dialog open={showImage} onOpenChange={setShowImage}>
                 <DialogContent className="max-w-[95vw] max-h-[95vh] w-auto h-auto p-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none">
                     <DialogTitle className="sr-only">{displayName}</DialogTitle>
-                    {character.image_url && (
+                    {displayImageUrl && (
                         <img
-                            src={character.image_url}
+                            src={displayImageUrl}
                             alt={displayName}
                             className="max-w-full max-h-[90vh] object-contain rounded-md"
                         />

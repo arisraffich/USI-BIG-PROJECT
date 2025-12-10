@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Character } from '@/types/character'
 import { Button } from '@/components/ui/button'
+import { useRouter } from 'next/navigation'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
@@ -51,6 +52,10 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
     // ... handleSaveNotes ...
 
 
+    const router = useRouter() // Initialize router
+
+    // ...
+
     const handleSaveNotes = async () => {
         if (!notes.trim()) {
             setIsEditing(false)
@@ -71,6 +76,7 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
 
             toast.success('Change request saved')
             setIsEditing(false)
+            router.refresh() // Refresh to show the new note
         } catch (error) {
             toast.error('Failed to save change request')
             console.error(error)
@@ -149,7 +155,7 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                className="absolute top-1 right-1 h-6 px-2 text-amber-600 hover:text-amber-800 hover:bg-amber-100 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+                                className="absolute top-1 right-1 h-6 px-2 text-amber-600 hover:text-amber-800 hover:bg-amber-100 transition-colors text-xs"
                                 onClick={() => setIsEditing(true)}
                             >
                                 Edit

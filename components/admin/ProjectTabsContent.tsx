@@ -168,8 +168,8 @@ export function ProjectTabsContent({
     }
   }, [projectId, router])
 
-  // Show Loading State if Generating
-  if (projectStatus === 'character_generation') {
+  // Show Loading State if Generating AND no images yet (Wait for at least one image before showing gallery)
+  if (projectStatus === 'character_generation' && !showGallery) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
         <div className="relative">
@@ -202,6 +202,7 @@ export function ProjectTabsContent({
           <AdminCharacterGallery
             characters={characters}
             projectId={projectId}
+            isGenerating={projectStatus === 'character_generation'}
           />
         ) : (
           /* Setup View (Stage 1) */

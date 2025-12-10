@@ -6,9 +6,10 @@ import { AdminCharacterGalleryCard } from './AdminCharacterGalleryCard'
 interface AdminCharacterGalleryProps {
     characters: Character[]
     projectId: string
+    isGenerating?: boolean
 }
 
-export function AdminCharacterGallery({ characters, projectId }: AdminCharacterGalleryProps) {
+export function AdminCharacterGallery({ characters, projectId, isGenerating = false }: AdminCharacterGalleryProps) {
     // Sort: Main first, then by creation date
     const sortedCharacters = [...characters].sort((a, b) => {
         if (a.is_main && !b.is_main) return -1
@@ -27,6 +28,7 @@ export function AdminCharacterGallery({ characters, projectId }: AdminCharacterG
                         <AdminCharacterGalleryCard
                             character={character}
                             projectId={projectId}
+                            isGenerating={isGenerating}
                         />
                     </div>
                 ))}

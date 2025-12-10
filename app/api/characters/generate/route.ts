@@ -128,18 +128,29 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (project) {
-        const sendCount = project.character_send_count || 0
-        const newStatus = sendCount > 0
-          ? 'characters_regenerated'
-          : 'character_generation_complete'
-
-        // Only update if status implies a change to avoid UI flicker or side effects
-        if (project.status !== newStatus) {
-          console.log(`Updating project status from ${project.status} to ${newStatus}`)
-          await supabase
+        // Initial Generation Phase
+        if (project.status === 'character_generation') {
+          console.log(`Initial generation complete. Updating status to character_generation_complete`)
+          const { error: updateError } = await supabase
             .from('projects')
-            .update({ status: newStatus })
+            .update({ status: 'character_generation_complete' })
             .eq('id', project_id)
+
+          if (updateError) {
+            console.error('Failed to update project status:', updateError)
+          }
+        } else {
+          // Manual Regeneration / Revision Phase
+          // Always update to 'characters_regenerated' to enable the "Resend" flow
+          console.log(`Regeneration complete. Updating status to characters_regenerated`)
+          const { error: updateError } = await supabase
+            .from('projects')
+            .update({ status: 'characters_regenerated' })
+            .eq('id', project_id)
+
+          if (updateError) {
+            console.error('Failed to update project status:', updateError)
+          }
         }
       }
     }

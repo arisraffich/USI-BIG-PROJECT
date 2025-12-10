@@ -107,23 +107,95 @@ export async function POST(
     }
 
     // Fetch characters to determine flow (Generation vs Revision vs Approval)
-    const { data: characters, error: charsError } = await supabase
+    // Fetch characters to determine flow (Generation vs Revision vs Approval)
+    // Re-fetch to ensure we have the latest edits from the transaction above
+    const { data: latestCharacters, error: charsError } = await supabase
       .from('characters')
       .select('*')
       .eq('project_id', project.id)
 
-    if (charsError) {
+    if (charsError || !latestCharacters) {
       console.error('Error fetching characters:', charsError)
       return NextResponse.json({ error: 'Failed to fetch characters' }, { status: 500 })
     }
 
-    // Check if secondary characters have images (excluding Main Character)
-    const charsToValidate = characters?.filter(c => !c.is_main) || []
-    const pendingGeneration = charsToValidate.some(c => !c.image_url || c.image_url.trim() === '')
-    const hasFeedback = characters?.some(c => c.feedback_notes && !c.is_resolved) || false
+    // Determine Logic Flow
+    // 1. Generation Needed? (Any secondary character missing image)
+    const secondaryCharacters = latestCharacters.filter(c => !c.is_main)
+    const pendingGeneration = secondaryCharacters.some(c => !c.image_url || c.image_url.trim() === '')
 
-    // SCENARIO A: Revision or Approval (No pending generation for secondary characters)
-    if (!pendingGeneration) {
+    // 2. Feedback Present? (Any character has NOTES and is NOT resolved)
+    // Note: We check ALL characters for feedback, including Main.
+    const hasFeedback = latestCharacters.some(c => !!c.feedback_notes && !c.is_resolved)
+
+    console.log(`[Submit] Status Check - Pending Gen: ${pendingGeneration}, Has Feedback: ${hasFeedback}`)
+
+    // DECISION TREE
+    if (pendingGeneration) {
+      // PATH A: GENERATION REQUIRED
+      // Update project status to generating
+      await supabase.from('projects').update({ status: 'character_generation' }).eq('id', project.id)
+
+      // Send notification (non-blocking)
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+        await notifyCustomerSubmission({
+          projectId: project.id,
+          projectTitle: project.book_title,
+          authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim(),
+          projectUrl: `${baseUrl}/admin/project/${project.id}`,
+        })
+      } catch (e) { console.error('Notification error:', e) }
+
+      // Fire-and-forget generation
+      const charactersToGenerate = secondaryCharacters.filter(c => !c.image_url || c.image_url.trim() === '')
+      if (charactersToGenerate.length > 0) {
+        (async () => {
+          try {
+            const { generateCharacterImage } = await import('@/lib/ai/character-generator')
+            const mainChar = latestCharacters.find(c => c.is_main)
+            const mainCharImage = mainChar?.image_url || ''
+
+            // Run in parallel
+            const results = await Promise.all(
+              charactersToGenerate.map(char => generateCharacterImage(char, mainCharImage, project.id))
+            )
+
+            // If successful, update status to complete
+            const allSucceeded = results.every(r => r.success)
+            if (allSucceeded) {
+              const supabaseAdmin = await createAdminClient()
+              await supabaseAdmin.from('projects').update({ status: 'character_generation_complete' }).eq('id', project.id)
+            }
+
+            // Notification logic...
+            try {
+              const { notifyCharacterGenerationComplete } = await import('@/lib/notifications')
+              const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+              await notifyCharacterGenerationComplete({
+                projectId: project.id,
+                projectTitle: project.book_title,
+                authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim(),
+                projectUrl: `${baseUrl}/admin/project/${project.id}`,
+                generatedCount: results.filter(r => r.success).length,
+                failedCount: results.filter(r => !r.success).length,
+              })
+            } catch (e) {
+              console.error('Error sending completion notification', e)
+            }
+
+          } catch (err) { console.error('Bg generation failed:', err) }
+        })()
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Changes submitted and generation started',
+        status: 'character_generation'
+      })
+
+    } else {
+      // PATH B: NO GENERATION NEEDED (Revision or Approval)
       let newStatus = 'characters_approved'
       let message = 'Characters approved successfully'
 
@@ -132,118 +204,24 @@ export async function POST(
         message = 'Feedback submitted successfully'
       }
 
-      const { error: statusError } = await supabase
-        .from('projects')
-        .update({ status: newStatus })
-        .eq('id', project.id)
-
-      if (statusError) {
-        console.error('Error updating status:', statusError)
-        throw new Error('Failed to update project status')
-      }
+      await supabase.from('projects').update({ status: newStatus }).eq('id', project.id)
 
       // Notify Admin
       try {
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
         await notifyCustomerSubmission({
           projectId: project.id,
           projectTitle: project.book_title,
           authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim(),
-          projectUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/project/${project.id}`,
+          projectUrl: `${baseUrl}/admin/project/${project.id}`,
         })
-      } catch (notifError) {
-        console.error('Error sending notification:', notifError)
-      }
+      } catch (e) { console.error('Notification error:', e) }
 
       return NextResponse.json({
         success: true,
         message,
         status: newStatus
       })
-    }
-
-    // SCENARIO B: First Time Generation (No images yet)
-    // Proceed with existing generation logic
-
-    // Update project status to generating
-    await supabase.from('projects').update({ status: 'character_generation' }).eq('id', project.id)
-
-    // Send notification for generation start (non-blocking)
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-    const projectUrl = `${baseUrl}/admin/project/${project.id}`
-
-    try {
-      await notifyCustomerSubmission({
-        projectId: project.id,
-        projectTitle: project.book_title,
-        authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim(),
-        projectUrl,
-      })
-    } catch (notifError) {
-      console.error('Error sending notification:', notifError)
-    }
-
-    // Identify/Generate secondary characters (Wait, logic usually generates ALL characters including Main?)
-    // Existing logic fetched "secondary" only? 
-    // "Get ALL secondary characters for generation" - Line 76 of original.
-    // If we only generate secondary, what about main? 
-    // Assuming Main is handled separately or this is a specific flow. 
-    // I will stick to "Generate secondary" as per original logic, but double check if Main needs generation.
-    // If Main has no image, we should probably generate it too?
-    // But original code filtered `is_main: false`. 
-    // I will respect original logic for now to avoid breaking Generation.
-
-    const secondaryCharacters = characters.filter(c => !c.is_main)
-
-    if (secondaryCharacters.length > 0) {
-      // Fire-and-forget generation (Do not await)
-      (async () => {
-        try {
-          console.log('[Submit] Starting background generation for project:', project.id)
-          // Import generator dynamically
-          const { generateCharacterImage } = await import('@/lib/ai/character-generator')
-
-          // Get main character image for style reference if available
-          const mainCharacter = characters.find(c => c.is_main)
-          const mainCharImage = mainCharacter?.image_url || ''
-
-          // Run in parallel
-          const results = await Promise.all(
-            secondaryCharacters.map(char => generateCharacterImage(char, mainCharImage, project.id))
-          )
-
-          console.log('[Submit] Background generation finished. Success count:', results.filter(r => r.success).length)
-
-          // If successful, update status to complete (Stage 2)
-          const allSucceeded = results.every(r => r.success)
-          if (allSucceeded) {
-            const supabaseAdmin = await createAdminClient() // Create fresh client for background task
-            await supabaseAdmin
-              .from('projects')
-              .update({ status: 'character_generation_complete' }) // Maps to "Characters Generated"
-              .eq('id', project.id)
-          }
-
-          // Notify completion
-          try {
-            const { notifyCharacterGenerationComplete } = await import('@/lib/notifications')
-            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-            const projectUrl = `${baseUrl}/admin/project/${project.id}`
-
-            await notifyCharacterGenerationComplete({
-              projectId: project.id,
-              projectTitle: project.book_title,
-              authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim(),
-              projectUrl,
-              generatedCount: results.filter(r => r.success).length,
-              failedCount: results.filter(r => !r.success).length,
-            })
-          } catch (e) {
-            console.error('Error sending completion notification', e)
-          }
-        } catch (err) {
-          console.error('[Submit] Background generation failed:', err)
-        }
-      })()
     }
 
     return NextResponse.json({

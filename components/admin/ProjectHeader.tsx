@@ -64,15 +64,38 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
     }
 
-    // STAGE 4: Characters Regenerated (Ready to Resend)
-    if (status === 'characters_regenerated') {
+    // STAGE 5.5: Waiting for Review (Sent to Customer)
+    if (status === 'character_review' && sendCount > 0) {
       return {
-        tag: 'Characters Regenerated',
-        tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        tag: 'Waiting for Review',
+        tagStyle: 'bg-blue-100 text-blue-800 border-blue-300',
         buttonLabel: 'Resend Characters',
         showCount: true,
         isResend: true,
-        buttonDisabled: false
+        buttonDisabled: true
+      }
+    }
+
+    // STAGE 4: Characters Regenerated (Ready to Resend)
+    if (status === 'characters_regenerated') {
+      if (sendCount === 0) {
+        return {
+          tag: 'Characters Generated',
+          tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+          buttonLabel: 'Send Characters',
+          showCount: false,
+          isResend: false,
+          buttonDisabled: false
+        }
+      } else {
+        return {
+          tag: 'Characters Regenerated',
+          tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+          buttonLabel: 'Resend Characters',
+          showCount: true,
+          isResend: true,
+          buttonDisabled: false
+        }
       }
     }
 
@@ -85,12 +108,25 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         buttonLabel: 'Resend Characters',
         showCount: true,
         isResend: true,
+        buttonDisabled: true // Disabled until regenerated
+      }
+    }
+
+    // STAGE 2.5: Characters Generated (Explicit Status)
+    // This handles cases where status is explicitly set (e.g. after customer submission), regardless of send count
+    if (status === 'character_generation_complete') {
+      return {
+        tag: 'Characters Generated',
+        tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        buttonLabel: 'Send Characters',
+        showCount: false,
+        isResend: sendCount > 0,
         buttonDisabled: false
       }
     }
 
-    // STAGE 2: Images Ready (First Time)
-    // Condition: Has images, but never sent (count 0)
+    // STAGE 2: Images Ready (First Time Implicit)
+    // Condition: Has images, but never sent (count 0) and status isn't explicit
     if (hasImages && sendCount === 0) {
       return {
         tag: 'Characters Generated',

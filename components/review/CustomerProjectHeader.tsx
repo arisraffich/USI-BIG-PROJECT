@@ -102,10 +102,9 @@ export function CustomerProjectHeader({
                 </Button>
                 {/* Tooltip for disabled state */}
                 {isSubmitDisabled && !isSubmitting && (
-                  <div className="absolute top-full mt-3 right-0 w-max max-w-[200px] px-3 py-2 bg-gray-800 text-white text-xs font-medium rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center">
-                    Please fill out all character form fields to submit
-                    {/* Arrow */}
-                    <div className="absolute -top-1 right-6 border-4 border-transparent border-b-gray-800" />
+                  <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-slate-800 text-white text-xs rounded shadow-lg whitespace-nowrap z-50 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none data-[state=visible]:animate-in data-[state=visible]:fade-in data-[state=visible]:slide-in-from-top-1">
+                    Please complete all character forms and all required fields before submitting.
+                    <div className="absolute -top-1 right-8 w-2 h-2 bg-slate-800 rotate-45"></div>
                   </div>
                 )}
               </div>
