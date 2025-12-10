@@ -119,6 +119,18 @@ export function CustomerProjectTabsContent({
   // Store manuscript editor edits
   const [manuscriptEdits, setManuscriptEdits] = useState<{ [pageId: string]: { story_text?: string; scene_description?: string } }>({})
 
+  // Store character form data and validity
+  // Map id -> { data, isValid }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [characterForms, setCharacterForms] = useState<{ [id: string]: { data: any; isValid: boolean } }>({})
+
+  const handleCharacterChange = useCallback((id: string, data: any, isValid: boolean) => {
+    setCharacterForms(prev => ({
+      ...prev,
+      [id]: { data, isValid }
+    }))
+  }, [])
+
   // Read active tab directly from search params
   const activeTab = useMemo(() => {
     const tab = searchParams?.get('tab')
@@ -154,6 +166,19 @@ export function CustomerProjectTabsContent({
   // Check if project is locked (status changed from character_review)
   const isLocked = projectStatus !== 'character_review'
 
+  // Calculate if submit button should be disabled
+  // Logic: Active only when all EDITABLE character forms are valid
+  // Main character is read-only, so we focus on secondary characters
+  const isSubmitDisabled = useMemo(() => {
+    if (!sortedCharacters.secondary.length) return false
+
+    // Check if every secondary character has an entry in characterForms AND it is valid
+    return !sortedCharacters.secondary.every(char => {
+      const formInfo = characterForms[char.id]
+      return formInfo && formInfo.isValid
+    })
+  }, [sortedCharacters.secondary, characterForms])
+
   const handleCharacterAdded = useCallback(() => {
     setRefreshing(true)
     router.refresh()
@@ -169,12 +194,20 @@ export function CustomerProjectTabsContent({
     setIsSubmitting(true)
     setSubmissionStatus('loading')
 
+    // Prepare character data for submission
+    // Map existing forms to a clean object
+    const characterEdits = Object.entries(characterForms).reduce((acc, [id, info]) => {
+      acc[id] = info.data
+      return acc
+    }, {} as Record<string, any>)
+
     try {
       const response = await fetch(`/api/review/${reviewToken}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pageEdits: manuscriptEdits,
+          characterEdits: characterEdits
         }),
       })
 
@@ -245,6 +278,7 @@ export function CustomerProjectTabsContent({
         isSubmitting={isSubmitting}
         onSubmit={handleSubmitChanges}
         showSubmitButton={!showGallery && !isLocked && !isEditMode}
+        isSubmitDisabled={isSubmitDisabled}
         hideOnMobile={activeTab === 'characters' && showGallery}
       />
       <div className={`p-8 pb-32 relative min-h-screen ${activeTab === 'characters' && showGallery ? 'pt-8 md:pt-24' : 'pt-24'}`}>
@@ -276,12 +310,14 @@ export function CustomerProjectTabsContent({
                     <CustomerCharacterCard
                       key={sortedCharacters.main.id}
                       character={sortedCharacters.main}
+                      onChange={handleCharacterChange}
                     />
                   )}
                   {sortedCharacters.secondary.map((character) => (
                     <CustomerCharacterCard
                       key={character.id}
                       character={character}
+                      onChange={handleCharacterChange}
                     />
                   ))}
                   {/* Add Character Ghost Card - Always at the end */}

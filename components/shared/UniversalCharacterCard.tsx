@@ -42,7 +42,22 @@ interface InternalCharacterFormData {
     clothing_and_accessories: string
 }
 
-interface UniversalCharacterCardProps {
+
+
+// Helper to validate if all fields are filled
+const validateForm = (data: InternalCharacterFormData): boolean => {
+    return !!(
+        data.age?.trim() &&
+        data.gender?.trim() &&
+        data.skin_color?.trim() &&
+        data.hair_color?.trim() &&
+        data.hair_style?.trim() &&
+        data.eye_color?.trim() &&
+        data.clothing_and_accessories?.trim()
+    )
+}
+
+export interface UniversalCharacterCardProps {
     character: Character
     onSave: (data: CharacterFormData) => Promise<void>
     onDelete?: () => Promise<void>
@@ -50,6 +65,8 @@ interface UniversalCharacterCardProps {
     className?: string
     readOnly?: boolean
     alwaysEditing?: boolean
+    hideSaveButton?: boolean
+    onChange?: (data: CharacterFormData, isValid: boolean) => void
 }
 
 export const UniversalCharacterCard = memo(function UniversalCharacterCard({
@@ -59,7 +76,9 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
     isGenerating = false,
     className,
     readOnly = false,
-    alwaysEditing = false
+    alwaysEditing = false,
+    hideSaveButton = false,
+    onChange
 }: UniversalCharacterCardProps) {
     const [isEditing, setIsEditing] = useState(alwaysEditing)
     const [saving, setSaving] = useState(false)
@@ -101,16 +120,43 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
 
         if (alwaysEditing && !readOnly) {
             setIsEditing(true)
-        } else if (!readOnly) {
-            // Auto-enter edit mode logic (optional, currently disabled or manual)
-            /*
-           const hasSavedData = Object.values(savedData).some(value => value.trim() !== '')
-           if (!hasSavedData && !character.is_main && !isGenerating) {
-               setIsEditing(true)
-           }
-           */
         }
-    }, [character, isGenerating, readOnly, alwaysEditing])
+
+        // Initial validation and bubble up
+        if (onChange) {
+            const isValid = validateForm(savedData)
+            onChange({
+                age: savedData.age || null,
+                gender: savedData.gender || null,
+                skin_color: savedData.skin_color || null,
+                hair_color: savedData.hair_color || null,
+                hair_style: savedData.hair_style || null,
+                eye_color: savedData.eye_color || null,
+                clothing: savedData.clothing_and_accessories || null,
+                accessories: null,
+                special_features: null,
+            }, isValid)
+        }
+    }, [character, isGenerating, readOnly, alwaysEditing]) // removed onChange to avoid circular deps if not memoized upstream
+
+    // Effect to bubble up changes
+    useEffect(() => {
+        if (!onChange || !formData) return
+
+        const isValid = validateForm(formData)
+        const outputData: CharacterFormData = {
+            age: formData.age || null,
+            gender: formData.gender || null,
+            skin_color: formData.skin_color || null,
+            hair_color: formData.hair_color || null,
+            hair_style: formData.hair_style || null,
+            eye_color: formData.eye_color || null,
+            clothing: formData.clothing_and_accessories || null,
+            accessories: null,
+            special_features: null,
+        }
+        onChange(outputData, isValid)
+    }, [formData, onChange]) // Ensure formData triggers this
 
     // Check if form is dirty
     const isDirty = initialData ? JSON.stringify(formData) !== JSON.stringify(initialData) : false
@@ -144,8 +190,6 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
             // If alwaysEditing, we stay in edit mode
             if (!alwaysEditing) {
                 setIsEditing(false)
-            } else {
-                // Optional: Show a "Saved!" state or rely on toast
             }
         } finally {
             setSaving(false)
@@ -331,8 +375,8 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
                             )}
                         </div>
 
-                        {/* Actions Footer - Visible only if not readOnly */}
-                        {!readOnly && (
+                        {/* Actions Footer - Visible only if not readOnly AND hideSaveButton is false */}
+                        {!readOnly && !hideSaveButton && (
                             <div className={cn("flex items-center pt-2", alwaysEditing ? "justify-center" : "")}>
                                 {editMode ? (
                                     <div className="flex gap-2">

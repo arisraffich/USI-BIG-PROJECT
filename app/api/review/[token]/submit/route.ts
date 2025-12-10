@@ -74,6 +74,38 @@ export async function POST(
       }
     }
 
+    // Update characters with customer edits
+    const { characterEdits } = body
+    if (characterEdits && Object.keys(characterEdits).length > 0) {
+      console.log('[Submit] Processing character edits:', Object.keys(characterEdits).length)
+
+      const characterUpdates = Object.entries(characterEdits).map(([charId, data]: [string, any]) => ({
+        id: charId,
+        data: data
+      }))
+
+      await Promise.all(characterUpdates.map(async (update) => {
+        const { error: updateError } = await supabase
+          .from('characters')
+          .update({
+            age: update.data.age,
+            gender: update.data.gender,
+            skin_color: update.data.skin_color,
+            hair_color: update.data.hair_color,
+            hair_style: update.data.hair_style,
+            eye_color: update.data.eye_color,
+            clothing: update.data.clothing,
+            accessories: update.data.accessories,
+            special_features: update.data.special_features,
+          })
+          .eq('id', update.id)
+
+        if (updateError) {
+          console.error(`Error updating character ${update.id}:`, updateError)
+        }
+      }))
+    }
+
     // Fetch characters to determine flow (Generation vs Revision vs Approval)
     const { data: characters, error: charsError } = await supabase
       .from('characters')

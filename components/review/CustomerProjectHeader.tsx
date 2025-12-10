@@ -13,6 +13,7 @@ interface CustomerProjectHeaderProps {
   isSubmitting: boolean
   onSubmit: () => void
   showSubmitButton?: boolean
+  isSubmitDisabled?: boolean
   hideOnMobile?: boolean
 }
 
@@ -24,6 +25,7 @@ export function CustomerProjectHeader({
   isSubmitting,
   onSubmit,
   showSubmitButton = true,
+  isSubmitDisabled = false,
   hideOnMobile = false
 }: CustomerProjectHeaderProps) {
   const searchParams = useSearchParams()
@@ -80,23 +82,33 @@ export function CustomerProjectHeader({
           <div className="flex items-center gap-3 pl-4">
             <div id="mobile-header-portal-right" className="flex md:hidden items-center gap-2"></div>
             {showSubmitButton && (
-              <Button
-                onClick={onSubmit}
-                disabled={isSubmitting}
-                className="pl-2 pr-3 bg-green-600 hover:bg-green-700 text-white font-medium shadow-sm transition-all"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4 mr-1.5" />
-                    Submit Changes
-                  </>
+              <div className="relative group">
+                <Button
+                  onClick={onSubmit}
+                  disabled={isSubmitting || isSubmitDisabled}
+                  className="pl-2 pr-3 bg-green-600 hover:bg-green-700 text-white font-medium shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-1.5" />
+                      Submit Changes
+                    </>
+                  )}
+                </Button>
+                {/* Tooltip for disabled state */}
+                {isSubmitDisabled && !isSubmitting && (
+                  <div className="absolute top-full mt-3 right-0 w-max max-w-[200px] px-3 py-2 bg-gray-800 text-white text-xs font-medium rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center">
+                    Please fill out all character form fields to submit
+                    {/* Arrow */}
+                    <div className="absolute -top-1 right-6 border-4 border-transparent border-b-gray-800" />
+                  </div>
                 )}
-              </Button>
+              </div>
             )}
           </div>
         </div>
