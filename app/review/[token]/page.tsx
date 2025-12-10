@@ -12,6 +12,8 @@ export default async function ReviewPage({ params }: { params: Promise<{ token: 
 
   const supabase = await createAdminClient()
 
+  console.log(`[ReviewPage] Accessing with token: ${token}`)
+
   // Fetch project by review token
   const { data: project, error: projectError } = await supabase
     .from('projects')
@@ -20,6 +22,8 @@ export default async function ReviewPage({ params }: { params: Promise<{ token: 
     .single()
 
   if (projectError || !project) {
+    console.error('[ReviewPage] Project not found or error:', projectError)
+    console.error(`[ReviewPage] Token used: ${token}`)
     notFound()
   }
 
