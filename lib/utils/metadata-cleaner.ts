@@ -1,9 +1,9 @@
 import sharp from 'sharp'
 
 export async function removeMetadata(
-  imageBuffer: ArrayBuffer
+  imageBuffer: Buffer | ArrayBuffer
 ): Promise<Buffer> {
-  const pipeline = sharp(Buffer.from(imageBuffer))
+  const pipeline = sharp(Buffer.isBuffer(imageBuffer) ? imageBuffer : Buffer.from(imageBuffer))
 
   // Strip all metadata by NOT chaining withMetadata() initially usually works, 
   // but to Add specific metadata we use withMetadata with defaults.
