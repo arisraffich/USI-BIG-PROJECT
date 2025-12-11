@@ -28,6 +28,8 @@ export function ProjectTabsContent({
   const searchParams = useSearchParams()
   const router = useRouter()
 
+  const isGenerating = projectStatus === 'character_generation'
+
   // Local state for pages to support instant realtime updates
   const [localPages, setLocalPages] = useState<Page[]>(pages || [])
   const lastToastTimeRef = useRef(0)
@@ -92,12 +94,13 @@ export function ProjectTabsContent({
     return sortedCharacters.secondary.some(c => c.image_url !== null && c.image_url !== '')
   }, [sortedCharacters.secondary])
 
-  // Realtime Subscription for Characters
+  // Realtime subscription for character updates
   useEffect(() => {
     const supabase = createClient()
+    const channelName = `admin-project-characters-${projectId}`
 
     const channel = supabase
-      .channel('project-characters')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -107,9 +110,20 @@ export function ProjectTabsContent({
           filter: `project_id=eq.${projectId}`
         },
         (payload) => {
-          router.refresh()
+          // 1. Image Generation Complete (UPDATE)
+          if (payload.eventType === 'UPDATE') {
+            const newChar = payload.new as any
+            if (newChar.image_url && !payload.old.image_url) {
+              router.refresh()
+              toast.success('New character illustration ready', {
+                description: `${newChar.name || newChar.role} has been generated.`
+              })
+            }
+          }
 
+          // 2. New Character Found (INSERT)
           if (payload.eventType === 'INSERT') {
+            router.refresh()
             toast.success('New character discovered!', {
               description: 'AI has identified a new character in your story.'
             })
@@ -122,6 +136,17 @@ export function ProjectTabsContent({
       supabase.removeChannel(channel)
     }
   }, [projectId, router])
+
+  // Polling fallback for generation (in case Realtime fails)
+  useEffect(() => {
+    if (!isGenerating) return
+
+    const intervalId = setInterval(() => {
+      router.refresh()
+    }, 4000)
+
+    return () => clearInterval(intervalId)
+  }, [isGenerating, router])
 
   // Realtime Subscription for Pages
   useEffect(() => {

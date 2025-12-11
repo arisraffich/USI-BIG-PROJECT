@@ -71,8 +71,8 @@ export async function POST(
       const charUpdates = characters.map(async (char) => {
         console.log(`[Resend] Char ${char.id}: resolved=${char.is_resolved}, hasNotes=${!!char.feedback_notes}`)
 
-        // Resolve feedback if marked resolved (regenerated)
-        if (char.is_resolved && char.feedback_notes) {
+        // Resolve feedback: always archive if notes exist
+        if (char.feedback_notes) {
           console.log(`[Resend] Archiving feedback for char ${char.id}`)
           const currentHistory = Array.isArray(char.feedback_history) ? char.feedback_history : []
           const newHistory = [
@@ -86,7 +86,7 @@ export async function POST(
             .update({
               feedback_history: newHistory,
               feedback_notes: null,
-              is_resolved: false
+              is_resolved: true // Mark as resolved since we are sending new version
             })
             .eq('id', char.id)
         }

@@ -25,7 +25,7 @@ export async function POST(
     }
 
     // Find the story file (should be named story.*)
-    const storyFile = files?.find(file => 
+    const storyFile = files?.find(file =>
       file.name.toLowerCase().startsWith('story.')
     )
 
@@ -79,17 +79,17 @@ export async function POST(
     }
 
     if (pages.length === 0) {
-      return NextResponse.json({ 
-        success: true, 
+      return NextResponse.json({
+        success: true,
         message: 'Story parsed but no pages found',
-        pagesCreated: 0 
+        pagesCreated: 0
       })
     }
 
     // Generate descriptions for pages that don't have them
     const pagesWithDescriptions = await Promise.all(
       pages.map(async (page) => {
-        if (!page.scene_description && page.story_text) {
+        if (page.story_text) {
           try {
             const response = await fetch(
               `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/ai/generate-description`,
@@ -99,25 +99,29 @@ export async function POST(
                 body: JSON.stringify({
                   story_text: page.story_text,
                   character_names: [], // Will be populated after character identification
+                  current_notes: page.scene_description || null
                 }),
               }
             )
-            
+
             if (response.ok) {
               const { description } = await response.json()
               return {
                 ...page,
                 scene_description: description,
+                // If we had original notes, we refined them. If not, we auto-generated.
+                // In both cases, AI was involved.
                 description_auto_generated: true,
               }
             }
           } catch (error: any) {
-            // Silently fail - description can be generated later
+            // Silently fail - keep original if exists
           }
         }
         return {
           ...page,
-          description_auto_generated: false,
+          description_auto_generated: !!page.scene_description, // If we failed but had notes, keep flag as is? Or false? 
+          // If we failed, we return the original page.
         }
         return page
       })
@@ -155,8 +159,8 @@ export async function POST(
       )
     }
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       pagesCreated: pages.length,
       message: `Successfully parsed story and created ${pages.length} pages`
     })

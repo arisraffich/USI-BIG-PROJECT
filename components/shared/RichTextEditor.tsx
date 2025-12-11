@@ -93,7 +93,7 @@ export function RichTextEditor({
             onFocus={handleFocus}
             onClick={handleClick}
             onKeyUp={handleKeyUp}
-            className={`min-h-[150px] w-full bg-transparent outline-none prose prose-sm max-w-none ${className}`}
+            className={`min-h-[60px] w-full bg-transparent outline-none prose prose-sm max-w-none ${className}`}
             style={{
                 whiteSpace: 'pre-wrap', // Preserve whitespace like a textarea
                 overflowWrap: 'break-word',

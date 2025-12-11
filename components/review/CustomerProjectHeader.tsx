@@ -113,17 +113,16 @@ export function CustomerProjectHeader({
                 <Button
                   onClick={onSubmit}
                   disabled={isSubmitting || isSubmitDisabled}
-                  variant="outline"
-                  className="bg-white hover:bg-gray-50 text-gray-700 font-medium border-gray-300 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-green-600 hover:bg-green-700 text-white font-medium shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
+                      Submitting...
                     </>
                   ) : (
                     <>
-                      Save Changes
+                      Submit Changes
                     </>
                   )}
                 </Button>

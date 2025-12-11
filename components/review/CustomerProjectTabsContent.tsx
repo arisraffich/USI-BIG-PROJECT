@@ -174,6 +174,31 @@ export function CustomerProjectTabsContent({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [characterForms, setCharacterForms] = useState<{ [id: string]: { data: any; isValid: boolean } }>({})
 
+  // Initialize character forms from props on mount (fix for manually added characters having disabled submit button)
+  useEffect(() => {
+    if (characters && characters.length > 0) {
+      const initialForms: Record<string, { data: any; isValid: boolean }> = {}
+
+      characters.forEach(char => {
+        // Only initialize if not main character (as main is read-only here)
+        if (!char.is_main) {
+          // Basic validation: needs name, age, gender. 
+          // If manual add, these should exist.
+          const isValid = !!(char.name && char.age && char.gender)
+          initialForms[char.id] = { data: char, isValid }
+        }
+      })
+
+      // Only set if not already populated (to avoid overwriting user edits on re-render)
+      setCharacterForms(prev => {
+        if (Object.keys(prev).length === 0 && Object.keys(initialForms).length > 0) {
+          return initialForms
+        }
+        return prev
+      })
+    }
+  }, [characters])
+
   const handleCharacterChange = useCallback((id: string, data: any, isValid: boolean) => {
     setCharacterForms(prev => ({
       ...prev,

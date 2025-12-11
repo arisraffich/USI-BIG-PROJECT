@@ -64,7 +64,7 @@ export function CustomerManuscriptPage({
       </div>
 
       {/* Block A: Story Text */}
-      <div className="px-8 pb-6 min-h-[100px]">
+      <div className="px-8 pb-6">
         {isEditMode ? (
           <RichTextEditor
             initialContent={localStoryText}
