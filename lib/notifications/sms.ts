@@ -5,7 +5,7 @@
 function normalizePhoneNumber(phone: string): string {
   // Remove all non-digit characters except +
   let cleaned = phone.replace(/[^\d+]/g, '')
-  
+
   // If it doesn't start with +, assume US number and add +1
   if (!cleaned.startsWith('+')) {
     // If it starts with 1, add +
@@ -16,7 +16,7 @@ function normalizePhoneNumber(phone: string): string {
       cleaned = '+1' + cleaned
     }
   }
-  
+
   return cleaned
 }
 
@@ -56,9 +56,9 @@ export async function sendSMS(options: {
   const normalizedFrom = normalizePhoneNumber(fromNumber)
 
   try {
-    console.log(`[SMS] Sending SMS to ${normalizedTo} (original: ${options.to}) from ${normalizedFrom}`)
-    console.log(`[SMS] Message length: ${options.message.length} characters`)
-    
+    // console.log(`[SMS] Sending SMS to ${normalizedTo} (original: ${options.to}) from ${normalizedFrom}`)
+    // console.log(`[SMS] Message length: ${options.message.length} characters`)
+
     // Get phone number ID if we need it
     // First, try to get the phone number ID for the from number
     let fromId: string | null = null
@@ -68,7 +68,7 @@ export async function sendSMS(options: {
       })
       if (numbersResponse.ok) {
         const numbersData = await numbersResponse.json()
-        const matchingNumber = numbersData.data?.find((num: any) => 
+        const matchingNumber = numbersData.data?.find((num: any) =>
           num.number === fromNumber || num.formattedNumber?.includes(fromNumber.replace('+1', ''))
         )
         if (matchingNumber) {
@@ -83,13 +83,13 @@ export async function sendSMS(options: {
     } catch (err) {
       console.log('[SMS] Could not fetch phone number ID, will use phone number directly')
     }
-    
+
     // Quo.com API (formerly OpenPhone) endpoint
     // API expects: content (not text), to as array, from as phone number ID (PN...) or E.164 format
     // Try with phone number ID first if available, otherwise use phone number
     const fromValue = fromId || fromNumber
     console.log(`[SMS] Using 'from' value: ${fromValue}`)
-    
+
     let response = await fetch('https://api.openphone.com/v1/messages', {
       method: 'POST',
       headers: {

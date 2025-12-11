@@ -15,7 +15,9 @@ export function AdminCharacterGallery({ characters, projectId, isGenerating = fa
         if (a.is_main && !b.is_main) return -1
         if (!a.is_main && b.is_main) return 1
         if (!a.is_main && !b.is_main) {
-            return new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime()
+            const timeDiff = new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime()
+            if (timeDiff !== 0) return timeDiff
+            return a.id.localeCompare(b.id)
         }
         return 0
     })

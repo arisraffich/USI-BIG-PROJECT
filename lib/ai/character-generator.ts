@@ -38,7 +38,7 @@ export async function generateCharacterImage(
 
     try {
         const prompt = customPrompt || buildCharacterPrompt(character)
-        console.log(`Generating image for character ${character.id} using Google Nano Banana Pro...`)
+        // console.log(`Generating image for character ${character.id} using Google Nano Banana Pro...`)
 
         const parts: any[] = [{ text: prompt }]
 

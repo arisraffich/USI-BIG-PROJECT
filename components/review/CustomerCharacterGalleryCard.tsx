@@ -71,15 +71,16 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
             })
 
             if (!response.ok) {
-                throw new Error('Failed to save notes')
+                const errorData = await response.json()
+                throw new Error(errorData.error || 'Failed to save notes')
             }
 
             toast.success('Change request saved')
             setIsEditing(false)
             router.refresh() // Refresh to show the new note
-        } catch (error) {
-            toast.error('Failed to save change request')
-            console.error(error)
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to save change request')
+            console.error('Save error:', error)
         } finally {
             setIsSaving(false)
         }

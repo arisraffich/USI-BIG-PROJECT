@@ -54,11 +54,8 @@ export async function notifyProjectSentToCustomer(options: {
   // Split by space and take the first part, or use the full name if no space
   const authorFirstName = authorName.trim().split(/\s+/)[0] || authorName
 
-  console.log(`[Notification] Sending project to customer: ${projectTitle}, email: ${authorEmail}, phone: ${authorPhone || 'not provided'}`)
-
   // Send email to customer
   try {
-    console.log(`[Notification] Attempting to send email to ${authorEmail}`)
     await sendEmail({
       to: authorEmail,
       subject: `Your project "${projectTitle}" is ready for review`,
@@ -76,7 +73,6 @@ export async function notifyProjectSentToCustomer(options: {
         <p>US Illustrations Team</p>
       `,
     })
-    console.log(`[Notification] Email sent successfully to ${authorEmail}`)
   } catch (emailError: any) {
     console.error('[Notification] Failed to send customer notification email:', emailError)
     console.error('[Notification] Email error details:', {
@@ -91,12 +87,10 @@ export async function notifyProjectSentToCustomer(options: {
   // Send SMS to customer if phone number is provided
   if (false && authorPhone) { // Temporarily disabled request by user
     try {
-      console.log(`[Notification] Attempting to send SMS to ${authorPhone}`)
       await sendSMS({
         to: authorPhone as string,
         message: `Hi ${authorFirstName}, your project "${projectTitle}" is ready for review! Check your email (including spam) for the review link: ${reviewUrl} - US Illustrations`,
       })
-      console.log(`[Notification] SMS sent successfully to ${authorPhone}`)
     } catch (smsError: any) {
       console.error('[Notification] Failed to send customer SMS:', smsError)
       console.error('[Notification] SMS error details:', {
@@ -105,8 +99,6 @@ export async function notifyProjectSentToCustomer(options: {
       })
       // Don't throw - we still want to notify Slack even if SMS fails
     }
-  } else {
-    console.log('[Notification] No phone number provided, skipping SMS')
   }
 
   // Send Slack notification to PM
@@ -176,5 +168,42 @@ export async function notifyCharacterGenerationComplete(options: {
     })
   } catch (error: any) {
     console.error('Failed to send character generation notification:', error)
+  }
+}
+
+export async function notifyCharactersApproved(options: {
+  projectId: string
+  projectTitle: string
+  authorName: string
+  projectUrl: string
+}): Promise<void> {
+  const { projectTitle, authorName, projectUrl } = options
+
+  try {
+    await sendSlackNotification({
+      text: `🎉 Characters APPROVED for "${projectTitle}"`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Characters Approved*\n${authorName} has approved the characters for "${projectTitle}".\nProject is ready for Illustration Phase.`,
+          },
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'View Project' },
+              url: projectUrl,
+              style: 'primary',
+            },
+          ],
+        },
+      ],
+    })
+  } catch (error: any) {
+    console.error('Failed to send character approval notification:', error)
   }
 }

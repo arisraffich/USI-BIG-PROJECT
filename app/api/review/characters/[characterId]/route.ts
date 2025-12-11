@@ -41,7 +41,7 @@ export async function PATCH(
 
     if (project.status !== 'character_review') {
       return NextResponse.json(
-        { error: 'Cannot edit characters in this project' },
+        { error: `Cannot edit characters. Project status is '${project.status}', expected 'character_review'.` },
         { status: 403 }
       )
     }

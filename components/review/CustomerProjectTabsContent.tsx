@@ -24,6 +24,7 @@ interface CustomerProjectTabsContentProps {
   reviewToken: string
   projectTitle: string
   authorName: string
+  characterSendCount: number
 }
 
 export function CustomerProjectTabsContent({
@@ -33,16 +34,21 @@ export function CustomerProjectTabsContent({
   projectStatus,
   reviewToken,
   projectTitle,
-  authorName
+  authorName,
+  characterSendCount
 }: CustomerProjectTabsContentProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isApproving, setIsApproving] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'loading' | 'success'>('idle')
   // Lifted state for Edit Mode to coordinate Header and Editor
   const [isEditMode, setIsEditMode] = useState(false)
+
+  // Track send count to conditionaly refresh
+  const lastSendCount = useRef(characterSendCount)
 
   // Local state for pages to support instant realtime updates
   const [localPages, setLocalPages] = useState<Page[]>(pages || [])
@@ -116,6 +122,50 @@ export function CustomerProjectTabsContent({
     }
   }, [projectId, router])
 
+  // Realtime Subscription for project status (Auto-refresh on "Resend")
+  useEffect(() => {
+    const supabase = createClient()
+    const channelName = `customer-project-status-${projectId}`
+
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'projects',
+          filter: `review_token=eq.${reviewToken}`
+        },
+        (payload) => {
+          const newProject = payload.new as any
+          const newSendCount = newProject.character_send_count || 0
+
+          // CRITICAL: Only refresh if send count INCREMENTED.
+          // This filters out status changes (e.g. Regenerated) that happen before sending.
+          if (newSendCount > lastSendCount.current) {
+            console.log('[Realtime] Project resent! Refreshing...')
+
+            lastSendCount.current = newSendCount // Update ref to avoid double refresh
+
+            toast.info('New Illustrations Available', {
+              description: 'The page will refresh to show the updated characters.'
+            })
+            router.refresh()
+          } else {
+            // console.log('[Realtime] Project updated but not sent (count did not increase). Ignoring refresh.')
+          }
+        }
+      )
+      .subscribe((status) => {
+        // console.log(`[Realtime] Subscription status: ${status}`)
+      })
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [projectId, router, reviewToken])
+
   // Store manuscript editor edits
   const [manuscriptEdits, setManuscriptEdits] = useState<{ [pageId: string]: { story_text?: string; scene_description?: string } }>({})
 
@@ -145,7 +195,10 @@ export function CustomerProjectTabsContent({
       if (a.is_main && !b.is_main) return -1
       if (!a.is_main && b.is_main) return 1
       if (!a.is_main && !b.is_main) {
-        return new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime()
+        const timeDiff = new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime()
+        if (timeDiff !== 0) return timeDiff
+        // Tie-breaker: existing order or ID to ensure stability
+        return a.id.localeCompare(b.id)
       }
       return 0
     })
@@ -228,34 +281,45 @@ export function CustomerProjectTabsContent({
     }
   }
 
+  // Check if project is marked as approved
+  const isApprovedState = projectStatus === 'characters_approved'
+
+  const handleApproveCharacters = async () => {
+    setIsApproving(true)
+    try {
+      const response = await fetch(`/api/review/${reviewToken}/approve`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to approve characters')
+      }
+
+      toast.success('Characters Approved!')
+      // Status update will come via realtime or refresh, but we can force state
+      router.refresh()
+    } catch (error) {
+      console.error('Approval failed:', error)
+      toast.error('Failed to approve characters')
+      setIsApproving(false)
+    }
+  }
+
+  // Disable approval if ANY character has pending feedback notes
+  const isApproveDisabled = useMemo(() => {
+    if (!characters) return false
+    return characters.some(c => c.feedback_notes && c.feedback_notes.trim() !== '')
+  }, [characters])
+
   // Guard Clause: Block access if locked AND (NOT in gallery mode OR Generation is pending/complete but not approved)
   // Logic Update: If status is 'character_generation' or 'character_generation_complete', we MUST hide the gallery
   // and show the "Submitted/Processing" screen, regardless of whether images exist.
   // The gallery only unlocks when Admin sends it back (status becomes 'character_review' or 'characters_approved')
 
+
   const isHiddenGenerationState =
     projectStatus === 'character_generation' ||
     projectStatus === 'character_generation_complete'
-
-  if ((isLocked && !showGallery) || isHiddenGenerationState) {
-    return (
-      <div className="p-8 flex items-center justify-center min-h-screen">
-        <div className="text-center max-w-md">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 mb-4">
-            <Check className="h-6 w-6 text-green-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Changes Submitted Successfully</h2>
-          <p className="text-gray-600 mb-6">
-            Thank you for submitting your character details and manuscript updates.
-          </p>
-          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm text-blue-800">
-            <p className="font-semibold mb-1">What happens next?</p>
-            <p>Our illustrators are now creating your character illustrations based on your specifications. You will be notified once they are ready for review.</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   // Redirect to characters tab by default if in gallery mode
   useEffect(() => {
@@ -264,6 +328,35 @@ export function CustomerProjectTabsContent({
       router.replace(`${pathname}?tab=characters`)
     }
   }, [showGallery, searchParams, pathname, router])
+
+  if ((isLocked && !showGallery) || isHiddenGenerationState || isApprovedState) {
+    return (
+      <div className="p-8 flex items-center justify-center min-h-screen">
+        <div className="text-center max-w-md">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 mb-4">
+            <Check className="h-6 w-6 text-green-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            {isApprovedState ? 'Characters Approved!' : 'Changes Submitted Successfully'}
+          </h2>
+          <p className="text-gray-600 mb-6">
+            {isApprovedState
+              ? 'Thank you for approving the characters. We will now proceed with creating the illustrations for your book.'
+              : 'Thank you for submitting your character details and manuscript updates.'}
+          </p>
+          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm text-blue-800">
+            <p className="font-semibold mb-1">What happens next?</p>
+            <p>
+              {isApprovedState
+                ? 'Our illustrators will start working on the full scene illustrations. You will be notified when the first drafts are ready.'
+                : 'Our illustrators are now creating your character illustrations based on your specifications. You will be notified once they are ready for review.'}
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
 
   const pageCount = pages?.length || 0
   const characterCount = characters?.length || 0
@@ -280,6 +373,11 @@ export function CustomerProjectTabsContent({
         showSubmitButton={!showGallery && !isLocked && !isEditMode}
         isSubmitDisabled={isSubmitDisabled}
         hideOnMobile={activeTab === 'characters' && showGallery}
+        // Approval Props
+        showApproveButton={showGallery && !isLocked && !isEditMode}
+        onApprove={handleApproveCharacters}
+        isApproving={isApproving}
+        isApproveDisabled={isApproveDisabled}
       />
       <div className={`p-8 pb-32 relative min-h-screen ${activeTab === 'characters' && showGallery ? 'pt-8 md:pt-24' : 'pt-24'}`}>
         {/* Pages Tab Content */}
@@ -299,7 +397,7 @@ export function CustomerProjectTabsContent({
           {/* Conditional Rendering: Gallery (Stage 2) vs Form (Stage 1) */}
           {showGallery ? (
             <CustomerCharacterGallery
-              characters={characters || []}
+              characters={sortedCharacters.secondary}
               mainCharacter={sortedCharacters.main || undefined}
             />
           ) : (

@@ -1,6 +1,6 @@
 'use client'
 
-import { useTransition, useState } from 'react'
+import { useTransition, useState, useEffect } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { Home, Loader2, Send } from 'lucide-react'
 import { ProjectStatus } from '@/types/project'
 import { useProjectStatus } from '@/hooks/use-project-status'
 import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
 
 interface ProjectInfo {
   id: string
@@ -60,7 +61,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         buttonLabel: 'Create Illustrations',
         showCount: false,
         isResend: false,
-        buttonDisabled: true
+        buttonDisabled: false
       }
     }
 
@@ -153,6 +154,40 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const stage = getStageConfig()
   const buttonDisplayLabel = isSendingToCustomer ? 'Sending...' : stage.buttonLabel
 
+  // Realtime Subscription for Admin Status Updates
+  useEffect(() => {
+    const supabase = createClient()
+    const channelName = `admin-project-status-${projectId}`
+
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'projects',
+          filter: `id=eq.${projectId}`
+        },
+        (payload) => {
+          const newProject = payload.new as any
+
+          if (newProject.status === 'characters_approved') {
+            // console.log('[Admin Realtime] Characters Approved! Refreshing...')
+            toast.success('Characters Approved!', {
+              description: 'The customer has approved the characters. Illustrations unlocked.'
+            })
+            router.refresh()
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [projectId, router])
+
   // Poll project status to detect when character identification completes
   const { status: currentStatus, isLoading: isCharactersLoading } = useProjectStatus(
     projectId,
@@ -186,6 +221,13 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
 
   const handleSendToCustomer = async () => {
     if (stage.buttonDisabled || isSendingToCustomer) return
+
+    if (stage.buttonLabel === 'Create Illustrations') {
+      toast.success("Ready for Illustrations", {
+        description: "This feature will be implemented in the next phase."
+      })
+      return
+    }
 
     setIsSendingToCustomer(true)
     try {

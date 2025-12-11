@@ -13,7 +13,7 @@ export async function parseCharacterForm(pdfBuffer: Buffer) {
   let rawText: string
   try {
     rawText = await parsePdf(pdfBuffer)
-    console.log('[parseCharacterForm] PDF extracted text length:', rawText.length)
+    // console.log('[parseCharacterForm] PDF extracted text length:', rawText.length)
   } catch (pdfError: any) {
     console.error('Error extracting PDF text:', pdfError.message)
     throw new Error(`Failed to extract text from PDF: ${pdfError.message}`)

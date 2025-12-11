@@ -67,9 +67,13 @@ export async function POST(
     const hasImages = characters?.some(c => c.image_url && c.image_url.trim() !== '' && !c.is_main) || false
 
     if (characters) {
+      console.log(`[Resend] Processing ${characters.length} characters for feedback resolution`)
       const charUpdates = characters.map(async (char) => {
+        console.log(`[Resend] Char ${char.id}: resolved=${char.is_resolved}, hasNotes=${!!char.feedback_notes}`)
+
         // Resolve feedback if marked resolved (regenerated)
         if (char.is_resolved && char.feedback_notes) {
+          console.log(`[Resend] Archiving feedback for char ${char.id}`)
           const currentHistory = Array.isArray(char.feedback_history) ? char.feedback_history : []
           const newHistory = [
             ...currentHistory,

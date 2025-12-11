@@ -15,6 +15,10 @@ interface CustomerProjectHeaderProps {
   showSubmitButton?: boolean
   isSubmitDisabled?: boolean
   hideOnMobile?: boolean
+  onApprove?: () => void
+  isApproving?: boolean
+  showApproveButton?: boolean
+  isApproveDisabled?: boolean
 }
 
 export function CustomerProjectHeader({
@@ -26,7 +30,11 @@ export function CustomerProjectHeader({
   onSubmit,
   showSubmitButton = true,
   isSubmitDisabled = false,
-  hideOnMobile = false
+  hideOnMobile = false,
+  onApprove,
+  isApproving = false,
+  showApproveButton = false,
+  isApproveDisabled = false
 }: CustomerProjectHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -81,22 +89,41 @@ export function CustomerProjectHeader({
           </div>
           <div className="flex items-center gap-3 pl-4">
             <div id="mobile-header-portal-right" className="flex md:hidden items-center gap-2"></div>
+            {showApproveButton && (
+              <Button
+                onClick={onApprove}
+                disabled={isApproving || isApproveDisabled}
+                className="bg-green-600 hover:bg-green-700 text-white font-medium shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isApproving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Approving...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 mr-1.5" />
+                    Approve Characters
+                  </>
+                )}
+              </Button>
+            )}
             {showSubmitButton && (
               <div className="relative group">
                 <Button
                   onClick={onSubmit}
                   disabled={isSubmitting || isSubmitDisabled}
-                  className="pl-2 pr-3 bg-green-600 hover:bg-green-700 text-white font-medium shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  variant="outline"
+                  className="bg-white hover:bg-gray-50 text-gray-700 font-medium border-gray-300 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Submitting...
+                      Saving...
                     </>
                   ) : (
                     <>
-                      <Check className="w-4 h-4 mr-1.5" />
-                      Submit Changes
+                      Save Changes
                     </>
                   )}
                 </Button>

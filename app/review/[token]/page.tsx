@@ -19,7 +19,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ token: 
   // Fetch project by review token
   const { data: project, error: projectError } = await supabase
     .from('projects')
-    .select('id, book_title, author_firstname, author_lastname, status, review_token')
+    .select('id, book_title, author_firstname, author_lastname, status, review_token, character_send_count')
     .eq('review_token', token)
     .single()
 
@@ -57,6 +57,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ token: 
           reviewToken={token}
           projectTitle={project.book_title}
           authorName={`${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Author'}
+          characterSendCount={project.character_send_count || 0}
         />
       </Suspense>
     </div>
