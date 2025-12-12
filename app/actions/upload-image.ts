@@ -50,7 +50,7 @@ export async function uploadImageAction(formData: FormData): Promise<UploadResul
         // --- OPTIMIZATION START ---
         try {
             // Resize to max 2048px (high quality enough for AI ref, small enough for storage/payload)
-            buffer = await sharp(buffer)
+            buffer = await sharp(buffer as any)
                 .resize(2048, 2048, { fit: 'inside', withoutEnlargement: true })
                 .jpeg({ quality: 85, mozjpeg: true })
                 .toBuffer()
