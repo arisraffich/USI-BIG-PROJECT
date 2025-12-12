@@ -45,7 +45,7 @@ export async function uploadImageAction(formData: FormData): Promise<UploadResul
 
         // Convert file to ArrayBuffer
         const arrayBuffer = await file.arrayBuffer()
-        let buffer = Buffer.from(arrayBuffer)
+        let buffer: any = Buffer.from(arrayBuffer)
 
         // --- OPTIMIZATION START ---
         try {
