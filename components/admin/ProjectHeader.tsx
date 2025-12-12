@@ -32,6 +32,7 @@ interface ProjectHeaderProps {
   pageCount: number
   characterCount: number
   hasImages?: boolean
+  isTrialReady?: boolean
   onCreateIllustrations?: () => void
 }
 
@@ -45,7 +46,7 @@ interface StageConfig {
   buttonDisabled: boolean
 }
 
-export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, onCreateIllustrations }: ProjectHeaderProps) {
+export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations }: ProjectHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -74,7 +75,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         buttonLabel: 'Send Trial',
         showCount: false,
         isResend: false,
-        buttonDisabled: true
+        buttonDisabled: !isTrialReady
       }
     }
 

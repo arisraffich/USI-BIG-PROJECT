@@ -262,6 +262,12 @@ export function ProjectTabsContent({
     )
   }
 
+  // Calculate Trial Readiness (Page 1 has Illustration + Sketch)
+  const isTrialReady = useMemo(() => {
+    const page1 = localPages.find(p => p.page_number === 1)
+    return !!(page1?.illustration_url && page1?.sketch_url)
+  }, [localPages])
+
   return (
     <div className="min-h-screen bg-gray-50">
       <ProjectHeader
@@ -274,6 +280,7 @@ export function ProjectTabsContent({
         pageCount={pageCount}
         characterCount={characterCount}
         hasImages={false}
+        isTrialReady={isTrialReady}
         onCreateIllustrations={() => {
           const params = new URLSearchParams(searchParams?.toString() || '')
           params.set('tab', 'illustrations')
