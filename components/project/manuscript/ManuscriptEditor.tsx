@@ -20,7 +20,7 @@ interface Page {
   id: string
   page_number: number
   story_text: string
-  scene_description?: string | null
+  scene_description: string | null
   description_auto_generated: boolean
   // Other fields from full Page type are ignored but allowed
   [key: string]: any
@@ -317,7 +317,7 @@ export function ManuscriptEditor({ pages, projectId, isVisible = true }: Manuscr
     return {
       ...page,
       story_text: edits.story_text ?? page.story_text,
-      scene_description: edits.scene_description ?? page.scene_description,
+      scene_description: edits.scene_description ?? page.scene_description ?? null,
     }
   }
 
