@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { ProjectTabsContent } from '@/components/admin/ProjectTabsContent'
+import { ProjectDevTools } from '@/components/admin/ProjectDevTools'
 import { Suspense } from 'react'
 
 export default async function ProjectDetailPage({
@@ -9,10 +10,12 @@ export default async function ProjectDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  
+
   let pages = null
   let characters = null
   let projectStatus: string = 'draft'
+  let illustrationStatus: string = 'not_started'
+  let projectInfo: any = null
 
   try {
     const supabase = await createAdminClient()
@@ -21,7 +24,7 @@ export default async function ProjectDetailPage({
     const [projectResult, pagesResult, charactersResult] = await Promise.all([
       supabase
         .from('projects')
-        .select('status')
+        .select('*')
         .eq('id', id)
         .single(),
       supabase
@@ -39,6 +42,12 @@ export default async function ProjectDetailPage({
     pages = pagesResult.data || null
     characters = charactersResult.data || null
     projectStatus = projectResult.data?.status || 'draft'
+    projectStatus = projectResult.data?.status || 'draft'
+    projectInfo = projectResult.data
+
+    // Extract illustration status
+    illustrationStatus = projectResult.data?.illustration_status || 'not_started'
+
   } catch (error: any) {
     console.error('Error in ProjectDetailPage:', error)
     // Continue rendering with null data - component will handle empty state
@@ -46,12 +55,15 @@ export default async function ProjectDetailPage({
 
   return (
     <Suspense fallback={<div className="p-8">Loading...</div>}>
-      <ProjectTabsContent 
-        projectId={id} 
-        pages={pages} 
+      <ProjectTabsContent
+        projectId={id}
+        pages={pages}
         characters={characters}
         projectStatus={projectStatus}
+        projectInfo={projectInfo}
+        illustrationStatus={illustrationStatus}
       />
+      <ProjectDevTools projectId={id} />
     </Suspense>
   )
 }

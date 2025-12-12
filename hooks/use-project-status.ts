@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { ProjectStatus } from '@/types/project'
 
 interface ProjectStatusResponse {
@@ -12,6 +13,7 @@ interface ProjectStatusResponse {
 }
 
 export function useProjectStatus(projectId: string, initialStatus: ProjectStatus) {
+  const router = useRouter()
   const [status, setStatus] = useState<ProjectStatus>(initialStatus)
   const [isLoading, setIsLoading] = useState(initialStatus === 'draft')
   const [error, setError] = useState<string | null>(null)
@@ -24,11 +26,11 @@ export function useProjectStatus(projectId: string, initialStatus: ProjectStatus
     isMountedRef.current = true
     consecutiveFailuresRef.current = 0
     setError(null)
-    
+
     // Only poll if status is 'draft' (character identification in progress)
     if (initialStatus === 'draft') {
       setIsLoading(true)
-      
+
       const pollStatus = async () => {
         if (!isMountedRef.current) return
 
@@ -40,7 +42,7 @@ export function useProjectStatus(projectId: string, initialStatus: ProjectStatus
           const response = await fetch(`/api/projects/${projectId}`, {
             signal: controller.signal,
           })
-          
+
           clearTimeout(timeoutId)
 
           if (!response.ok) {
@@ -57,15 +59,15 @@ export function useProjectStatus(projectId: string, initialStatus: ProjectStatus
             }
             return
           }
-          
+
           const data: ProjectStatusResponse = await response.json()
-          
+
           // Reset failure counter on success
           consecutiveFailuresRef.current = 0
-          
+
           if (isMountedRef.current) {
             setStatus(data.status)
-            
+
             // Stop polling when status changes from 'draft' to something else
             if (data.status !== 'draft') {
               setIsLoading(false)
@@ -74,14 +76,14 @@ export function useProjectStatus(projectId: string, initialStatus: ProjectStatus
                 clearInterval(pollingIntervalRef.current)
                 pollingIntervalRef.current = null
               }
-              // Trigger a page refresh to get updated characters
-              window.location.reload()
+              // Trigger a data refresh to get updated characters, but avoid full page reload loop
+              router.refresh()
             }
           }
         } catch (error: any) {
           consecutiveFailuresRef.current++
           console.error('Error polling project status:', error)
-          
+
           if (consecutiveFailuresRef.current >= maxFailures) {
             if (isMountedRef.current) {
               setIsLoading(false)

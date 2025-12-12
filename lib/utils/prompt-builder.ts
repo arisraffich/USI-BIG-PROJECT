@@ -2,53 +2,85 @@ import { Character } from '@/types/character'
 import { Page } from '@/types/page'
 import { Project } from '@/types/project'
 
-export function buildCharacterPrompt(character: Character): string {
+export function buildCharacterPrompt(character: Character, hasReferenceImage: boolean = false): string {
+  // Helper to build the character description details
+  const details: string[] = []
+
+  // Core physical traits
+  if (character.eye_color) details.push(`Eye color: ${character.eye_color}`)
+  if (character.hair_color) details.push(`Hair color: ${character.hair_color}`)
+  if (character.hair_style) details.push(`Hair Style: ${character.hair_style}`)
+  if (character.age) details.push(`Age: ${character.age}`)
+  if (character.gender) details.push(`Gender: ${character.gender}`)
+  if (character.skin_color) details.push(`Skin color: ${character.skin_color}`)
+
+  // Visuals (Clothing, Accessories, Features)
+  const visualRefs: string[] = []
+  if (character.clothing && character.clothing !== 'N/A') visualRefs.push(`Wears ${character.clothing}`)
+  if (character.accessories && character.accessories !== 'N/A') visualRefs.push(`with ${character.accessories}`)
+  if (character.special_features && character.special_features !== 'N/A') visualRefs.push(character.special_features)
+
+  if (visualRefs.length > 0) {
+    details.push(`Additional visual references: ${visualRefs.join(', ')}`)
+  }
+
+  // Name/Role fallback (if used in description)
+  const nameRef = character.name || character.role || 'Character'
+
+  // SCENARIO 1: Style Reference is available (Secondary Characters)
+  // Use the detailed user-provided prompt
+  if (hasReferenceImage) {
+    const charDescription = `[${details.join(', ')}]`
+
+    return `Use the attached image as the STYLE REFERENCE.
+Analyze it thoroughly and extract its complete visual style AND drawing technique.
+Identify and replicate the medium used in the reference (e.g., watercolor, digital watercolor, gouache, soft digital painting, pencil, ink, marker, or any other).
+Match the same stroke style, texture, pigment behavior, shading softness, edge quality, color blending method, and overall rendering technique.
+
+Recreate this exact style and technique in the new character illustration.
+The new character must look like it was created by the same illustrator using the same tools and the same artistic method.
+Do NOT copy the reference character’s identity — only its stylistic technique.
+
+Character Description:
+${charDescription}
+
+Generate a full-body children’s book character illustration that shows the character from head to toes, standing on a clean, plain white background (no scenery, no additional objects, no background colors).
+The illustration must match the reference image in:
+
+line quality
+
+brush/pen/pencil stroke behavior
+
+shading + highlights technique
+
+color palette + saturation
+
+texture of the medium (e.g., watercolor softness, pigment pooling, grain, etc.)
+
+proportions and facial style
+
+overall aesthetic consistency
+
+The output MUST feel like it belongs in the same book series, drawn by the same artist using the same medium and technique, with the character shown full-height on a pure white background.`
+  }
+
+  // SCENARIO 2: No Reference (Main Character / First Gen)
+  // Use the original prompt strategy but cleaner
   const parts: string[] = []
 
-  // Basic description
   if (character.age) parts.push(`${character.age} year old`)
-  if (character.gender && character.gender !== 'N/A')
-    parts.push(character.gender)
-  if (character.name) {
-    parts.push(`named ${character.name}`)
-  } else if (character.role) {
-    parts.push(character.role)
-  }
+  if (character.gender && character.gender !== 'N/A') parts.push(character.gender)
+  parts.push(nameRef) // "named Zara" or "Main Character"
 
-  // Physical attributes
-  if (character.ethnicity && character.ethnicity !== 'N/A') {
-    parts.push(`${character.ethnicity} ethnicity`)
-  }
-  if (character.skin_color && character.skin_color !== 'N/A') {
-    parts.push(`${character.skin_color} skin`)
-  }
-  if (character.hair_color && character.hair_color !== 'N/A') {
-    parts.push(`${character.hair_color} hair`)
-  }
-  if (character.hair_style && character.hair_style !== 'N/A') {
-    parts.push(`${character.hair_style} hairstyle`)
-  }
-  if (character.eye_color && character.eye_color !== 'N/A') {
-    parts.push(`${character.eye_color} eyes`)
-  }
-
-  // Clothing and accessories
-  if (character.clothing && character.clothing !== 'N/A') {
-    parts.push(`wearing ${character.clothing}`)
-  }
-  if (character.accessories && character.accessories !== 'N/A') {
-    parts.push(`with ${character.accessories}`)
-  }
-
-  // Special features
-  if (character.special_features && character.special_features !== 'N/A') {
-    parts.push(character.special_features)
-  }
+  // Reuse the details we already parsed, but flatten them for the comma-separated list
+  // (We skip the first few that are already handled or need specific phrasing)
+  if (character.ethnicity && character.ethnicity !== 'N/A') parts.push(`${character.ethnicity} ethnicity`)
+  if (character.hair_color && character.hair_color !== 'N/A') parts.push(`${character.hair_color} hair`)
+  if (character.eye_color && character.eye_color !== 'N/A') parts.push(`${character.eye_color} eyes`)
+  if (character.clothing && character.clothing !== 'N/A') parts.push(`wearing ${character.clothing}`)
 
   const basePrompt = parts.join(', ')
 
-  // Add style instructions
-  // Add style instructions
   return `${basePrompt}, children's book character illustration, COLORED, hand-drawn style, warm and inviting, NOT photorealistic, NOT digital art looking, professional children's book quality`
 }
 

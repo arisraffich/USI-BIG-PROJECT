@@ -273,8 +273,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 # OpenAI
 OPENAI_API_KEY=
 
-# Replicate
-REPLICATE_API_TOKEN=
+
 
 # Email (Gmail SMTP)
 SMTP_HOST=smtp.gmail.com

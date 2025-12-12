@@ -27,5 +27,10 @@ export interface Project {
   created_at: string
   updated_at: string
   character_send_count?: number
+  // Illustration Module
+  illustration_aspect_ratio?: string | null
+  illustration_text_integration?: string | null
+  illustration_status?: 'not_started' | 'analyzing' | 'generating' | 'completed' | 'sketch_review'
+  style_reference_page_id?: string | null
 }
 

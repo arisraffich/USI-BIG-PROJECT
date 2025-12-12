@@ -23,8 +23,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
 # OpenAI (add your key when you have it)
 OPENAI_API_KEY=
 
-# Replicate (add your token when you have it)
-REPLICATE_API_TOKEN=
+
 
 # Resend (add your key when you have it)
 RESEND_API_KEY=

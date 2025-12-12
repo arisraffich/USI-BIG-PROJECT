@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
         ...config.resolve.fallback,
         fs: false,
       };
-      
+
       // Add externals to prevent bundling issues
       config.externals = config.externals || [];
       config.externals.push({
@@ -20,6 +20,16 @@ const nextConfig: NextConfig = {
   // Add empty turbopack config to silence the warning
   // (webpack config is still used when --webpack flag is passed)
   turbopack: {},
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'vwzzfbpjzjbhejqizmqh.supabase.co',
+        port: '',
+        pathname: '/storage/v1/object/public/**',
+      },
+    ],
+  },
 };
 
 export default nextConfig;

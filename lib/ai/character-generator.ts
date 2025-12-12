@@ -37,7 +37,7 @@ export async function generateCharacterImage(
     }
 
     try {
-        const prompt = customPrompt || buildCharacterPrompt(character)
+        const prompt = customPrompt || buildCharacterPrompt(character, !!mainCharacterImageUrl)
         // console.log(`Generating image for character ${character.id} using Google Nano Banana Pro...`)
 
         const parts: any[] = [{ text: prompt }]
@@ -46,7 +46,7 @@ export async function generateCharacterImage(
         if (mainCharacterImageUrl) {
             const refImage = await fetchImageAsBase64(mainCharacterImageUrl)
             if (refImage) {
-                console.log('Attaching reference image...')
+                // console.log('Attaching reference image...')
                 parts.push({
                     inlineData: {
                         mimeType: refImage.mimeType,

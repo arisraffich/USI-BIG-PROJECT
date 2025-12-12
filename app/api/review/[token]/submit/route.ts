@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notifyCustomerSubmission } from '@/lib/notifications'
-import { replicate } from '@/lib/ai/replicate'
+
 import { buildCharacterPrompt } from '@/lib/utils/prompt-builder'
 import { removeMetadata, sanitizeFilename } from '@/lib/utils/metadata-cleaner'
 

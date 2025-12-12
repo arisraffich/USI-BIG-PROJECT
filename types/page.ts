@@ -15,6 +15,14 @@ export interface Page {
   original_scene_description?: string | null
   created_at: string
   updated_at: string
+  // Illustration Module
+  character_actions?: any | null // JSONB
+  background_elements?: string | null
+  illustration_prompt?: string | null
+  illustration_status?: 'pending' | 'generating' | 'completed' | 'sketch_ready'
+  illustration_version?: number
+  illustration_generated_at?: string | null
+  sketch_generated_at?: string | null
 }
 
 

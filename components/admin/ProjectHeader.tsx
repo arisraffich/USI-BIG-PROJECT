@@ -4,7 +4,13 @@ import { useTransition, useState, useEffect } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Home, Loader2, Send } from 'lucide-react'
+import { Home, Loader2, Send, Menu, FileText, Sparkles } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { ProjectStatus } from '@/types/project'
 import { useProjectStatus } from '@/hooks/use-project-status'
 import { toast } from 'sonner'
@@ -26,6 +32,7 @@ interface ProjectHeaderProps {
   pageCount: number
   characterCount: number
   hasImages?: boolean
+  onCreateIllustrations?: () => void
 }
 
 // Define clear stage configuration
@@ -38,12 +45,18 @@ interface StageConfig {
   buttonDisabled: boolean
 }
 
-export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false }: ProjectHeaderProps) {
+export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, onCreateIllustrations }: ProjectHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
   const [isPending, startTransition] = useTransition()
   const [isSendingToCustomer, setIsSendingToCustomer] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  // Hydration fix
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const sendCount = projectInfo.character_send_count || 0
 
@@ -56,12 +69,12 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     // STAGE 5: Characters Approved
     if (status === 'characters_approved') {
       return {
-        tag: 'Characters Approved',
+        tag: 'Trial Illustration',
         tagStyle: 'bg-green-100 text-green-800 border-green-300',
-        buttonLabel: 'Create Illustrations',
+        buttonLabel: 'Send Trial',
         showCount: false,
         isResend: false,
-        buttonDisabled: false
+        buttonDisabled: true
       }
     }
 
@@ -196,11 +209,18 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
 
   // Read active tab from search params - synchronous, instant
   const activeTab = searchParams?.get('tab')
-  const isPagesActive = activeTab !== 'characters'
+  const isPagesActive = !activeTab || activeTab === 'pages'
   const isCharactersActive = activeTab === 'characters'
+  const isIllustrationsActive = activeTab === 'illustrations'
 
-  const handleTabClick = (tab: 'pages' | 'characters', e: React.MouseEvent) => {
-    e.preventDefault()
+  // Check if Illustrations are unlocked
+  const isIllustrationsUnlocked = projectInfo.status === 'characters_approved' ||
+    projectInfo.status === 'sketch_generation' ||
+    projectInfo.status === 'sketch_ready' ||
+    projectInfo.status === 'completed'
+
+  const handleTabClick = (tab: 'pages' | 'characters' | 'illustrations', e?: React.MouseEvent) => {
+    if (e) e.preventDefault()
 
     // Prevent switching to Characters tab while loading
     if (tab === 'characters' && isCharactersLoading) {
@@ -210,11 +230,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     // Use startTransition to make URL update non-blocking - instant UI response
     startTransition(() => {
       const params = new URLSearchParams(searchParams?.toString() || '')
-      if (tab === 'characters') {
-        params.set('tab', 'characters')
-      } else {
-        params.delete('tab')
-      }
+      params.set('tab', tab)
       router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     })
   }
@@ -223,9 +239,11 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     if (stage.buttonDisabled || isSendingToCustomer) return
 
     if (stage.buttonLabel === 'Create Illustrations') {
-      toast.success("Ready for Illustrations", {
-        description: "This feature will be implemented in the next phase."
-      })
+      if (onCreateIllustrations) {
+        onCreateIllustrations()
+      } else {
+        toast.info("Illustration setup is coming soon")
+      }
       return
     }
 
@@ -258,72 +276,90 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     }
   }
 
+  // Determine Section Title (was mobileTitle)
+  // Default logic must match ProjectTabsContent
+  const currentTab = activeTab || (isIllustrationsUnlocked ? 'illustrations' : 'pages')
+  const sectionTitle = currentTab.charAt(0).toUpperCase() + currentTab.slice(1)
+
   return (
     <>
       <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-b-2 border-blue-200 shadow-lg pl-8 fixed top-0 left-0 right-0 z-50 pt-[16px] pr-[42px] pb-[16px]">
         <div className="flex items-center justify-between relative">
           <div className="flex items-center gap-2 md:gap-4">
-            <Link href="/admin/dashboard" className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-2">
-              <Home className="w-4 h-4" />
-              <span className="hidden md:inline">Dashboard</span>
-            </Link>
-            <span className="text-gray-300 hidden md:inline">/</span>
-            <p className="text-sm font-medium text-gray-900 hidden md:block">
-              {projectInfo.author_firstname || ''} {projectInfo.author_lastname || ''}'s project
-            </p>
+            {mounted ? (
+              <DropdownMenu key="client-menu">
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="text-sm font-medium text-gray-900 flex items-center gap-2 hover:bg-white/50 px-2 -ml-2">
+                    <span className="truncate max-w-[200px] md:max-w-xs">{sectionTitle}</span>
+                    <Menu className="w-4 h-4 text-gray-500" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-[200px]">
+                  <DropdownMenuItem onClick={() => router.push('/admin/dashboard')}>
+                    <Home className="w-4 h-4 mr-2" />
+                    Dashboard
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleTabClick('pages')}>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Pages
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleTabClick('characters')}
+                    disabled={isCharactersLoading}
+                  >
+                    <Loader2 className={`w-4 h-4 mr-2 ${isCharactersLoading ? 'animate-spin' : ''}`} />
+                    Characters
+                  </DropdownMenuItem>
+                  {isIllustrationsUnlocked && (
+                    <DropdownMenuItem onClick={() => handleTabClick('illustrations')}>
+                      <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
+                      Illustrations
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button key="server-fallback" variant="ghost" className="text-sm font-medium text-gray-900 flex items-center gap-2 hover:bg-white/50 px-2 -ml-2">
+                <span className="truncate max-w-[200px] md:max-w-xs">{sectionTitle}</span>
+                <Menu className="w-4 h-4 text-gray-500" />
+              </Button>
+            )}
           </div>
 
           <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 flex items-center -mt-[16px] -mb-[16px]">
-            {/* Desktop Tabs */}
-            <div className="hidden md:flex h-full items-center">
-              <Button
-                variant="outline"
-                onClick={(e) => handleTabClick('pages', e)}
-                className={`h-full rounded-none w-[140px] m-0 ${isPagesActive ? 'bg-blue-600 hover:bg-blue-700 text-white hover:text-white border-0 shadow-lg hover:shadow-xl' : 'bg-white border-0 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 text-blue-700 hover:text-blue-800'} box-border font-semibold text-lg transition-colors duration-75 cursor-pointer`}
-              >
-                <span>Pages</span>
-                <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${isPagesActive ? 'bg-white/30 text-white hover:text-white' : 'bg-blue-100 text-blue-700'}`}>{pageCount ?? 0}</span>
-              </Button>
-              <Button
-                variant="outline"
-                onClick={(e) => handleTabClick('characters', e)}
-                disabled={isCharactersLoading}
-                className={`h-full rounded-none w-[140px] m-0 ${isCharactersLoading ? 'opacity-70 cursor-not-allowed bg-yellow-50 border-yellow-300' : ''} ${isCharactersActive && !isCharactersLoading ? 'bg-blue-600 hover:bg-blue-700 text-white hover:text-white border-0 shadow-lg hover:shadow-xl' : isCharactersActive && isCharactersLoading ? 'bg-yellow-100 border-yellow-400' : 'bg-white border-0 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 text-blue-700 hover:text-blue-800'} box-border font-semibold text-lg transition-colors duration-75 ${isCharactersLoading ? '' : 'cursor-pointer'}`}
-              >
-                <span className="flex items-center gap-1.5">
-                  {isCharactersLoading && (
-                    <Loader2 className="w-4 h-4 animate-spin text-yellow-600" />
-                  )}
-                  Characters
-                  {isCharactersLoading && (
-                    <span className="text-xs text-yellow-700 font-normal">(Loading...)</span>
-                  )}
-                </span>
-                <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${isCharactersActive && !isCharactersLoading ? 'bg-white/30 text-white hover:text-white' : isCharactersLoading ? 'bg-yellow-200 text-yellow-800' : 'bg-blue-100 text-blue-700'}`}>
-                  {isCharactersLoading ? '...' : (characterCount ?? 0)}
-                </span>
-              </Button>
-            </div>
-
-            {/* Mobile Centered Send Button */}
-            <div className="md:hidden flex items-center">
-              {!stage.buttonDisabled && (
+            {/* Desktop Tabs - Only show in earlier stages (before illustrations unlocked) */}
+            {!isIllustrationsUnlocked && (
+              <div className="hidden md:flex h-full items-center">
                 <Button
-                  onClick={handleSendToCustomer}
-                  disabled={isSendingToCustomer}
-                  size="sm"
-                  className="px-3 bg-green-600 hover:bg-green-700 text-white border-0 shadow-md hover:shadow-lg font-semibold transition-all duration-75 rounded-md whitespace-nowrap flex items-center justify-center h-9"
+                  variant="outline"
+                  onClick={(e) => handleTabClick('pages', e)}
+                  className={`h-full rounded-none w-[140px] m-0 ${isPagesActive ? 'bg-blue-600 hover:bg-blue-700 text-white hover:text-white border-0 shadow-lg hover:shadow-xl' : 'bg-white border-0 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 text-blue-700 hover:text-blue-800'} box-border font-semibold text-lg transition-colors duration-75 cursor-pointer`}
                 >
-                  <Send className="w-4 h-4 mr-2" />
-                  <span>{buttonDisplayLabel}</span>
-                  {stage.showCount && !isSendingToCustomer && sendCount > 0 && (
-                    <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
-                      {sendCount}
-                    </span>
-                  )}
+                  <span>Pages</span>
+                  <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${isPagesActive ? 'bg-white/30 text-white hover:text-white' : 'bg-blue-100 text-blue-700'}`}>{pageCount ?? 0}</span>
                 </Button>
-              )}
-            </div>
+                <Button
+                  variant="outline"
+                  onClick={(e) => handleTabClick('characters', e)}
+                  disabled={isCharactersLoading}
+                  className={`h-full rounded-none w-[140px] m-0 ${isCharactersLoading ? 'opacity-70 cursor-not-allowed bg-yellow-50 border-yellow-300' : ''} ${isCharactersActive && !isCharactersLoading ? 'bg-blue-600 hover:bg-blue-700 text-white hover:text-white border-0 shadow-lg hover:shadow-xl' : isCharactersActive && isCharactersLoading ? 'bg-yellow-100 border-yellow-400' : 'bg-white border-0 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 text-blue-700 hover:text-blue-800'} box-border font-semibold text-lg transition-colors duration-75 ${isCharactersLoading ? '' : 'cursor-pointer'}`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    {isCharactersLoading && (
+                      <Loader2 className="w-4 h-4 animate-spin text-yellow-600" />
+                    )}
+                    Characters
+                    {isCharactersLoading && (
+                      <span className="text-xs text-yellow-700 font-normal">(Loading...)</span>
+                    )}
+                  </span>
+                  <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${isCharactersActive && !isCharactersLoading ? 'bg-white/30 text-white hover:text-white' : isCharactersLoading ? 'bg-yellow-200 text-yellow-800' : 'bg-blue-100 text-blue-700'}`}>
+                    {isCharactersLoading ? '...' : (characterCount ?? 0)}
+                  </span>
+                </Button>
+              </div>
+            )}
+            {/* Removed Mobile Centered Button */}
           </div>
 
           <div className="flex items-center gap-2 md:gap-4">
@@ -333,18 +369,17 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
               {stage.tag}
             </span>
 
-            {/* Portal Target for Mobile Actions (like Edit Manuscript) */}
-            <div id="mobile-header-portal" className="flex md:hidden items-center gap-2" />
-
-            {/* Desktop Send Button */}
+            {/* Combined Send Button (Mobile & Desktop) */}
             <Button
               onClick={handleSendToCustomer}
               disabled={isSendingToCustomer || stage.buttonDisabled}
               size="sm"
-              className={`hidden md:flex px-3 md:px-4 ${stage.buttonDisabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} text-white border-0 shadow-md hover:shadow-lg font-semibold transition-all duration-75 rounded-md whitespace-nowrap items-center justify-center h-9`}
+              className={`flex px-3 md:px-4 ${stage.buttonDisabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} text-white border-0 shadow-md hover:shadow-lg font-semibold transition-all duration-75 rounded-md whitespace-nowrap items-center justify-center h-9`}
             >
               <Send className="w-4 h-4 md:mr-2" />
-              <span className="ml-2 md:ml-0">{buttonDisplayLabel}</span>
+              <span className="ml-2 md:ml-0 md:inline hidden">{buttonDisplayLabel}</span>
+              <span className="ml-2 md:hidden inline">{buttonDisplayLabel}</span>
+
               {stage.showCount && !isSendingToCustomer && sendCount > 0 && (
                 <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
                   {sendCount}
@@ -357,19 +392,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
 
       {/* Mobile Bottom Navigation Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 md:hidden flex h-16 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-        <Button
-          variant="ghost"
-          onClick={(e) => handleTabClick('pages', e)}
-          className={`flex-1 h-full rounded-none flex flex-col items-center justify-center gap-1 ${isPagesActive ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700 hover:text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
-        >
-          <div className="flex items-center gap-1.5">
-            <span className="text-base font-semibold">Pages</span>
-            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isPagesActive ? 'bg-white text-blue-600' : 'bg-blue-100 text-blue-700'}`}>
-              {pageCount ?? 0}
-            </span>
-          </div>
-        </Button>
-        <div className="w-px bg-blue-100 h-8 self-center"></div>
+
         <Button
           variant="ghost"
           onClick={(e) => handleTabClick('characters', e)}
@@ -384,7 +407,21 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
             </span>
           </div>
         </Button>
-      </div>
+        {isIllustrationsUnlocked && (
+          <>
+            <div className="w-px bg-blue-100 h-8 self-center"></div>
+            <Button
+              variant="ghost"
+              onClick={(e) => handleTabClick('illustrations', e)}
+              className={`flex-1 h-full rounded-none flex flex-col items-center justify-center gap-1 ${isIllustrationsActive ? 'bg-purple-600 text-white shadow-md hover:bg-purple-700 hover:text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'}`}
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="text-base font-semibold">Art</span>
+              </div>
+            </Button>
+          </>
+        )}
+      </div >
     </>
   )
 }
