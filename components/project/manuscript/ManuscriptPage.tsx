@@ -7,7 +7,7 @@ interface Page {
   id: string
   page_number: number
   story_text: string
-  scene_description: string | null
+  scene_description?: string | null
   description_auto_generated: boolean
   is_customer_edited_story_text?: boolean
   is_customer_edited_scene_description?: boolean

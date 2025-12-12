@@ -20,7 +20,7 @@ interface Page {
   id: string
   page_number: number
   story_text: string
-  scene_description: string | null
+  scene_description?: string | null
   description_auto_generated: boolean
   // Other fields from full Page type are ignored but allowed
   [key: string]: any
