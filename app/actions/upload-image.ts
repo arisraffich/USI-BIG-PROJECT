@@ -11,6 +11,7 @@ interface UploadResult {
 }
 
 export async function uploadImageAction(formData: FormData): Promise<UploadResult> {
+    console.log("SERVER ACTION: uploadImageAction started");
     try {
         const file = formData.get('file') as File
         const projectId = formData.get('projectId') as string
@@ -61,6 +62,7 @@ export async function uploadImageAction(formData: FormData): Promise<UploadResul
         // --- OPTIMIZATION END ---
 
         // 1. Upload to Storage (Overwrite/Upsert) using Admin Client
+        console.log("SERVER ACTION: Starting Supabase Upload to", storagePath);
         const { error: uploadError } = await supabase.storage
             .from('illustrations')
             .upload(storagePath, buffer, {
@@ -99,7 +101,7 @@ export async function uploadImageAction(formData: FormData): Promise<UploadResul
         return { success: true, url: versionedUrl }
 
     } catch (error: any) {
-        console.error('Server Upload Action Error:', error)
+        console.error('Server Upload Action Error DETAILS:', error);
         return { success: false, error: error.message || 'Unknown server error' }
     }
 }

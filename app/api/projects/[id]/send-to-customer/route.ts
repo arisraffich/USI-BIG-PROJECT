@@ -48,133 +48,186 @@ export async function POST(
       reviewToken = uuidv4().replace(/-/g, '').substring(0, 32)
     }
 
-    // Get all pages for this project to store original text
-    const { data: pages, error: pagesError } = await supabase
-      .from('pages')
-      .select('id, story_text, scene_description')
-      .eq('project_id', id)
+    // DETERMINE MODE: Character Review vs Illustration Trial
+    const isIllustrationMode = ['characters_approved', 'illustration_review', 'illustration_revision_needed'].includes(project.status)
 
-    if (pagesError) {
-      console.error('Error fetching pages:', pagesError)
-    }
+    if (isIllustrationMode) {
+      // --- ILLUSTRATION TRIAL MODE ---
+      console.log(`[Send to Customer] Processing Illustration Trial for project ${id}`)
 
-    // Process "Resend" logic: Resolve feedback for regenerated characters
-    const { data: characters } = await supabase
-      .from('characters')
-      .select('id, feedback_notes, feedback_history, is_resolved, image_url, is_main')
-      .eq('project_id', id)
+      // 1. Get Page 1 to check/resolve feedback
+      const { data: page1 } = await supabase
+        .from('pages')
+        .select('id, feedback_notes, feedback_history, is_resolved, illustration_url, sketch_url')
+        .eq('project_id', id)
+        .eq('page_number', 1)
+        .single()
 
-    const hasImages = characters?.some(c => c.image_url && c.image_url.trim() !== '' && !c.is_main) || false
-
-    if (characters) {
-      console.log(`[Resend] Processing ${characters.length} characters for feedback resolution`)
-      const charUpdates = characters.map(async (char) => {
-        console.log(`[Resend] Char ${char.id}: resolved=${char.is_resolved}, hasNotes=${!!char.feedback_notes}`)
-
-        // Resolve feedback: always archive if notes exist
-        if (char.feedback_notes) {
-          console.log(`[Resend] Archiving feedback for char ${char.id}`)
-          const currentHistory = Array.isArray(char.feedback_history) ? char.feedback_history : []
+      if (page1) {
+        // Resolve feedback if exists (like characters)
+        if (page1.feedback_notes) {
+          console.log(`[Resend] Archiving feedback for Page 1`)
+          const currentHistory = Array.isArray(page1.feedback_history) ? page1.feedback_history : []
           const newHistory = [
             ...currentHistory,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            { note: char.feedback_notes, created_at: new Date().toISOString() } as any
+            { note: page1.feedback_notes, created_at: new Date().toISOString() } as any
           ]
 
-          return supabase
-            .from('characters')
+          await supabase
+            .from('pages')
             .update({
               feedback_history: newHistory,
               feedback_notes: null,
-              is_resolved: true // Mark as resolved since we are sending new version
+              is_resolved: true
             })
-            .eq('id', char.id)
+            .eq('id', page1.id)
         }
-        return Promise.resolve()
+      }
+
+      // 2. Update Project Status & Count & SYNC IMAGES TO PATIENT
+      const hasImages = !!(page1?.illustration_url || page1?.sketch_url)
+      const currentCount = (project as any).illustration_send_count || 0
+
+      // SYNC: Copy Draft -> Published
+      // We do this for Page 1 (currently checking Page 1 for trial)
+      if (page1) {
+        await supabase.from('pages')
+          .update({
+            customer_illustration_url: page1.illustration_url,
+            customer_sketch_url: page1.sketch_url
+          })
+          .eq('id', page1.id)
+      }
+
+      const { error: updateError } = await supabase
+        .from('projects')
+        .update({
+          status: 'illustration_review', // Set to waiting for review
+          review_token: reviewToken,
+          illustration_send_count: hasImages ? currentCount + 1 : currentCount
+        })
+        .eq('id', id)
+
+      if (updateError) throw updateError
+
+      // 3. Notify
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+      const reviewUrl = `${baseUrl}/review/${reviewToken}?tab=illustrations`
+      const projectUrl = `${baseUrl}/admin/project/${id}`
+
+      if (project.author_email) {
+        const { notifyIllustrationTrialSent } = await import('@/lib/notifications')
+        notifyIllustrationTrialSent({
+          projectTitle: project.book_title || 'Untitled Project',
+          authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer',
+          authorEmail: project.author_email,
+          authorPhone: project.author_phone || undefined,
+          reviewUrl,
+          projectUrl,
+        }).catch(err => console.error('Notification error:', err))
+      }
+
+      return NextResponse.json({
+        success: true,
+        reviewUrl,
+        reviewToken,
+        message: 'Illustration trial sent to customer successfully',
       })
-      await Promise.all(charUpdates)
-    }
 
-    // Update project status to character_review, increment send count only if sending images
-    const { error: updateError } = await supabase
-      .from('projects')
-      .update({
-        status: 'character_review',
-        review_token: reviewToken,
-        character_send_count: hasImages ? (project.character_send_count || 0) + 1 : (project.character_send_count || 0)
-      })
-      .eq('id', id)
+    } else {
+      // --- CHARACTER REVIEW MODE (Existing Logic) ---
 
-    if (updateError) {
-      console.error('Error updating project:', updateError)
-      return NextResponse.json(
-        { error: 'Failed to update project' },
-        { status: 500 }
-      )
-    }
+      // Get all pages for this project to store original text (Legacy requirement for char review phase)
+      const { data: pages, error: pagesError } = await supabase
+        .from('pages')
+        .select('id, story_text, scene_description')
+        .eq('project_id', id)
 
-    // Store original text for all pages (only if not already set)
-    if (pages && pages.length > 0) {
-      const updatePromises = pages.map(async (page) => {
-        // Only update if original_story_text is not already set
-        const { data: existingPage } = await supabase
-          .from('pages')
-          .select('original_story_text')
-          .eq('id', page.id)
-          .single()
+      if (pagesError) console.error('Error fetching pages:', pagesError)
 
-        if (!existingPage?.original_story_text) {
-          return supabase
-            .from('pages')
-            .update({
+      // Process "Resend" logic: Resolve feedback for regenerated characters
+      const { data: characters } = await supabase
+        .from('characters')
+        .select('id, feedback_notes, feedback_history, is_resolved, image_url, is_main')
+        .eq('project_id', id)
+
+      const hasImages = characters?.some(c => c.image_url && c.image_url.trim() !== '' && !c.is_main) || false
+
+      if (characters) {
+        // ... (Keep existing character resolution logic)
+        const charUpdates = characters.map(async (char) => {
+          if (char.feedback_notes) {
+            const currentHistory = Array.isArray(char.feedback_history) ? char.feedback_history : []
+            const newHistory = [
+              ...currentHistory,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              { note: char.feedback_notes, created_at: new Date().toISOString() } as any
+            ]
+            return supabase.from('characters').update({
+              feedback_history: newHistory,
+              feedback_notes: null,
+              is_resolved: true
+            }).eq('id', char.id)
+          }
+          return Promise.resolve()
+        })
+        await Promise.all(charUpdates)
+      }
+
+      // Update project status to character_review
+      const { error: updateError } = await supabase
+        .from('projects')
+        .update({
+          status: 'character_review',
+          review_token: reviewToken,
+          character_send_count: hasImages ? (project.character_send_count || 0) + 1 : (project.character_send_count || 0)
+        })
+        .eq('id', id)
+
+      if (updateError) throw updateError
+
+      // Store original text for all pages
+      if (pages && pages.length > 0) {
+        const updatePromises = pages.map(async (page) => {
+          const { data: existingPage } = await supabase.from('pages').select('original_story_text').eq('id', page.id).single()
+          if (!existingPage?.original_story_text) {
+            return supabase.from('pages').update({
               original_story_text: page.story_text || '',
               original_scene_description: page.scene_description || null,
-            })
-            .eq('id', page.id)
-        }
-        return Promise.resolve({ error: null })
-      })
-
-      await Promise.all(updatePromises)
-    }
-
-    // Generate review URL
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-    const reviewUrl = `${baseUrl}/review/${reviewToken}?tab=characters`
-    const projectUrl = `${baseUrl}/admin/project/${id}`
-
-    // Send notifications (don't await - send in background)
-    console.log(`[Send to Customer] Sending notifications for project ${id}`)
-    console.log(`[Send to Customer] Customer email: ${project.author_email || 'not provided'}`)
-    console.log(`[Send to Customer] Customer phone: ${project.author_phone || 'not provided'}`)
-
-    // Only send notifications if customer email is available
-    if (!project.author_email) {
-      console.warn(`[Send to Customer] No customer email found for project ${id}, skipping notifications`)
-    } else {
-      notifyProjectSentToCustomer({
-        projectTitle: project.book_title || 'Untitled Project',
-        authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer',
-        authorEmail: project.author_email,
-        authorPhone: project.author_phone || undefined,
-        reviewUrl,
-        projectUrl,
-      }).catch((error) => {
-        console.error('[Send to Customer] Error sending notifications:', error)
-        console.error('[Send to Customer] Error details:', {
-          message: error.message,
-          stack: error.stack,
+            }).eq('id', page.id)
+          }
+          return Promise.resolve({ error: null })
         })
-        // Don't fail the request if notification fails
+        await Promise.all(updatePromises)
+      }
+
+      // Generate review URL
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+      const reviewUrl = `${baseUrl}/review/${reviewToken}?tab=characters`
+      const projectUrl = `${baseUrl}/admin/project/${id}`
+
+      // Send notifications
+      if (project.author_email) {
+        notifyProjectSentToCustomer({
+          projectTitle: project.book_title || 'Untitled Project',
+          authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer',
+          authorEmail: project.author_email,
+          authorPhone: project.author_phone || undefined,
+          reviewUrl,
+          projectUrl,
+        }).catch((error) => console.error('[Send to Customer] Error sending notifications:', error))
+      }
+
+      return NextResponse.json({
+        success: true,
+        reviewUrl,
+        reviewToken,
+        message: 'Project sent to customer review successfully',
       })
     }
 
-    return NextResponse.json({
-      success: true,
-      reviewUrl,
-      reviewToken,
-      message: 'Project sent to customer review successfully',
-    })
+
   } catch (error: any) {
     console.error('Error sending project to customer:', error)
     return NextResponse.json(

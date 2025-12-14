@@ -29,7 +29,7 @@ export async function POST(request: Request) {
         // 1. Fetch Project Configuration (Always needed for ratio)
         const { data: project } = await supabase
             .from('projects')
-            .select('illustration_aspect_ratio, illustration_text_integration')
+            .select('illustration_aspect_ratio, illustration_text_integration, illustration_send_count')
             .eq('id', projectId)
             .single()
 
@@ -209,26 +209,24 @@ ${textPromptSection}`
         await supabase.from('pages')
             .update({
                 illustration_url: publicUrl,
-                // illustration_status, prompts, and timestamps are missing from DB schema
-                // illustration_generated_at: new Date().toISOString()
+                is_resolved: true, // Mark any existing feedback as resolved since we generated a new version
             })
             .eq('id', pageData.id)
 
-        // 8. Update Project Status (Reference Set)
-        // If this was Page 1, set it as style anchor
-        if (pageData.page_number === 1) {
+        // 8. Update Project Status (Enable Resend Flow)
+        // Only update status to 'illustration_revision_needed' if we have already sent the trial at least once.
+        // If this is the FIRST generation (send_count === 0), we stay in the current state (likely 'characters_approved')
+        // to keep the "Send Trial" button active (Green) instead of "Resend Trial" (Orange).
+
+        const sendCount = project?.illustration_send_count || 0
+
+        if (sendCount > 0) {
             await supabase.from('projects')
                 .update({
-                    style_reference_page_id: pageData.id,
-                    // Only update status if likely done or allow parallel, for now maybe just keep 'generating'
+                    status: 'illustration_revision_needed',
                 })
                 .eq('id', projectId)
         }
-
-        // 9. Chain Sketch Generation (Trigger async - client can call separate endpoint or we do it here)
-        // For reliability, we can do it here if time permits, or return URL and let client trigger.
-        // Client-side chaining is safer for Vercel timeouts, but internally we have 60s.
-        // Let's return success and let client trigger sketch generation for better UX progress.
 
         return NextResponse.json({
             success: true,

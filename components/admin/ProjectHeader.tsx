@@ -15,6 +15,7 @@ import { ProjectStatus } from '@/types/project'
 import { useProjectStatus } from '@/hooks/use-project-status'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { MobilePageNavigator } from '@/components/ui/mobile-page-navigator'
 
 interface ProjectInfo {
   id: string
@@ -23,6 +24,7 @@ interface ProjectInfo {
   author_lastname: string
   status: ProjectStatus
   character_send_count?: number
+  illustration_send_count?: number
   review_token?: string | null
 }
 
@@ -59,7 +61,10 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     setMounted(true)
   }, [])
 
-  const sendCount = projectInfo.character_send_count || 0
+  const isIllustrationMode = ['illustration_review', 'illustration_revision_needed'].includes(projectInfo.status)
+  const sendCount = isIllustrationMode
+    ? (projectInfo.illustration_send_count || 0)
+    : (projectInfo.character_send_count || 0)
 
   // ------------------------------------------------------------------
   // STAGE CONFIGURATION LOGIC
@@ -67,7 +72,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const getStageConfig = (): StageConfig => {
     const status = projectInfo.status
 
-    // STAGE 5: Characters Approved
+    // STAGE 5: Characters Approved (Ready for Trial)
     if (status === 'characters_approved') {
       return {
         tag: 'Trial Illustration',
@@ -76,6 +81,30 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         showCount: false,
         isResend: false,
         buttonDisabled: !isTrialReady
+      }
+    }
+
+    // STAGE 6: Illustration Review (Sent)
+    if (status === 'illustration_review') {
+      return {
+        tag: 'Waiting for Review',
+        tagStyle: 'bg-blue-100 text-blue-800 border-blue-300',
+        buttonLabel: 'Resend Trial',
+        showCount: true, // Use illustration_send_count from projectInfo
+        isResend: true,
+        buttonDisabled: true
+      }
+    }
+
+    // STAGE 7: Revision Needed
+    if (status === 'illustration_revision_needed') {
+      return {
+        tag: 'Action Required',
+        tagStyle: 'bg-orange-100 text-orange-800 border-orange-300',
+        buttonLabel: 'Resend Trial',
+        showCount: true,
+        isResend: true,
+        buttonDisabled: false
       }
     }
 
@@ -218,6 +247,9 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const isIllustrationsUnlocked = projectInfo.status === 'characters_approved' ||
     projectInfo.status === 'sketch_generation' ||
     projectInfo.status === 'sketch_ready' ||
+    projectInfo.status === 'illustration_review' ||
+    projectInfo.status === 'illustration_revision_needed' ||
+    projectInfo.status === 'illustration_approved' ||
     projectInfo.status === 'completed'
 
   const handleTabClick = (tab: 'pages' | 'characters' | 'illustrations', e?: React.MouseEvent) => {
@@ -291,7 +323,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
               <DropdownMenu key="client-menu">
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="text-sm font-medium text-gray-900 flex items-center gap-2 hover:bg-white/50 px-2 -ml-2">
-                    <span className="truncate max-w-[200px] md:max-w-xs">{sectionTitle}</span>
+                    <span className="hidden md:block truncate max-w-[200px] md:max-w-xs">{sectionTitle}</span>
                     <Menu className="w-4 h-4 text-gray-500" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -321,7 +353,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
               </DropdownMenu>
             ) : (
               <Button key="server-fallback" variant="ghost" className="text-sm font-medium text-gray-900 flex items-center gap-2 hover:bg-white/50 px-2 -ml-2">
-                <span className="truncate max-w-[200px] md:max-w-xs">{sectionTitle}</span>
+                <span className="hidden md:block truncate max-w-[200px] md:max-w-xs">{sectionTitle}</span>
                 <Menu className="w-4 h-4 text-gray-500" />
               </Button>
             )}
@@ -379,7 +411,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
             >
               <Send className="w-4 h-4 md:mr-2" />
               <span className="ml-2 md:ml-0 md:inline hidden">{buttonDisplayLabel}</span>
-              <span className="ml-2 md:hidden inline">{buttonDisplayLabel}</span>
+              <span className="ml-2 md:hidden inline">Send</span>
 
               {stage.showCount && !isSendingToCustomer && sendCount > 0 && (
                 <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
@@ -392,37 +424,19 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       </div>
 
       {/* Mobile Bottom Navigation Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 md:hidden flex h-16 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-
-        <Button
-          variant="ghost"
-          onClick={(e) => handleTabClick('characters', e)}
-          disabled={isCharactersLoading}
-          className={`flex-1 h-full rounded-none flex flex-col items-center justify-center gap-1 ${isCharactersActive ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700 hover:text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'} ${isCharactersLoading ? 'opacity-70 bg-gray-50' : ''}`}
-        >
-          <div className="flex items-center gap-1.5">
-            {isCharactersLoading && <Loader2 className={`w-3 h-3 animate-spin ${isCharactersActive ? 'text-white' : ''}`} />}
-            <span className="text-base font-semibold">Characters</span>
-            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isCharactersActive ? 'bg-white text-blue-600' : 'bg-blue-100 text-blue-700'}`}>
-              {isCharactersLoading ? '...' : (characterCount ?? 0)}
-            </span>
-          </div>
-        </Button>
-        {isIllustrationsUnlocked && (
-          <>
-            <div className="w-px bg-blue-100 h-8 self-center"></div>
-            <Button
-              variant="ghost"
-              onClick={(e) => handleTabClick('illustrations', e)}
-              className={`flex-1 h-full rounded-none flex flex-col items-center justify-center gap-1 ${isIllustrationsActive ? 'bg-purple-600 text-white shadow-md hover:bg-purple-700 hover:text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'}`}
-            >
-              <div className="flex items-center gap-1.5">
-                <span className="text-base font-semibold">Art</span>
-              </div>
-            </Button>
-          </>
-        )}
-      </div >
+      {/* Mobile Bottom Navigation Bar (Filmstrip) */}
+      {!isCharactersActive && (
+        <MobilePageNavigator
+          currentPage={1} // TODO: Connect to active page state when multi-page is enabled
+          totalPages={pageCount}
+          onPageSelect={(page) => {
+            handleTabClick('pages')
+            // TODO: Scroll to page logic
+            toast.info(`Page ${page} selected`, { duration: 1000 })
+          }}
+          disabled={!isIllustrationsUnlocked || stage.tag === 'Trial Illustration'} // Inactive during trial as requested
+        />
+      )}
     </>
   )
 }

@@ -80,18 +80,39 @@ export function ProjectTabsContent({
   const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0 })
   const hasStartedAnalysisRef = useRef(false)
 
-  // Sync local state when server props update, but respect newer local versions (from realtime)
+  // Sync local state when server props update, but respect newer local versions (from realtime/fetch)
   useEffect(() => {
     if (pages) {
       setLocalPages(currentLocal => {
         if (currentLocal.length === 0) return pages
         return pages.map(serverPage => {
           const localPage = currentLocal.find(p => p.id === serverPage.id)
+
+          // 1. Time-based precedence
           if (localPage?.updated_at && serverPage.updated_at) {
             const localTime = new Date(localPage.updated_at).getTime()
             const serverTime = new Date(serverPage.updated_at).getTime()
             if (localTime > serverTime) return localPage
           }
+
+          // 2. Sticky Data Protection (Critical for Caching Issues)
+          // If local has feedback/approval data but server (stale) does not, PRESERVE LOCAL
+          if (localPage && (localPage.feedback_notes || localPage.is_approved !== undefined)) {
+            // Check if server is missing specific fields that local has
+            const hasLocalNotes = !!localPage.feedback_notes
+            const serverMissingNotes = !serverPage.feedback_notes
+
+            if (hasLocalNotes && serverMissingNotes) {
+              return {
+                ...serverPage,
+                feedback_notes: localPage.feedback_notes,
+                is_resolved: localPage.is_resolved,
+                is_approved: localPage.is_approved,
+                feedback_history: localPage.feedback_history
+              }
+            }
+          }
+
           return serverPage
         })
       })
@@ -232,6 +253,15 @@ export function ProjectTabsContent({
         if (payload.eventType === 'UPDATE' && payload.new) {
           const updatedPage = payload.new as Page
           setLocalPages(prev => prev.map(p => p.id === updatedPage.id ? { ...p, ...updatedPage } : p))
+
+          // Debug Realtime
+          if (updatedPage.feedback_notes) {
+            console.log('[Realtime] Feedback received:', updatedPage.feedback_notes)
+            toast.info('New Feedback Received', {
+              description: 'Review panel updated.'
+            })
+          }
+
           const now = Date.now()
           if (now - lastToastTimeRef.current > 2000) {
             toast.info('Manuscript updated', { description: 'Page content has been modified.' })
@@ -245,6 +275,39 @@ export function ProjectTabsContent({
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [projectId, router])
+
+  // Force Client-Side Fetch on Mount (To fix sticky server caching & RLS)
+  useEffect(() => {
+    const fetchFreshPages = async () => {
+      try {
+        // Use API route instead of direct Supabase client to:
+        // 1. Bypass RLS (API uses admin client)
+        // 2. Control caching headers explicitely
+        const response = await fetch(`/api/projects/${projectId}/pages`, {
+          cache: 'no-store',
+          headers: { 'Pragma': 'no-cache' }
+        })
+
+        if (!response.ok) return
+
+        const { pages: freshPages } = await response.json()
+
+        if (freshPages && freshPages.length > 0) {
+          console.log('[Client-Side API] Refreshed pages data', freshPages.length)
+          setLocalPages(prev => {
+            return freshPages.map((freshPage: Page) => {
+              const existing = prev.find(p => p.id === freshPage.id)
+              return { ...existing, ...freshPage } as Page
+            })
+          })
+        }
+      } catch (e) {
+        console.error('Error fetching fresh pages:', e)
+      }
+    }
+
+    fetchFreshPages()
+  }, [projectId])
 
   // Loading State
   if (projectStatus === 'character_generation' && !showGallery) {

@@ -2,9 +2,7 @@
 import { OpenAI } from 'openai'
 import { createAdminClient } from '@/lib/supabase/server'
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
-})
+
 
 export async function analyzeScene(
     projectId: string,
@@ -13,6 +11,10 @@ export async function analyzeScene(
     sceneDescription: string,
     characters: any[]
 ) {
+    const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY
+    })
+
     try {
         const supabase = await createAdminClient()
 

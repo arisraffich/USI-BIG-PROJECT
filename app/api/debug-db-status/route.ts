@@ -1,22 +1,34 @@
-import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/server'
 
-export async function GET() {
-    const supabase = createAdminClient()
-    const projectId = '8d58e31d-1089-419b-8a26-9bcb87401015'
+export const dynamic = 'force-dynamic'
 
-    const { data: page, error } = await supabase
-        .from('pages')
-        .select('*')
-        .eq('project_id', projectId)
-        .eq('page_number', 1)
-        .single()
+export async function GET(request: Request) {
+    try {
+        const { searchParams } = new URL(request.url)
+        const projectId = searchParams.get('projectId')
 
-    console.log('Page 1 Status Check:', {
-        projectId,
-        page,
-        error: error?.message
-    })
+        if (!projectId) {
+            return NextResponse.json({ error: 'Missing projectId' }, { status: 400 })
+        }
 
-    return NextResponse.json({ page, error })
+        const supabase = await createAdminClient()
+
+        // Fetch pages with feedback_notes explicit selection
+        const { data: pages, error } = await supabase
+            .from('pages')
+            .select('id, page_number, feedback_notes, is_resolved')
+            .eq('project_id', projectId)
+            .order('page_number', { ascending: true })
+
+        if (error) throw error
+
+        return NextResponse.json({
+            success: true,
+            pages
+        })
+
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 }

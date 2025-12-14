@@ -4,6 +4,8 @@ import { ProjectTabsContent } from '@/components/admin/ProjectTabsContent'
 import { ProjectDevTools } from '@/components/admin/ProjectDevTools'
 import { Suspense } from 'react'
 
+export const dynamic = 'force-dynamic'
+
 export default async function ProjectDetailPage({
   params,
 }: {
@@ -40,6 +42,19 @@ export default async function ProjectDetailPage({
     ])
 
     pages = pagesResult.data || null
+
+    // Debug Server Fetch
+    if (pages) {
+      console.log('[Server Fetch] Pages fetched:', pages.length)
+      pages.forEach(p => {
+        if (p.feedback_notes) {
+          console.log(`[Server Fetch] Page ${p.page_number} has notes:`, p.feedback_notes)
+        } else {
+          console.log(`[Server Fetch] Page ${p.page_number} notes: ${p.feedback_notes} (Resolved: ${p.is_resolved})`)
+        }
+      })
+    }
+
     characters = charactersResult.data || null
     projectStatus = projectResult.data?.status || 'draft'
     projectStatus = projectResult.data?.status || 'draft'

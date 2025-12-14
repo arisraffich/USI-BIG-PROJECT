@@ -9,6 +9,9 @@ export interface Page {
   sketch_url?: string | null
   sketch_prompt?: string | null
   illustration_url?: string | null
+  // Published versions (Synrchronized on "Send")
+  customer_illustration_url?: string | null
+  customer_sketch_url?: string | null
   is_customer_edited_story_text?: boolean
   is_customer_edited_scene_description?: boolean
   original_story_text?: string | null
@@ -23,6 +26,11 @@ export interface Page {
   illustration_version?: number
   illustration_generated_at?: string | null
   sketch_generated_at?: string | null
+  // Feedback Module
+  feedback_notes?: string | null
+  feedback_history?: Array<{ note: string; created_at: string }> | null
+  is_approved?: boolean
+  is_resolved?: boolean
 }
 
 

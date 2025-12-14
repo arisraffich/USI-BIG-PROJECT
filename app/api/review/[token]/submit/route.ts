@@ -40,14 +40,95 @@ export async function POST(
     // Check if project is in correct status
     // Allow submission if in review or if revision needed (re-submitting?)
     // Strictly speaking, should be 'character_review'.
-    if (project.status !== 'character_review' && project.status !== 'character_revision_needed') {
+    // Check if project is in correct status
+    // Allow submission if in ANY review status
+    const allowedStatuses = [
+      'character_review', 'character_revision_needed',
+      'illustration_review', 'illustration_revision_needed'
+    ]
+
+    if (!allowedStatuses.includes(project.status)) {
       return NextResponse.json(
-        { error: 'Project is not in review status' },
+        { error: 'Project is not in a reviewable status' },
         { status: 403 }
       )
     }
 
-    // Update pages with customer edits
+    // BRANCH 1: ILLUSTRATION REVIEW SUBMISSION
+    if (project.status.includes('illustration')) {
+      const { illustrationEdits } = body
+
+      // Update Illustration Feedback
+      if (illustrationEdits && Object.keys(illustrationEdits).length > 0) {
+        console.log('[Submit] Processing illustration feedback:', Object.keys(illustrationEdits).length)
+
+        const updates = Object.entries(illustrationEdits).map(([pageId, notes]: [string, any]) => ({
+          id: pageId,
+          notes: notes
+        }))
+
+        for (const update of updates) {
+          // If notes provided, mark as NOT resolved (needs revision)
+          // If empty notes, we don't necessarily change resolved status unless we treat it as approval?
+          // Actually, if submitting with empty notes, it means "Looks good".
+          // So if notes present -> is_resolved = false. 
+          // If notes empty -> we ignore (don't overwrite old notes possibly? Or treat as clear?)
+          // Usually submission overwrites.
+
+          const hasNotes = !!update.notes && update.notes.trim() !== ''
+
+          await supabase.from('pages').update({
+            feedback_notes: hasNotes ? update.notes : null, // Clear if empty
+            is_resolved: !hasNotes // Resolved if no notes (= approved)
+          }).eq('id', update.id)
+        }
+      }
+
+      // Determine Outcome: Revision vs Approval
+      // Check if ANY page has feedback notes (unresolved)
+      const { data: pages } = await supabase.from('pages').select('feedback_notes, is_resolved').eq('project_id', project.id)
+      const hasFeedback = pages?.some(p => !!p.feedback_notes)
+
+      // Only check Page 1 for trial
+      // const page1 = pages?.find(...) 
+      // Safe to check all for now as only Page 1 exists/has images.
+
+      let newStatus = 'illustration_approved'
+      let message = 'Illustration trial approved!'
+
+      if (hasFeedback) {
+        newStatus = 'illustration_revision_needed'
+        message = 'Feedback submitted. We will revise the illustration.'
+      }
+
+      await supabase.from('projects').update({ status: newStatus }).eq('id', project.id)
+
+      // Notify
+      try {
+        await notifyCustomerSubmission({
+          projectId: project.id,
+          projectTitle: project.book_title,
+          authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim(),
+          projectUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/project/${project.id}`,
+        })
+      } catch (e) { console.error('Notification error:', e) }
+
+      return NextResponse.json({
+        success: true,
+        message,
+        status: newStatus
+      })
+    }
+
+    // BRANCH 2: CHARACTER REVIEW SUBMISSION (Existing Logic)
+    // ... page edits (manuscript) are shared? 
+    // Actually, customer might edit manuscript during character review. 
+    // We should allow pageEdits in both modes? 
+    // User request: "Cusromers will also Have the add review botton... similar to character revision section"
+    // Usually focus is on Illustration but manuscript edits might happen.
+    // Existing logic processes pageEdits at the top. Let's keep that shared.
+
+    // Update pages with customer edits (Shared)
     if (pageEdits && Object.keys(pageEdits).length > 0) {
       const pageUpdates = Object.entries(pageEdits).map(([pageId, edits]: [string, any]) => ({
         id: pageId,

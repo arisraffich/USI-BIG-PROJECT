@@ -18,16 +18,18 @@ export async function POST(request: Request) {
 
         console.log(`[DevTools] Resetting project ${projectId} to 'Illustrations Not Started'`)
 
-        // 1. Reset Project Status (Skipping missing columns on 'projects' table for now)
-        // const { error: projectError } = await supabase
-        //     .from('projects')
-        //     .update({
-        //         illustration_status: 'not_started',
-        //         style_reference_page_id: null
-        //     })
-        //     .eq('id', projectId)
+        // 1. Reset Project Status
+        const { error: projectError } = await supabase
+            .from('projects')
+            .update({
+                status: 'characters_approved', // Go back to "Ready for Illustration" stage
+                illustration_send_count: 0,
+                review_token: crypto.randomUUID().replace(/-/g, ''), // Invalidate existing customer URL by rotating it
+                // illustration_status: 'not_started', // Might be deprecated, relying on status
+            })
+            .eq('id', projectId)
 
-        // if (projectError) throw projectError
+        if (projectError) throw projectError
 
         // 2. Clear Page Data (Illustrations & Sketches)
         const { error: pageError } = await supabase
@@ -36,9 +38,11 @@ export async function POST(request: Request) {
                 illustration_url: null,
                 // illustration_status: 'pending', // Missing
                 sketch_url: null,
-                // sketch_prompt: null, // sketch_prompt column might be missing too, let's check schema.json... 
-                // Schema JSON said: "sketch_prompt":null exists. "sketch_url":null exists.
-                sketch_prompt: null
+                sketch_prompt: null,
+                // Reset Feedback Data too
+                feedback_notes: null,
+                is_resolved: false,
+                feedback_history: [] // or null depending on schema preference, [] is safer for array types
             })
             .eq('project_id', projectId)
 

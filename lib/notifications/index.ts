@@ -207,3 +207,73 @@ export async function notifyCharactersApproved(options: {
     console.error('Failed to send character approval notification:', error)
   }
 }
+
+export async function notifyIllustrationTrialSent(options: {
+  projectTitle: string
+  authorName: string
+  authorEmail: string
+  authorPhone?: string
+  reviewUrl: string
+  projectUrl: string
+}): Promise<void> {
+  const { projectTitle, authorName, authorEmail, authorPhone, reviewUrl, projectUrl } = options
+
+  const authorFirstName = authorName.trim().split(/\s+/)[0] || authorName
+
+  // Send email to customer
+  try {
+    await sendEmail({
+      to: authorEmail,
+      subject: `Illustration Trial Ready: "${projectTitle}"`,
+      html: `
+        <h2>Your Illustration Trial is Ready</h2>
+        <p>Hello ${authorFirstName},</p>
+        <p>Great news! We have prepared the initial illustration trial for your project "<strong>${projectTitle}</strong>".</p>
+        <p>Please review the illustration and sketch for the first page and let us know what you think:</p>
+        <p style="margin: 20px 0;">
+          <a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">Review Illustration Trial</a>
+        </p>
+        <p>Or copy and paste this link into your browser:</p>
+        <p style="color: #666; word-break: break-all;">${reviewUrl}</p>
+        <p>Thank you!</p>
+        <p>US Illustrations Team</p>
+      `,
+    })
+  } catch (emailError: any) {
+    console.error('[Notification] Failed to send illustration trial email:', emailError)
+  }
+
+  // Send SMS (DISABLED temporarily per user request condition)
+  if (false && authorPhone) {
+    // ...
+  }
+
+  // Send Slack notification to PM
+  try {
+    await sendSlackNotification({
+      text: `🎨 Illustration Trial sent to customer for "${projectTitle}"`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Illustration Trial Sent*\nTrial illustration for "${projectTitle}" by ${authorName} has been sent for review.`,
+          },
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'View Project' },
+              url: projectUrl,
+              style: 'primary',
+            },
+          ],
+        },
+      ],
+    })
+  } catch (slackError: any) {
+    console.error('Failed to send Slack notification:', slackError)
+  }
+}

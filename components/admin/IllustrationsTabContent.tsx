@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, startTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Page } from '@/types/page'
+import { PageStatusBar, PageStatus } from '@/components/project/PageStatusBar'
+import { ReviewHistoryDialog } from '@/components/project/ReviewHistoryDialog'
 import { Button } from '@/components/ui/button'
 import { Loader2, Sparkles, AlertCircle, RefreshCw, MessageSquare, CheckCircle2, Download, Upload } from 'lucide-react'
 import { toast } from 'sonner'
@@ -41,6 +43,8 @@ export function IllustrationsTabContent({
     initialAspectRatio
 }: IllustrationsTabContentProps) {
     const router = useRouter()
+    const [loadingState, setLoadingState] = useState<{ sketch: boolean; illustration: boolean }>({ sketch: false, illustration: false })
+    const [loadingMessage, setLoadingMessage] = useState<{ sketch: string; illustration: string }>({ sketch: 'Updating...', illustration: 'Updating...' })
     const [isGenerating, setIsGenerating] = useState(false)
     const [reviews, setReviews] = useState<IllustrationReview[]>([])
     const [viewingImage, setViewingImage] = useState<string | null>(null)
@@ -55,6 +59,8 @@ export function IllustrationsTabContent({
     const handleRegenerateWithPrompt = async () => {
         setIsRegenerateDialogOpen(false)
         setIsGenerating(true)
+        setLoadingState(prev => ({ ...prev, illustration: true }))
+        setLoadingMessage(prev => ({ ...prev, illustration: 'Regenerating...' }))
         toast.loading('Regenerating Illustration...', { id: 'regen-wait' })
 
         try {
@@ -82,6 +88,9 @@ export function IllustrationsTabContent({
                     ...prev,
                     illustration_url: data.illustrationUrl
                 }))
+                // Note: illustration loading state will be cleared by onLoad handler
+            } else {
+                setLoadingState(prev => ({ ...prev, illustration: false }))
             }
 
             toast.dismiss('regen-wait')
@@ -97,6 +106,7 @@ export function IllustrationsTabContent({
         } catch (error: any) {
             toast.dismiss('regen-wait')
             toast.error('Regeneration Failed', { description: error.message })
+            setLoadingState(prev => ({ ...prev, illustration: false }))
         } finally {
             setIsGenerating(false)
         }
@@ -105,6 +115,7 @@ export function IllustrationsTabContent({
     // Configuration State (Inline)
     const [aspectRatio, setAspectRatio] = useState<string>(initialAspectRatio || '8:10')
     const [textIntegration, setTextIntegration] = useState<string>('integrated')
+    const [historyOpen, setHistoryOpen] = useState(false)
 
     // Find Page 1 (The Style Anchor)
     const initialPage1 = pages.find(p => p.page_number === 1) || pages[0]
@@ -218,6 +229,8 @@ export function IllustrationsTabContent({
         }
 
         setIsUploading(true)
+        setLoadingState(prev => ({ ...prev, [type]: true }))
+        setLoadingMessage(prev => ({ ...prev, [type]: 'Uploading...' }))
         const toastId = toast.loading(`Uploading ${type}...`)
 
         try {
@@ -249,15 +262,28 @@ export function IllustrationsTabContent({
 
             // Optimistic Update: Manually update the URL in the local state to show "Uploaded" tag immediately
             if (result.url) {
+                // Determine if we need to force re-render by ensuring URL is different/cache-busted
+                // Wait, if result.url is same, we might want to append query param
+                const newUrl = result.url.includes('?') ? `${result.url}&t=${Date.now()}` : `${result.url}?t=${Date.now()}`
+
                 setPage1(prev => ({
                     ...prev,
-                    [type === 'sketch' ? 'sketch_url' : 'illustration_url']: result.url
+                    [type === 'sketch' ? 'sketch_url' : 'illustration_url']: newUrl
                 }))
+
+                // AUTOMATIC SKETCH REGENERATION
+                // If the user uploads a new illustration (manual edit), we must regenerate the sketch
+                // to ensure they match (e.g. if items were removed).
+                if (type === 'illustration') {
+                    // We don't await this blocking the UI, but we trigger it
+                    handleGenerateSketch(page1.id, result.url) // Use original URL for generation
+                }
 
                 startTransition(() => {
                     router.refresh()
                 })
             } else {
+                setLoadingState(prev => ({ ...prev, [type]: false }))
                 router.refresh()
             }
 
@@ -267,6 +293,7 @@ export function IllustrationsTabContent({
                 id: toastId,
                 description: error.message || "An unexpected error occurred."
             })
+            setLoadingState(prev => ({ ...prev, [type]: false }))
         } finally {
             setIsUploading(false)
         }
@@ -357,6 +384,10 @@ export function IllustrationsTabContent({
             toast.success('Illustration Generated!', { description: 'Creating sketch now...' })
 
             if (data.illustrationUrl) {
+                setPage1(prev => ({
+                    ...prev,
+                    illustration_url: data.illustrationUrl
+                }))
                 handleGenerateSketch(page1.id, data.illustrationUrl)
             }
 
@@ -371,17 +402,36 @@ export function IllustrationsTabContent({
     }
 
     const handleGenerateSketch = async (pageId: string, illustrationUrl: string) => {
+        setLoadingState(prev => ({ ...prev, sketch: true }))
+        setLoadingMessage(prev => ({ ...prev, sketch: 'Regenerating...' }))
         try {
             toast.info('Starting Sketch Generation...', { description: 'Converting illustration to pencil sketch.' })
-            await fetch('/api/illustrations/generate-sketch', {
+            const res = await fetch('/api/illustrations/generate-sketch', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ projectId, pageId, illustrationUrl })
             })
+
+            if (res.ok) {
+                const data = await res.json()
+                if (data.sketchUrl) {
+                    setPage1(prev => ({
+                        ...prev,
+                        sketch_url: data.sketchUrl
+                    }))
+                    // Note: sketch loading state will be cleared by onLoad handler
+                } else {
+                    setLoadingState(prev => ({ ...prev, sketch: false }))
+                }
+            } else {
+                setLoadingState(prev => ({ ...prev, sketch: false }))
+            }
+
             toast.success('Sketch Ready!')
             router.refresh()
         } catch (e) {
             console.error('Sketch trigger failed', e)
+            setLoadingState(prev => ({ ...prev, sketch: false }))
         }
     }
 
@@ -441,8 +491,8 @@ export function IllustrationsTabContent({
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col md:flex-row">
 
                     {/* Left Column: Reviews (Desktop Only - Unified Block) */}
-                    <div className="hidden md:flex w-72 flex-col shrink-0 border-r border-slate-100 bg-slate-50/50">
-                        <div className="p-4 border-b border-slate-100 h-[73px] flex items-center justify-between">
+                    <div className="hidden md:flex w-72 flex-col shrink-0 border-r border-slate-100 bg-slate-50/50 h-full">
+                        <div className="p-4 border-b border-slate-100 h-[73px] flex items-center justify-between shrink-0">
                             <h4 className="font-semibold text-slate-800">Reviews</h4>
                             <Button variant="outline" size="sm" onClick={handleOpenRegenerate} disabled={isGenerating} title="Regenerate with Instructions">
                                 <RefreshCw className="w-3.5 h-3.5 mr-2" />
@@ -450,8 +500,44 @@ export function IllustrationsTabContent({
                             </Button>
                         </div>
 
-                        <div className="p-4 space-y-4 overflow-y-auto max-h-[800px]">
-                            {/* Pending Reviews */}
+                        <div className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0">
+                            {/* Current Unresolved Feedback from Page (Priority) */}
+                            {page1.feedback_notes && !page1.is_resolved && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-yellow-900 relative animate-in fade-in">
+                                    <div className="flex items-start gap-2">
+                                        <MessageSquare className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                                        <div>
+                                            <span className="text-xs font-semibold text-amber-800 uppercase block mb-1">Current Request</span>
+                                            <p className="whitespace-pre-wrap">{page1.feedback_notes}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Resolved Feedback (Ready to Resend) */}
+                            {page1.feedback_notes && page1.is_resolved && (
+                                <div className="bg-green-50 border border-green-200 rounded-md p-3 text-sm flex items-start gap-2 relative animate-in fade-in">
+                                    <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+                                    <p className="leading-relaxed text-green-900">
+                                        <span className="font-bold text-green-700 uppercase text-xs mr-2">Resolved (Resend):</span>
+                                        {page1.feedback_notes}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Historic Resolved Reviews (Already Sent) - Reversed to show recent first */}
+                            {/* @ts-ignore */}
+                            {page1.feedback_history?.slice().reverse().map((item: any, index: number) => (
+                                <div key={`hist-${index}`} className="bg-green-50/80 border border-green-200/60 rounded-md p-3 text-sm flex items-start gap-2 relative animate-in fade-in">
+                                    <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+                                    <p className="leading-relaxed text-green-900">
+                                        <span className="font-bold text-green-700 uppercase text-xs mr-2">Resolved:</span>
+                                        {item.note}
+                                    </p>
+                                </div>
+                            ))}
+
+                            {/* Pending Reviews (legacy or secondary) */}
                             {reviews.filter(r => r.status === 'pending').map(review => (
                                 <div key={review.id} className="bg-yellow-50 border border-yellow-200 rounded-md p-3 text-sm text-yellow-900 relative animate-in fade-in">
                                     <div className="flex items-start gap-2">
@@ -466,12 +552,12 @@ export function IllustrationsTabContent({
 
                             {/* Resolved Reviews */}
                             {reviews.filter(r => r.status === 'resolved').map(review => (
-                                <div key={review.id} className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-900 relative animate-in fade-in">
-                                    <div className="flex items-center gap-1.5 mb-1">
-                                        <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-                                        <span className="font-semibold text-xs text-green-700 uppercase">Resolved</span>
-                                    </div>
-                                    <p className="text-green-800 opacity-90">{review.review_text}</p>
+                                <div key={review.id} className="bg-green-50 border border-green-200 rounded-md p-3 text-sm flex items-start gap-2 relative animate-in fade-in">
+                                    <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+                                    <p className="leading-relaxed text-green-900">
+                                        <span className="font-bold text-green-700 uppercase text-xs mr-2">Resolved:</span>
+                                        {review.review_text}
+                                    </p>
                                 </div>
                             ))}
 
@@ -486,12 +572,34 @@ export function IllustrationsTabContent({
                     {/* Right Column: Images */}
                     <div className="flex-1 flex flex-col min-w-0">
                         {/* Mobile Header */}
-                        <div className="md:hidden p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/30 h-[73px]">
-                            <h3 className="font-semibold text-slate-800">Page 1</h3>
-                            <Button variant="outline" size="sm" onClick={handleOpenRegenerate} disabled={isGenerating} title="Regenerate">
-                                <RefreshCw className="w-4 h-4 mr-2" />
-                                Regenerate
-                            </Button>
+
+
+                        {/* Mobile: Page Status Bar & History */}
+                        <div className="md:hidden border-b border-slate-100 bg-white">
+                            <div className="px-4 pt-4 pb-2">
+                                <h3 className="font-bold text-slate-800">Page {page1.page_number}</h3>
+                            </div>
+                            <PageStatusBar
+                                status={
+                                    page1.feedback_notes && !page1.is_resolved ? 'request' :
+                                        page1.is_resolved ? 'resolved' : 'fresh'
+                                }
+                                labelText={
+                                    page1.feedback_notes && !page1.is_resolved ? `Request: ${page1.feedback_notes}` :
+                                        page1.is_resolved ? 'Resolved' : 'No Reviews'
+                                }
+                                onStatusClick={() => setHistoryOpen(true)}
+                                actionButton={
+                                    <Button variant="ghost" size="icon" onClick={handleOpenRegenerate} disabled={isGenerating} className="h-8 w-8 rounded-full bg-slate-100 text-slate-600">
+                                        <RefreshCw className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
+                                    </Button>
+                                }
+                            />
+                            <ReviewHistoryDialog
+                                open={historyOpen}
+                                onOpenChange={setHistoryOpen}
+                                page={page1}
+                            />
                         </div>
 
                         {/* Desktop Header (Split) */}
@@ -571,7 +679,7 @@ export function IllustrationsTabContent({
                             {/* 1. Sketch (First/Left) */}
                             <div className="p-6 md:p-0 flex flex-col items-center space-y-4 md:space-y-0 bg-white relative">
                                 <div className="flex items-center gap-2 md:hidden">
-                                    <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">Pencil Sketch</span>
+                                    <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">Sketch</span>
                                     {page1.sketch_url && (
                                         <button
                                             onClick={() => handleDownload(page1.sketch_url!, `Page-${page1.page_number}-Sketch.jpg`)}
@@ -581,6 +689,14 @@ export function IllustrationsTabContent({
                                             <Download className="w-4 h-4" />
                                         </button>
                                     )}
+                                    <button
+                                        className="h-8 w-8 flex items-center justify-center rounded-full bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors"
+                                        onClick={() => sketchInputRef.current?.click()}
+                                        disabled={isUploading}
+                                        title="Upload Sketch"
+                                    >
+                                        <Upload className="h-4 w-4" />
+                                    </button>
                                 </div>
                                 <div
                                     className="relative w-full cursor-pointer hover:opacity-95 transition-opacity"
@@ -590,6 +706,7 @@ export function IllustrationsTabContent({
                                         <img
                                             src={page1.sketch_url}
                                             alt="Generated Sketch"
+                                            onLoad={() => setLoadingState(prev => ({ ...prev, sketch: false }))}
                                             className="w-full h-auto object-cover grayscale contrast-125 rounded-lg md:rounded-none shadow-sm md:shadow-none border border-slate-200 md:border-none"
                                         />
                                     ) : (
@@ -598,11 +715,11 @@ export function IllustrationsTabContent({
                                             <span className="text-sm">Generating sketch...</span>
                                         </div>
                                     )}
-                                    {isGenerating && (
+                                    {loadingState.sketch && (
                                         <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-50 rounded-lg">
                                             <div className="flex flex-col items-center gap-2 bg-white p-3 rounded-lg shadow-sm border">
                                                 <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
-                                                <span className="text-xs font-semibold text-purple-700">Regenerating...</span>
+                                                <span className="text-xs font-semibold text-purple-700">{loadingMessage.sketch}</span>
                                             </div>
                                         </div>
                                     )}
@@ -612,13 +729,29 @@ export function IllustrationsTabContent({
                             {/* 2. Illustration (Second/Right) */}
                             <div className="p-6 md:p-0 flex flex-col items-center space-y-4 md:space-y-0 bg-slate-50/10 relative">
                                 <div className="flex items-center gap-2 md:hidden">
-                                    <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">Final Illustration</span>
+                                    <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">Colored</span>
+                                    <button
+                                        className="h-8 w-8 flex items-center justify-center rounded-full bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-purple-600 transition-colors mr-1"
+                                        onClick={handleOpenRegenerate}
+                                        disabled={isGenerating}
+                                        title="Regenerate"
+                                    >
+                                        <RefreshCw className={`h-4 w-4 ${isGenerating ? 'animate-spin' : ''}`} />
+                                    </button>
                                     <button
                                         onClick={() => handleDownload(page1.illustration_url!, `Page-${page1.page_number}-Illustration.jpg`)}
                                         className="text-slate-400 hover:text-purple-600 transition-colors"
                                         title="Download Illustration"
                                     >
                                         <Download className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        className="h-8 w-8 flex items-center justify-center rounded-full bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors"
+                                        onClick={() => illustrationInputRef.current?.click()}
+                                        disabled={isUploading}
+                                        title="Upload Illustration"
+                                    >
+                                        <Upload className="h-4 w-4" />
                                     </button>
                                 </div>
                                 <div
@@ -628,13 +761,14 @@ export function IllustrationsTabContent({
                                     <img
                                         src={page1.illustration_url}
                                         alt="Generated Illustration"
+                                        onLoad={() => setLoadingState(prev => ({ ...prev, illustration: false }))}
                                         className="w-full h-auto object-cover rounded-lg md:rounded-none shadow-lg md:shadow-none border border-slate-100 md:border-none"
                                     />
-                                    {isGenerating && (
+                                    {loadingState.illustration && (
                                         <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-50 rounded-lg">
                                             <div className="flex flex-col items-center gap-2 bg-white p-3 rounded-lg shadow-sm border">
                                                 <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
-                                                <span className="text-xs font-semibold text-purple-700">Regenerating...</span>
+                                                <span className="text-xs font-semibold text-purple-700">{loadingMessage.illustration}</span>
                                             </div>
                                         </div>
                                     )}
@@ -652,13 +786,14 @@ export function IllustrationsTabContent({
                     >
                         <DialogTitle className="sr-only">Full Size Image</DialogTitle>
 
-                        {/* Wrapper to center image */}
-                        <div className="relative w-full h-full flex items-center justify-center p-4">
+                        {/* Wrapper to center image - Click to close */}
+                        <div className="relative w-full h-full flex items-center justify-center p-4" onClick={() => setViewingImage(null)}>
                             {viewingImage && (
                                 <img
                                     src={viewingImage}
                                     alt="Full size"
                                     className="max-w-full max-h-full object-contain rounded-md shadow-2xl"
+                                    onClick={(e) => e.stopPropagation()}
                                 />
                             )}
                         </div>

@@ -1,19 +1,20 @@
 'use client'
 
 import { useMemo, useState, useRef, useCallback, useEffect } from 'react'
-import { useSearchParams, usePathname } from 'next/navigation'
-import { CustomerCharacterCard } from './CustomerCharacterCard'
+import { useSearchParams, usePathname, useRouter } from 'next/navigation'
+import { CustomerIllustrationReview } from './CustomerIllustrationReview'
+import { CustomerIllustrationSidebar } from './CustomerIllustrationSidebar'
 import { CustomerAddCharacterButton } from './CustomerAddCharacterButton'
 import { CustomerManuscriptEditor } from './CustomerManuscriptEditor'
 import { CustomerProjectHeader } from './CustomerProjectHeader'
 import { SubmissionStatusModal } from './SubmissionStatusModal'
 import { CustomerCharacterGallery } from './CustomerCharacterGallery'
+import { CustomerCharacterCard } from './CustomerCharacterCard'
 import { Page } from '@/types/page'
 import { Character } from '@/types/character'
 import { Button } from '@/components/ui/button'
 import { Send, Check } from 'lucide-react'
 import { toast } from 'sonner'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 interface CustomerProjectTabsContentProps {
@@ -49,6 +50,9 @@ export function CustomerProjectTabsContent({
 
   // Track send count to conditionaly refresh
   const lastSendCount = useRef(characterSendCount)
+
+  // Illustration Feedback State
+  const [illustrationEdits, setIllustrationEdits] = useState<{ [pageId: string]: string }>({})
 
   // Local state for pages to support instant realtime updates
   const [localPages, setLocalPages] = useState<Page[]>(pages || [])
@@ -125,53 +129,35 @@ export function CustomerProjectTabsContent({
   // Realtime Subscription for project status (Auto-refresh on "Resend")
   useEffect(() => {
     const supabase = createClient()
-    const channelName = `customer-project-status-${projectId}`
-
     const channel = supabase
-      .channel(channelName)
+      .channel(`project-status-${projectId}`)
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
           table: 'projects',
-          filter: `review_token=eq.${reviewToken}`
+          filter: `id=eq.${projectId}`
         },
         (payload) => {
-          const newProject = payload.new as any
-          const newSendCount = newProject.character_send_count || 0
+          console.log('[Realtime] Project update:', payload.new.status)
+          router.refresh()
 
-          // CRITICAL: Only refresh if send count INCREMENTED.
-          // This filters out status changes (e.g. Regenerated) that happen before sending.
-          if (newSendCount > lastSendCount.current) {
-            console.log('[Realtime] Project resent! Refreshing...')
-
-            lastSendCount.current = newSendCount // Update ref to avoid double refresh
-
-            toast.info('New Illustrations Available', {
-              description: 'The page will refresh to show the updated characters.'
-            })
-            router.refresh()
-          } else {
-            // console.log('[Realtime] Project updated but not sent (count did not increase). Ignoring refresh.')
-          }
+          // If status changes to a reviewable state, refresh local state
+          // logic...
         }
       )
-      .subscribe((status) => {
-        // console.log(`[Realtime] Subscription status: ${status}`)
-      })
+      .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [projectId, router, reviewToken])
+  }, [projectId, router])
 
   // Store manuscript editor edits
   const [manuscriptEdits, setManuscriptEdits] = useState<{ [pageId: string]: { story_text?: string; scene_description?: string } }>({})
 
   // Store character form data and validity
-  // Map id -> { data, isValid }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [characterForms, setCharacterForms] = useState<{ [id: string]: { data: any; isValid: boolean } }>({})
 
   // Initialize character forms from props on mount (fix for manually added characters having disabled submit button)
@@ -209,7 +195,8 @@ export function CustomerProjectTabsContent({
   // Read active tab directly from search params
   const activeTab = useMemo(() => {
     const tab = searchParams?.get('tab')
-    return tab === 'characters' ? 'characters' : 'pages'
+    if (tab === 'illustations') return 'illustrations' // typo handle?
+    return tab === 'characters' ? 'characters' : (tab === 'illustrations' ? 'illustrations' : 'pages')
   }, [searchParams])
 
   // Sort characters: main character first, then secondary by creation date
@@ -228,39 +215,64 @@ export function CustomerProjectTabsContent({
       return 0
     })
 
-    const main = sorted.find(c => c.is_main) || null
-    // Important: typed correctly as Character array
-    const secondary = sorted.filter(c => !c.is_main)
-
-    return { main, secondary }
+    return {
+      main: sorted.find(c => c.is_main) || null,
+      secondary: sorted.filter(c => !c.is_main)
+    }
   }, [characters])
 
-  // Check if we are in "Stage 2" (Images generated)
-  // We check if any secondary character has an image_url
+  // Check modes
+  const isCharacterMode = ['character_generation', 'character_review', 'character_revision_needed', 'characters_approved'].includes(projectStatus)
+  const isIllustrationMode = ['illustration_review', 'illustration_revision_needed'].includes(projectStatus)
   const showGallery = useMemo(() => {
     return sortedCharacters.secondary.some(c => c.image_url !== null && c.image_url !== '')
   }, [sortedCharacters.secondary])
 
-  // Check if project is locked (status changed from character_review)
-  const isLocked = projectStatus !== 'character_review'
+  const showIllustrationsTab = isIllustrationMode
 
-  // Calculate if submit button should be disabled
-  // Logic: Active only when all EDITABLE character forms are valid
-  // Main character is read-only, so we focus on secondary characters
+  // Redirect Logic
+  // If in illustration mode, default to illustration tab
+  useEffect(() => {
+    if (showIllustrationsTab && !searchParams?.get('tab')) {
+      router.replace(`${pathname}?tab=illustrations`)
+    } else if (showGallery && !searchParams?.get('tab') && isCharacterMode) {
+      // Only redirect to character gallery if NOT in illustration mode
+      router.replace(`${pathname}?tab=characters`)
+    }
+  }, [showIllustrationsTab, showGallery, searchParams, pathname, router, isCharacterMode])
+
+  const handleIllustrationFeedbackChange = useCallback((pageId: string, notes: string) => {
+    setIllustrationEdits(prev => ({
+      ...prev,
+      [pageId]: notes
+    }))
+
+    // Optimistically update local pages so the UI reflects the change immediately
+    setLocalPages(prev => prev.map(p =>
+      p.id === pageId
+        ? { ...p, feedback_notes: notes }
+        : p
+    ))
+  }, [])
+
+  const isLocked = !['character_review', 'character_revision_needed', 'illustration_review', 'illustration_revision_needed'].includes(projectStatus)
+
+  // Calculate submit disabled
   const isSubmitDisabled = useMemo(() => {
-    if (!sortedCharacters.secondary.length) return false
+    // If in Illustration Mode, we are always valid (empty feedback is allowed = approval)
+    if (showIllustrationsTab) return false
 
-    // Check if every secondary character has an entry in characterForms AND it is valid
+    // Character checks
+    if (!sortedCharacters.secondary.length) return false
     return !sortedCharacters.secondary.every(char => {
       const formInfo = characterForms[char.id]
       return formInfo && formInfo.isValid
     })
-  }, [sortedCharacters.secondary, characterForms])
+  }, [sortedCharacters.secondary, characterForms, showIllustrationsTab])
 
   const handleCharacterAdded = useCallback(() => {
-    setRefreshing(true)
+    setLocalPages(prev => [...prev]) // Force re-render? No need, props update handles it.
     router.refresh()
-    setTimeout(() => setRefreshing(false), 1000)
   }, [router])
 
   const handleSubmitChanges = async () => {
@@ -273,7 +285,6 @@ export function CustomerProjectTabsContent({
     setSubmissionStatus('loading')
 
     // Prepare character data for submission
-    // Map existing forms to a clean object
     const characterEdits = Object.entries(characterForms).reduce((acc, [id, info]) => {
       acc[id] = info.data
       return acc
@@ -285,7 +296,8 @@ export function CustomerProjectTabsContent({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pageEdits: manuscriptEdits,
-          characterEdits: characterEdits
+          characterEdits: characterEdits,
+          illustrationEdits: illustrationEdits // New payload
         }),
       })
 
@@ -294,9 +306,7 @@ export function CustomerProjectTabsContent({
         throw new Error(error.error || 'Failed to submit changes')
       }
 
-      // Success! Show success modal state
       setSubmissionStatus('success')
-      // Note: We do NOT redirect. The modal stays open as the "Thank You" screen.
 
     } catch (error: any) {
       console.error('Error submitting changes:', error)
@@ -306,55 +316,44 @@ export function CustomerProjectTabsContent({
     }
   }
 
-  // Check if project is marked as approved
-  const isApprovedState = projectStatus === 'characters_approved'
-
   const handleApproveCharacters = async () => {
+    if (isLocked) return
+
     setIsApproving(true)
+    setSubmissionStatus('loading')
     try {
-      const response = await fetch(`/api/review/${reviewToken}/approve`, {
+      // Logic: Submit empty edits. The backend will see no feedback notes (because we don't send any from Gallery) and move to `characters_approved`.
+      const response = await fetch(`/api/review/${reviewToken}/submit`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pageEdits: {},
+          characterEdits: {}
+        }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to approve characters')
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to approve')
       }
 
-      toast.success('Characters Approved!')
-      // Status update will come via realtime or refresh, but we can force state
-      router.refresh()
-    } catch (error) {
-      console.error('Approval failed:', error)
+      setSubmissionStatus('success')
+
+    } catch (error: any) {
+      console.error('Error approving:', error)
       toast.error('Failed to approve characters')
+      setSubmissionStatus('idle')
       setIsApproving(false)
     }
   }
 
-  // Disable approval if ANY character has pending feedback notes
-  const isApproveDisabled = useMemo(() => {
-    if (!characters) return false
-    return characters.some(c => c.feedback_notes && c.feedback_notes.trim() !== '')
-  }, [characters])
-
-  // Guard Clause: Block access if locked AND (NOT in gallery mode OR Generation is pending/complete but not approved)
-  // Logic Update: If status is 'character_generation' or 'character_generation_complete', we MUST hide the gallery
-  // and show the "Submitted/Processing" screen, regardless of whether images exist.
-  // The gallery only unlocks when Admin sends it back (status becomes 'character_review' or 'characters_approved')
-
+  const isApprovedState = projectStatus === 'characters_approved'
 
   const isHiddenGenerationState =
     projectStatus === 'character_generation' ||
     projectStatus === 'character_generation_complete'
 
-  // Redirect to characters tab by default if in gallery mode
-  useEffect(() => {
-    if (showGallery && !searchParams?.get('tab')) {
-      // Use replace to avoid history stack buildup
-      router.replace(`${pathname}?tab=characters`)
-    }
-  }, [showGallery, searchParams, pathname, router])
-
-  if ((isLocked && !showGallery) || isHiddenGenerationState || isApprovedState) {
+  if ((isLocked && !showIllustrationsTab && !showGallery) || isHiddenGenerationState || (isApprovedState && !showIllustrationsTab)) {
     return (
       <div className="p-8 flex items-center justify-center min-h-screen">
         <div className="text-center max-w-md">
@@ -382,9 +381,23 @@ export function CustomerProjectTabsContent({
     )
   }
 
+  // Page 1 for Illustration Review
+  const page1 = localPages.find(p => p.page_number === 1)
 
-  const pageCount = pages?.length || 0
+  const pageCount = localPages.length
   const characterCount = characters?.length || 0
+
+  // Approval disabled?
+  // For characters: disabled if not all secondary chars are valid.
+  // For illustrations: not used (we submit changes instead).
+  const isApproveDisabled = useMemo(() => {
+    if (showIllustrationsTab) return false
+    if (!sortedCharacters.secondary.length) return false
+    return !sortedCharacters.secondary.every(char => {
+      const formInfo = characterForms[char.id]
+      return formInfo && formInfo.isValid
+    })
+  }, [sortedCharacters.secondary, characterForms, showIllustrationsTab])
 
   return (
     <>
@@ -395,72 +408,98 @@ export function CustomerProjectTabsContent({
         characterCount={characterCount}
         isSubmitting={isSubmitting}
         onSubmit={handleSubmitChanges}
-        showSubmitButton={!showGallery && !isLocked && !isEditMode}
+        showSubmitButton={(!isLocked && !isEditMode)}
         isSubmitDisabled={isSubmitDisabled}
         hideOnMobile={activeTab === 'characters' && showGallery}
-        // Approval Props
-        showApproveButton={showGallery && !isLocked && !isEditMode}
+        // Approval Props (Only for Character Phase)
+        showApproveButton={showGallery && !isLocked && !isEditMode && !showIllustrationsTab}
         onApprove={handleApproveCharacters}
         isApproving={isApproving}
         isApproveDisabled={isApproveDisabled}
+        // New Prop
+        showIllustrationsTab={showIllustrationsTab}
       />
-      <div className={`p-8 pb-32 relative min-h-screen ${activeTab === 'characters' && showGallery ? 'pt-8 md:pt-24' : 'pt-24'}`}>
-        {/* Pages Tab Content */}
-        <div className={activeTab === 'pages' ? 'block' : 'hidden'}>
-          <CustomerManuscriptEditor
+      <div className={`relative min-h-screen ${activeTab === 'characters' && showGallery ? 'pt-8 md:pt-24' : 'pt-24'} ${activeTab === 'illustrations' ? 'lg:pl-[250px]' : ''}`}>
+
+        {/* Illustrations Sidebar (Only visible on Illustrations tab) */}
+        {activeTab === 'illustrations' && showIllustrationsTab && (
+          <CustomerIllustrationSidebar
             pages={localPages as any}
-            projectId={projectId}
-            onEditsChange={setManuscriptEdits}
-            isEditMode={isEditMode}
-            onEditModeChange={setIsEditMode}
-            isVisible={activeTab === 'pages'}
+            activePageId={page1?.id || null}
+            onPageClick={(id) => {
+              // Navigate to page (future support for multiple pages)
+              toast.info(`Switched to Page ${localPages.find(p => p.id === id)?.page_number}`)
+            }}
           />
-        </div>
+        )}
 
-        {/* Characters Tab Content */}
-        <div className={activeTab === 'characters' ? 'block space-y-4' : 'hidden'}>
-          {/* Conditional Rendering: Gallery (Stage 2) vs Form (Stage 1) */}
-          {showGallery ? (
-            <CustomerCharacterGallery
-              characters={sortedCharacters.secondary}
-              mainCharacter={sortedCharacters.main || undefined}
+        <div className="p-8 pb-32">
+          {/* Pages Tab Content */}
+          <div className={activeTab === 'pages' ? 'block' : 'hidden'}>
+            <CustomerManuscriptEditor
+              pages={localPages as any}
+              projectId={projectId}
+              onEditsChange={setManuscriptEdits}
+              isEditMode={isEditMode}
+              onEditModeChange={setIsEditMode}
+              isVisible={activeTab === 'pages'}
             />
-          ) : (
-            <>
-              {characters && characters.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {sortedCharacters.main && (
-                    <CustomerCharacterCard
-                      key={sortedCharacters.main.id}
-                      character={sortedCharacters.main}
-                      onChange={handleCharacterChange}
-                    />
-                  )}
-                  {sortedCharacters.secondary.map((character) => (
-                    <CustomerCharacterCard
-                      key={character.id}
-                      character={character}
-                      onChange={handleCharacterChange}
-                    />
-                  ))}
-                  {/* Add Character Ghost Card - Always at the end */}
-                  <div className="h-full">
-                    <CustomerAddCharacterButton
-                      mode="card"
-                      projectId={projectId}
-                      mainCharacterName={sortedCharacters.main?.name || sortedCharacters.main?.role || null}
-                      onCharacterAdded={handleCharacterAdded}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500 text-center py-8">
-                  No characters yet. Characters will appear here after story parsing.
-                </p>
-              )}
-            </>
-          )}
+          </div>
 
+          {/* Characters Tab Content */}
+          <div className={activeTab === 'characters' ? 'block space-y-4' : 'hidden'}>
+            {/* ... (Existing Character Logic) */}
+            {showGallery ? (
+              <CustomerCharacterGallery
+                characters={sortedCharacters.secondary}
+                mainCharacter={sortedCharacters.main || undefined}
+              />
+            ) : (
+              <>
+                {characters && characters.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {sortedCharacters.main && (
+                      <CustomerCharacterCard
+                        key={sortedCharacters.main.id}
+                        character={sortedCharacters.main}
+                        onChange={handleCharacterChange}
+                      />
+                    )}
+                    {sortedCharacters.secondary.map((character) => (
+                      <CustomerCharacterCard
+                        key={character.id}
+                        character={character}
+                        onChange={handleCharacterChange}
+                      />
+                    ))}
+                    {/* Add Character Ghost Card - Always at the end */}
+                    <div className="h-full">
+                      <CustomerAddCharacterButton
+                        mode="card"
+                        projectId={projectId}
+                        mainCharacterName={sortedCharacters.main?.name || sortedCharacters.main?.role || null}
+                        onCharacterAdded={handleCharacterAdded}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 text-center py-8">
+                    No characters yet. Characters will appear here after story parsing.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Illustrations Tab Content */}
+          {showIllustrationsTab && page1 && (
+            <div className={activeTab === 'illustrations' ? 'block space-y-4' : 'hidden'}>
+              <CustomerIllustrationReview
+                page={page1}
+                onChange={handleIllustrationFeedbackChange}
+              />
+            </div>
+          )}
         </div>
       </div>
       <SubmissionStatusModal
