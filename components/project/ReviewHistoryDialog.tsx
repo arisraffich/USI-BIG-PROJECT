@@ -55,6 +55,36 @@ export function ReviewHistoryDialog({ open, onOpenChange, page, reviews = [], on
                 </DialogHeader>
 
                 <div className="space-y-4">
+                    {/* 0. New Request (Add Button) */}
+                    {canEdit && !page.feedback_notes && (
+                        <div className="mb-4">
+                            {!isEditing ? (
+                                <Button onClick={() => { setEditText(''); setIsEditing(true) }} className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-semibold">
+                                    <MessageSquare className="w-4 h-4" />
+                                    Add Edits
+                                </Button>
+                            ) : (
+                                <div className="bg-white border border-blue-200 rounded-lg p-4 shadow-sm animate-in fade-in zoom-in-95">
+                                    <h4 className="text-xs font-bold text-blue-700 uppercase mb-2">New Request</h4>
+                                    <Textarea
+                                        value={editText}
+                                        onChange={(e) => setEditText(e.target.value)}
+                                        className="min-h-[100px] mb-3 border-blue-200 focus-visible:ring-blue-500"
+                                        placeholder="Describe what needs to be changed..."
+                                        autoFocus
+                                    />
+                                    <div className="flex justify-end gap-2">
+                                        <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} className="text-slate-500 hover:text-slate-700">Cancel</Button>
+                                        <Button size="sm" onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
+                                            {isSaving ? <Loader2 className="w-3 h-3 animate-spin mr-1.5" /> : <Save className="w-3 h-3 mr-1.5" />}
+                                            Save Request
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* 1. Current Open Request (Editable) */}
                     {page.feedback_notes && !page.is_resolved && (
                         <div className={`bg-amber-50 border border-amber-100 rounded-md p-4 text-sm text-amber-900 shadow-sm relative group transition-all duration-300 ${isEditing ? 'ring-2 ring-amber-200 bg-white' : ''}`}>

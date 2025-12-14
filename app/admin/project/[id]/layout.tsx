@@ -23,7 +23,7 @@ export default async function ProjectLayout({
 
     if (projectError || !project) {
       // Log ID for debugging
-      console.log(`[ProjectLayout] Fetching project with ID: ${id}`)
+
 
       // Only log actual errors, not "Row not found" (PGRST116)
       if (projectError && projectError.code !== 'PGRST116') {
@@ -50,22 +50,7 @@ export default async function ProjectLayout({
 
     return (
       <>
-        <ProjectHeader
-          projectId={id}
-          projectInfo={{
-            id: project.id,
-            book_title: project.book_title,
-            author_firstname: project.author_firstname || '',
-            author_lastname: project.author_lastname || '',
-            status: project.status || 'draft',
-            character_send_count: project.character_send_count || 0,
-            review_token: project.review_token
-          }}
-          pageCount={pageCount}
-          characterCount={characterCount}
-          hasImages={hasImages}
-        />
-        <main className="pt-16 min-h-screen bg-gray-50">{children}</main>
+        {children}
       </>
     )
   } catch (error) {

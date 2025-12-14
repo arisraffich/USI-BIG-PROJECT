@@ -9,12 +9,14 @@ import { AddCharacterButton } from '@/components/admin/AddCharacterButton'
 import { AdminCharacterGallery } from '@/components/admin/AdminCharacterGallery'
 import { ManuscriptEditor } from '@/components/project/manuscript/ManuscriptEditor'
 import { ProjectHeader } from '@/components/admin/ProjectHeader'
-import { IllustrationsSidebar } from '@/components/admin/IllustrationsSidebar'
+import { UnifiedIllustrationSidebar } from '@/components/illustration/UnifiedIllustrationSidebar'
+import { UnifiedProjectLayout } from '@/components/layout/UnifiedProjectLayout'
 import { Loader2, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IllustrationsTabContent } from '@/components/admin/IllustrationsTabContent'
 import { Page } from '@/types/page'
 import { Character } from '@/types/character'
+import { ProjectStatus } from '@/types/project'
 
 interface ProjectTabsContentProps {
   projectId: string
@@ -42,6 +44,20 @@ export function ProjectTabsContent({
     projectStatus === 'sketch_generation' ||
     projectStatus === 'sketch_ready' ||
     projectStatus === 'completed'
+
+  // Auto-heal status mismatch
+  useEffect(() => {
+    if (projectStatus === 'illustration_approved' && illustrationStatus !== 'illustration_approved') {
+      const supabase = createClient()
+      supabase.from('projects')
+        .update({ illustration_status: 'illustration_approved' })
+        .eq('id', projectId)
+        .then(() => {
+          toast.success('Project status synchronized')
+          router.refresh()
+        })
+    }
+  }, [projectStatus, illustrationStatus, projectId, router])
 
   // 1. Determine Active Tab (Hoist to top)
   const activeTab = useMemo(() => {
@@ -76,7 +92,6 @@ export function ProjectTabsContent({
   const lastToastTimeRef = useRef(0)
 
   const [activeIllustrationPageId, setActiveIllustrationPageId] = useState<string | null>(pages?.[0]?.id || null)
-  // Removed isConfigModalOpen (inline config now)
   const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0 })
   const hasStartedAnalysisRef = useRef(false)
 
@@ -96,9 +111,7 @@ export function ProjectTabsContent({
           }
 
           // 2. Sticky Data Protection (Critical for Caching Issues)
-          // If local has feedback/approval data but server (stale) does not, PRESERVE LOCAL
           if (localPage && (localPage.feedback_notes || localPage.is_approved !== undefined)) {
-            // Check if server is missing specific fields that local has
             const hasLocalNotes = !!localPage.feedback_notes
             const serverMissingNotes = !serverPage.feedback_notes
 
@@ -121,6 +134,20 @@ export function ProjectTabsContent({
 
   // Analysis Loop
   useEffect(() => {
+    if (isAnalyzing && pages && pages.length > 0) {
+      const p1 = pages.find(p => p.page_number === 1)
+      if (p1?.character_actions && Object.keys(p1.character_actions).length > 0) {
+        if (!hasStartedAnalysisRef.current) {
+          hasStartedAnalysisRef.current = true
+          const supabase = createClient()
+          supabase.from('projects').update({ illustration_status: 'generating' }).eq('id', projectId).then(() => {
+            router.refresh()
+          })
+        }
+        return
+      }
+    }
+
     if (isAnalyzing && pages && pages.length > 0 && !hasStartedAnalysisRef.current) {
       hasStartedAnalysisRef.current = true
       setAnalysisProgress({ current: 0, total: pages.length })
@@ -128,18 +155,10 @@ export function ProjectTabsContent({
       const runAnalysis = async () => {
         const supabase = createClient()
         let completedCount = 0
-
-        // OPTIMIZATION: Only analyze Page 1 for now, and skip if already analyzed
-        const pagesToAnalyze = pages.length > 0 ? [pages[0]] : []
-
-        // If we are regenerating and Page 1 is already done, we want to skip quickly
-        // But we still need to set progress to 100% to clear the UI state if it depends on it
-        // Or if the parent logic expects 'generating' status transition
+        const pagesToAnalyze = [pages[0]] // Only analyze Page 1
 
         for (const page of pagesToAnalyze) {
-          // Skip if already analyzed (data exists)
           if (page.character_actions && Object.keys(page.character_actions).length > 0) {
-            console.log('Skipping analysis for Page 1 (Data exists)')
             completedCount++
             continue
           }
@@ -156,27 +175,13 @@ export function ProjectTabsContent({
                 characters
               })
             })
-
             if (!response.ok) throw new Error('Failed to analyze page')
+            completedCount++
           } catch (error) {
             console.error(`Error analyzing page ${page.page_number}:`, error)
           }
-
-          completedCount++
-          setAnalysisProgress({ current: completedCount, total: pagesToAnalyze.length })
         }
 
-        // Only show toast if we actually did something (or maybe just suppress it for regeneration?)
-        // The user wants "eliminate this process" visual. 
-        // If we skipped, it will be instant.
-
-        if (completedCount > 0) {
-          toast.success('Story Analysis Complete', {
-            description: 'Preparing to generate illustrations...'
-          })
-        }
-
-        // Transition state
         await supabase.from('projects').update({ illustration_status: 'generating' }).eq('id', projectId)
         router.refresh()
       }
@@ -230,7 +235,6 @@ export function ProjectTabsContent({
         }
         if (payload.eventType === 'INSERT') {
           router.refresh()
-          toast.success('New character discovered!', { description: 'AI has identified a new character in your story.' })
         }
       })
       .subscribe()
@@ -256,15 +260,12 @@ export function ProjectTabsContent({
 
           // Debug Realtime
           if (updatedPage.feedback_notes) {
-            console.log('[Realtime] Feedback received:', updatedPage.feedback_notes)
-            toast.info('New Feedback Received', {
-              description: 'Review panel updated.'
-            })
+            toast.info('New Feedback Received')
           }
 
           const now = Date.now()
           if (now - lastToastTimeRef.current > 2000) {
-            toast.info('Manuscript updated', { description: 'Page content has been modified.' })
+            toast.info('Manuscript updated')
             lastToastTimeRef.current = now
           }
         } else if (payload.eventType === 'INSERT' && payload.new) {
@@ -276,13 +277,10 @@ export function ProjectTabsContent({
     return () => { supabase.removeChannel(channel) }
   }, [projectId, router])
 
-  // Force Client-Side Fetch on Mount (To fix sticky server caching & RLS)
+  // Force Client-Side Fetch
   useEffect(() => {
     const fetchFreshPages = async () => {
       try {
-        // Use API route instead of direct Supabase client to:
-        // 1. Bypass RLS (API uses admin client)
-        // 2. Control caching headers explicitely
         const response = await fetch(`/api/projects/${projectId}/pages`, {
           cache: 'no-store',
           headers: { 'Pragma': 'no-cache' }
@@ -293,7 +291,6 @@ export function ProjectTabsContent({
         const { pages: freshPages } = await response.json()
 
         if (freshPages && freshPages.length > 0) {
-          console.log('[Client-Side API] Refreshed pages data', freshPages.length)
           setLocalPages(prev => {
             return freshPages.map((freshPage: Page) => {
               const existing = prev.find(p => p.id === freshPage.id)
@@ -325,46 +322,52 @@ export function ProjectTabsContent({
     )
   }
 
-  // Calculate Trial Readiness (Page 1 has Illustration + Sketch)
+  // Calculate Trial Readiness
   const isTrialReady = useMemo(() => {
     const page1 = localPages.find(p => p.page_number === 1)
     return !!(page1?.illustration_url && page1?.sketch_url)
   }, [localPages])
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <ProjectHeader
-        projectId={projectId}
-        projectInfo={{
-          id: projectId,
-          ...projectInfo, // Spread the full project info (title, author names)
-          status: projectStatus as any
-        }}
-        pageCount={pageCount}
-        characterCount={characterCount}
-        hasImages={false}
-        isTrialReady={isTrialReady}
-        onCreateIllustrations={() => {
-          const params = new URLSearchParams(searchParams?.toString() || '')
-          params.set('tab', 'illustrations')
-          router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-        }}
-      />
-
-      {/* Render Sidebar if applicable */}
-      {showIllustrationsSidebar && localPages?.length > 0 && (
-        <IllustrationsSidebar
-          pages={localPages}
-          activePageId={activeIllustrationPageId}
-          onPageClick={(id) => setActiveIllustrationPageId(id)}
+    <UnifiedProjectLayout
+      header={
+        <ProjectHeader
+          projectId={projectId}
+          projectInfo={{
+            id: projectInfo.id,
+            book_title: projectInfo.book_title,
+            author_firstname: projectInfo.author_firstname || '',
+            author_lastname: projectInfo.author_lastname || '',
+            status: (projectStatus as ProjectStatus) || 'draft',
+            character_send_count: projectInfo.character_send_count || 0,
+            illustration_send_count: projectInfo.illustration_send_count || 0,
+            review_token: projectInfo.review_token
+          }}
+          pageCount={pageCount}
+          characterCount={characterCount}
+          hasImages={false}
+          isTrialReady={isTrialReady}
+          onCreateIllustrations={() => {
+            const params = new URLSearchParams(searchParams?.toString() || '')
+            params.set('tab', 'illustrations')
+            router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+          }}
         />
-      )}
-
+      }
+      sidebar={
+        activeTab === 'illustrations' ? (
+          <UnifiedIllustrationSidebar
+            mode="admin"
+            pages={localPages}
+            activePageId={activeIllustrationPageId}
+            onPageClick={(id) => setActiveIllustrationPageId(id)}
+            illustrationStatus={illustrationStatus}
+          />
+        ) : null
+      }
+    >
       {/* Main Content Area */}
-      {/* Add dynamic left padding when sidebar is shown */}
-      <div
-        className={`p-8 pb-32 transition-all duration-300 ${showSidebar ? 'md:pl-[282px]' : ''}`}
-      >
+      <div className={activeTab === 'illustrations' ? 'p-0 pb-0 pt-0' : 'p-8 pb-32'}>
 
         {/* Pages Tab Content */}
         <div className={activeTab === 'pages' ? 'block' : 'hidden'}>
@@ -438,9 +441,12 @@ export function ProjectTabsContent({
             isAnalyzing={isAnalyzing}
             analysisProgress={analysisProgress}
             initialAspectRatio={projectInfo?.illustration_aspect_ratio}
+            initialTextIntegration={projectInfo?.illustration_text_integration}
+            activePageId={activeIllustrationPageId}
+            onPageChange={setActiveIllustrationPageId}
           />
         </div>
       </div>
-    </div>
+    </UnifiedProjectLayout>
   )
 }

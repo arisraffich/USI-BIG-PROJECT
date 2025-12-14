@@ -45,12 +45,10 @@ export default async function ProjectDetailPage({
 
     // Debug Server Fetch
     if (pages) {
-      console.log('[Server Fetch] Pages fetched:', pages.length)
+
       pages.forEach(p => {
         if (p.feedback_notes) {
-          console.log(`[Server Fetch] Page ${p.page_number} has notes:`, p.feedback_notes)
-        } else {
-          console.log(`[Server Fetch] Page ${p.page_number} notes: ${p.feedback_notes} (Resolved: ${p.is_resolved})`)
+
         }
       })
     }

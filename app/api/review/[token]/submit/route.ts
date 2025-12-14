@@ -58,36 +58,41 @@ export async function POST(
     if (project.status.includes('illustration')) {
       const { illustrationEdits } = body
 
-      // Update Illustration Feedback
-      if (illustrationEdits && Object.keys(illustrationEdits).length > 0) {
-        console.log('[Submit] Processing illustration feedback:', Object.keys(illustrationEdits).length)
+      // Fetch all pages to handle implicit resolution
+      const { data: allPages } = await supabase
+        .from('pages')
+        .select('id, feedback_notes, is_resolved')
+        .eq('project_id', project.id)
 
-        const updates = Object.entries(illustrationEdits).map(([pageId, notes]: [string, any]) => ({
-          id: pageId,
-          notes: notes
-        }))
+      if (allPages) {
+        const editsMap = illustrationEdits || {}
 
-        for (const update of updates) {
-          // If notes provided, mark as NOT resolved (needs revision)
-          // If empty notes, we don't necessarily change resolved status unless we treat it as approval?
-          // Actually, if submitting with empty notes, it means "Looks good".
-          // So if notes present -> is_resolved = false. 
-          // If notes empty -> we ignore (don't overwrite old notes possibly? Or treat as clear?)
-          // Usually submission overwrites.
+        for (const p of allPages) {
+          const edit = editsMap[p.id]
 
-          const hasNotes = !!update.notes && update.notes.trim() !== ''
-
-          await supabase.from('pages').update({
-            feedback_notes: hasNotes ? update.notes : null, // Clear if empty
-            is_resolved: !hasNotes // Resolved if no notes (= approved)
-          }).eq('id', update.id)
+          if (edit !== undefined) {
+            // User explicitly edited this page
+            const hasNotes = !!edit && edit.trim() !== ''
+            await supabase.from('pages').update({
+              feedback_notes: hasNotes ? edit : null,
+              is_resolved: !hasNotes
+            }).eq('id', p.id)
+          } else {
+            // User did NOT edit this page. 
+            // If it has pending notes, assume they are now approved/accepted as-is.
+            if (p.feedback_notes && !p.is_resolved) {
+              await supabase.from('pages').update({
+                is_resolved: true
+              }).eq('id', p.id)
+            }
+          }
         }
       }
 
       // Determine Outcome: Revision vs Approval
       // Check if ANY page has feedback notes (unresolved)
       const { data: pages } = await supabase.from('pages').select('feedback_notes, is_resolved').eq('project_id', project.id)
-      const hasFeedback = pages?.some(p => !!p.feedback_notes)
+      const hasFeedback = pages?.some(p => !!p.feedback_notes && !p.is_resolved)
 
       // Only check Page 1 for trial
       // const page1 = pages?.find(...) 
@@ -101,7 +106,10 @@ export async function POST(
         message = 'Feedback submitted. We will revise the illustration.'
       }
 
-      await supabase.from('projects').update({ status: newStatus }).eq('id', project.id)
+      await supabase.from('projects').update({
+        status: newStatus,
+        illustration_status: newStatus
+      }).eq('id', project.id)
 
       // Notify
       try {
@@ -158,7 +166,7 @@ export async function POST(
     // Update characters with customer edits
     const { characterEdits } = body
     if (characterEdits && Object.keys(characterEdits).length > 0) {
-      console.log('[Submit] Processing character edits:', Object.keys(characterEdits).length)
+
 
       const characterUpdates = Object.entries(characterEdits).map(([charId, data]: [string, any]) => ({
         id: charId,
@@ -209,7 +217,7 @@ export async function POST(
     // Note: We check ALL characters for feedback, including Main.
     const hasFeedback = latestCharacters.some(c => !!c.feedback_notes && !c.is_resolved)
 
-    console.log(`[Submit] Status Check - Pending Gen: ${pendingGeneration}, Has Feedback: ${hasFeedback}`)
+
 
     // DECISION TREE
     if (pendingGeneration) {

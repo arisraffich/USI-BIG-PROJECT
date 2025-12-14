@@ -55,7 +55,7 @@ export async function POST(request: Request) {
 
         // --- EDIT MODE vs STANDARD MODE ---
         if (customPrompt && currentImageUrl) {
-            console.log(`Regenerating illustration (Edit Mode) for Page ${pageData.page_number}`)
+
             // Edit Mode: Use User Prompt + Current Image
             fullPrompt = `EDIT INSTRUCTIONS:
 ${customPrompt}
@@ -66,7 +66,7 @@ Modify it appropriately based on the user's instructions while maintaining the o
 
             referenceImages = [currentImageUrl]
         } else {
-            console.log(`Generating illustration (Standard Mode) for Project ${projectId}, Page ${pageData.page_number}`)
+
 
             // Standard Mode: Fetch Characters & Build AI Director Prompt
             const { data: characters } = await supabase
@@ -76,6 +76,21 @@ Modify it appropriately based on the user's instructions while maintaining the o
                 .not('image_url', 'is', null)
 
             referenceImages = characters?.map(c => c.image_url).filter(Boolean) as string[] || []
+
+            // Fetch Page 1 Anchor if needed
+            let anchorImage: string | null = null
+            if (pageData.page_number > 1) {
+                const { data: p1 } = await supabase
+                    .from('pages')
+                    .select('illustration_url')
+                    .eq('project_id', projectId)
+                    .eq('page_number', 1)
+                    .single()
+                if (p1?.illustration_url) {
+                    anchorImage = p1.illustration_url
+                    referenceImages.push(p1.illustration_url) // Add Anchor to refs
+                }
+            }
 
             // Construct Prompt (Existing Logic)
             const characterActions = pageData.character_actions || {}
@@ -149,16 +164,32 @@ If there is any conflict between illustration detail and text readability, text 
 IMPORTANT: Do NOT render any text in the illustration. The story text will be printed on a separate page.`
             }
 
-            fullPrompt = `Scene Description:
-${pageData.scene_description || 'A scene from the story.'}
+            // Determine Style Instructions Block
+            let styleInstructions = ''
 
-Character Instructions:
-${actionDescription || 'No specific character actions.'}
+            if (anchorImage) {
+                // PAGES 2-N (Style Anchor Mode)
+                styleInstructions = `STYLE & TECHNIQUE INSTRUCTIONS:
+Use ALL attached character images as REFERENCES.
 
-Background Instructions:
-${pageData.background_elements || 'Appropriate background for the scene.'}
-
-STYLE & TECHNIQUE INSTRUCTIONS:
+2. SCENE INTEGRATION & ART STYLE (CRITICAL - PRIORITY #2):
+Use ALL attached reference images together to lock a single, consistent visual style across pages.
+STYLE ANCHOR RULE:
+- Among the attached images, there is ONE full-page colored illustration with a complete environment.
+- This full-scene illustration defines the GLOBAL STYLE for the book and must be treated as the primary reference for:
+  - lighting behavior and mood
+  - color harmony and palette balance
+  - rendering depth and level of polish
+  - overall visual atmosphere
+CHARACTER STYLE REINFORCEMENT:
+- Isolated character images on white backgrounds must reinforce stylistic details such as:
+  - line weight and stroke character
+  - facial rendering language
+  - edge softness and surface treatment
+- Character images must support the established scene style, not override it.`
+            } else {
+                // PAGE 1 (Standard Mode) or if Anchor missing
+                styleInstructions = `STYLE & TECHNIQUE INSTRUCTIONS:
 Use ALL attached character images as REFERENCES.
 
 1. CHARACTER IDENTITY (CRITICAL - PRIORITY #1):
@@ -171,12 +202,24 @@ Use ALL attached character images as REFERENCES.
    - Do NOT just "paste" them in. They must interact with the scene's lighting (shadows, highlights, color temperature) and perspective.
    - Replicate the exact art style and medium of the reference images (e.g., watercolor, pencil, digital paint).
    - Match the line quality, brush strokes, shading technique, and color palette.
-   - The final result must be a cohesive, professional children's book illustration where the characters are instantly recognizable but fully immersed in the scene's lighting and mood.
+   - The final result must be a cohesive, professional children's book illustration where the characters are instantly recognizable but fully immersed in the scene's lighting and mood.`
+            }
+
+            fullPrompt = `Scene Description:
+${pageData.scene_description || 'A scene from the story.'}
+
+Character Instructions:
+${actionDescription || 'No specific character actions.'}
+
+Background Instructions:
+${pageData.background_elements || 'Appropriate background for the scene.'}
+
+${styleInstructions}
 
 ${textPromptSection}`
         }
 
-        console.log(`Generating illustration with Aspect Ratio: ${mappedAspectRatio}`)
+
 
         // 5. Generate with Google AI
         const result = await generateIllustration({
@@ -206,10 +249,12 @@ ${textPromptSection}`
         const publicUrl = urlData.publicUrl
 
         // 7. Update Page Record
+        // Only update the internal illustration URL. 
+        // Resolution and history update will happen when Admin clicks "Resend Trial" (Send to Customer).
+
         await supabase.from('pages')
             .update({
                 illustration_url: publicUrl,
-                is_resolved: true, // Mark any existing feedback as resolved since we generated a new version
             })
             .eq('id', pageData.id)
 

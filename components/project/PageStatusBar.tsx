@@ -61,7 +61,7 @@ export function PageStatusBar({
             <button
                 onClick={onStatusClick}
                 className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold transition-all active:scale-95",
+                    "hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold transition-all active:scale-95",
                     config.bg, config.border, config.text
                 )}
             >

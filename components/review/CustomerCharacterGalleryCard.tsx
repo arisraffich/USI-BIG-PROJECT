@@ -210,7 +210,7 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
                                 onClick={() => setIsEditing(true)}
                             >
                                 <MessageSquarePlus className="w-4 h-4" />
-                                Request Changes
+                                Add Edits
                             </Button>
                         )
                     )}
