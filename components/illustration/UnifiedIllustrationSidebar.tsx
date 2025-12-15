@@ -35,41 +35,69 @@ export function UnifiedIllustrationSidebar({
     // If the user said "Identical", then logic is identical.
 
     return (
-        <div className="hidden lg:block fixed left-0 top-[70px] h-[calc(100vh-70px)] w-[250px] bg-white border-r border-gray-200 overflow-y-auto z-40 pb-20">
-            <div className="p-2 space-y-1">
-                {/* Header or Spacing? Customer had p-4 wrapper. Admin had p-2. Let's start with a small p-2 padding for the list */}
+        <>
+            {/* Desktop Sidebar */}
+            <div className="hidden lg:block fixed left-0 top-[70px] h-[calc(100vh-70px)] w-[250px] bg-white border-r border-gray-200 overflow-y-auto z-40 pb-20">
+                <div className="p-2 space-y-1">
+                    {/* Header or Spacing? Customer had p-4 wrapper. Admin had p-2. Let's start with a small p-2 padding for the list */}
 
-                {pages.filter(p => isProductionUnlocked || p.page_number === 1).map((page) => {
-                    const isActive = activePageId === page.id
+                    {pages.filter(p => {
+                        if (mode === 'admin') return true
+                        return p.page_number === 1 || !!p.customer_illustration_url || !!p.customer_sketch_url
+                    }).map((page) => {
+                        const isActive = activePageId === page.id
+                        const isLocked = !isProductionUnlocked && page.page_number > 1
 
-                    // If we are filtering, we don't strictly need the lock visual anymore IF they are hidden.
-                    // But if we ever allow them to be seen (e.g. Admin override?), we keep lock logic.
-                    // Since we are filtering them out locally, they simply won't exist in the DOM.
-                    const isLocked = false // They are hidden now.
+                        return (
+                            <button
+                                key={page.id}
+                                onClick={() => !isLocked && onPageClick(page.id)}
+                                disabled={disabled || isLocked}
+                                className={`w-full text-left px-3 py-2.5 rounded-md text-sm transition-all flex items-center justify-between group ${isActive
+                                    ? 'bg-purple-50 text-purple-700 font-medium border-l-4 border-purple-600' // Customer Style
+                                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'
+                                    } ${(disabled || isLocked) ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
+                            >
+                                <span className="flex items-center gap-2">
+                                    Page {page.page_number}
+                                </span>
 
-                    return (
-                        <button
-                            key={page.id}
-                            onClick={() => onPageClick(page.id)}
-                            className={`w-full text-left px-3 py-2.5 rounded-md text-sm transition-all flex items-center justify-between group ${isActive
-                                ? 'bg-purple-50 text-purple-700 font-medium border-l-4 border-purple-600' // Customer Style
-                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'
-                                } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                            <span className="flex items-center gap-2">
-                                Page {page.page_number}
-                                {page.page_number === 1 && !isProductionUnlocked && (
-                                    <span className="text-[10px] uppercase font-bold tracking-wider bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">Trial</span>
-                                )}
-                            </span>
+                                {/* Status Indicators */}
+                                <span className={`w-2 h-2 rounded-full ${page.illustration_url ? 'bg-green-400' : 'bg-transparent'
+                                    }`} title={page.illustration_url ? "Completed" : "Pending"}></span>
+                            </button>
+                        )
+                    })}
+                </div>
+            </div >
 
-                            {/* Status Indicators */}
-                            <span className={`w-2 h-2 rounded-full ${page.illustration_url ? 'bg-green-400' : 'bg-transparent'
-                                }`} title={page.illustration_url ? "Completed" : "Pending"}></span>
-                        </button>
-                    )
-                })}
+            {/* Mobile Bottom Navigation - Individual Glass Buttons */}
+            {/* Mobile Bottom Navigation - Individual Glass Buttons */}
+            <div className="block lg:hidden fixed bottom-6 left-0 right-0 z-50 pointer-events-none">
+                <div className="flex items-center gap-2 overflow-x-auto pointer-events-auto px-4 py-2 [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-400/30 [&::-webkit-scrollbar-thumb]:rounded-full">
+                    {pages.filter(p => {
+                        if (mode === 'admin') return true
+                        return p.page_number === 1 || !!p.customer_illustration_url || !!p.customer_sketch_url
+                    }).map((page) => {
+                        const isActive = activePageId === page.id
+                        const isLocked = !isProductionUnlocked && page.page_number > 1
+
+                        return (
+                            <button
+                                key={page.id}
+                                onClick={() => !isLocked && onPageClick(page.id)}
+                                disabled={disabled || isLocked}
+                                className={`flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full text-xs font-bold transition-all shadow-sm ${isActive
+                                    ? 'bg-purple-600 text-white shadow-lg scale-110 border border-purple-500'
+                                    : 'bg-white/30 backdrop-blur-md border border-white/20 text-slate-900 ring-1 ring-white/30 hover:bg-white/50'
+                                    } ${(disabled || isLocked) ? 'opacity-40 cursor-not-allowed' : ''}`}
+                            >
+                                {page.page_number}
+                            </button>
+                        )
+                    })}
+                </div>
             </div>
-        </div>
+        </>
     )
 }

@@ -61,7 +61,7 @@ export async function POST(
       // Fetch all pages to handle implicit resolution
       const { data: allPages } = await supabase
         .from('pages')
-        .select('id, feedback_notes, is_resolved')
+        .select('id, feedback_notes, is_resolved, feedback_history')
         .eq('project_id', project.id)
 
       if (allPages) {
@@ -73,16 +73,33 @@ export async function POST(
           if (edit !== undefined) {
             // User explicitly edited this page
             const hasNotes = !!edit && edit.trim() !== ''
+
+            // If clearing notes (approving previously rejected page), strictly enable history move if needed?
+            // Actually, if customer clears text, we just clear it. We don't archive "empty" notes.
+            // But if they are replacing text, we overwrite.
+
             await supabase.from('pages').update({
               feedback_notes: hasNotes ? edit : null,
               is_resolved: !hasNotes
             }).eq('id', p.id)
           } else {
             // User did NOT edit this page. 
-            // If it has pending notes, assume they are now approved/accepted as-is.
+            // If it has pending notes, assume they are now approved/accepted as-is (Implicit Approval).
             if (p.feedback_notes && !p.is_resolved) {
+              // Move to history and clear
+              const newHistoryItem = {
+                note: p.feedback_notes,
+                date: new Date().toISOString(),
+                status: 'resolved_by_customer_approval',
+                source: 'customer'
+              }
+
+              const currentHistory = Array.isArray(p.feedback_history) ? p.feedback_history : []
+
               await supabase.from('pages').update({
-                is_resolved: true
+                feedback_notes: null,
+                is_resolved: true,
+                feedback_history: [...currentHistory, newHistoryItem]
               }).eq('id', p.id)
             }
           }

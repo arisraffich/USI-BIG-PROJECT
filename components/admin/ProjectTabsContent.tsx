@@ -59,6 +59,30 @@ export function ProjectTabsContent({
     }
   }, [projectStatus, illustrationStatus, projectId, router])
 
+  // Realtime Project Status Subscription (Admin)
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`admin-project-status-${projectId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'projects',
+          filter: `id=eq.${projectId}`
+        },
+        () => {
+          router.refresh()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [projectId, router])
+
   // 1. Determine Active Tab (Hoist to top)
   const activeTab = useMemo(() => {
     const tab = searchParams?.get('tab')
@@ -347,6 +371,7 @@ export function ProjectTabsContent({
           characterCount={characterCount}
           hasImages={false}
           isTrialReady={isTrialReady}
+          generatedIllustrationCount={localPages.filter(p => !!p.illustration_url).length}
           onCreateIllustrations={() => {
             const params = new URLSearchParams(searchParams?.toString() || '')
             params.set('tab', 'illustrations')

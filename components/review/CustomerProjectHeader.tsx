@@ -121,10 +121,10 @@ export function CustomerProjectHeader({
                 ) : isApprovedStage ? (
                   <>
                     <Check className="w-4 h-4 mr-2" />
-                    Trial Approved
+                    1st Illustration Approved
                   </>
                 ) : (
-                  "Approve Illustration"
+                  "Approve Illustrations"
                 )}
               </Button>
             ) : null
@@ -196,10 +196,10 @@ export function CustomerProjectHeader({
                     ) : isApprovedStage ? (
                       <>
                         <Check className="w-4 h-4 mr-2" />
-                        Trial Approved
+                        1st Illustration Approved
                       </>
                     ) : (
-                      "Approve Illustration"
+                      "Approve Illustrations"
                     )}
                   </Button>
                 </div>

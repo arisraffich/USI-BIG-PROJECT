@@ -31,8 +31,8 @@ export function IllustrationsTabContent({
 }: IllustrationsTabContentProps) {
     const router = useRouter()
     // Local state for wizard settings (propagated to pages if needed via DB)
-    const [aspectRatio, setAspectRatio] = useState(initialAspectRatio || '8.5:8.5')
-    const [textIntegration, setTextIntegration] = useState(initialTextIntegration || 'separated')
+    const [aspectRatio, setAspectRatio] = useState(initialAspectRatio || '')
+    const [textIntegration, setTextIntegration] = useState(initialTextIntegration || '')
     const [generatingPageId, setGeneratingPageId] = useState<string | null>(null)
     const [loadingState, setLoadingState] = useState<{ [key: string]: { sketch: boolean; illustration: boolean } }>({})
 
@@ -88,7 +88,7 @@ export function IllustrationsTabContent({
         }
     }
 
-    const handleRegenerate = async (page: Page, prompt: string) => {
+    const handleRegenerate = async (page: Page, prompt: string, referenceImages?: string[]) => {
         try {
             setGeneratingPageId(page.id)
             setLoadingState(prev => ({ ...prev, [page.id]: { ...prev[page.id], illustration: true } }))
@@ -100,7 +100,8 @@ export function IllustrationsTabContent({
                     projectId,
                     pageId: page.id,
                     customPrompt: prompt,
-                    currentImageUrl: page.illustration_url
+                    currentImageUrl: page.illustration_url,
+                    referenceImages // Array of base64 strings
                 })
             })
 
@@ -221,6 +222,7 @@ export function IllustrationsTabContent({
             onUpload={handleUpload}
 
             // Wizard State
+            aspectRatio={aspectRatio}
             setAspectRatio={setAspectRatio}
             textIntegration={textIntegration}
             setTextIntegration={setTextIntegration}

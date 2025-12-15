@@ -60,6 +60,7 @@ export function CustomerProjectTabsContent({
 
   // Local state for pages to support instant realtime updates
   const [localPages, setLocalPages] = useState<Page[]>(pages || [])
+  const [activeIllustrationPageId, setActiveIllustrationPageId] = useState<string | null>(pages?.[0]?.id || null)
 
   // Sync local state when server props update, but respect newer local versions (from realtime)
   useEffect(() => {
@@ -313,7 +314,7 @@ export function CustomerProjectTabsContent({
         body: JSON.stringify({
           pageEdits: manuscriptEdits,
           characterEdits: characterEdits,
-          illustrationEdits: illustrationEdits // New payload
+          illustrationEdits: {} // Relies on instant-save DB state to prevent stale overwrite
         }),
       })
 
@@ -438,11 +439,9 @@ export function CustomerProjectTabsContent({
           <UnifiedIllustrationSidebar
             mode="customer"
             pages={localPages as any}
-            activePageId={page1?.id || null}
+            activePageId={activeIllustrationPageId || localPages.find(p => p.page_number === 1)?.id || null}
             illustrationStatus={illustrationStatus}
-            onPageClick={(id) => {
-              toast.info(`Switched to Page ${localPages.find(p => p.id === id)?.page_number}`)
-            }}
+            onPageClick={setActiveIllustrationPageId}
           />
         ) : null
       }
@@ -509,7 +508,8 @@ export function CustomerProjectTabsContent({
             <UnifiedIllustrationFeed
               mode="customer"
               pages={localPages}
-              activePageId={localPages.find(p => p.page_number === 1)?.id}
+              activePageId={activeIllustrationPageId || localPages.find(p => p.page_number === 1)?.id}
+              onPageChange={setActiveIllustrationPageId}
               illustrationStatus={illustrationStatus}
               onSaveFeedback={async (pageId, notes) => handleIllustrationFeedbackChange(pageId, notes)}
             />

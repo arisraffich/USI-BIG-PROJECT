@@ -18,7 +18,7 @@ function mapAspectRatio(ratio: string | null | undefined): string {
 
 export async function POST(request: Request) {
     try {
-        const { projectId, pageId, customPrompt, currentImageUrl } = await request.json()
+        const { projectId, pageId, customPrompt, currentImageUrl, referenceImages: uploadedReferenceImages } = await request.json()
 
         if (!projectId) {
             return NextResponse.json({ error: 'Missing projectId' }, { status: 400 })
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
         // 1. Fetch Project Configuration (Always needed for ratio)
         const { data: project } = await supabase
             .from('projects')
-            .select('illustration_aspect_ratio, illustration_text_integration, illustration_send_count')
+            .select('illustration_aspect_ratio, illustration_text_integration, illustration_send_count, status')
             .eq('id', projectId)
             .single()
 
@@ -56,15 +56,23 @@ export async function POST(request: Request) {
         // --- EDIT MODE vs STANDARD MODE ---
         if (customPrompt && currentImageUrl) {
 
-            // Edit Mode: Use User Prompt + Current Image
+            // Edit Mode: Use User Prompt + Current Image + Uploaded References
+            const extraRefNote = uploadedReferenceImages?.length
+                ? `\nREFERENCE IMAGES:\nI have attached ${uploadedReferenceImages.length} additional reference images. Use these visually to understand the specific object, style, or detail requested in the instructions.`
+                : ''
+
             fullPrompt = `EDIT INSTRUCTIONS:
 ${customPrompt}
 
+${extraRefNote}
+
 ORIGINAL IMAGE CONTEXT:
-The attached image is the current illustration. 
+The FIRST attached image is the current illustration to be modified.
 Modify it appropriately based on the user's instructions while maintaining the overall style and composition unless asked to change it.`
 
-            referenceImages = [currentImageUrl]
+            // Current Image is ALWAYS first (Instruction target), followed by Optional References
+            referenceImages = [currentImageUrl, ...(uploadedReferenceImages || [])]
+
         } else {
 
 
@@ -260,12 +268,13 @@ ${textPromptSection}`
 
         // 8. Update Project Status (Enable Resend Flow)
         // Only update status to 'illustration_revision_needed' if we have already sent the trial at least once.
-        // If this is the FIRST generation (send_count === 0), we stay in the current state (likely 'characters_approved')
-        // to keep the "Send Trial" button active (Green) instead of "Resend Trial" (Orange).
+        // AND if we are NOT in the 'illustration_approved' (Production) phase.
+        // In Production, we want to stay 'illustration_approved' so the "Send Illustrations" button remains active.
 
         const sendCount = project?.illustration_send_count || 0
+        const currentStatus = project?.status
 
-        if (sendCount > 0) {
+        if (sendCount > 0 && currentStatus !== 'illustration_approved') {
             await supabase.from('projects')
                 .update({
                     status: 'illustration_revision_needed',

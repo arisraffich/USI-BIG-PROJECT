@@ -277,3 +277,113 @@ export async function notifyIllustrationTrialSent(options: {
     console.error('Failed to send Slack notification:', slackError)
   }
 }
+
+export async function notifyIllustrationsUpdate(options: {
+  projectTitle: string
+  authorName: string
+  authorEmail: string
+  authorPhone?: string
+  reviewUrl: string
+  projectUrl: string
+}): Promise<void> {
+  const { projectTitle, authorName, authorEmail, authorPhone, reviewUrl, projectUrl } = options
+
+  const authorFirstName = authorName.trim().split(/\s+/)[0] || authorName
+
+  // Send email to customer
+  try {
+    await sendEmail({
+      to: authorEmail,
+      subject: `New Illustrations Ready: "${projectTitle}"`,
+      html: `
+        <h2>New Illustrations Are Ready</h2>
+        <p>Hello ${authorFirstName},</p>
+        <p>We have uploaded new illustrations for your project "<strong>${projectTitle}</strong>".</p>
+        <p>Please review the latest updates:</p>
+        <p style="margin: 20px 0;">
+          <a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">Review Illustrations</a>
+        </p>
+        <p>Or copy and paste this link into your browser:</p>
+        <p style="color: #666; word-break: break-all;">${reviewUrl}</p>
+        <p>Thank you!</p>
+        <p>US Illustrations Team</p>
+      `,
+    })
+  } catch (emailError: any) {
+    console.error('[Notification] Failed to send illustration update email:', emailError)
+  }
+
+  // Send Slack notification to PM
+  try {
+    await sendSlackNotification({
+      text: `🎨 New Illustrations sent to customer for "${projectTitle}"`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*New Illustrations Sent*\nUpdated illustrations for "${projectTitle}" by ${authorName} have been sent for review.`,
+          },
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'View Project' },
+              url: projectUrl,
+              style: 'primary',
+            },
+          ],
+        },
+      ],
+    })
+  } catch (slackError: any) {
+    console.error('Failed to send Slack notification:', slackError)
+  }
+}
+
+export async function notifyCustomerReview(options: {
+  projectTitle: string
+  authorName: string
+  pageNumber: number
+  feedbackText: string
+  projectUrl: string
+}): Promise<void> {
+  const { projectTitle, authorName, pageNumber, feedbackText, projectUrl } = options
+
+  try {
+    await sendSlackNotification({
+      text: `📝 New Customer Review for "${projectTitle}"`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*New Customer Review*\n${authorName} added a review for *Page ${pageNumber}* of "${projectTitle}".`,
+          },
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `> ${feedbackText}`,
+          },
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'View Project' },
+              url: projectUrl,
+              style: 'primary',
+            },
+          ],
+        },
+      ],
+    })
+  } catch (error: any) {
+    console.error('Failed to send customer review notification:', error)
+  }
+}

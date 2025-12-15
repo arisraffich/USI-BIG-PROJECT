@@ -59,23 +59,23 @@ export function ReviewHistoryDialog({ open, onOpenChange, page, reviews = [], on
                     {canEdit && !page.feedback_notes && (
                         <div className="mb-4">
                             {!isEditing ? (
-                                <Button onClick={() => { setEditText(''); setIsEditing(true) }} className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-semibold">
+                                <Button onClick={() => { setEditText(''); setIsEditing(true) }} variant="outline" className="w-full gap-2 text-amber-600 border-amber-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-700 shadow-sm font-semibold">
                                     <MessageSquare className="w-4 h-4" />
-                                    Add Edits
+                                    Request Revision
                                 </Button>
                             ) : (
-                                <div className="bg-white border border-blue-200 rounded-lg p-4 shadow-sm animate-in fade-in zoom-in-95">
-                                    <h4 className="text-xs font-bold text-blue-700 uppercase mb-2">New Request</h4>
+                                <div className="bg-white border border-amber-200 rounded-lg p-4 shadow-sm animate-in fade-in zoom-in-95">
+                                    <h4 className="text-xs font-bold text-amber-800 uppercase mb-2">Your Request:</h4>
                                     <Textarea
                                         value={editText}
                                         onChange={(e) => setEditText(e.target.value)}
-                                        className="min-h-[100px] mb-3 border-blue-200 focus-visible:ring-blue-500"
+                                        className="min-h-[100px] mb-3 border-amber-200 focus-visible:ring-amber-500"
                                         placeholder="Describe what needs to be changed..."
                                         autoFocus
                                     />
                                     <div className="flex justify-end gap-2">
                                         <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} className="text-slate-500 hover:text-slate-700">Cancel</Button>
-                                        <Button size="sm" onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
+                                        <Button size="sm" onClick={handleSave} disabled={isSaving} className="bg-amber-600 hover:bg-amber-700 text-white" style={{ backgroundColor: '#d97706', color: '#ffffff' }}>
                                             {isSaving ? <Loader2 className="w-3 h-3 animate-spin mr-1.5" /> : <Save className="w-3 h-3 mr-1.5" />}
                                             Save Request
                                         </Button>

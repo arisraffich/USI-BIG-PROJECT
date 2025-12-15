@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 
+
 export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ pageId: string }> }
@@ -14,7 +15,7 @@ export async function PATCH(
         // Get page to verify it exists and get project_id
         const { data: page, error: pageError } = await supabase
             .from('pages')
-            .select('id, project_id')
+            .select('id, project_id, page_number')
             .eq('id', pageId)
             .single()
 
@@ -76,6 +77,53 @@ export async function PATCH(
                 { error: 'Failed to update page' },
                 { status: 500 }
             )
+        }
+
+        // --- NOTIFICATION Trigger ---
+        // Only notify if feedback_notes is set (not null/empty)
+        if (body.feedback_notes) {
+            try {
+                // Fetch extra project details needed for notification
+                const { data: projectDetails, error: projError } = await supabase
+                    .from('projects')
+                    .select('book_title, author_firstname, author_lastname')
+                    .eq('id', page.project_id)
+                    .single()
+
+                if (projError) {
+                    console.error('Project Fetch Error:', projError)
+                }
+
+                if (projectDetails) {
+                    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+                    const projectUrl = `${appUrl}/admin/projects/${page.project_id}?tab=illustrations`
+
+                    const { notifyCustomerReview } = await import('@/lib/notifications')
+
+                    const safeTitle = projectDetails.book_title || 'Untitled Project'
+                    // @ts-ignore
+                    const safeAuthor = projectDetails.author_name ||
+                        `${projectDetails.author_firstname || ''} ${projectDetails.author_lastname || ''}`.trim() ||
+                        'Customer'
+
+                    // Non-blocking call
+                    notifyCustomerReview({
+                        projectTitle: safeTitle,
+                        authorName: safeAuthor,
+                        pageNumber: updatedPage.page_number,
+                        feedbackText: body.feedback_notes,
+                        projectUrl
+                    }).then(() => { })
+                        .catch(err => console.error('Notification error:', err))
+
+                } else {
+                    // No Project Details Found for ID: ${page.project_id}
+                }
+            } catch (notifyError: any) {
+                console.error('Notification setup failed:', notifyError)
+            }
+        } else {
+            // No feedback_notes in body
         }
 
         return NextResponse.json(updatedPage)

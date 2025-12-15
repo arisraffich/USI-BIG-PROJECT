@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw } from 'lucide-react'
+import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X } from 'lucide-react'
+
 import Image from 'next/image'
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from '@/components/ui/dialog'
 import { toast } from 'sonner'
@@ -37,7 +38,7 @@ interface SharedIllustrationBoardProps {
 
     // Admin Handlers
     onGenerate?: () => void
-    onRegenerate?: (prompt: string) => void
+    onRegenerate?: (prompt: string, referenceImages?: string[]) => void
     onUpload?: (type: 'sketch' | 'illustration', file: File) => void
 }
 
@@ -87,10 +88,12 @@ export function SharedIllustrationBoard({
     // Admin: Regenerate Logic
     const [isRegenerateDialogOpen, setIsRegenerateDialogOpen] = useState(false)
     const [regenerationPrompt, setRegenerationPrompt] = useState('')
+    const [referenceImages, setReferenceImages] = useState<{ file: File; preview: string }[]>([])
 
     // Refs for hidden inputs
     const sketchInputRef = useRef<HTMLInputElement>(null)
     const illustrationInputRef = useRef<HTMLInputElement>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null) // For Reference Images
 
     const isAdmin = mode === 'admin'
     const isCustomer = mode === 'customer'
@@ -101,19 +104,61 @@ export function SharedIllustrationBoard({
     // --------------------------------------------------------------------------
     // HANDLERS
     // --------------------------------------------------------------------------
+    const handleReferenceSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files) return
+
+        const files = Array.from(e.target.files)
+        const validFiles = files.filter(file => {
+            if (file.size > 1024 * 1024) { // 1MB limit
+                toast.error(`"${file.name}" is too large (max 1MB).`)
+                return false
+            }
+            return true
+        })
+
+        if (referenceImages.length + validFiles.length > 5) {
+            toast.error("Max 5 reference images allowed.")
+            return
+        }
+
+        const newrefs = validFiles.map(file => ({
+            file,
+            preview: URL.createObjectURL(file)
+        }))
+
+        setReferenceImages(prev => [...prev, ...newrefs])
+
+        // Clear input value so same file can be selected again if needed
+        if (e.target) e.target.value = ''
+    }
+
+    const removeReference = (index: number) => {
+        setReferenceImages(prev => {
+            const newImages = [...prev]
+            URL.revokeObjectURL(newImages[index].preview) // Cleanup
+            newImages.splice(index, 1)
+            return newImages
+        })
+    }
+
     const handleDownload = useCallback((url: string, filename: string) => {
         window.location.href = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
     }, [])
 
-    const handleCustomerSave = useCallback(async () => {
+    const handleCustomerSave = useCallback(async (textOverride?: string) => {
         if (!onSaveFeedback) return
-        if (!notes.trim()) {
+
+        // Use override (from mobile modal) or local state (desktop)
+        const textToSave = typeof textOverride === 'string' ? textOverride : notes
+
+        if (!textToSave.trim()) {
             setIsEditing(false)
             return
         }
         setIsSaving(true)
         try {
-            await onSaveFeedback(notes)
+            await onSaveFeedback(textToSave)
+            setNotes(textToSave) // Sync local state
             setIsEditing(false)
             toast.success('Feedback saved successfully')
         } catch (e) {
@@ -243,7 +288,29 @@ export function SharedIllustrationBoard({
                 <Button
                     size="lg"
                     className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-xl shadow-purple-200 transition-all hover:scale-105 min-w-[240px]"
-                    onClick={onGenerate}
+                    onClick={() => {
+                        if (!onGenerate) return
+
+                        // VALIDATION
+                        if (page.page_number === 1) {
+                            if (!aspectRatio) {
+                                toast.error('Please select an Aspect Ratio first')
+                                return
+                            }
+                            if (!textIntegration) {
+                                toast.error('Please select Text Placement first')
+                                return
+                            }
+                        } else {
+                            // Pages 2+ (Locked Aspect Ratio, but check Text Integration)
+                            if (!textIntegration) {
+                                toast.error('Please select Text Placement first')
+                                return
+                            }
+                        }
+
+                        onGenerate()
+                    }}
                     disabled={isGenerating}
                 >
                     {isGenerating ? (
@@ -275,7 +342,7 @@ export function SharedIllustrationBoard({
     const illustrationUrl = isAdmin ? page.illustration_url : page.customer_illustration_url
 
     return (
-        <div id={`page-${page.id}`} className="max-w-[1600px] mx-auto w-full h-full snap-start" data-page-id={page.id}>
+        <div className="max-w-[1600px] mx-auto w-full h-full snap-start">
             <div className="bg-white shadow-sm border border-slate-200 flex flex-col md:flex-row min-h-[600px] h-full">
 
                 {/* ----------------------------------------------------------- */}
@@ -298,11 +365,8 @@ export function SharedIllustrationBoard({
 
                     <div className="p-4 space-y-4 overflow-y-auto max-h-[800px] flex-1">
                         {isCustomer && (
-                            <div className="text-sm text-slate-600 mb-4 space-y-2">
-                                <p>Please review line work, composition, and character likeness.</p>
-                                <p className="text-xs text-slate-400">
-                                    Note: Colors and lighting might be adjusted in the final version.
-                                </p>
+                            <div className="text-sm text-slate-600 mb-4 leading-relaxed">
+                                <p>Request revisions here. Adjustments will be ready within 1-3 days.</p>
                             </div>
                         )}
 
@@ -333,7 +397,7 @@ export function SharedIllustrationBoard({
                                     <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Describe what needs to be changed..." className="min-h-[120px] text-sm resize-none focus-visible:ring-amber-500 border-amber-200 bg-white" autoFocus />
                                     <div className="flex gap-3 justify-end mt-2">
                                         <Button variant="ghost" size="sm" onClick={() => { setNotes(page.feedback_notes || ''); setIsEditing(false) }} className="text-slate-600 hover:bg-slate-50">Cancel</Button>
-                                        <Button size="sm" onClick={handleCustomerSave} disabled={isSaving} className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm" style={{ backgroundColor: '#d97706', color: '#ffffff' }}>
+                                        <Button size="sm" onClick={() => handleCustomerSave()} disabled={isSaving} className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm" style={{ backgroundColor: '#d97706', color: '#ffffff' }}>
                                             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
                                             Save
                                         </Button>
@@ -342,9 +406,9 @@ export function SharedIllustrationBoard({
                             ) : (
                                 // CREATE BUTTON (Customer Only)
                                 isCustomer && !page.feedback_notes && !isLocked && (
-                                    <Button variant="outline" size="sm" className="w-full h-11 gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 shadow-sm bg-white font-medium" onClick={() => setIsEditing(true)}>
+                                    <Button variant="outline" size="sm" className="w-full h-11 gap-2 text-amber-600 border-amber-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-700 shadow-sm bg-white font-medium" onClick={() => setIsEditing(true)}>
                                         <MessageSquarePlus className="w-4 h-4" />
-                                        Add Edits
+                                        Request Revision
                                     </Button>
                                 )
                             )}
@@ -375,36 +439,37 @@ export function SharedIllustrationBoard({
                 {/* ----------------------------------------------------------- */}
                 <div className="flex-1 flex flex-col min-w-0 h-full">
 
-                    {/* MOBILE TOP BAR (Hidden) */}
-                    <div className="hidden">
-                        <PageStatusBar
-                            status={page.feedback_notes && !page.is_resolved ? 'pending' : 'resolved'} // "request" vs "resolved" mapped to unified status
-                            labelText={page.feedback_notes ? `Pending: ${page.feedback_notes}` : `Page ${page.page_number}`}
-                            onStatusClick={() => setHistoryOpen(true)}
-                            actionButton={
-                                <div className="flex items-center gap-2">
-                                    {/* Add Edits Button (Full Text) */}
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setHistoryOpen(true)}
-                                        className="h-8 gap-2 text-blue-600 bg-blue-50 hover:bg-blue-100 font-semibold px-3 rounded-full"
-                                    >
-                                        <MessageSquarePlus className="w-4 h-4" />
-                                        Add Edits
-                                    </Button>
-                                </div>
-                            }
-                        />
-                        {/* HISTORY DIALOG (Mobile/Desktop Popup) */}
+                    {/* MOBILE TOP BAR (Vibrant Page Separator) */}
+                    <div className="md:hidden w-full py-3 px-5 bg-gradient-to-r from-violet-600 to-indigo-600 shadow-md flex items-center justify-between shrink-0 relative overflow-hidden z-20">
+                        {/* Abstract Background Element (Subtle) */}
+                        <div className="absolute top-0 right-16 w-64 h-full bg-white/5 skew-x-12"></div>
+
+                        {/* Left: Page Identity */}
+                        <div className="flex items-center gap-2 z-10">
+                            <Bookmark className="w-5 h-5 text-white/90" fill="currentColor" />
+                            <span className="text-white font-bold text-lg tracking-wide">
+                                Page {page.page_number}
+                            </span>
+                        </div>
+
+                        {/* Right: Action Button */}
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setHistoryOpen(true)}
+                            className="bg-amber-500 hover:bg-amber-600 text-white border-transparent font-semibold px-4 h-8 gap-2 rounded-full z-10 transition-colors shadow-sm"
+                        >
+                            <MessageSquarePlus className="w-4 h-4" />
+                            {isAdmin ? 'Revisions' : 'Request Revision'}
+                        </Button>
+
+                        {/* HISTORY DIALOG */}
                         <ReviewHistoryDialog
                             open={historyOpen}
                             onOpenChange={setHistoryOpen}
                             page={page}
                             canEdit={isCustomer && !isLocked}
-                            onSave={async (newNotes) => {
-                                if (onSaveFeedback) await onSaveFeedback(newNotes)
-                            }}
+                            onSave={handleCustomerSave}
                         />
                     </div>
 
@@ -413,7 +478,7 @@ export function SharedIllustrationBoard({
 
                         {/* SKETCH HEADER */}
                         <div className="flex items-center justify-center gap-2 relative">
-                            <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase">Pencil Sketch</h4>
+                            <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase">{isCustomer ? 'Draft Sketch' : 'Pencil Sketch'}</h4>
                             {isManualUpload(sketchUrl) && (
                                 <span className="absolute top-1/2 -translate-y-1/2 right-12 lg:right-16 px-1.5 py-0.5 text-[9px] font-bold bg-rose-50 text-rose-600 rounded border border-rose-100 leading-none">
                                     UPLOADED
@@ -511,18 +576,7 @@ export function SharedIllustrationBoard({
                             </div>
                         </div>
 
-                        {/* Mobile Add Edits Button (Between Images) */}
-                        <div className="md:hidden w-full flex justify-center py-2 bg-white relative z-20 border-t border-slate-100">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setHistoryOpen(true)}
-                                className="h-8 gap-2 text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 font-semibold px-4 rounded-full shadow-sm"
-                            >
-                                <MessageSquarePlus className="w-4 h-4" />
-                                {isAdmin ? 'Edits' : 'Add Edits'}
-                            </Button>
-                        </div>
+
 
                         {/* 2. ILLUSTRATION BLOCK */}
                         <div className="flex flex-col items-center md:space-y-0 bg-slate-50/10 relative min-h-[300px] md:min-h-0">
@@ -617,16 +671,95 @@ export function SharedIllustrationBoard({
 
             {/* ADMIN REGENERATE DIALOG */}
             {isAdmin && onRegenerate && (
-                <Dialog open={isRegenerateDialogOpen} onOpenChange={setIsRegenerateDialogOpen}>
-                    <DialogContent>
+                <Dialog open={isRegenerateDialogOpen} onOpenChange={(open) => {
+                    setIsRegenerateDialogOpen(open)
+                    if (!open) {
+                        setRegenerationPrompt('')
+                        setReferenceImages([]) // Reset on close
+                    }
+                }}>
+                    <DialogContent className="sm:max-w-[500px]">
                         <DialogHeader>
                             <DialogTitle>Regenerate Illustration</DialogTitle>
                             <DialogDescription>Describe what you want to change.</DialogDescription>
                         </DialogHeader>
-                        <Textarea value={regenerationPrompt} onChange={(e) => setRegenerationPrompt(e.target.value)} placeholder="e.g. Make the lighting warmer..." className="min-h-[100px]" />
+
+                        <div className="space-y-4 py-2">
+                            <div className="space-y-2">
+                                <Label>Instructions</Label>
+                                <Textarea
+                                    value={regenerationPrompt}
+                                    onChange={(e) => setRegenerationPrompt(e.target.value)}
+                                    placeholder="e.g. Make the lighting warmer, add sunglasses..."
+                                    className="min-h-[100px]"
+                                />
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-sm font-medium">Reference Images (Optional)</Label>
+                                    <span className="text-xs text-slate-400">{referenceImages.length}/5 • Max 1MB each</span>
+                                </div>
+
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    className="hidden"
+                                    accept="image/*"
+                                    multiple
+                                    onChange={handleReferenceSelect}
+                                />
+
+                                {referenceImages.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                        {referenceImages.map((img, idx) => (
+                                            <div key={idx} className="relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 group">
+                                                <img src={img.preview} alt="Ref" className="w-full h-full object-cover" />
+                                                <button
+                                                    onClick={() => removeReference(idx)}
+                                                    className="absolute top-0.5 right-0.5 bg-black/50 hover:bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {referenceImages.length < 5 && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-full border-dashed border-slate-300 text-slate-500 hover:text-slate-700 hover:border-slate-400 hover:bg-slate-50 gap-2 h-16"
+                                        onClick={() => fileInputRef.current?.click()}
+                                    >
+                                        <Upload className="w-4 h-4" />
+                                        Add Reference Image
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+
                         <DialogFooter>
                             <Button variant="ghost" onClick={() => setIsRegenerateDialogOpen(false)}>Cancel</Button>
-                            <Button onClick={() => { setIsRegenerateDialogOpen(false); onRegenerate(regenerationPrompt) }}>Regenerate</Button>
+                            <Button
+                                onClick={async () => {
+                                    const base64Images = await Promise.all(referenceImages.map(img =>
+                                        new Promise<string>((resolve, reject) => {
+                                            const reader = new FileReader()
+                                            reader.onload = () => resolve(reader.result as string)
+                                            reader.onerror = reject
+                                            reader.readAsDataURL(img.file)
+                                        })
+                                    ))
+                                    setIsRegenerateDialogOpen(false)
+                                    onRegenerate(regenerationPrompt, base64Images)
+                                }}
+                                disabled={!regenerationPrompt.trim() && referenceImages.length === 0}
+                            >
+                                Regenerate
+                            </Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>

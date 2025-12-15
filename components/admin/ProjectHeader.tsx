@@ -33,6 +33,8 @@ interface ProjectInfo {
   send_count?: number
 }
 
+
+
 interface ProjectHeaderProps {
   projectId: string
   projectInfo: ProjectInfo
@@ -41,6 +43,7 @@ interface ProjectHeaderProps {
   hasImages?: boolean
   isTrialReady?: boolean
   onCreateIllustrations?: () => void
+  generatedIllustrationCount?: number
 }
 
 // Define clear stage configuration
@@ -53,7 +56,7 @@ interface StageConfig {
   buttonDisabled: boolean
 }
 
-export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations }: ProjectHeaderProps) {
+export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations, generatedIllustrationCount = 0 }: ProjectHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -80,7 +83,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     // STAGE 5: Characters Approved (Ready for Trial)
     if (status === 'characters_approved') {
       return {
-        tag: 'Trial Illustration',
+        tag: '1st Illustration',
         tagStyle: 'bg-green-100 text-green-800 border-green-300',
         buttonLabel: 'Send Trial',
         showCount: false,
@@ -95,7 +98,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         tag: 'Waiting for Review',
         tagStyle: 'bg-blue-100 text-blue-800 border-blue-300',
         buttonLabel: 'Resend Trial',
-        showCount: true, // Use illustration_send_count from projectInfo
+        showCount: false, // Use illustration_send_count from projectInfo
         isResend: true,
         buttonDisabled: true
       }
@@ -107,9 +110,22 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         tag: 'Action Required',
         tagStyle: 'bg-orange-100 text-orange-800 border-orange-300',
         buttonLabel: 'Resend Trial',
-        showCount: true,
+        showCount: false,
         isResend: true,
         buttonDisabled: false
+      }
+    }
+
+    // STAGE 8: Illustrations Stage (Trial Approved)
+    if (status === 'illustration_approved') {
+      const hasSecondIllustration = generatedIllustrationCount >= 2
+      return {
+        tag: 'Illustrations Stage',
+        tagStyle: 'bg-teal-100 text-teal-800 border-teal-300',
+        buttonLabel: 'Send Illustrations',
+        showCount: true,
+        isResend: true,
+        buttonDisabled: !hasSecondIllustration
       }
     }
 

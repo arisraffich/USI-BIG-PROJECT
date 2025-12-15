@@ -52,58 +52,59 @@ export async function POST(
     const isIllustrationMode = ['characters_approved', 'illustration_review', 'illustration_revision_needed'].includes(project.status)
 
     if (isIllustrationMode) {
-      // --- ILLUSTRATION TRIAL MODE ---
-      console.log(`[Send to Customer] Processing Illustration Trial for project ${id}`)
+      // --- ILLUSTRATION REVIEW MODE ---
+      console.log(`[Send to Customer] Processing Illustrations for project ${id}`)
 
-      // 1. Get Page 1 to check/resolve feedback
-      const { data: page1 } = await supabase
+      // 1. Get ALL Pages
+      const { data: pages } = await supabase
         .from('pages')
-        .select('id, feedback_notes, feedback_history, is_resolved, illustration_url, sketch_url')
+        .select('*')
         .eq('project_id', id)
-        .eq('page_number', 1)
-        .single()
+        .order('page_number', { ascending: true })
 
-      if (page1) {
-        // Resolve feedback if exists (like characters)
-        if (page1.feedback_notes) {
-          console.log(`[Resend] Archiving feedback for Page 1`)
-          const currentHistory = Array.isArray(page1.feedback_history) ? page1.feedback_history : []
-          const newHistory = [
-            ...currentHistory,
+      let hasImages = false
+
+      if (pages && pages.length > 0) {
+        // 2. Process Sync & Resolve Feedback for EACH page
+        const updates = pages.map(async (page) => {
+          const hasPageImages = !!(page.illustration_url || page.sketch_url)
+          if (hasPageImages) hasImages = true
+
+          // Resolve Feedback Logic
+          const updateData: any = {}
+          if (page.feedback_notes) {
+            const currentHistory = Array.isArray(page.feedback_history) ? page.feedback_history : []
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            { note: page1.feedback_notes, created_at: new Date().toISOString() } as any
-          ]
+            const newHistory = [
+              ...currentHistory,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              { note: page.feedback_notes, created_at: new Date().toISOString() } as any
+            ]
+            updateData.feedback_history = newHistory
+            updateData.feedback_notes = null
+            updateData.is_resolved = true
+          }
 
-          await supabase
-            .from('pages')
-            .update({
-              feedback_history: newHistory,
-              feedback_notes: null,
-              is_resolved: true
-            })
-            .eq('id', page1.id)
-        }
+          // Sync Images (Ensure customer sees latest generated versions)
+          // We only sync if there is a URL.
+          if (page.illustration_url) updateData.customer_illustration_url = page.illustration_url
+          if (page.sketch_url) updateData.customer_sketch_url = page.sketch_url
+
+          if (Object.keys(updateData).length > 0) {
+            await supabase.from('pages').update(updateData).eq('id', page.id)
+          }
+        })
+        await Promise.all(updates)
       }
 
-      // 2. Update Project Status & Count & SYNC IMAGES TO PATIENT
-      const hasImages = !!(page1?.illustration_url || page1?.sketch_url)
+      // 3. Update Project Status & Count
       const currentCount = (project as any).illustration_send_count || 0
-
-      // SYNC: Copy Draft -> Published
-      // We do this for Page 1 (currently checking Page 1 for trial)
-      if (page1) {
-        await supabase.from('pages')
-          .update({
-            customer_illustration_url: page1.illustration_url,
-            customer_sketch_url: page1.sketch_url
-          })
-          .eq('id', page1.id)
-      }
 
       const { error: updateError } = await supabase
         .from('projects')
         .update({
           status: 'illustration_review', // Set to waiting for review
+          illustration_status: 'illustration_review', // Sync illustration status
           review_token: reviewToken,
           illustration_send_count: hasImages ? currentCount + 1 : currentCount
         })
@@ -111,28 +112,40 @@ export async function POST(
 
       if (updateError) throw updateError
 
-      // 3. Notify
+      // 4. Notify
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
       const reviewUrl = `${baseUrl}/review/${reviewToken}?tab=illustrations`
       const projectUrl = `${baseUrl}/admin/project/${id}`
 
       if (project.author_email) {
-        const { notifyIllustrationTrialSent } = await import('@/lib/notifications')
-        notifyIllustrationTrialSent({
-          projectTitle: project.book_title || 'Untitled Project',
-          authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer',
-          authorEmail: project.author_email,
-          authorPhone: project.author_phone || undefined,
-          reviewUrl,
-          projectUrl,
-        }).catch(err => console.error('Notification error:', err))
+        if (currentCount > 0) {
+          const { notifyIllustrationsUpdate } = await import('@/lib/notifications')
+          notifyIllustrationsUpdate({
+            projectTitle: project.book_title || 'Untitled Project',
+            authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer',
+            authorEmail: project.author_email,
+            authorPhone: project.author_phone || undefined,
+            reviewUrl,
+            projectUrl,
+          }).catch(err => console.error('Notification error:', err))
+        } else {
+          const { notifyIllustrationTrialSent } = await import('@/lib/notifications')
+          notifyIllustrationTrialSent({
+            projectTitle: project.book_title || 'Untitled Project',
+            authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer',
+            authorEmail: project.author_email,
+            authorPhone: project.author_phone || undefined,
+            reviewUrl,
+            projectUrl,
+          }).catch(err => console.error('Notification error:', err))
+        }
       }
 
       return NextResponse.json({
         success: true,
         reviewUrl,
         reviewToken,
-        message: 'Illustration trial sent to customer successfully',
+        message: 'Illustrations sent to customer successfully',
       })
 
     } else {

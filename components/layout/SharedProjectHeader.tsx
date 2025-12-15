@@ -117,12 +117,9 @@ export function SharedProjectHeader({
                     {/* DESKTOP TITLE INFO */}
                     {/* Hidden on Mobile as per request/design to save space */}
                     <div className="hidden md:flex items-center gap-4">
-                        {/* Dashboard/Back Button could go here if separate */}
-                        {dashboardLink && (
-                            <Button onClick={dashboardLink.onClick} variant="ghost" size="icon" className="text-slate-400 hover:text-slate-700">
-                                {dashboardLink.icon}
-                            </Button>
-                        )}
+                        {/* Separator */}
+                        <div className="h-8 w-px bg-slate-200" />
+
 
                         <div className="flex flex-col justify-center h-full">
                             <h1 className="text-sm font-bold text-slate-900 leading-none">

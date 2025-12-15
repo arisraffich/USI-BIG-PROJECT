@@ -30,7 +30,7 @@ interface UnifiedIllustrationFeedProps {
     // ADMIN STATE/HANDLERS
     loadingState?: { sketch: boolean; illustration: boolean }
     onGenerate?: (page: Page) => void
-    onRegenerate?: (page: Page, prompt: string) => void
+    onRegenerate?: (page: Page, prompt: string, referenceImages?: string[]) => void
     onUpload?: (page: Page, type: 'sketch' | 'illustration', file: File) => void
 
     // Wizard State (Admin)
@@ -66,43 +66,95 @@ export function UnifiedIllustrationFeed({
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const isScrollingRef = useRef(false)
     const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+    const lastSpyPageIdRef = useRef<string | null>(null)
+    const pageRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
     // --------------------------------------------------------------------------
-    // SCROLL SPY (Intersection Observer)
+    // SCROLL SPY (Intersection Observer) - Logic from ManuscriptEditor
     // --------------------------------------------------------------------------
     useEffect(() => {
+        // NOTE: Switched to root: null (viewport) to match ManuscriptEditor and ensuring detection works regardless of container quirks.
         const container = scrollContainerRef.current
-        if (!container || !pages.length) return
 
-        const observer = new IntersectionObserver((entries) => {
-            // Find the entry that is most visible
-            const visibleEntry = entries.find(entry => entry.isIntersecting && entry.intersectionRatio > 0.5)
+        if (!pages || pages.length === 0) return // Removed container check for return since we use viewport
 
-            if (visibleEntry) {
-                const pageId = visibleEntry.target.getAttribute('data-page-id')
-                if (pageId && pageId !== activePageId && !isScrollingRef.current) {
+        // NOTE: Switched to root: null (viewport).
+        // Debugging: rootMargin 0px, detailed logs.
+        // Match ManuscriptEditor's robust settings
+        const observerOptions = {
+            root: null, // viewport
+            // Trigger when page crosses top (with some buffer) or leaves bottom
+            // -100px from top means we start 'seeing' it when it's near the top
+            // -50% from bottom means we stop 'seeing' it when it's half scrolled out? 
+            // Actually ManuscriptEditor uses: '-100px 0px -50% 0px'
+            rootMargin: '-100px 0px -50% 0px',
+            threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
+        }
+
+        const pageVisibility = new Map<string, number>()
+
+        const observerCallback = (entries: IntersectionObserverEntry[]) => {
+            // Update our map of visible ratios
+            entries.forEach((entry) => {
+                const pageId = entry.target.getAttribute('data-page-id')
+                if (pageId) {
+                    if (entry.isIntersecting) {
+                        pageVisibility.set(pageId, entry.intersectionRatio)
+                    } else {
+                        pageVisibility.delete(pageId)
+                    }
+                }
+            })
+
+
+
+            // Find the best page
+            let bestPage: { id: string; ratio: number } | null = null
+
+            if (pageVisibility.size > 0) {
+                let maxRatio = -1
+                for (const [id, ratio] of pageVisibility.entries()) {
+                    if (ratio > maxRatio) {
+                        maxRatio = ratio
+                        bestPage = { id, ratio }
+                    }
+                }
+            }
+
+            if (bestPage) {
+                const pageId = bestPage.id
+                // Use ref to prevent circular updates if we just scrolled programmatically
+                if (pageId !== activePageId && !isScrollingRef.current) {
+                    lastSpyPageIdRef.current = pageId
                     onPageChange?.(pageId)
                 }
             }
-        }, {
-            root: container,
-            threshold: 0.6 // Trigger when 60% visible
+        }
+
+        const observer = new IntersectionObserver(observerCallback, observerOptions)
+
+        // Use requestAnimationFrame to ensure DOM is ready (Critical for React rendering)
+        const rafId = requestAnimationFrame(() => {
+            pages.forEach(page => {
+                const el = pageRefs.current.get(page.id)
+                // Also check if data-page-id matches just in case? No, ID relies on `page-{id}`
+                if (el) observer.observe(el)
+            })
         })
 
-        pages.forEach(page => {
-            const el = document.getElementById(`page-${page.id}`)
-            if (el) observer.observe(el)
-        })
-
-        return () => observer.disconnect()
+        return () => {
+            cancelAnimationFrame(rafId)
+            observer.disconnect()
+            pageVisibility.clear()
+        }
     }, [pages, activePageId, onPageChange])
 
     // --------------------------------------------------------------------------
     // PROGRAMMATIC SCROLL
     // --------------------------------------------------------------------------
     useEffect(() => {
-        if (activePageId && !isScrollingRef.current) {
-            const el = document.getElementById(`page-${activePageId}`)
+        if (activePageId && !isScrollingRef.current && activePageId !== lastSpyPageIdRef.current) {
+            const el = pageRefs.current.get(activePageId)
             if (el && scrollContainerRef.current) {
                 isScrollingRef.current = true
                 el.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -112,6 +164,13 @@ export function UnifiedIllustrationFeed({
                     isScrollingRef.current = false
                 }, 1000)
             }
+        } else if (activePageId === lastSpyPageIdRef.current) {
+            // Reset the spy ref so that if we navigate away and back to the same page manually (e.g. via button), it still works.
+            // Actually, keep it until activePageId changes to something else.
+            // But if user scrolls (spy updates ref), and then clicks the same page in sidebar?
+            // Sidebar click triggers activePageId update, but it's same ID, so effect won't run anyway.
+            // If user clicks different page, activePageId !== ref, so it ignores check.
+            // Logic holds.
         }
     }, [activePageId])
 
@@ -144,16 +203,27 @@ export function UnifiedIllustrationFeed({
     // Both views now use full-screen layout for illustrations.
     const heightClass = 'h-[calc(100vh-70px)]'
 
-    const isProductionUnlocked = ['illustration_approved', 'illustration_production', 'completed'].includes(illustrationStatus)
-    const visiblePages = pages.filter(p => isProductionUnlocked || p.page_number === 1)
+    const visiblePages = pages.filter(p => {
+        if (mode === 'admin') return true
+        return p.page_number === 1 || !!p.customer_illustration_url || !!p.customer_sketch_url
+    })
 
     return (
         <div
             ref={scrollContainerRef}
-            className={`${heightClass} w-full overflow-y-auto snap-y snap-mandatory scroll-smooth pb-20`}
+            className={`${heightClass} w-full overflow-y-auto md:snap-y md:snap-mandatory scroll-smooth pb-20`}
         >
             {visiblePages.map(page => (
-                <div key={page.id} className="min-h-full h-auto snap-start w-full">
+                <div
+                    key={page.id}
+                    ref={(el) => {
+                        if (el) pageRefs.current.set(page.id, el)
+                        else pageRefs.current.delete(page.id)
+                    }}
+                    id={`page-${page.id}`}
+                    data-page-id={page.id}
+                    className="min-h-full h-auto snap-start w-full"
+                >
                     <SharedIllustrationBoard
                         mode={mode}
                         page={page}
