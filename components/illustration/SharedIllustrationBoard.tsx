@@ -756,9 +756,12 @@ export function SharedIllustrationBoard({
                                     setIsRegenerateDialogOpen(false)
                                     onRegenerate(regenerationPrompt, base64Images)
                                 }}
-                                disabled={!regenerationPrompt.trim() && referenceImages.length === 0}
+                                // Enable if prompt OR images exist (Edit), OR if BOTH are empty (Reset)
+                                // Actually, always enable? Yes, because empty = reset.
+                                disabled={false}
+                                className={(!regenerationPrompt.trim() && referenceImages.length === 0) ? "bg-red-600 hover:bg-red-700 text-white" : ""}
                             >
-                                Regenerate
+                                {(!regenerationPrompt.trim() && referenceImages.length === 0) ? "Reset to Original" : "Regenerate"}
                             </Button>
                         </DialogFooter>
                     </DialogContent>

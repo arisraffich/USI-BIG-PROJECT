@@ -232,7 +232,7 @@ export function UnifiedIllustrationFeed({
                         // Handlers
                         onSaveFeedback={onSaveFeedback ? (notes) => onSaveFeedback(page.id, notes) : undefined}
                         onGenerate={onGenerate ? () => onGenerate(page) : undefined}
-                        onRegenerate={onRegenerate ? (prompt) => onRegenerate(page, prompt) : undefined}
+                        onRegenerate={onRegenerate ? (prompt, referenceImages) => onRegenerate(page, prompt, referenceImages) : undefined}
                         onUpload={onUpload ? (type, file) => onUpload(page, type, file) : undefined}
 
                         // State Config

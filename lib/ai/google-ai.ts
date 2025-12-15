@@ -19,34 +19,54 @@ interface GenerateOptions {
     textIntegration?: string
 }
 
-async function fetchImageAsBase64(url: string): Promise<{ mimeType: string, data: string } | null> {
+async function fetchImageAsBase64(input: string): Promise<{ mimeType: string, data: string } | null> {
     try {
-        const response = await fetch(url)
-        if (!response.ok) return null
-        const arrayBuffer = await response.arrayBuffer()
-        let buffer: any = Buffer.from(arrayBuffer)
+        let buffer: Buffer;
+        let mimeType: string;
 
+        // 1. Handle Data URI (Base64)
+        if (input.startsWith('data:')) {
+            const matches = input.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+            if (!matches || matches.length !== 3) {
+                console.warn('Invalid Data URI format');
+                return null;
+            }
+            mimeType = matches[1];
+            buffer = Buffer.from(matches[2], 'base64');
+        } else {
+            // 2. Handle URL Fetch
+            const response = await fetch(input)
+            if (!response.ok) {
+                console.warn(`Failed to fetch image URL: ${input} (${response.status})`)
+                return null
+            }
+            const arrayBuffer = await response.arrayBuffer()
+            buffer = Buffer.from(arrayBuffer)
+            mimeType = response.headers.get('content-type') || 'image/jpeg'
+        }
+
+        // 3. Rezise & Standardize (For BOTH URL and Data URI)
         // Resize image to max 1024px to prevent payload issues (500 errors)
         try {
             buffer = await sharp(buffer)
-                .resize(1024, 1024, { fit: 'inside' })
+                .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true }) // Added withoutEnlargement
                 .jpeg({ quality: 80 }) // standardized to jpeg
                 .toBuffer()
+
             return {
                 mimeType: 'image/jpeg',
                 data: buffer.toString('base64')
             }
         } catch (resizeError) {
             console.warn('Image resize failed, using original:', resizeError)
-            // Fallback to original if resize fails (unlikely)
-            const mimeType = response.headers.get('content-type') || 'image/jpeg'
+            // Fallback to original
             return {
                 mimeType,
                 data: buffer.toString('base64')
             }
         }
     } catch (e) {
-        console.error('Failed to fetch image:', url, e)
+        console.error('Failed to process image input:', e)
         return null
     }
 }
@@ -59,12 +79,14 @@ export async function generateIllustration({
 
     if (!API_KEY) throw new Error('Google API Key missing')
 
+    // DEBUG: Confirm inputs
+    console.log(`[GoogleAI] Reference Images Count: ${referenceImages.length}`)
+
     try {
         const parts: any[] = [{ text: prompt }]
 
         // Fetch and attach all reference images
         if (referenceImages.length > 0) {
-            // console.log(`Attaching ${referenceImages.length} reference images...`)
             for (const url of referenceImages) {
                 const img = await fetchImageAsBase64(url)
                 if (img) {
@@ -77,13 +99,6 @@ export async function generateIllustration({
                 }
             }
         }
-
-        // Map common aspect ratios to Gemini format if needed, or pass directly
-        // Gemini usually takes "1:1", "3:4", "4:3", "9:16", "16:9"
-
-        // Normalize aspect ratio string if needed (e.g. "Landscape" -> "16:9")
-        // Assuming UI passes strictly formatted strings or we handle it here.
-        // For now, pass through.
 
         const payload = {
             contents: [{ parts }],

@@ -18,7 +18,9 @@ function mapAspectRatio(ratio: string | null | undefined): string {
 
 export async function POST(request: Request) {
     try {
-        const { projectId, pageId, customPrompt, currentImageUrl, referenceImages: uploadedReferenceImages } = await request.json()
+        const body = await request.json()
+        const { projectId, pageId, customPrompt, currentImageUrl, referenceImages: uploadedReferenceImages } = body
+
 
         if (!projectId) {
             return NextResponse.json({ error: 'Missing projectId' }, { status: 400 })
@@ -54,21 +56,29 @@ export async function POST(request: Request) {
         let referenceImages: string[] = []
 
         // --- EDIT MODE vs STANDARD MODE ---
-        if (customPrompt && currentImageUrl) {
+        // Edit Mode triggers if we have a current image AND (User Text OR User References)
+        // If NO text and NO references, it falls through to Standard Mode (Reset/Fresh Generation)
+        const hasReferences = uploadedReferenceImages?.length > 0
+
+        if ((customPrompt || hasReferences) && currentImageUrl) {
 
             // Edit Mode: Use User Prompt + Current Image + Uploaded References
-            const extraRefNote = uploadedReferenceImages?.length
-                ? `\nREFERENCE IMAGES:\nI have attached ${uploadedReferenceImages.length} additional reference images. Use these visually to understand the specific object, style, or detail requested in the instructions.`
+            const referenceInstruction = hasReferences
+                ? `\nVISUAL REFERENCING TASK:
+I have provided ${uploadedReferenceImages.length} additional reference image(s) AFTER the first image.
+You MUST analyze the object, style, color, and design in these reference image(s) and apply them to your generation.
+If the user asks to "add" or "change" something shown in the reference, you must COPY its visual appearance (shape, color, material) as closely as possible.`
                 : ''
 
-            fullPrompt = `EDIT INSTRUCTIONS:
+            fullPrompt = `MODE: IMAGE EDITING
+INSTRUCTIONS:
 ${customPrompt}
 
-${extraRefNote}
+${referenceInstruction}
 
-ORIGINAL IMAGE CONTEXT:
-The FIRST attached image is the current illustration to be modified.
-Modify it appropriately based on the user's instructions while maintaining the overall style and composition unless asked to change it.`
+IMAGE CONTEXT:
+1. The FIRST attached image is the "Target Image" to be edited. Keep its composition and style unless instructed otherwise.
+2. Any SUBSEQUENT images are "Style/Object References". Use them ONLY as visual guides for the requested changes.`
 
             // Current Image is ALWAYS first (Instruction target), followed by Optional References
             referenceImages = [currentImageUrl, ...(uploadedReferenceImages || [])]
