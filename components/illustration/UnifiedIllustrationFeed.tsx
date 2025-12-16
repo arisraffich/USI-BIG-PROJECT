@@ -20,16 +20,11 @@ interface UnifiedIllustrationFeedProps {
 
     // ADMIN SPECIFIC
     isAnalyzing?: boolean
-    projectId?: string // Needed for reviews fetch inside Board? actually Board handles reviews internally via props or fetch?
-    // Wait, SharedBoard doesn't fetch reviews. It receives `page`. `page` has `feedback_notes`.
-    // BUT the History Dialog needs to fetch? Or it uses `page.feedback_history`.
-    // IllustrationsTabContent was fetching reviews: `const { data } = await supabase.from('illustration_reviews')...`
-    // We should probably move that fetch logic OR pass reviews down.
-    // For now, let's assume `page` object has recent data. 
+    projectId?: string
 
     // ADMIN STATE/HANDLERS
     loadingState?: { sketch: boolean; illustration: boolean }
-    onGenerate?: (page: Page) => void
+    onGenerate?: (page: Page, referenceImageUrl?: string) => void
     onRegenerate?: (page: Page, prompt: string, referenceImages?: string[]) => void
     onUpload?: (page: Page, type: 'sketch' | 'illustration', file: File) => void
 
@@ -106,8 +101,6 @@ export function UnifiedIllustrationFeed({
                 }
             })
 
-
-
             // Find the best page
             let bestPage: { id: string; ratio: number } | null = null
 
@@ -166,11 +159,6 @@ export function UnifiedIllustrationFeed({
             }
         } else if (activePageId === lastSpyPageIdRef.current) {
             // Reset the spy ref so that if we navigate away and back to the same page manually (e.g. via button), it still works.
-            // Actually, keep it until activePageId changes to something else.
-            // But if user scrolls (spy updates ref), and then clicks the same page in sidebar?
-            // Sidebar click triggers activePageId update, but it's same ID, so effect won't run anyway.
-            // If user clicks different page, activePageId !== ref, so it ignores check.
-            // Logic holds.
         }
     }, [activePageId])
 
@@ -213,40 +201,53 @@ export function UnifiedIllustrationFeed({
             ref={scrollContainerRef}
             className={`${heightClass} w-full overflow-y-auto md:snap-y md:snap-mandatory scroll-smooth pb-20`}
         >
-            {visiblePages.map(page => (
-                <div
-                    key={page.id}
-                    ref={(el) => {
-                        if (el) pageRefs.current.set(page.id, el)
-                        else pageRefs.current.delete(page.id)
-                    }}
-                    id={`page-${page.id}`}
-                    data-page-id={page.id}
-                    className="min-h-full h-auto snap-start w-full"
-                >
-                    <SharedIllustrationBoard
-                        mode={mode}
-                        page={page}
-                        illustrationStatus={illustrationStatus}
+            {visiblePages.map(page => {
+                // CALCULATE PREVIOUS ILLUSTRATED PAGES FOR THIS SPECIFIC PAGE
+                // Must be: Before current page AND have illustration_url
+                const previousIllustratedPages = pages.filter(p =>
+                    p.page_number < page.page_number &&
+                    // Only Admin has Manual Reference, so check admin url
+                    (p.illustration_url)
+                ).sort((a, b) => a.page_number - b.page_number)
 
-                        // Handlers
-                        onSaveFeedback={onSaveFeedback ? (notes) => onSaveFeedback(page.id, notes) : undefined}
-                        onGenerate={onGenerate ? () => onGenerate(page) : undefined}
-                        onRegenerate={onRegenerate ? (prompt, referenceImages) => onRegenerate(page, prompt, referenceImages) : undefined}
-                        onUpload={onUpload ? (type, file) => onUpload(page, type, file) : undefined}
+                return (
+                    <div
+                        key={page.id}
+                        ref={(el) => {
+                            if (el) pageRefs.current.set(page.id, el)
+                            else pageRefs.current.delete(page.id)
+                        }}
+                        id={`page-${page.id}`}
+                        data-page-id={page.id}
+                        className="min-h-full h-auto snap-start w-full"
+                    >
+                        <SharedIllustrationBoard
+                            mode={mode}
+                            page={page}
+                            illustrationStatus={illustrationStatus}
 
-                        // State Config
-                        isGenerating={page.id === generatingPageId}
-                        loadingState={loadingStateMap?.[page.id] || { sketch: false, illustration: false }}
+                            // Pass candidates
+                            previousIllustratedPages={previousIllustratedPages}
 
-                        // Wizard
-                        aspectRatio={aspectRatio}
-                        setAspectRatio={setAspectRatio}
-                        textIntegration={textIntegration}
-                        setTextIntegration={setTextIntegration}
-                    />
-                </div>
-            ))}
+                            // Handlers
+                            onSaveFeedback={onSaveFeedback ? (notes) => onSaveFeedback(page.id, notes) : undefined}
+                            onGenerate={onGenerate ? (refUrl) => onGenerate(page, refUrl) : undefined}
+                            onRegenerate={onRegenerate ? (prompt, referenceImages) => onRegenerate(page, prompt, referenceImages) : undefined}
+                            onUpload={onUpload ? (type, file) => onUpload(page, type, file) : undefined}
+
+                            // State Config
+                            isGenerating={page.id === generatingPageId}
+                            loadingState={loadingStateMap?.[page.id] || { sketch: false, illustration: false }}
+
+                            // Wizard
+                            aspectRatio={aspectRatio}
+                            setAspectRatio={setAspectRatio}
+                            textIntegration={textIntegration}
+                            setTextIntegration={setTextIntegration}
+                        />
+                    </div>
+                )
+            })}
             {/* Spacer for bottom scrolling */}
             {pages.length > 1 && <div className="min-h-[100px] w-full snap-center" />}
         </div>

@@ -87,15 +87,20 @@ export async function generateIllustration({
 
         // Fetch and attach all reference images
         if (referenceImages.length > 0) {
+            console.log('[GoogleAI] Processing Reference Images:', JSON.stringify(referenceImages, null, 2))
             for (const url of referenceImages) {
+                console.log(`[GoogleAI] Fetching: ${url}`)
                 const img = await fetchImageAsBase64(url)
                 if (img) {
+                    console.log(`[GoogleAI] Successfully attached image: ${url.slice(-20)}`)
                     parts.push({
                         inline_data: {
                             mime_type: img.mimeType,
                             data: img.data
                         }
                     })
+                } else {
+                    console.error(`[GoogleAI] FAILED to fetch/attach image: ${url}`)
                 }
             }
         }

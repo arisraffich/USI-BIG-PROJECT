@@ -139,34 +139,37 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
         }
     }, [character, isGenerating, readOnly, alwaysEditing]) // removed onChange to avoid circular deps if not memoized upstream
 
-    // Effect to bubble up changes
-    useEffect(() => {
-        if (!onChange || !formData) return
-
-        const isValid = validateForm(formData)
+    // Helper to bubble up changes
+    const notifyChange = (newData: InternalCharacterFormData) => {
+        if (!onChange) return
+        const isValid = validateForm(newData)
         const outputData: CharacterFormData = {
-            age: formData.age || null,
-            gender: formData.gender || null,
-            skin_color: formData.skin_color || null,
-            hair_color: formData.hair_color || null,
-            hair_style: formData.hair_style || null,
-            eye_color: formData.eye_color || null,
-            clothing: formData.clothing_and_accessories || null,
+            age: newData.age || null,
+            gender: newData.gender || null,
+            skin_color: newData.skin_color || null,
+            hair_color: newData.hair_color || null,
+            hair_style: newData.hair_style || null,
+            eye_color: newData.eye_color || null,
+            clothing: newData.clothing_and_accessories || null,
             accessories: null,
             special_features: null,
         }
         onChange(outputData, isValid)
-    }, [formData, onChange]) // Ensure formData triggers this
+    }
 
     // Check if form is dirty
     const isDirty = initialData ? JSON.stringify(formData) !== JSON.stringify(initialData) : false
 
     const handleInputChange = (field: string, value: string) => {
-        setFormData(prev => ({ ...prev, [field]: value }))
+        const newData = { ...formData, [field]: value }
+        setFormData(newData)
+        notifyChange(newData)
     }
 
     const handleTextareaChange = (value: string) => {
-        setFormData(prev => ({ ...prev, clothing_and_accessories: value }))
+        const newData = { ...formData, clothing_and_accessories: value }
+        setFormData(newData)
+        notifyChange(newData)
     }
 
     const handleSaveWrapper = async () => {
@@ -242,9 +245,9 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
             className
         )}>
             <CardContent className="p-6">
-                {/* Delete button (Top Right, absolute) - only if onDelete is provided and not readOnly */}
-                {!isMainCharacter && !editMode && !readOnly && onDelete && (
-                    <div className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                {/* Delete button (Top Right, absolute) - only if onDelete is provided */}
+                {!isMainCharacter && onDelete && (
+                    <div className="absolute top-4 right-4 z-10 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <Button

@@ -17,6 +17,7 @@ import { IllustrationsTabContent } from '@/components/admin/IllustrationsTabCont
 import { Page } from '@/types/page'
 import { Character } from '@/types/character'
 import { ProjectStatus } from '@/types/project'
+import { CharacterFormData } from '@/components/shared/UniversalCharacterCard'
 
 interface ProjectTabsContentProps {
   projectId: string
@@ -110,6 +111,120 @@ export function ProjectTabsContent({
 
   const pageCount = pages?.length || 0
   const characterCount = characters?.length || 0
+
+  // Sort characters
+  const sortedCharacters = useMemo(() => {
+    if (!characters) return { main: null, secondary: [] }
+    const sorted = [...characters].sort((a, b) => {
+      if (a.is_main && !b.is_main) return -1
+      if (!a.is_main && b.is_main) return 1
+      if (!a.is_main && !b.is_main) {
+        return new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime()
+      }
+      return 0
+    })
+    return { main: sorted.find(c => c.is_main) || null, secondary: sorted.filter(c => !c.is_main) }
+  }, [characters])
+
+
+
+  // Manual Mode State
+  const [isManualMode, setIsManualMode] = useState(false)
+  const [characterForms, setCharacterForms] = useState<{ [id: string]: { data: any; isValid: boolean } }>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleManualTrialApprove = async () => {
+    if (!confirm("Are you sure you want to manually approve the 1st illustration? This will unlock all pages for generation.")) return
+
+    setIsSubmitting(true)
+    try {
+      const response = await fetch(`/api/admin/projects/${projectId}/illustration-manual-approve`, {
+        method: 'POST',
+      })
+      if (!response.ok) throw new Error('Approval failed')
+      toast.success('Illustration trial manually approved')
+      router.refresh()
+    } catch (e) {
+      toast.error('Failed to approve trial')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Initialize forms when entering manual mode (or when characters load)
+  useEffect(() => {
+    if (characters && characters.length > 0) {
+      const initialForms: Record<string, { data: any; isValid: boolean }> = {}
+      characters.forEach(char => {
+        if (!char.is_main) {
+          const isValid = !!(char.name && char.age && char.gender)
+          initialForms[char.id] = { data: char, isValid }
+        }
+      })
+      setCharacterForms(prev => {
+        if (Object.keys(prev).length === 0 && Object.keys(initialForms).length > 0) return initialForms
+        return prev
+      })
+    }
+  }, [characters])
+
+  const handleCharacterFormChange = (id: string, data: any, isValid: boolean) => {
+    setCharacterForms(prev => ({ ...prev, [id]: { data, isValid } }))
+  }
+
+  const isManualSubmitValid = useMemo(() => {
+    if (!sortedCharacters.secondary.length) return false
+    return sortedCharacters.secondary.every(char => {
+      const form = characterForms[char.id]
+      return form && form.isValid
+    })
+  }, [sortedCharacters.secondary, characterForms])
+
+  const handleManualSubmit = async () => {
+    setIsSubmitting(true)
+    try {
+      // Collect edits
+      const characterEdits = Object.entries(characterForms).reduce((acc, [id, info]) => {
+        acc[id] = info.data
+        return acc
+      }, {} as Record<string, any>)
+
+      const response = await fetch(`/api/admin/projects/${projectId}/characters/manual-submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ characterEdits })
+      })
+
+      if (!response.ok) throw new Error('Submission failed')
+
+      toast.success('Manual submission successful')
+      setIsManualMode(false)
+      router.refresh()
+    } catch (e) {
+      toast.error('Failed to submit')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleManualApprove = async () => {
+    setIsSubmitting(true)
+    try {
+      const response = await fetch(`/api/admin/projects/${projectId}/characters/manual-submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ characterEdits: {} }) // No edits, just proceed
+      })
+      if (!response.ok) throw new Error('Approval failed')
+      toast.success('Characters manually approved')
+      setIsManualMode(false)
+      router.refresh()
+    } catch (e) {
+      toast.error('Failed to approve')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   // Local state for pages to support instant realtime updates
   const [localPages, setLocalPages] = useState<Page[]>(pages || [])
@@ -226,19 +341,7 @@ export function ProjectTabsContent({
     })
   }
 
-  // Sort characters
-  const sortedCharacters = useMemo(() => {
-    if (!characters) return { main: null, secondary: [] }
-    const sorted = [...characters].sort((a, b) => {
-      if (a.is_main && !b.is_main) return -1
-      if (!a.is_main && b.is_main) return 1
-      if (!a.is_main && !b.is_main) {
-        return new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime()
-      }
-      return 0
-    })
-    return { main: sorted.find(c => c.is_main) || null, secondary: sorted.filter(c => !c.is_main) }
-  }, [characters])
+
 
   const showGallery = useMemo(() => {
     return sortedCharacters.secondary.some(c => c.image_url !== null && c.image_url !== '')
@@ -330,6 +433,12 @@ export function ProjectTabsContent({
     fetchFreshPages()
   }, [projectId])
 
+  // Calculate Trial Readiness
+  const isTrialReady = useMemo(() => {
+    const page1 = localPages.find(p => p.page_number === 1)
+    return !!(page1?.illustration_url && page1?.sketch_url)
+  }, [localPages])
+
   // Loading State
   if (projectStatus === 'character_generation' && !showGallery) {
     return (
@@ -346,11 +455,7 @@ export function ProjectTabsContent({
     )
   }
 
-  // Calculate Trial Readiness
-  const isTrialReady = useMemo(() => {
-    const page1 = localPages.find(p => p.page_number === 1)
-    return !!(page1?.illustration_url && page1?.sketch_url)
-  }, [localPages])
+
 
   return (
     <UnifiedProjectLayout
@@ -377,6 +482,63 @@ export function ProjectTabsContent({
             params.set('tab', 'illustrations')
             router.replace(`${pathname}?${params.toString()}`, { scroll: false })
           }}
+          centerContent={
+            // 1. Characters Manual Mode
+            (activeTab === 'characters' && characters && characters.length > 1 && (
+              <div className="flex items-center gap-2">
+                {!isManualMode ? (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setIsManualMode(true)}
+                    className="bg-red-600 hover:bg-red-700 text-white h-8 text-xs px-3 shadow-sm"
+                  >
+                    Manual
+                  </Button>
+                ) : (
+                  <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
+                    <Button variant="ghost" size="sm" onClick={() => setIsManualMode(false)} className="h-7 text-xs px-2 text-slate-500 hover:text-slate-700">
+                      Cancel
+                    </Button>
+
+                    <div className="h-4 w-px bg-slate-200" />
+
+                    {sortedCharacters.secondary.every(c => c.image_url) ? (
+                      <Button
+                        size="sm"
+                        className="bg-orange-500 hover:bg-orange-600 text-white h-7 text-xs px-3"
+                        onClick={handleManualApprove}
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Approve'}
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        className="bg-orange-500 hover:bg-orange-600 text-white h-7 text-xs px-3"
+                        onClick={handleManualSubmit}
+                        disabled={!isManualSubmitValid || isSubmitting}
+                      >
+                        {isSubmitting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Submit'}
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )) ||
+            // 2. Illustration Trial Manual Approve
+            (activeTab === 'illustrations' && isTrialReady && illustrationStatus !== 'illustration_approved' && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleManualTrialApprove}
+                className="bg-red-600 hover:bg-red-700 text-white h-8 text-xs px-3 shadow-sm"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Manual Approve Trial'}
+              </Button>
+            ))
+          }
         />
       }
       sidebar={
@@ -405,7 +567,7 @@ export function ProjectTabsContent({
 
         {/* Characters Tab Content */}
         <div className={activeTab === 'characters' ? 'block space-y-4' : 'hidden'}>
-          {showGallery && characters ? (
+          {showGallery && characters && !isManualMode ? (
             <AdminCharacterGallery
               characters={characters}
               projectId={projectId}
@@ -413,6 +575,8 @@ export function ProjectTabsContent({
             />
           ) : (
             <>
+              {/* Manual mode controls moved to header */}
+
               {characters && characters.length > 0 ? (
                 <div className="w-full">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -436,9 +600,14 @@ export function ProjectTabsContent({
                       </div>
                     )}
                     {sortedCharacters.secondary.map((character) => (
-                      <CharacterCard key={character.id} character={character} />
+                      <CharacterCard
+                        key={character.id}
+                        character={character}
+                        readOnly={!isManualMode}
+                        onChange={handleCharacterFormChange}
+                      />
                     ))}
-                    {characters.length > 1 && (
+                    {characters.length > 1 && !isManualMode && (
                       <div className="h-full">
                         <AddCharacterButton
                           mode="card"

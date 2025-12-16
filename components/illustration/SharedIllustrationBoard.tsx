@@ -6,41 +6,32 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X } from 'lucide-react'
+import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, AlignLeft } from 'lucide-react'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 import Image from 'next/image'
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { PageStatusBar } from '@/components/project/PageStatusBar'
+import { EmptyStateBoard } from '@/components/illustration/EmptyStateBoard'
 import { ReviewHistoryDialog } from '@/components/project/ReviewHistoryDialog'
 
-// --------------------------------------------------------------------------
-// SHARED INTERFACE
-// --------------------------------------------------------------------------
-interface SharedIllustrationBoardProps {
-    page: Page
-    mode: 'admin' | 'customer'
-
-    // CUSTOMER PROPS
-    illustrationStatus?: string
-    onSaveFeedback?: (notes: string) => Promise<void>
-
-    // ADMIN PROPS
-    isGenerating?: boolean
-    isUploading?: boolean
-    loadingState?: { sketch: boolean; illustration: boolean }
-
-    // Admin Wizard State
-    aspectRatio?: string
-    setAspectRatio?: (val: string) => void
-    textIntegration?: string
-    setTextIntegration?: (val: string) => void
-
-    // Admin Handlers
-    onGenerate?: () => void
-    onRegenerate?: (prompt: string, referenceImages?: string[]) => void
-    onUpload?: (type: 'sketch' | 'illustration', file: File) => void
-}
+// Helper for the beautiful animation
+const AnimatedOverlay = ({ label }: { label: string }) => (
+    <div className="absolute inset-0 bg-white/90 backdrop-blur-[2px] flex items-center justify-center z-50 animate-in fade-in duration-300">
+        <div className="flex flex-col items-center gap-4">
+            <div className="relative">
+                <div className="absolute inset-0 bg-pink-100 rounded-full animate-pulse opacity-75"></div>
+                <div className="relative bg-gradient-to-br from-purple-600 to-pink-600 rounded-full p-4">
+                    <Loader2 className="w-8 h-8 text-white animate-spin" />
+                </div>
+            </div>
+            <div className="space-y-1 text-center">
+                <h2 className="text-lg font-semibold text-slate-900">{label}</h2>
+            </div>
+        </div>
+    </div>
+)
 
 export function SharedIllustrationBoard({
     page,
@@ -56,25 +47,9 @@ export function SharedIllustrationBoard({
     setTextIntegration,
     onGenerate,
     onRegenerate,
-    onUpload
+    onUpload,
+    previousIllustratedPages = []
 }: SharedIllustrationBoardProps) {
-
-    // Helper for the beautiful animation
-    const AnimatedOverlay = ({ label }: { label: string }) => (
-        <div className="absolute inset-0 bg-white/90 backdrop-blur-[2px] flex items-center justify-center z-50 animate-in fade-in duration-300">
-            <div className="flex flex-col items-center gap-4">
-                <div className="relative">
-                    <div className="absolute inset-0 bg-pink-100 rounded-full animate-pulse opacity-75"></div>
-                    <div className="relative bg-gradient-to-br from-purple-600 to-pink-600 rounded-full p-4">
-                        <Loader2 className="w-8 h-8 text-white animate-spin" />
-                    </div>
-                </div>
-                <div className="space-y-1 text-center">
-                    <h2 className="text-lg font-semibold text-slate-900">{label}</h2>
-                </div>
-            </div>
-        </div>
-    )
 
     // --------------------------------------------------------------------------
     // LOCAL STATE
@@ -84,6 +59,9 @@ export function SharedIllustrationBoard({
     const [isSaving, setIsSaving] = useState(false)
     const [showImage, setShowImage] = useState<string | null>(null)
     const [historyOpen, setHistoryOpen] = useState(false)
+
+    // NEW: View Mode for Sketch Card
+    const [sketchViewMode, setSketchViewMode] = useState<'sketch' | 'text'>('sketch')
 
     // Admin: Regenerate Logic
     const [isRegenerateDialogOpen, setIsRegenerateDialogOpen] = useState(false)
@@ -180,162 +158,41 @@ export function SharedIllustrationBoard({
     }
 
     // --------------------------------------------------------------------------
-    // EMPTY STATE (WIZARD vs PENDING)
-    // Same functionality as before because backup tab content also had this logic
-    // --------------------------------------------------------------------------
-    const renderEmptyState = () => {
-        // BEAUTIFUL LOADING STATE (Restored from Backup)
-        if (isGenerating) {
-            return (
-                <div className="bg-white shadow-sm border border-slate-200 p-12 text-center flex flex-col items-center justify-center space-y-6 h-full min-h-[500px]">
-                    <div className="relative">
-                        <div className="absolute inset-0 bg-pink-100 rounded-full animate-pulse opacity-75"></div>
-                        <div className="relative bg-gradient-to-br from-purple-600 to-pink-600 rounded-full p-4">
-                            <Loader2 className="w-8 h-8 text-white animate-spin" />
-                        </div>
-                    </div>
-                    <div className="space-y-1">
-                        <h2 className="text-xl font-semibold text-slate-900">Painting Illustration...</h2>
-                        <p className="text-slate-500 text-sm">Applying watercolors and defining style from references.</p>
-                    </div>
-                </div>
-            )
-        }
-
-        if (isCustomer) {
-            return (
-                <div className="max-w-[1600px] mx-auto min-h-[400px] flex items-center justify-center bg-white rounded-xl border border-slate-200 text-slate-400">
-                    Pending Illustration Release...
-                </div>
-            )
-        }
-
-        // ADMIN CREATION WIZARD
-        // ADMIN CREATION WIZARD (Restored Beautiful Layout)
-        return (
-            <div className="bg-white shadow-sm border border-slate-200 p-8 md:p-12 text-center flex flex-col items-center justify-center space-y-8 min-h-[500px] h-full">
-                <div className="space-y-4 max-w-md w-full">
-                    <div className="flex flex-col items-center mb-6">
-                        <div className="bg-purple-50 p-6 rounded-full mb-4">
-                            <Sparkles className="w-10 h-10 text-purple-600" />
-                        </div>
-                        <h2 className="text-2xl font-semibold text-slate-900">Ready to Create Art</h2>
-                        <p className="text-slate-500 mt-2">
-                            The AI Director has analyzed the story. We will now generate <b>Page {page.page_number}</b> to establish the artistic style for the entire book.
-                        </p>
-                    </div>
-
-                    <div className="bg-slate-50/50 p-6 rounded-xl border border-slate-100 space-y-6 text-left">
-                        {/* Aspect Ratio Selection */}
-                        <div className="space-y-3">
-                            <Label className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Aspect Ratio</Label>
-                            {page.page_number === 1 ? (
-                                <RadioGroup
-                                    value={aspectRatio}
-                                    onValueChange={setAspectRatio}
-                                    className="flex flex-col space-y-2"
-                                >
-                                    <div className="flex items-center space-x-3">
-                                        <RadioGroupItem value="8:10" id={`r1-${page.id}`} />
-                                        <Label htmlFor={`r1-${page.id}`} className="font-medium text-sm cursor-pointer text-slate-700">8:10 (Portrait)</Label>
-                                    </div>
-                                    <div className="flex items-center space-x-3">
-                                        <RadioGroupItem value="8.5:8.5" id={`r2-${page.id}`} />
-                                        <Label htmlFor={`r2-${page.id}`} className="font-medium text-sm cursor-pointer text-slate-700">8.5x8.5 (Square)</Label>
-                                    </div>
-                                    <div className="flex items-center space-x-3">
-                                        <RadioGroupItem value="8.5:11" id={`r3-${page.id}`} />
-                                        <Label htmlFor={`r3-${page.id}`} className="font-medium text-sm cursor-pointer text-slate-700">8.5x11 (Letter)</Label>
-                                    </div>
-                                </RadioGroup>
-                            ) : (
-                                <div className="bg-white border border-slate-200 rounded-md p-3 text-sm text-slate-500">
-                                    <span className="block font-medium text-slate-700 mb-1">Locked by Page 1</span>
-                                    {aspectRatio || '8:10'} (Consistent with Book)
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="h-px bg-slate-200"></div>
-
-                        {/* Text Placement Selection */}
-                        <div className="space-y-3">
-                            <Label className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Text Placement</Label>
-                            <RadioGroup
-                                value={textIntegration}
-                                onValueChange={setTextIntegration}
-                                className="flex flex-col space-y-2"
-                            >
-                                <div className="flex items-center space-x-3">
-                                    <RadioGroupItem value="integrated" id={`t1-${page.id}`} />
-                                    <div>
-                                        <Label htmlFor={`t1-${page.id}`} className="font-medium text-sm cursor-pointer text-slate-700">Integrated</Label>
-                                        <p className="text-xs text-slate-400">Text inside illustration</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center space-x-3">
-                                    <RadioGroupItem value="separated" id={`t2-${page.id}`} />
-                                    <div>
-                                        <Label htmlFor={`t2-${page.id}`} className="font-medium text-sm cursor-pointer text-slate-700">Separated</Label>
-                                        <p className="text-xs text-slate-400">Text on blank page</p>
-                                    </div>
-                                </div>
-                            </RadioGroup>
-                        </div>
-                    </div>
-                </div>
-
-                <Button
-                    size="lg"
-                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-xl shadow-purple-200 transition-all hover:scale-105 min-w-[240px]"
-                    onClick={() => {
-                        if (!onGenerate) return
-
-                        // VALIDATION
-                        if (page.page_number === 1) {
-                            if (!aspectRatio) {
-                                toast.error('Please select an Aspect Ratio first')
-                                return
-                            }
-                            if (!textIntegration) {
-                                toast.error('Please select Text Placement first')
-                                return
-                            }
-                        } else {
-                            // Pages 2+ (Locked Aspect Ratio, but check Text Integration)
-                            if (!textIntegration) {
-                                toast.error('Please select Text Placement first')
-                                return
-                            }
-                        }
-
-                        onGenerate()
-                    }}
-                    disabled={isGenerating}
-                >
-                    {isGenerating ? (
-                        <>
-                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                            Initializing...
-                        </>
-                    ) : (
-                        <>
-                            <Sparkles className="w-5 h-5 mr-2" />
-                            Generate Illustration
-                        </>
-                    )}
-                </Button>
-            </div>
-        )
-    }
-
-    // --------------------------------------------------------------------------
     // MAIN RENDER (RESTORED LAYOUT)
     // --------------------------------------------------------------------------
 
     // Check if we show empty state (no illustration yet)
-    if (!page.customer_illustration_url && !page.customer_sketch_url && isCustomer) return renderEmptyState()
-    if (!page.illustration_url && isAdmin) return renderEmptyState() // Admin uses internal URL
+    if (!page.customer_illustration_url && !page.customer_sketch_url && isCustomer) {
+        return (
+            <EmptyStateBoard
+                page={page}
+                isGenerating={isGenerating}
+                isCustomer={isCustomer}
+                aspectRatio={aspectRatio}
+                setAspectRatio={setAspectRatio}
+                textIntegration={textIntegration}
+                setTextIntegration={setTextIntegration}
+                onGenerate={onGenerate}
+                previousIllustratedPages={previousIllustratedPages}
+            />
+        )
+    }
+
+    if (!page.illustration_url && isAdmin) {
+        return (
+            <EmptyStateBoard
+                page={page}
+                isGenerating={isGenerating}
+                isCustomer={isCustomer}
+                aspectRatio={aspectRatio}
+                setAspectRatio={setAspectRatio}
+                textIntegration={textIntegration}
+                setTextIntegration={setTextIntegration}
+                onGenerate={onGenerate}
+                previousIllustratedPages={previousIllustratedPages}
+            />
+        )
+    }
 
     // Use correct URLs based on role
     const sketchUrl = isAdmin ? page.sketch_url : page.customer_sketch_url
@@ -477,15 +334,35 @@ export function SharedIllustrationBoard({
                     <div className="hidden md:grid grid-cols-2 divide-x border-b border-slate-100 h-[73px] bg-white text-sm">
 
                         {/* SKETCH HEADER */}
+                        {/* SKETCH HEADER */}
                         <div className="flex items-center justify-center gap-2 relative">
-                            <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase">{isCustomer ? 'Draft Sketch' : 'Pencil Sketch'}</h4>
-                            {isManualUpload(sketchUrl) && (
+
+                            <DropdownMenu>
+                                <DropdownMenuTrigger className="flex items-center gap-2 outline-none group">
+                                    <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase group-hover:text-purple-600 transition-colors">
+                                        {sketchViewMode === 'sketch' ? 'Draft Sketch' : 'Page Text'}
+                                    </h4>
+                                    <ChevronDown className="w-3 h-3 text-slate-400 group-hover:text-purple-600 transition-colors" />
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="center">
+                                    <DropdownMenuItem onClick={() => setSketchViewMode('sketch')} className="gap-2 cursor-pointer">
+                                        <Sparkles className="w-4 h-4 text-slate-500" />
+                                        <span>Draft Sketch</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setSketchViewMode('text')} className="gap-2 cursor-pointer">
+                                        <AlignLeft className="w-4 h-4 text-slate-500" />
+                                        <span>Page Text</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            {isManualUpload(sketchUrl) && sketchViewMode === 'sketch' && (
                                 <span className="absolute top-1/2 -translate-y-1/2 right-12 lg:right-16 px-1.5 py-0.5 text-[9px] font-bold bg-rose-50 text-rose-600 rounded border border-rose-100 leading-none">
                                     UPLOADED
                                 </span>
                             )}
-                            {/* Admin Upload Button (From Admin Backup) */}
-                            {isAdmin && onUpload && (
+                            {/* Admin Upload Button (From Admin Backup) - Only in Sketch Mode */}
+                            {isAdmin && onUpload && sketchViewMode === 'sketch' && (
                                 <>
                                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700" onClick={() => sketchInputRef.current?.click()} title="Upload Sketch">
                                         <Upload className="w-4 h-4" />
@@ -493,7 +370,7 @@ export function SharedIllustrationBoard({
                                     <input type="file" ref={sketchInputRef} className="hidden" accept="image/*" onChange={handleAdminUploadSelect('sketch')} />
                                 </>
                             )}
-                            {sketchUrl && (
+                            {sketchUrl && sketchViewMode === 'sketch' && (
                                 <button onClick={() => handleDownload(sketchUrl!, `Page-${page.page_number}-Sketch.jpg`)} className="text-slate-400 hover:text-purple-600 transition-colors ml-2" title="Download Sketch">
                                     <Download className="w-4 h-4" />
                                 </button>
@@ -531,11 +408,30 @@ export function SharedIllustrationBoard({
                         {/* 1. SKETCH BLOCK */}
                         <div className="flex flex-col items-center md:space-y-0 bg-white relative min-h-[300px] md:min-h-0">
                             {/* MOBILE HEADER FOR SKETCH (Overlay) */}
+                            {/* MOBILE HEADER FOR SKETCH (Overlay) */}
                             <div className="absolute top-0 left-0 right-0 z-10 flex items-center gap-2 md:hidden p-3 bg-gradient-to-b from-black/40 to-transparent">
-                                <span className="text-xs font-bold tracking-wider text-white/90 uppercase shadow-sm">Sketch</span>
 
-                                {/* 1. REGENERATE (Admin) */}
-                                {isAdmin && onRegenerate && (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger className="flex items-center gap-1 outline-none">
+                                        <span className="text-xs font-bold tracking-wider text-white/90 uppercase shadow-sm">
+                                            {sketchViewMode === 'sketch' ? 'Sketch' : 'Text'}
+                                        </span>
+                                        <ChevronDown className="w-3 h-3 text-white/80" />
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start">
+                                        <DropdownMenuItem onClick={() => setSketchViewMode('sketch')} className="gap-2 cursor-pointer">
+                                            <Sparkles className="w-4 h-4" />
+                                            <span>Draft Sketch</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setSketchViewMode('text')} className="gap-2 cursor-pointer">
+                                            <AlignLeft className="w-4 h-4" />
+                                            <span>Page Text</span>
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+
+                                {/* 1. REGENERATE (Admin) - Only show in Sketch Mode */}
+                                {isAdmin && onRegenerate && sketchViewMode === 'sketch' && (
                                     <button
                                         className="h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm transition-colors ml-auto"
                                         onClick={isGenerating ? undefined : () => setIsRegenerateDialogOpen(true)}
@@ -545,35 +441,61 @@ export function SharedIllustrationBoard({
                                     </button>
                                 )}
 
-                                {/* 2. UPLOAD (Admin) */}
-                                {isAdmin && onUpload && (
+                                {/* 2. UPLOAD (Admin) - Only show in Sketch Mode */}
+                                {isAdmin && onUpload && sketchViewMode === 'sketch' && (
                                     <Button variant="ghost" size="icon" className={`h-8 w-8 rounded-full bg-black/40 text-red-500 hover:bg-black/60 backdrop-blur-sm ${isAdmin && onRegenerate ? 'ml-1' : 'ml-auto'}`} onClick={() => sketchInputRef.current?.click()}>
                                         <Upload className="w-4 h-4" />
                                     </Button>
                                 )}
 
-                                {/* 3. DOWNLOAD */}
-                                {sketchUrl && (
+                                {/* 3. DOWNLOAD - Only show in Sketch Mode */}
+                                {sketchUrl && sketchViewMode === 'sketch' && (
                                     <button onClick={() => handleDownload(sketchUrl!, `Page-${page.page_number}-Sketch.jpg`)} className={`h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm ${isAdmin && (onRegenerate || onUpload) ? 'ml-1' : 'ml-auto'}`}>
                                         <Download className="w-4 h-4" />
                                     </button>
                                 )}
                             </div>
 
-                            <div className="relative w-full h-full cursor-pointer hover:opacity-95 transition-opacity bg-white" onClick={() => setShowImage(sketchUrl || null)}>
-                                {loadingState.sketch && <AnimatedOverlay label="Tracing Sketch..." />}
-                                {sketchUrl ? (
-                                    <img
-                                        src={sketchUrl}
-                                        alt="Sketch"
-                                        className="w-full h-full object-contain grayscale contrast-125 block"
-                                    />
-                                ) : (
-                                    <div className="flex items-center justify-center min-h-[300px]">
-                                        <span className="text-sm text-slate-300">No sketch available</span>
+                            {/* MAIN CONTENT: IMAGE or TEXT */}
+                            {sketchViewMode === 'sketch' ? (
+                                <div className="relative w-full h-full cursor-pointer hover:opacity-95 transition-opacity bg-white" onClick={() => setShowImage(sketchUrl || null)}>
+                                    {loadingState.sketch && <AnimatedOverlay label="Tracing Sketch..." />}
+                                    {sketchUrl ? (
+                                        <img
+                                            src={sketchUrl}
+                                            alt="Sketch"
+                                            className="w-full h-full object-contain grayscale contrast-125 block"
+                                        />
+                                    ) : (
+                                        <div className="flex items-center justify-center min-h-[300px]">
+                                            <span className="text-sm text-slate-300">No sketch available</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                /* TEXT VIEW MODE */
+                                <div className="w-full h-full p-8 overflow-y-auto bg-white text-slate-900 pointer-events-auto cursor-text text-left">
+                                    {/* 1. PAGE TEXT */}
+                                    <div className="mb-8">
+                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">Page {page.page_number}</span>
+                                        <p className="text-lg md:text-xl font-serif leading-relaxed text-slate-800">
+                                            {page.story_text || <span className="italic text-slate-300">No text content available.</span>}
+                                        </p>
                                     </div>
-                                )}
-                            </div>
+
+                                    {/* 2. ILLUSTRATION NOTES */}
+                                    {page.scene_description && (
+                                        <div className="bg-amber-50/50 p-5 rounded-lg border border-amber-100/60">
+                                            <span className="flex items-center gap-2 text-[10px] font-bold text-amber-600/80 uppercase tracking-widest mb-2">
+                                                🎨 Illustration Notes
+                                            </span>
+                                            <p className="text-sm leading-relaxed text-slate-600">
+                                                {page.scene_description}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
 

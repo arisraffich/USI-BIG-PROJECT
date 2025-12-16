@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Page } from '@/types/page'
 import { createClient } from '@/lib/supabase/client'
 import { UnifiedIllustrationFeed } from '@/components/illustration/UnifiedIllustrationFeed'
@@ -30,13 +30,21 @@ export function IllustrationsTabContent({
     onPageChange
 }: IllustrationsTabContentProps) {
     const router = useRouter()
+
+    // MEMOIZE VISIBLE PAGES to prevent unstable references passed to children
+    const visiblePages = useMemo(() => {
+        return ['illustration_approved', 'completed'].includes(illustrationStatus)
+            ? pages
+            : pages.slice(0, 1)
+    }, [pages, illustrationStatus])
+
     // Local state for wizard settings (propagated to pages if needed via DB)
     const [aspectRatio, setAspectRatio] = useState(initialAspectRatio || '')
     const [textIntegration, setTextIntegration] = useState(initialTextIntegration || '')
     const [generatingPageId, setGeneratingPageId] = useState<string | null>(null)
     const [loadingState, setLoadingState] = useState<{ [key: string]: { sketch: boolean; illustration: boolean } }>({})
 
-    const handleGenerate = async (page: Page) => {
+    const handleGenerate = async (page: Page, referenceImageUrl?: string) => {
         try {
             setGeneratingPageId(page.id)
             setLoadingState(prev => ({ ...prev, [page.id]: { ...prev[page.id], illustration: true, sketch: false } })) // Lock illustration initially
@@ -55,7 +63,7 @@ export function IllustrationsTabContent({
             const response = await fetch('/api/illustrations/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pageId: page.id, projectId })
+                body: JSON.stringify({ pageId: page.id, projectId, referenceImageUrl })
             })
 
             if (!response.ok) throw new Error('Generation failed')
@@ -210,7 +218,7 @@ export function IllustrationsTabContent({
     return (
         <UnifiedIllustrationFeed
             mode="admin"
-            pages={['illustration_approved', 'completed'].includes(illustrationStatus) ? pages : pages.slice(0, 1)}
+            pages={visiblePages}
             activePageId={activePageId}
             onPageChange={onPageChange}
             illustrationStatus={illustrationStatus}

@@ -8,9 +8,15 @@ import { UniversalCharacterCard, CharacterFormData } from '@/components/shared/U
 
 interface CharacterCardProps {
   character: Character
+  readOnly?: boolean
+  onChange?: (id: string, data: any, isValid: boolean) => void
 }
 
-export const CharacterCard = memo(function CharacterCard({ character }: CharacterCardProps) {
+export const CharacterCard = memo(function CharacterCard({
+  character,
+  readOnly = true,
+  onChange
+}: CharacterCardProps) {
   const router = useRouter()
 
   const handleSave = async (data: CharacterFormData) => {
@@ -51,12 +57,21 @@ export const CharacterCard = memo(function CharacterCard({ character }: Characte
     }
   }
 
+  // Handle local changes for parent form tracking
+  const handleChange = (data: CharacterFormData, isValid: boolean) => {
+    if (onChange) {
+      onChange(character.id, data, isValid)
+    }
+  }
+
   return (
     <UniversalCharacterCard
       character={character}
       onSave={handleSave}
       onDelete={handleDelete}
-      readOnly={true}
+      readOnly={readOnly}
+      alwaysEditing={!readOnly}
+      onChange={handleChange}
     />
   )
 })

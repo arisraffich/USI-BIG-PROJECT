@@ -44,6 +44,7 @@ interface ProjectHeaderProps {
   isTrialReady?: boolean
   onCreateIllustrations?: () => void
   generatedIllustrationCount?: number
+  centerContent?: React.ReactNode
 }
 
 // Define clear stage configuration
@@ -56,7 +57,7 @@ interface StageConfig {
   buttonDisabled: boolean
 }
 
-export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations, generatedIllustrationCount = 0 }: ProjectHeaderProps) {
+export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations, generatedIllustrationCount = 0, centerContent }: ProjectHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -393,6 +394,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         icon: <Home className="w-4 h-4" />,
         onClick: handleDashboardClick
       }}
+      centerContent={centerContent}
       statusTag={
         <span className={`hidden md:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${stage.tagStyle} shadow-sm`}>
           {stage.tag}

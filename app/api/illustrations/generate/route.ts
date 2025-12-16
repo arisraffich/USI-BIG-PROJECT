@@ -19,13 +19,14 @@ function mapAspectRatio(ratio: string | null | undefined): string {
 export async function POST(request: Request) {
     try {
         const body = await request.json()
-        const { projectId, pageId, customPrompt, currentImageUrl, referenceImages: uploadedReferenceImages } = body
+        const { projectId, pageId, customPrompt, currentImageUrl, referenceImages: uploadedReferenceImages, referenceImageUrl } = body
 
 
         if (!projectId) {
             return NextResponse.json({ error: 'Missing projectId' }, { status: 400 })
         }
 
+        // ... (existing code for fetching project and page) ...
         const supabase = await createAdminClient()
 
         // 1. Fetch Project Configuration (Always needed for ratio)
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Page not found' }, { status: 404 })
         }
 
-        const mappedAspectRatio = mapAspectRatio(project?.illustration_aspect_ratio)
+        const mappedAspectRatio = mapAspectRatio(project?.illustration_aspect_ratio || undefined)
         let fullPrompt = ''
         let referenceImages: string[] = []
 
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
         const hasReferences = uploadedReferenceImages?.length > 0
 
         if ((customPrompt || hasReferences) && currentImageUrl) {
-
+            // ... (Edit Mode Logic - Unchanged) ...
             // Edit Mode: Use User Prompt + Current Image + Uploaded References
             const referenceInstruction = hasReferences
                 ? `\nVISUAL REFERENCING TASK:
@@ -95,9 +96,24 @@ IMAGE CONTEXT:
 
             referenceImages = characters?.map(c => c.image_url).filter(Boolean) as string[] || []
 
-            // Fetch Page 1 Anchor if needed
+            // FETCH ANCHOR IMAGE (Logic Update)
             let anchorImage: string | null = null
-            if (pageData.page_number > 1) {
+
+            if (referenceImageUrl) {
+                // MANUAL OVERRIDE: Use user-selected previous page
+                console.log('[API] Manual Style Reference Selected:', referenceImageUrl)
+                try {
+                    const fs = require('fs')
+                    const path = require('path')
+                    const logPath = path.join(process.cwd(), 'debug-logs.txt')
+                    const logEntry = `[${new Date().toISOString()}] MANUAL_REF_SELECTED: ${referenceImageUrl}\n`
+                    fs.appendFileSync(logPath, logEntry)
+                } catch (e) { console.error('Log write failed', e) }
+
+                anchorImage = referenceImageUrl
+                referenceImages.push(anchorImage)
+            } else if (pageData.page_number > 1) {
+                // DEFAULT: Use Page 1 as Style Anchor
                 const { data: p1 } = await supabase
                     .from('pages')
                     .select('illustration_url')
