@@ -193,6 +193,22 @@ export function IllustrationItem({
         window.location.href = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
     }
 
+    const handleSaveFeedback = async (notes: string) => {
+        const supabase = createClient()
+        const { error } = await supabase
+            .from('pages')
+            .update({ feedback_notes: notes })
+            .eq('id', page.id)
+
+        if (error) {
+            toast.error('Failed to save notes')
+            throw error
+        }
+
+        toast.success('Notes saved')
+        router.refresh()
+    }
+
 
     // -------------------------------------------------------------------------
     // RENDER (Unified via SharedIllustrationBoard)
@@ -219,6 +235,7 @@ export function IllustrationItem({
             onGenerate={handleGenerateValues}
             onRegenerate={handleRegenerateWithPrompt}
             onUpload={handleUpload}
+            onSaveFeedback={handleSaveFeedback}
         />
     )
 }

@@ -224,16 +224,21 @@ export function UnifiedIllustrationFeed({
                         <SharedIllustrationBoard
                             mode={mode}
                             page={page}
-                            illustrationStatus={illustrationStatus}
+                            illustrationStatus={illustrationStatus as any}
 
                             // Pass candidates
                             previousIllustratedPages={previousIllustratedPages}
 
                             // Handlers
-                            onSaveFeedback={onSaveFeedback ? (notes) => onSaveFeedback(page.id, notes) : undefined}
-                            onGenerate={onGenerate ? (refUrl) => onGenerate(page, refUrl) : undefined}
+                            // Handlers
+                            onSaveFeedback={async (notes) => {
+                                if (onSaveFeedback) await onSaveFeedback(page.id, notes)
+                            }}
+                            onGenerate={onGenerate ? (() => onGenerate(page)) : undefined}
                             onRegenerate={onRegenerate ? (prompt, referenceImages) => onRegenerate(page, prompt, referenceImages) : undefined}
-                            onUpload={onUpload ? (type, file) => onUpload(page, type, file) : undefined}
+                            onUpload={async (type, file) => {
+                                if (onUpload) onUpload(page, type, file)
+                            }}
 
                             // State Config
                             isGenerating={page.id === generatingPageId}

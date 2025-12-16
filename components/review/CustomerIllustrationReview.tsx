@@ -50,7 +50,7 @@ export const CustomerIllustrationReview = memo(function CustomerIllustrationRevi
             <SharedIllustrationBoard
                 mode="customer"
                 page={page}
-                illustrationStatus={illustrationStatus}
+                illustrationStatus={illustrationStatus as any}
                 onSaveFeedback={handleSaveFeedback}
             />
         </div>
