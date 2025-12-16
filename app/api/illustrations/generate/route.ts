@@ -111,7 +111,7 @@ IMAGE CONTEXT:
                 } catch (e) { console.error('Log write failed', e) }
 
                 anchorImage = referenceImageUrl
-                referenceImages.push(anchorImage)
+                if (anchorImage) referenceImages.push(anchorImage)
             } else if (pageData.page_number > 1) {
                 // DEFAULT: Use Page 1 as Style Anchor
                 const { data: p1 } = await supabase
