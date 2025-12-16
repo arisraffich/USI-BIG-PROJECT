@@ -53,7 +53,6 @@ export async function sendSMS(options: {
 
   // Normalize phone numbers to E.164 format
   const normalizedTo = normalizePhoneNumber(options.to)
-  const normalizedFrom = normalizePhoneNumber(fromNumber)
 
   try {
     // console.log(`[SMS] Sending SMS to ${normalizedTo} (original: ${options.to}) from ${normalizedFrom}`)

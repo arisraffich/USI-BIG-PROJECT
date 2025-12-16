@@ -8,7 +8,7 @@ export async function notifyCustomerSubmission(options: {
   authorName: string
   projectUrl: string
 }): Promise<void> {
-  const { projectId, projectTitle, authorName, projectUrl } = options
+  const { projectId: _projectId, projectTitle, authorName, projectUrl } = options
 
   try {
     await sendSlackNotification({

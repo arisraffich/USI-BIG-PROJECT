@@ -1,2 +1,0 @@
-[2025-12-16T10:27:51.973Z] MANUAL_REF_SELECTED: https://vwzzfbpjzjbhejqizmqh.supabase.co/storage/v1/object/public/illustrations/06662056-99d7-46ab-8324-411b42d4e199/illustrations/page-3-1765830657865.png
-[2025-12-16T12:18:35.277Z] MANUAL_REF_SELECTED: https://vwzzfbpjzjbhejqizmqh.supabase.co/storage/v1/object/public/illustrations/c0aee6f9-5d5b-4a3f-8be1-b74fe1d1f5b8/illustrations/page-2-1765887439046.png

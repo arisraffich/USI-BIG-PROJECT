@@ -3,12 +3,6 @@ import sharp from 'sharp'
 
 const API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY
 const ILLUSTRATION_MODEL = 'gemini-3-pro-image-preview' // Nano Banana Pro
-const SKETCH_MODEL = 'gemini-2.5-flash-image' // Nano Banana Flash
-
-// Fallback or specific model names if 'gemini-2.5-flash-image' is not exact:
-// User called it "Gemini 2.5 Flash Image".
-// We will use 'gemini-2.0-flash-exp' or similar if 2.5 isn't public yet, but user said "Gemini 2.5 Flash". 
-// I will use a constant so it's easy to change.
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 
