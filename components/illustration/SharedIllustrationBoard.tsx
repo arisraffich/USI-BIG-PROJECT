@@ -33,6 +33,24 @@ const AnimatedOverlay = ({ label }: { label: string }) => (
     </div>
 )
 
+export interface SharedIllustrationBoardProps {
+    page: Page
+    mode: 'admin' | 'customer'
+    illustrationStatus?: 'draft' | 'illustration_approved' | 'illustration_production' | 'completed'
+    onSaveFeedback: (notes: string) => Promise<void>
+    isGenerating?: boolean
+    isUploading?: boolean
+    loadingState?: { sketch: boolean, illustration: boolean }
+    aspectRatio?: string
+    setAspectRatio?: (ratio: string) => void
+    textIntegration?: string
+    setTextIntegration?: (text: string) => void
+    onGenerate?: () => void
+    onRegenerate?: (prompt: string, referenceImages?: string[]) => void
+    onUpload?: (type: 'sketch' | 'illustration', file: File) => Promise<void>
+    previousIllustratedPages?: Page[]
+}
+
 export function SharedIllustrationBoard({
     page,
     mode,
