@@ -54,12 +54,14 @@ export const CustomerCharacterCard = memo(function CustomerCharacterCard({
       onDelete={handleDelete}
       isGenerating={isGenerating}
       readOnly={character.is_main}
-      alwaysEditing={!character.is_main}
-      hideSaveButton={!character.is_main} // Hide save button for editable cards (Main is read-only anyway)
+      alwaysEditing={false} // Enable Lock-on-Save behavior
+      hideSaveButton={false}
       onChange={handleChange}
     />
   )
 })
+
+
 
 
 

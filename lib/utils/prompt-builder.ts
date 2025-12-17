@@ -40,6 +40,13 @@ Match the same stroke style, texture, pigment behavior, shading softness, edge q
 Recreate this exact style and technique in the new character illustration.
 The new character must look like it was created by the same illustrator using the same tools and the same artistic method.
 Do NOT copy the reference character’s identity — only its stylistic technique.
+OVERRIDE SEMANTIC BIAS:
+- If the reference image is 2D/Stylized/Flat:
+  * Do NOT render "feathers", "fur", or "scales" realistically even if the text mentions them.
+  * NO 3D shading, NO photorealism, NO complex texture maps.
+- If the reference image is 3D/Realistic:
+  * You MAY match the realism of the reference.
+- IMPERATIVE: The Reference Image is the SOLE TRUTH for the rendering style.
 
 Character Description:
 ${charDescription}
@@ -109,6 +116,8 @@ export function buildSketchPrompt(
 
   return prompt
 }
+
+
 
 
 

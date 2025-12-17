@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect, memo } from 'react'
+import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Save, Edit, Trash2, Loader2, User } from 'lucide-react'
+import { Save, Edit, Trash2, Loader2, User, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Character } from '@/types/character'
 import {
@@ -97,6 +98,9 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
 
     // Track original data for dirty checking
     const [initialData, setInitialData] = useState<InternalCharacterFormData | null>(null)
+    const [highlightMissing, setHighlightMissing] = useState(false) // Keeping state variable to minimize diff, though used via showHighlight now? Actually removed derived usage previously?
+    // User requested checkmark only on blur.
+    const [focusedField, setFocusedField] = useState<string | null>(null)
 
     // Reset form data when character changes
     useEffect(() => {
@@ -118,7 +122,10 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
         setFormData(savedData)
         setInitialData(savedData)
 
-        if (alwaysEditing && !readOnly) {
+        // Force open if data is missing, unless it's read-only
+        // Or if alwaysEditing is on
+        const isComplete = validateForm(savedData)
+        if (!readOnly && (alwaysEditing || !isComplete)) {
             setIsEditing(true)
         }
 
@@ -157,8 +164,10 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
         onChange(outputData, isValid)
     }
 
-    // Check if form is dirty
-    const isDirty = initialData ? JSON.stringify(formData) !== JSON.stringify(initialData) : false
+    // Check if form has any content
+    const hasAnyContent = (data: InternalCharacterFormData) => {
+        return Object.values(data).some(v => v && v.trim().length > 0)
+    }
 
     const handleInputChange = (field: string, value: string) => {
         const newData = { ...formData, [field]: value }
@@ -215,35 +224,74 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
     const showLoadingState = isGenerating && !hasImage
 
     // Determine effective edit state
-    const editMode = (isEditing || alwaysEditing) && !readOnly
+    // "Never lock a form... if no character": If form is incomplete, force Edit Mode (unless purely Read Only).
+    const editMode = (isEditing || alwaysEditing || !validateForm(formData)) && !readOnly
+
+    const isFormValid = validateForm(formData)
+    const hasContent = hasAnyContent(formData)
+    const showHighlight = editMode && hasContent && !isFormValid
 
     // Helper to render a field label and value/input
-    const renderField = (label: string, fieldKey: keyof typeof formData, placeholder: string) => (
-        <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</label>
-            {editMode ? (
-                <Input
-                    value={formData[fieldKey]}
-                    onChange={(e) => handleInputChange(fieldKey, e.target.value)}
-                    placeholder={placeholder}
-                    className="h-9 text-sm bg-white"
-                />
-            ) : (
-                <div className="min-h-[1.5rem] flex items-center">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                        {formData[fieldKey] || <span className="text-gray-400 font-normal italic">Not specified</span>}
-                    </p>
+    const renderField = (label: string, fieldKey: keyof typeof formData, placeholder: string) => {
+        const isFilled = formData[fieldKey] && formData[fieldKey].trim().length > 0
+        const showCheck = isFilled && focusedField !== fieldKey
+
+        return (
+            <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                    {showCheck && editMode && (
+                        <div className="w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center animate-in fade-in zoom-in duration-200">
+                            <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
+                        </div>
+                    )}
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</label>
                 </div>
-            )}
-        </div>
-    )
+                {editMode ? (
+                    <div className="relative">
+                        <Input
+                            value={formData[fieldKey]}
+                            onChange={(e) => handleInputChange(fieldKey, e.target.value)}
+                            onFocus={() => setFocusedField(fieldKey)}
+                            onBlur={() => setFocusedField(null)}
+                            placeholder={placeholder}
+                            className="h-9 text-sm bg-white transition-all duration-200"
+                            style={showHighlight && !formData[fieldKey] ? {
+                                borderColor: '#f97316', // orange-500
+                                backgroundColor: '#fff7ed', // orange-50
+                                boxShadow: '0 0 0 2px #fed7aa' // orange-200 ring
+                            } : {}}
+                        />
+                        {showHighlight && !formData[fieldKey] && (
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-orange-500 pointer-events-none">REQUIRED</span>
+                        )}
+                    </div>
+                ) : (
+                    <div className="min-h-[1.5rem] flex items-center">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                            {formData[fieldKey] || <span className="text-gray-400 font-normal italic">Not specified</span>}
+                        </p>
+                    </div>
+                )}
+            </div>
+        )
+    }
 
     return (
         <Card id={`character-${character.id}`} className={cn(
-            "overflow-hidden transition-all duration-200 bg-white border-gray-200 shadow-sm relative group",
-            editMode ? "ring-2 ring-blue-500/10 shadow-md" : "hover:shadow-md",
+            "w-full transition-all duration-300 relative overflow-hidden group",
+            // Conditional Glow Logic
+            !isFormValid
+                ? "border-amber-200 shadow-[0_0_15px_-3px_rgba(251,191,36,0.15)] bg-amber-50/10" // Pending Glow
+                : !editMode
+                    ? "border-green-200 shadow-[0_0_15px_-3px_rgba(34,197,94,0.15)] bg-green-50/10" // Ready & Saved Glow
+                    : "border-gray-200 shadow-sm hover:shadow-md", // Default/Editing Valid
             className
         )}>
+            {/* Status Strip for Quick Scanning */}
+            <div className={cn(
+                "absolute left-0 top-0 right-0 h-1 transition-colors duration-300",
+                !isFormValid ? "bg-amber-400" : (!editMode ? "bg-green-500" : "bg-transparent")
+            )} />
             <CardContent className="p-6">
                 {/* Delete button (Top Right, absolute) - only if onDelete is provided */}
                 {!isMainCharacter && onDelete && (
@@ -302,6 +350,18 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
                                         Main
                                     </span>
                                 )}
+                                {/* Status Badges */}
+                                {isFormValid ? (
+                                    <span className="px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[10px] font-bold uppercase tracking-wider border border-green-100 flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                        Ready
+                                    </span>
+                                ) : (
+                                    <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-bold uppercase tracking-wider border border-amber-100 flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                        Pending
+                                    </span>
+                                )}
                             </div>
                             {character.story_role && (
                                 <p className="text-sm text-gray-500 font-medium leading-relaxed line-clamp-6">{character.story_role}</p>
@@ -315,6 +375,11 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
                                     <div className="absolute inset-0 bg-white/50 animate-pulse" />
                                     <Loader2 className="w-8 h-8 text-blue-500 animate-spin relative z-10" />
                                     <span className="text-xs font-medium text-blue-600 mt-2 relative z-10">Generating...</span>
+                                </div>
+                            ) : character.generation_error ? (
+                                <div className="w-32 h-32 md:w-32 md:h-32 lg:w-40 lg:h-40 rounded-xl border border-red-200 bg-red-50 flex flex-col items-center justify-center text-red-500 gap-2 p-2 text-center">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider">Generation Failed</span>
+                                    <span className="text-[10px] leading-tight opacity-75 line-clamp-3">{character.generation_error}</span>
                                 </div>
                             ) : character.image_url ? (
                                 <div className="relative group perspective-1000">
@@ -358,16 +423,30 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
 
                         {/* Full Width Clothing Section */}
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                                Clothing & Visual Details
-                            </label>
+                            <div className="flex items-center gap-2">
+                                {formData.clothing_and_accessories && formData.clothing_and_accessories.trim().length > 0 && focusedField !== 'clothing_and_accessories' && editMode && (
+                                    <div className="w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center animate-in fade-in zoom-in duration-200">
+                                        <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
+                                    </div>
+                                )}
+                                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                    Clothing & Visual Details
+                                </label>
+                            </div>
                             {editMode ? (
                                 <Textarea
                                     value={formData.clothing_and_accessories}
                                     onChange={(e) => handleTextareaChange(e.target.value)}
+                                    onFocus={() => setFocusedField('clothing_and_accessories')}
+                                    onBlur={() => setFocusedField(null)}
                                     placeholder="Describe clothing, accessories, and any distinct visual features..."
                                     rows={4}
-                                    className="text-sm resize-none bg-white leading-relaxed"
+                                    className="text-sm resize-none bg-white leading-relaxed transition-all duration-200"
+                                    style={showHighlight && !formData.clothing_and_accessories ? {
+                                        borderColor: '#f97316',
+                                        backgroundColor: '#fff7ed',
+                                        boxShadow: '0 0 0 2px #fed7aa'
+                                    } : {}}
                                 />
                             ) : (
                                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 min-h-[5rem]">
@@ -385,14 +464,12 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
                                     <div className="flex gap-2">
                                         <Button
                                             onClick={handleSaveWrapper}
-                                            disabled={saving || (alwaysEditing && !isDirty)}
+                                            disabled={saving || !validateForm(formData)}
                                             size="sm"
                                             className={cn(
                                                 "min-w-[100px]",
                                                 alwaysEditing
-                                                    ? isDirty
-                                                        ? "bg-green-600 hover:bg-green-700 text-white shadow-sm border border-green-700/10"
-                                                        : "bg-gray-200 text-gray-400 cursor-not-allowed hover:bg-gray-200"
+                                                    ? "bg-green-600 hover:bg-green-700 text-white shadow-sm border border-green-700/10"
                                                     : "bg-blue-600 hover:bg-blue-700 text-white"
                                             )}
                                         >

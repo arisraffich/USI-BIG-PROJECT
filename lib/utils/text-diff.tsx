@@ -161,3 +161,5 @@ export function highlightTextDiffSimple(
   // This prevents highlighting entire text when diff algorithm can't find differences
   return edited
 }
+
+

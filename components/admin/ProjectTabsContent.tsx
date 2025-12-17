@@ -93,8 +93,9 @@ export function ProjectTabsContent({
 
     // Default tab logic based on status
     if (isIllustrationsUnlocked) return 'illustrations'
+    if (projectStatus === 'character_review' || projectStatus === 'character_generation' || projectStatus === 'draft') return 'characters'
     return 'pages'
-  }, [searchParams, isIllustrationsUnlocked])
+  }, [searchParams, isIllustrationsUnlocked, projectStatus])
 
   const isPagesActive = activeTab === 'pages'
   const isCharactersActive = activeTab === 'characters'
@@ -579,7 +580,7 @@ export function ProjectTabsContent({
 
               {characters && characters.length > 0 ? (
                 <div className="w-full">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
                     {sortedCharacters.main && (
                       <CharacterCard key={sortedCharacters.main.id} character={sortedCharacters.main} />
                     )}

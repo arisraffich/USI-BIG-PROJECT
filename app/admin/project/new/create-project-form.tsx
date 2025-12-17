@@ -27,7 +27,7 @@ export default function CreateProjectForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [processingStep, setProcessingStep] = useState<string>('')
   const [isCancelled, setIsCancelled] = useState(false)
-  
+
   // Form data
   const [formData, setFormData] = useState({
     book_title: '',
@@ -114,7 +114,7 @@ export default function CreateProjectForm() {
 
   async function handleFinalSubmit(e: React.FormEvent) {
     e.preventDefault()
-    
+
     // Validate files
     if (!mainCharacterImage || !characterFormPdf || !storyFile) {
       toast.error('Please upload all required files')
@@ -183,25 +183,41 @@ export default function CreateProjectForm() {
         console.error('Failed to parse API response:', parseError)
         throw new Error('Invalid response from server')
       }
-      
+
       // Check if we have a project_id (success) or error
       if (result.project_id) {
-        setProcessingStep('Parsing story and creating pages...')
-        
-        // Wait for story parsing and character identification to complete
-        // The API now waits for these to finish, but we'll add a small delay
-        // to ensure database is fully updated
-        await new Promise((resolve) => setTimeout(resolve, 2000))
-        
-        setProcessingStep('Finalizing...')
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        
+        setProcessingStep('Parsing story (this may take a minute)...')
+
+        // Poll for pages to be created (signals story parsing is done)
+        let attempts = 0
+        const maxAttempts = 60 // 60 seconds
+
+        while (attempts < maxAttempts) {
+          try {
+            const statusRes = await fetch(`/api/projects/${result.project_id}`)
+            if (statusRes.ok) {
+              const statusData = await statusRes.json()
+              // If we have pages, or if status moved past 'draft' (meaning parsing failed but other things proceeded?), proceed.
+              // Actually, simply checking pages_count > 0 is safest for "Story Parsed".
+              if (statusData.pages_count > 0) {
+                break
+              }
+            }
+          } catch (e) {
+            console.error('Polling error', e)
+          }
+
+          attempts++
+          await new Promise(r => setTimeout(r, 1000))
+        }
+
+        setProcessingStep('Project ready! Redirecting...')
         toast.success('Project created successfully!')
         setIsSubmitting(false)
         setProcessingStep('')
-        
-        // Redirect to the newly created project page
-        window.location.href = `/admin/project/${result.project_id}`
+
+        // Redirect to the newly created project page - CHARACTERS TAB
+        window.location.href = `/admin/project/${result.project_id}?tab=characters`
       } else if (result.error) {
         throw new Error(result.error || result.details || 'Failed to create project')
       } else {
@@ -378,11 +394,10 @@ export default function CreateProjectForm() {
                 ) : (
                   <div
                     {...getImageRootProps()}
-                    className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                      isImageDragActive
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-300 hover:border-gray-400'
-                    }`}
+                    className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${isImageDragActive
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-300 hover:border-gray-400'
+                      }`}
                   >
                     <input {...getImageInputProps()} />
                     <ImageIcon className="w-12 h-12 mx-auto text-gray-400 mb-2" />
@@ -416,11 +431,10 @@ export default function CreateProjectForm() {
                 ) : (
                   <div
                     {...getPdfRootProps()}
-                    className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                      isPdfDragActive
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-300 hover:border-gray-400'
-                    }`}
+                    className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${isPdfDragActive
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-300 hover:border-gray-400'
+                      }`}
                   >
                     <input {...getPdfInputProps()} />
                     <Upload className="w-12 h-12 mx-auto text-gray-400 mb-2" />
@@ -454,11 +468,10 @@ export default function CreateProjectForm() {
                 ) : (
                   <div
                     {...getStoryRootProps()}
-                    className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                      isStoryDragActive
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-300 hover:border-gray-400'
-                    }`}
+                    className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${isStoryDragActive
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-300 hover:border-gray-400'
+                      }`}
                   >
                     <input {...getStoryInputProps()} />
                     <Upload className="w-12 h-12 mx-auto text-gray-400 mb-2" />

@@ -66,7 +66,10 @@ export function IllustrationsTabContent({
                 body: JSON.stringify({ pageId: page.id, projectId, referenceImageUrl })
             })
 
-            if (!response.ok) throw new Error('Generation failed')
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.error || 'Generation failed')
+            }
             const data = await response.json()
             toast.success('Illustration Generated!', { description: 'Starting sketch generation...' })
 

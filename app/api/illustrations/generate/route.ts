@@ -54,66 +54,77 @@ export async function POST(request: Request) {
 
         const mappedAspectRatio = mapAspectRatio(project?.illustration_aspect_ratio || undefined)
         let fullPrompt = ''
-        let referenceImages: string[] = []
+        let characterReferences: any[] = []
+        let anchorImage: string | null = null
+        let styleReferenceImages: string[] = []
 
         // --- EDIT MODE vs STANDARD MODE ---
-        // Edit Mode triggers if we have a current image AND (User Text OR User References)
-        // If NO text and NO references, it falls through to Standard Mode (Reset/Fresh Generation)
         const hasReferences = uploadedReferenceImages?.length > 0
 
         if ((customPrompt || hasReferences) && currentImageUrl) {
-            // ... (Edit Mode Logic - Unchanged) ...
-            // Edit Mode: Use User Prompt + Current Image + Uploaded References
-            const referenceInstruction = hasReferences
-                ? `\nVISUAL REFERENCING TASK:
-I have provided ${uploadedReferenceImages.length} additional reference image(s) AFTER the first image.
-You MUST analyze the object, style, color, and design in these reference image(s) and apply them to your generation.
-If the user asks to "add" or "change" something shown in the reference, you must COPY its visual appearance (shape, color, material) as closely as possible.`
-                : ''
-
+            // Edit Mode: Use User Prompt + Current Image as Anchor + Uploaded References
             fullPrompt = `MODE: IMAGE EDITING
 INSTRUCTIONS:
 ${customPrompt}
 
-${referenceInstruction}
-
 IMAGE CONTEXT:
-1. The FIRST attached image is the "Target Image" to be edited. Keep its composition and style unless instructed otherwise.
-2. Any SUBSEQUENT images are "Style/Object References". Use them ONLY as visual guides for the requested changes.`
+1. The provided "STYLE REFERENCE" (Anchor) is the "Target Image" to be edited. Keep its composition and style unless instructed otherwise.
+2. Any "Additional Visual References" are guides for the requested changes.`
 
-            // Current Image is ALWAYS first (Instruction target), followed by Optional References
-            referenceImages = [currentImageUrl, ...(uploadedReferenceImages || [])]
+            anchorImage = currentImageUrl
+            styleReferenceImages = uploadedReferenceImages || []
 
         } else {
-
-
             // Standard Mode: Fetch Characters & Build AI Director Prompt
             const { data: characters } = await supabase
                 .from('characters')
-                .select('id, name, role, image_url')
+                .select('id, name, role, image_url, is_main')
                 .eq('project_id', projectId)
                 .not('image_url', 'is', null)
+                .order('is_main', { ascending: false }) // Put Main Character (true) first
+                .order('created_at', { ascending: true }) // Then by creation
 
-            referenceImages = characters?.map(c => c.image_url).filter(Boolean) as string[] || []
+            // Map to new structure for Interleaved Prompting
+            let mainCharacterName = '';
 
-            // FETCH ANCHOR IMAGE (Logic Update)
-            let anchorImage: string | null = null
+            if (characters) {
+                characterReferences = characters.map((c, index) => {
+                    let safeName = c.name || `Character ${index + 1}`
 
-            if (referenceImageUrl) {
-                // MANUAL OVERRIDE: Use user-selected previous page
-                console.log('[API] Manual Style Reference Selected:', referenceImageUrl)
+                    if (c.is_main) {
+                        mainCharacterName = c.name || ''
+                        safeName = "THE MAIN CHARACTER"
+                    }
+
+                    return {
+                        name: safeName,
+                        imageUrl: c.image_url!,
+                        role: c.role || undefined,
+                        isMain: c.is_main
+                    }
+                })
+            }
+
+            // SCRUBBING LOGIC: Remove the Main Character's species name from the text
+            // This prevents "Hedgehog" leaks while keeping "Owl" (Secondary) intact for context
+            const scrubText = (text: string) => {
+                if (!text || !mainCharacterName) return text
+                // Create a regex to replace the name case-insensitively
+                // We use word boundaries \b. We also handle plurals (s) and possessives ('s) optionally.
                 try {
-                    const fs = require('fs')
-                    const path = require('path')
-                    const logPath = path.join(process.cwd(), 'debug-logs.txt')
-                    const logEntry = `[${new Date().toISOString()}] MANUAL_REF_SELECTED: ${referenceImageUrl}\n`
-                    fs.appendFileSync(logPath, logEntry)
-                } catch (e) { console.error('Log write failed', e) }
+                    const regex = new RegExp(`\\b${mainCharacterName}(?:'s|s)?\\b`, 'gi')
+                    return text.replace(regex, "THE MAIN CHARACTER")
+                } catch (e) {
+                    return text
+                }
+            }
 
+            // FETCH ANCHOR IMAGE
+            if (referenceImageUrl) {
+                // MANUAL OVERRIDE
                 anchorImage = referenceImageUrl
-                if (anchorImage) referenceImages.push(anchorImage)
             } else if (pageData.page_number > 1) {
-                // DEFAULT: Use Page 1 as Style Anchor
+                // PAGES 2-N: Use Page 1 as Style Anchor
                 const { data: p1 } = await supabase
                     .from('pages')
                     .select('illustration_url')
@@ -122,11 +133,18 @@ IMAGE CONTEXT:
                     .single()
                 if (p1?.illustration_url) {
                     anchorImage = p1.illustration_url
-                    referenceImages.push(p1.illustration_url) // Add Anchor to refs
+                }
+            } else if (pageData.page_number === 1) {
+                // PAGE 1: SELF-ANCHORING (CRITICAL FIX)
+                // Use the MAIN CHARACTER as the Style Anchor for the scene itself.
+                // This ensures the forest/background matches the character's vector style.
+                const mainChar = characters?.find(c => c.is_main)
+                if (mainChar?.image_url) {
+                    anchorImage = mainChar.image_url
                 }
             }
 
-            // Construct Prompt (Existing Logic)
+            // Construct Prompt
             const characterActions = pageData.character_actions || {}
             let actionDescription = ''
 
@@ -138,59 +156,26 @@ IMAGE CONTEXT:
                 })
             }
 
+            // Scrub the descriptions
+            const cleanSceneDescription = scrubText(pageData.scene_description || 'A scene from the story.')
+            const cleanActionDescription = scrubText(actionDescription || 'No specific character actions.')
+
             const isIntegrated = project?.illustration_text_integration === 'integrated'
             const storyText = pageData.story_text || ''
             let textPromptSection = ''
 
-            // ... (Existing Text Integration Logic) ...
             if (isIntegrated) {
                 textPromptSection = `TEXT INTEGRATION & LAYOUT INSTRUCTIONS:
-
 The following story text is provided ONLY to determine layout and spacing.
 It must NOT be drawn or rendered inside the illustration.
 
 "${storyText}"
 
 You must plan the illustration composition around this text BEFORE finalizing the scene.
-
 CRITICAL RULE — NO TEXT DRAWING:
-Do NOT draw, write, paint, render, or include ANY visible text, letters, words, symbols, handwriting, or placeholder typography inside the illustration.
 The illustration must contain ZERO visible text of any kind.
-Your responsibility is layout planning only.
-
-IMPORTANT:
 You are NOT responsible for final typography.
-Your task is to CREATE appropriate text-safe areas or text containers that will later receive the final text rendered by the application.
-
-TEXT PLANNING RULES:
-- Analyze the length, structure, and paragraph count of the provided story text.
-- Based on the text length, intentionally reserve sufficient visual space for the text.
-- For short text, reserve one calm text area.
-- For long or multi-paragraph text, reserve larger areas, typically at the TOP and/or BOTTOM of the illustration.
-- If the text contains multiple paragraphs, you may split the layout into multiple text-safe areas.
-
-TEXT AREA DESIGN:
-- Use harmonious visual solutions appropriate to the illustration style (soft background washes, framed negative space, sky, walls, floor, or other calm zones).
-- Text-safe areas must NOT resemble signs, banners, labels, or UI elements.
-- Do NOT use speech bubbles, thought bubbles, captions, or dialogue containers.
-- Text areas must feel intentionally designed as part of the composition, not overlaid.
-
-EDGE SAFETY & MARGINS (STRICT):
-- Text-safe areas must NEVER touch or intersect the edges of the illustration.
-- Always maintain a clear inner margin between the text-safe area and all illustration borders.
-- The text-safe area must appear comfortably inset, with visible breathing space from the page edges.
-
-SAFETY & READABILITY RULES (STRICT):
-- NEVER place text-safe areas over characters.
-- NEVER cover faces, eyes, hands, or emotional focal points.
-- NEVER place text-safe areas on busy or highly textured backgrounds.
-- ALWAYS ensure sufficient contrast for future readability.
-
-FINAL REQUIREMENT:
-The illustration must look intentionally composed to include text, following professional children’s book layout standards, while containing NO drawn text at all.
-
-FAILSAFE RULE:
-If there is any conflict between illustration detail and text readability, text readability takes priority over background decoration.`
+Your task is to CREATE appropriate text-safe areas or text containers that will later receive the final text rendered by the application.`
             } else {
                 textPromptSection = `STORY CONTEXT (FOR SCENE MOOD ONLY):
 "${storyText}"
@@ -198,54 +183,44 @@ If there is any conflict between illustration detail and text readability, text 
 IMPORTANT: Do NOT render any text in the illustration. The story text will be printed on a separate page.`
             }
 
-            // Determine Style Instructions Block
-            let styleInstructions = ''
-
+            // Determine Style Instructions Block - UPDATED FOR GENERIC NAMES
+            let styleInstructions: string;
+            // Note: anchorImage is now TRUE for Page 1 too (Self-Anchoring)
             if (anchorImage) {
-                // PAGES 2-N (Style Anchor Mode)
-                styleInstructions = `STYLE & TECHNIQUE INSTRUCTIONS:
-Use ALL attached character images as REFERENCES.
+                styleInstructions = `STYLE & RENDERING RULES (STRICT CONSISTENCY):
+1. GLOBAL STYLE ANCHOR:
+   - Use the "Main Character" reference image as the MASTER STYLE for the entire scene.
+   - Render the FOREST (and all background elements) in the EXACT SAME ART STYLE (Medium, Brushwork, Dimensionality) as the character.
+   - If the character is 2D/Flat, the background MUST be 2D/Flat. If the character is 3D/Realistic, the background MUST be 3D/Realistic.
+   - The goal is perfect stylistic unity.
 
-2. SCENE INTEGRATION & ART STYLE (CRITICAL - PRIORITY #2):
-Use ALL attached reference images together to lock a single, consistent visual style across pages.
-STYLE ANCHOR RULE:
-- Among the attached images, there is ONE full-page colored illustration with a complete environment.
-- This full-scene illustration defines the GLOBAL STYLE for the book and must be treated as the primary reference for:
-  - lighting behavior and mood
-  - color harmony and palette balance
-  - rendering depth and level of polish
-  - overall visual atmosphere
-CHARACTER STYLE REINFORCEMENT:
-- Isolated character images on white backgrounds must reinforce stylistic details such as:
-  - line weight and stroke character
-  - facial rendering language
-  - edge softness and surface treatment
-- Character images must support the established scene style, not override it.`
+2. SUBJECT RENDERING (CRITICAL - NO UNINTENDED REALISM):
+   - Do NOT apply "Hero Lighting" or "Realistic Details" UNLESS the reference image explicitly has them.
+   - Do NOT add fur texture, hair strands, or 3D shading UNLESS the reference image has them.
+   - If the Main Character reference is FLAT (Vector/2D), you must render it FLAT in the scene.
+   - Treat the Main Character as a "Asset" placed in the scene. Match its style exactly.
+
+3. UNIFIED DIMENSIONALITY:
+   - The Character and the Background must look like they exist in the same artistic universe.
+   - Do not mix 2D characters with 3D backgrounds.`
             } else {
-                // PAGE 1 (Standard Mode) or if Anchor missing
+                // Fallback if no Main Character Image (Rare)
                 styleInstructions = `STYLE & TECHNIQUE INSTRUCTIONS:
-Use ALL attached character images as REFERENCES.
-
-1. CHARACTER IDENTITY (CRITICAL - PRIORITY #1):
-   - All characters in the illustration must LOOK EXACTLY like the characters in the reference images.
-   - Maintain strict consistency in their: hair color, hairstyle, facial features, proportions, clothing, accessories (glasses/hats), and distinctive design elements.
-   - Do NOT alter or reinterpret their physical appearance.
-   
-2. SCENE INTEGRATION & ART STYLE (CRITICAL - PRIORITY #2):
-   - Perfectly integrate these characters into the new environment.
-   - Do NOT just "paste" them in. They must interact with the scene's lighting (shadows, highlights, color temperature) and perspective.
-   - Replicate the exact art style and medium of the reference images (e.g., watercolor, pencil, digital paint).
-   - Match the line quality, brush strokes, shading technique, and color palette.
-   - The final result must be a cohesive, professional children's book illustration where the characters are instantly recognizable but fully immersed in the scene's lighting and mood.`
+1. CHARACTER IDENTITY (ABSOLUTE PRIORITY):
+   - You have been provided with explicit visual references.
+   - The Main Character's style dictates the scene style.`
             }
 
-            fullPrompt = `Scene Description:
-${pageData.scene_description || 'A scene from the story.'}
+            fullPrompt = `TASK: ILLUSTRATION GENERATION
 
-Character Instructions:
-${actionDescription || 'No specific character actions.'}
+SCENE Context:
+${cleanSceneDescription}
 
-Background Instructions:
+CHARACTER ACTION:
+${cleanActionDescription}
+(Character: "[MAIN CHARACTER]").
+
+BACKGROUND:
 ${pageData.background_elements || 'Appropriate background for the scene.'}
 
 ${styleInstructions}
@@ -253,12 +228,12 @@ ${styleInstructions}
 ${textPromptSection}`
         }
 
-
-
         // 5. Generate with Google AI
         const result = await generateIllustration({
             prompt: fullPrompt,
-            referenceImages: referenceImages,
+            characterReferences: characterReferences,
+            anchorImage: anchorImage,
+            styleReferenceImages: styleReferenceImages,
             aspectRatio: mappedAspectRatio
         })
 

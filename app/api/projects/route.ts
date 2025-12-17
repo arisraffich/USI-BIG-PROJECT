@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { parseCharacterForm } from '@/lib/ai/openai'
-import { parseStoryFile, parsePages, parsePagesWithAI } from '@/lib/utils/file-parser'
+import { parseStoryFile, parsePagesWithAI } from '@/lib/utils/file-parser'
 import { v4 as uuidv4 } from 'uuid'
 
 export const runtime = 'nodejs'
@@ -248,106 +248,17 @@ export async function POST(request: NextRequest) {
       .update({ status: 'character_review' })
       .eq('id', projectId)
 
-    // Parse story and create pages synchronously (wait for completion)
-    try {
-      // Determine file type from extension
-      const extension = storyPath.split('.').pop()?.toLowerCase() || 'txt'
-      let fileType: string
-      if (extension === 'pdf') {
-        fileType = 'application/pdf'
-      } else if (extension === 'docx') {
-        fileType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      } else {
-        fileType = 'text/plain'
-      }
+    // TRIGGER ASYNC PARSING & GENERATION
+    // We do NOT await this. We let it run in the background so the user can be redirected immediately.
+    // The flow handles: Parse Story -> Create Pages -> Identify Characters -> Create Characters
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 
-      // Parse story file
-      const storyText = await parseStoryFile(storyBuffer, fileType)
+    // Trigger "Reparse Story" (which now chains into "Identify Characters")
+    fetch(`${baseUrl}/api/projects/${projectId}/reparse-story`, {
+      method: 'POST',
+    }).catch(err => console.error('Failed to trigger background story parsing:', err))
 
-      // Parse into pages using AI (with fallback to pattern-based)
-      let pages
-      try {
-        pages = await parsePagesWithAI(storyText)
-      } catch (aiError: any) {
-        console.warn('AI parsing failed, falling back to pattern-based:', aiError.message)
-        pages = parsePages(storyText)
-      }
-
-      if (pages.length > 0) {
-        // Generate descriptions for pages that don't have them
-        const pagesWithDescriptions = await Promise.all(
-          pages.map(async (page) => {
-            if (!page.scene_description && page.story_text) {
-              try {
-                const response = await fetch(
-                  `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/ai/generate-description`,
-                  {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      story_text: page.story_text,
-                      character_names: [], // Will be populated after character identification
-                    }),
-                  }
-                )
-
-                if (response.ok) {
-                  const { description } = await response.json()
-                  return {
-                    ...page,
-                    scene_description: description,
-                    description_auto_generated: true,
-                  }
-                }
-              } catch (error: any) {
-                // Silently fail - description can be generated later
-              }
-            }
-            return {
-              ...page,
-              description_auto_generated: false,
-            }
-          })
-        )
-
-        // Create page records in database
-        const pagesToInsert = pagesWithDescriptions.map(page => ({
-          project_id: projectId,
-          page_number: page.page_number,
-          story_text: page.story_text,
-          scene_description: page.scene_description,
-          description_auto_generated: page.description_auto_generated,
-          character_ids: [],
-        }))
-
-        const { error: insertError } = await supabase
-          .from('pages')
-          .insert(pagesToInsert)
-
-        if (insertError) {
-          console.error('Error creating pages:', insertError.message)
-          throw new Error(`Failed to create pages: ${insertError.message}`)
-        }
-      }
-    } catch (parseError: any) {
-      console.error('Error parsing story:', parseError.message)
-      // Don't fail the entire project creation, but log the error
-      // Pages can be parsed manually later
-    }
-
-    // Trigger character identification asynchronously (non-blocking)
-    // This allows the response to return faster while identification runs in background
-    fetch(
-      `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/ai/identify-characters`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: projectId }),
-      }
-    ).catch((identifyError: any) => {
-      console.error('Character identification error:', identifyError.message)
-      // Don't fail the entire project creation, but log the error
-    })
+    // Note: We removed the direct call to identify-characters here because reparse-story now calls it.
 
     return NextResponse.json({
       success: true,

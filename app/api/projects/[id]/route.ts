@@ -12,9 +12,14 @@ export async function GET(
 
     const { data: project, error } = await supabase
       .from('projects')
-      .select('id, book_title, author_firstname, author_lastname, status')
+      .select('*')
       .eq('id', id)
       .single()
+
+    const { count: pagesCount, error: pagesError } = await supabase
+      .from('pages')
+      .select('id', { count: 'exact', head: true })
+      .eq('project_id', id)
 
     if (error || !project) {
       return NextResponse.json(
@@ -23,7 +28,7 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(project)
+    return NextResponse.json({ ...project, pages_count: pagesCount || 0 })
   } catch (error: any) {
     console.error('Error in GET /api/projects/[id]:', error)
     return NextResponse.json(

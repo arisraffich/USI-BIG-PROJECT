@@ -6,9 +6,18 @@ const ILLUSTRATION_MODEL = 'gemini-3-pro-image-preview' // Nano Banana Pro
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 
+interface CharacterReference {
+    name: string
+    imageUrl: string
+    role?: string
+    isMain?: boolean
+}
+
 interface GenerateOptions {
     prompt: string
-    referenceImages?: string[] // Array of public URLs
+    characterReferences?: CharacterReference[] // Replaces simple string[]
+    anchorImage?: string | null // Explicit anchor image
+    styleReferenceImages?: string[] // Optional extra style refs
     aspectRatio?: string
     textIntegration?: string
 }
@@ -67,37 +76,77 @@ async function fetchImageAsBase64(input: string): Promise<{ mimeType: string, da
 
 export async function generateIllustration({
     prompt,
-    referenceImages = [],
-    aspectRatio = "1:1" // Default, can be overridden by project settings
+    characterReferences = [],
+    anchorImage,
+    styleReferenceImages = [],
+    aspectRatio = "1:1"
 }: GenerateOptions): Promise<{ success: boolean, imageBuffer: Buffer | null, error: string | null }> {
 
     if (!API_KEY) throw new Error('Google API Key missing')
 
-    // DEBUG: Confirm inputs
-    console.log(`[GoogleAI] Reference Images Count: ${referenceImages.length}`)
+    console.log(`[GoogleAI] processing ${characterReferences.length} chars + anchor: ${!!anchorImage}`)
 
     try {
-        const parts: any[] = [{ text: prompt }]
+        const parts: any[] = []
 
-        // Fetch and attach all reference images
-        if (referenceImages.length > 0) {
-            console.log('[GoogleAI] Processing Reference Images:', JSON.stringify(referenceImages, null, 2))
-            for (const url of referenceImages) {
-                console.log(`[GoogleAI] Fetching: ${url}`)
-                const img = await fetchImageAsBase64(url)
-                if (img) {
-                    console.log(`[GoogleAI] Successfully attached image: ${url.slice(-20)}`)
-                    parts.push({
-                        inline_data: {
-                            mime_type: img.mimeType,
-                            data: img.data
-                        }
-                    })
-                } else {
-                    console.error(`[GoogleAI] FAILED to fetch/attach image: ${url}`)
+        // 1. Interleaved Character References (Text -> Image)
+        // This binds the "Name/Identity" to the specific "Image" in the model's context.
+        for (const char of characterReferences) {
+            const imgData = await fetchImageAsBase64(char.imageUrl)
+            if (imgData) {
+                // A. Label
+                let label = `Reference image for character named "${char.name}"`
+                if (char.role) label += ` (Role: ${char.role})`
+                if (char.isMain) {
+                    label += ` [MAIN CHARACTER - MASTER STYLE REFERENCE]` // Renamed for clarity
+                    label += `\nINSTRUCTION: This image determines the VISUAL STYLE for the ENTIRE ILLUSTRATION.`
+                    label += `\n- Apply the Art Style (Medium, Flatness, Texture) of this character to the BACKGROUND, TREES, and PROPS.`
+                    label += `\n- The whole scene must look like it belongs in the same universe as this character.`
                 }
+                label += ":"
+
+                parts.push({ text: label })
+
+                // B. Image
+                parts.push({
+                    inline_data: {
+                        mime_type: imgData.mimeType,
+                        data: imgData.data
+                    }
+                })
             }
         }
+
+        // 2. Anchor Image (Style Reference) - If provided (Page 2+)
+        if (anchorImage) {
+            const anchorData = await fetchImageAsBase64(anchorImage)
+            if (anchorData) {
+                parts.push({ text: "STYLE REFERENCE (Maintain the art style, lighting, and rendering of this previous page):" })
+                parts.push({
+                    inline_data: {
+                        mime_type: anchorData.mimeType,
+                        data: anchorData.data
+                    }
+                })
+            }
+        }
+
+        // 3. Additional Style References (e.g. from Edit Mode uploads)
+        for (const url of styleReferenceImages) {
+            const imgData = await fetchImageAsBase64(url)
+            if (imgData) {
+                parts.push({ text: "Additional Visual Reference:" })
+                parts.push({
+                    inline_data: {
+                        mime_type: imgData.mimeType,
+                        data: imgData.data
+                    }
+                })
+            }
+        }
+
+        // 4. Final Instruction Prompt (The Scene)
+        parts.push({ text: prompt })
 
         const payload = {
             contents: [{ parts }],
@@ -122,14 +171,6 @@ export async function generateIllustration({
         }
 
         const result = await response.json()
-        // Extract image (Check both camelCase for SDK parity or snake_case for raw REST if returned that way)
-        // User's REST example: jq -r '.candidates[0].content.parts[] | select(.inlineData) | .inlineData.data'
-        // Wait, the jq example uses .inlineData (camelCase) to access the parsing result? 
-        // No, jq on raw JSON usually follows JSON keys. 
-        // User's REST example: | grep -o '"data": "[^"]*"' -> This suggests raw grep response.
-        // User's REST jq example: select(.inlineData) -> This is suspicious. 
-        // But the input payload MUST be snake_case per curl example: "inline_data": {...}
-        // Let's handle both for safety in response parsing, but enforce snake_case in Request.
 
         const candidate = result.candidates?.[0]?.content?.parts?.[0]
         const base64Image = candidate?.inline_data?.data || candidate?.inlineData?.data

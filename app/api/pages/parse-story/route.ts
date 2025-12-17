@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { parseStoryFile, parsePages, parsePagesWithAI } from '@/lib/utils/file-parser'
+import { parseStoryFile, parsePagesWithAI } from '@/lib/utils/file-parser'
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,14 +49,8 @@ export async function POST(request: NextRequest) {
     // Parse story file
     const storyText = await parseStoryFile(buffer, fileType)
 
-    // Parse into pages using AI (with fallback to pattern-based)
-    let pages
-    try {
-      pages = await parsePagesWithAI(storyText)
-    } catch (aiError: any) {
-      console.warn('AI parsing failed, falling back to pattern-based:', aiError.message)
-      pages = parsePages(storyText)
-    }
+    // Parse into pages using GPT-5.2 (includes description generation)
+    const pages = await parsePagesWithAI(storyText)
 
     if (pages.length === 0) {
       return NextResponse.json({ 

@@ -214,24 +214,27 @@ export function EmptyStateBoard({
                         Page {page.page_number} Context
                     </span>
 
-                    {/* Story Text */}
-                    <div className="prose prose-lg prose-slate text-center md:text-left">
-                        <p className="font-serif text-xl leading-normal text-slate-800">
-                            {page.story_text || <span className="italic text-slate-300">No story text available.</span>}
-                        </p>
-                    </div>
-
-                    {/* Scene Description Box */}
-                    {page.scene_description && (
-                        <div className="bg-amber-50 p-6 rounded-xl border border-amber-100">
-                            <h5 className="flex items-center gap-2 text-xs font-bold text-amber-600 uppercase tracking-widest mb-3">
-                                🎨 Illustration Notes
-                            </h5>
-                            <p className="text-sm text-slate-700 leading-relaxed">
-                                {page.scene_description}
+                    {/* SCROLLABLE CONTENT AREA */}
+                    <div className="max-h-[500px] overflow-y-auto pr-4 custom-scrollbar space-y-8">
+                        {/* Story Text */}
+                        <div className="prose prose-lg prose-slate text-center md:text-left">
+                            <p className="font-serif text-xl leading-normal text-slate-800">
+                                {page.story_text || <span className="italic text-slate-300">No story text available.</span>}
                             </p>
                         </div>
-                    )}
+
+                        {/* Scene Description Box */}
+                        {page.scene_description && (
+                            <div className="bg-amber-50 p-6 rounded-xl border border-amber-100">
+                                <h5 className="flex items-center gap-2 text-xs font-bold text-amber-600 uppercase tracking-widest mb-3">
+                                    🎨 Illustration Notes
+                                </h5>
+                                <p className="text-sm text-slate-700 leading-relaxed">
+                                    {page.scene_description}
+                                </p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 

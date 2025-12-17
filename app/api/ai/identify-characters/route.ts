@@ -44,6 +44,62 @@ function isPluralCharacter(nameOrRole: string | null): boolean {
   return false
 }
 
+// Safety Net: Fuzzy matching to detect if a character is likely the main character
+function isLikelyMainCharacter(
+  identifiedChar: any,
+  mainCharacter: any
+): boolean {
+  if (!mainCharacter) return false
+
+  const mainName = mainCharacter.name?.toLowerCase().trim() || ''
+  const mainRole = mainCharacter.story_role?.toLowerCase().trim() ||
+    mainCharacter.biography?.toLowerCase().trim() || ''
+
+  const charName = identifiedChar.name?.toLowerCase().trim() || ''
+  const charRole = identifiedChar.role?.toLowerCase().trim() || ''
+  const charStoryRole = identifiedChar.story_role?.toLowerCase().trim() || ''
+
+  // 1. Exact name match
+  if (mainName && charName && charName === mainName) {
+    return true
+  }
+
+  // 2. Name contains main name (e.g., "Zara" in "Zara the Explorer")
+  if (mainName && charName && charName.includes(mainName) && mainName.length > 2) {
+    return true
+  }
+
+  // 3. Main name contains character name (e.g., main is "Zara the Explorer", char is "Zara")
+  if (mainName && charName && mainName.includes(charName) && charName.length > 2) {
+    return true
+  }
+
+  // 4. Role matches main character description
+  if (mainRole && (charRole.includes(mainRole) || mainRole.includes(charRole)) && mainRole.length > 3) {
+    return true
+  }
+
+  // 5. Story role matches main character description
+  if (mainRole && (charStoryRole.includes(mainRole) || mainRole.includes(charStoryRole)) && mainRole.length > 3) {
+    return true
+  }
+
+  // 6. Check if character appears on many pages (main character trait)
+  // Main characters typically appear on 50%+ of pages
+  const appearsOnManyPages = identifiedChar.appears_in?.length > 0 &&
+    identifiedChar.appears_in.length >= 3 // At least 3 pages
+
+  // If unnamed character appears frequently, might be main character
+  if (appearsOnManyPages && !charName && mainName) {
+    // Be conservative - only flag if we have strong role match
+    if (charRole && mainRole && (charRole.includes(mainRole) || mainRole.includes(charRole))) {
+      return true
+    }
+  }
+
+  return false
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { project_id } = await request.json()
@@ -57,7 +113,15 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createAdminClient()
 
-    // Get all pages for this project
+    // STEP 1: Fetch main character FIRST (before building prompt)
+    const { data: mainCharacter } = await supabase
+      .from('characters')
+      .select('id, name, role, story_role, biography, age, gender, is_main')
+      .eq('project_id', project_id)
+      .eq('is_main', true)
+      .single()
+
+    // STEP 2: Get all pages for this project
     const { data: pages, error: pagesError } = await supabase
       .from('pages')
       .select('*')
@@ -81,18 +145,53 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const maxPageNumber = pages.length
+
     // Build full story text
     const fullStory = pages
       .map((p) => `Page ${p.page_number}: ${p.story_text}`)
       .join('\n\n')
 
-    const prompt = `You are analyzing a children's book story to identify important characters that need to be illustrated.
+    // STEP 3: Build enhanced prompt with main character context
+    const mainCharContext = mainCharacter ? `
+CRITICAL: MAIN CHARACTER INFORMATION
+The main character for this story has already been created from a character form. You must recognize this character in the story and handle it separately.
+
+MAIN CHARACTER DETAILS:
+- Name: ${mainCharacter.name || 'Not specified in form (may be referred to by role in story)'}
+- Role/Description: ${mainCharacter.story_role || mainCharacter.biography || 'Main character'}
+- Age: ${mainCharacter.age || 'Not specified'}
+- Gender: ${mainCharacter.gender || 'Not specified'}
+
+YOUR TASK HAS TWO PARTS:
+
+PART 1: TRACK MAIN CHARACTER APPEARANCES
+- Identify which pages the main character appears on
+- The main character may be referred to by:
+  * Their exact name: "${mainCharacter.name}"
+  * Name variations: nicknames, titles, or descriptive phrases (e.g., "Zara" might be called "Zara the Explorer", "Little Zara", "our hero")
+  * Role-based references: "the girl", "the boy", "Mom", "Dad", "the hero", "the main character", etc.
+  * If a character appears frequently throughout the story and matches the main character's description, it's likely the same person
+- Return the main character's page appearances in the "main_character.appears_in" field
+- If the main character appears on most or all pages, include all relevant page numbers
+
+PART 2: IDENTIFY SECONDARY CHARACTERS ONLY
+- Find all OTHER characters (excluding the main character)
+- DO NOT create a duplicate entry for the main character
+- If you identify a character that matches the main character (by name, role, or description), DO NOT include it in secondary_characters
+- Only include characters that are DIFFERENT from the main character
+
+IMPORTANT RULES FOR MAIN CHARACTER RECOGNITION:
+1. If the main character has a name and you see that name (or variations) in the story → it's the main character
+2. If the main character has no name but has a role/description, match by role/description
+3. If a character appears on many pages and matches the main character's description → it's likely the main character
+4. When in doubt, exclude the character from secondary_characters (better to miss a secondary than duplicate the main)` : ''
+
+    const prompt = `You are analyzing a children's book story to identify characters that need to be illustrated.
+${mainCharContext}
 
 STORY:
 ${fullStory}
-
-TASK:
-Identify all characters (human, animal, or object) that are important to the story and should be illustrated.
 
 CRITICAL RULES - CHARACTER IDENTIFICATION:
 
@@ -113,23 +212,7 @@ CRITICAL RULES - CHARACTER IDENTIFICATION:
    - Include personified objects that are singular and specific (e.g., "Blue Truck", "Magic Wand")
    - If a character appears multiple times and is clearly the same individual, include it
 
-4. NAMED VS UNNAMED:
-   - If a character has a name (even if mentioned once), include it
-   - If a character is referred to by a singular role/title consistently, include it
-   - If a character is part of a group but has a specific name, include ONLY the named individual, not the group
-
-5. ROLE-BASED CHARACTERS:
-   - Singular roles are OK: "Mom", "Dad", "Teacher", "Doctor" (if it's THE specific mom/dad/teacher/doctor)
-   - Plural roles are NOT OK: "Moms", "Teachers", "Doctors" (if referring to multiple)
-   - If text says "the teacher" (singular, specific) → include
-   - If text says "the teachers" (plural) → exclude
-
-6. ANIMALS AND OBJECTS:
-   - Include if singular and specific: "the dog", "Rex", "Blue Truck"
-   - Exclude if plural or generic: "dogs", "the animals", "trucks"
-   - Include personified objects only if they are singular and play a meaningful role
-
-7. VALIDATION CHECK - WRITER INTENT & CHARACTER FORM NECESSITY:
+4. VALIDATION CHECK - WRITER INTENT & CHARACTER FORM NECESSITY:
 
    The ultimate question: "Would the writer want to fill out a character form for this character?"
    
@@ -154,20 +237,15 @@ CRITICAL RULES - CHARACTER IDENTIFICATION:
    d) If this character were removed, would the story change meaningfully?
       - Story would be different → INCLUDE
       - Story would be essentially the same → EXCLUDE
-      
-   REMEMBER: We're identifying characters so writers can fill out character forms.
-   Only include characters where the form-filling effort is justified by the character's importance.
 
-NOTE: After identification, plural characters will be filtered out programmatically as a safety measure.
-
-For each character, provide:
-1. Name (if they have one) OR Role (if singular and specific, e.g., "Mom", "the Dog", "Blue Truck")
-2. All page numbers where they appear (list all)
-3. Brief story role (1 sentence describing their significance)
-
-Respond in JSON format:
+RESPONSE FORMAT:
+You must return a JSON object with this exact structure:
 {
-  "characters": [
+  "main_character": {
+    "name": "${mainCharacter?.name || 'Main Character'}",
+    "appears_in": [1, 2, 3, 5, 8]
+  },
+  "secondary_characters": [
     {
       "name": "Character name or null",
       "role": "Role if no name (e.g., Mom, the Dog, Blue Truck)",
@@ -175,7 +253,14 @@ Respond in JSON format:
       "story_role": "Brief description of significance"
     }
   ]
-}`
+}
+
+IMPORTANT:
+- If main character exists, you MUST include their page appearances in "main_character.appears_in"
+- "secondary_characters" should ONLY contain characters that are NOT the main character
+- Each secondary character must have either a "name" OR a "role" (or both)
+- "appears_in" must be an array of page numbers (integers between 1 and ${maxPageNumber})
+- Filter out plural characters programmatically (they will be filtered again as a safety measure)`
 
     if (!openai) {
       return NextResponse.json(
@@ -184,41 +269,121 @@ Respond in JSON format:
       )
     }
 
+    // STEP 4: Call AI with GPT-5.2 (best model for reasoning)
     let completion
     try {
+      console.log('[Character ID] Calling GPT-5.2 for analysis...')
       completion = await openai.chat.completions.create({
-        model: 'gpt-4o', // Reverting to proven model for reliable identification
+        model: 'gpt-5.2', // GPT-5.2
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
-        temperature: 0.5, // Balanced creativity for identification
+        temperature: 0.3, // Lower temperature for more consistent identification
       })
     } catch (error: any) {
-      console.error('OpenAI API Error in identify-characters:', error.message)
-      throw error
+      const errorMessage = error.message || String(error)
+      console.error('OpenAI API Error in identify-characters:', errorMessage)
+      console.error('Full API Error:', error)
+      throw new Error(`Failed to identify characters with GPT-5.2: ${errorMessage}`)
     }
 
-    const identified = JSON.parse(
-      completion.choices[0].message.content || '{"characters": []}'
-    )
+    const responseContent = completion.choices[0].message.content || '{}'
+    console.log('[Character ID] Raw AI response length:', responseContent.length)
+    let identified
 
-    if (!identified.characters || !Array.isArray(identified.characters)) {
+    try {
+      identified = JSON.parse(responseContent)
+    } catch (parseError) {
+      console.error('[Character ID] Failed to parse AI response:', parseError)
+      console.error('[Character ID] Response content:', responseContent.substring(0, 500))
       return NextResponse.json(
-        { error: 'Invalid response format from AI' },
+        { error: 'Invalid JSON response from AI', details: responseContent.substring(0, 200) },
         { status: 500 }
       )
     }
 
-    // Get existing characters (including main character) to avoid duplicates
+    // STEP 5: Validate response structure
+    if (!identified.secondary_characters || !Array.isArray(identified.secondary_characters)) {
+      console.error('[Character ID] Invalid response structure - missing secondary_characters')
+      return NextResponse.json(
+        { error: 'Invalid response format from AI - missing secondary_characters array' },
+        { status: 500 }
+      )
+    }
+
+    // Validate main_character structure if main character exists
+    if (mainCharacter && (!identified.main_character || !Array.isArray(identified.main_character?.appears_in))) {
+      console.warn('[Character ID] Main character exists but AI did not return main_character.appears_in')
+      // We'll handle this in fallback logic below
+    }
+
+    // STEP 6: SAFETY NET - Remove main character duplicates from secondary_characters
+    let filteredSecondary = identified.secondary_characters
+    const removedDuplicates: string[] = []
+
+    if (mainCharacter) {
+      filteredSecondary = identified.secondary_characters.filter((char: any) => {
+        if (isLikelyMainCharacter(char, mainCharacter)) {
+          const identifier = char.name || char.role || 'unnamed'
+          removedDuplicates.push(identifier)
+          console.warn(`[Safety Net] Removed main character duplicate from secondary: ${identifier}`)
+          return false
+        }
+        return true
+      })
+    }
+
+    // STEP 7: Update main character's appears_in (if main character exists)
+    let mainCharAppearances: string[] = []
+    let mainCharUpdated = false
+
+    if (mainCharacter) {
+      if (identified.main_character?.appears_in && Array.isArray(identified.main_character.appears_in)) {
+        // Validate and sanitize page numbers
+        mainCharAppearances = identified.main_character.appears_in
+          .map((p: number) => {
+            const pageNum = parseInt(String(p))
+            return isNaN(pageNum) || pageNum < 1 || pageNum > maxPageNumber ? null : pageNum.toString()
+          })
+          .filter((p: string | null): p is string => p !== null)
+
+        if (mainCharAppearances.length > 0) {
+          await supabase
+            .from('characters')
+            .update({
+              appears_in: mainCharAppearances,
+              // Optionally update story_role if AI provided better description
+              story_role: identified.main_character.story_role || mainCharacter.story_role || mainCharacter.biography
+            })
+            .eq('id', mainCharacter.id)
+
+          mainCharUpdated = true
+          console.log(`[Character ID] Updated main character appearances: ${mainCharAppearances.join(', ')}`)
+        } else {
+          console.warn(`[Character ID] Main character found but no valid page appearances returned`)
+        }
+      }
+
+      // FALLBACK: If AI didn't return valid appearances, use conservative approach
+      if (!mainCharUpdated || mainCharAppearances.length === 0) {
+        console.log('[Character ID] Using fallback: assuming main character appears on all pages')
+        const allPageNumbers = pages.map(p => p.page_number.toString())
+        await supabase
+          .from('characters')
+          .update({ appears_in: allPageNumbers })
+          .eq('id', mainCharacter.id)
+
+        mainCharAppearances = allPageNumbers
+        mainCharUpdated = true
+      }
+    }
+
+    // STEP 8: Filter secondary characters (plural check + existing character check)
     const { data: existingCharacters } = await supabase
       .from('characters')
       .select('name, role, is_main')
       .eq('project_id', project_id)
 
-    // Find the main character
-    const mainCharacter = existingCharacters?.find((c) => c.is_main)
-    const mainCharName = mainCharacter?.name?.toLowerCase().trim() || null
-
-    // Create sets of existing character identifiers for quick lookup
+    // Create sets for quick lookup
     const existingNames = new Set<string>()
     const existingRoles = new Set<string>()
     existingCharacters?.forEach((c) => {
@@ -228,8 +393,9 @@ Respond in JSON format:
       if (roleKey) existingRoles.add(roleKey)
     })
 
-    // HYBRID FILTER: Filter out main character, existing characters, AND plural characters
-    const newCharacters = identified.characters.filter((char: any) => {
+    // Filter secondary characters
+    const beforeFilterCount = filteredSecondary.length
+    const newCharacters = filteredSecondary.filter((char: any) => {
       const charName = char.name?.toLowerCase().trim() || null
       const charRole = char.role?.toLowerCase().trim() || null
 
@@ -238,24 +404,17 @@ Respond in JSON format:
         return false
       }
 
-      // CRITICAL: Skip if this character's name matches the main character's name
-      // This prevents "Zara" from being added as a new character when main character is already "Zara"
-      if (mainCharName && charName && charName === mainCharName) {
-        return false
-      }
-
-      // Skip if name already exists in any character
+      // Skip if name already exists
       if (charName && existingNames.has(charName)) {
         return false
       }
 
-      // Skip if role already exists (but allow if it's a generic role like "Mom")
-      // Only skip if it's a specific role that already exists
+      // Skip if role already exists (but allow generic roles like "Mom", "Dad")
       if (charRole && existingRoles.has(charRole) && charRole !== 'mom' && charRole !== 'dad') {
         return false
       }
 
-      // HYBRID FILTER: Check if character name/role is plural
+      // Filter out plural characters
       if (isPluralCharacter(char.name || char.role)) {
         return false
       }
@@ -263,52 +422,107 @@ Respond in JSON format:
       return true
     })
 
-    // Create character records for new characters only
-    const charactersToCreate = newCharacters.map((char: any) => ({
-      project_id,
-      name: char.name || null,
-      role: char.role || null,
-      appears_in: char.appears_in || [],
-      story_role: char.story_role || null,
-      is_main: false,
-    }))
+    // STEP 9: LOGGING - Comprehensive logging for monitoring
+    console.log('[Character ID] ===== CHARACTER IDENTIFICATION SUMMARY =====')
+    console.log(`[Character ID] Project ID: ${project_id}`)
+    console.log(`[Character ID] Total Pages: ${maxPageNumber}`)
+    console.log(`[Character ID] Main Character Exists: ${!!mainCharacter}`)
+    if (mainCharacter) {
+      console.log(`[Character ID] Main Character Name: ${mainCharacter.name || 'Unnamed'}`)
+      console.log(`[Character ID] Main Character Appearances: ${mainCharAppearances.length} pages`)
+    }
+    console.log(`[Character ID] AI Response - Secondary Characters Identified: ${identified.secondary_characters.length}`)
+    console.log(`[Character ID] Safety Net - Main Character Duplicates Removed: ${removedDuplicates.length} (${removedDuplicates.join(', ')})`)
+    console.log(`[Character ID] After Safety Net - Secondary Characters: ${beforeFilterCount}`)
+    console.log(`[Character ID] After Filtering - New Characters to Create: ${newCharacters.length}`)
+    console.log(`[Character ID] Filtered Out: ${beforeFilterCount - newCharacters.length} characters`)
+    console.log('[Character ID] ============================================')
 
-    if (charactersToCreate.length > 0) {
+    // STEP 10: Create secondary character records
+    let charactersCreated = 0
+    if (newCharacters.length > 0) {
+      const charactersToCreate = newCharacters.map((char: any) => {
+        // Validate and sanitize page numbers
+        const validAppearances = (char.appears_in || [])
+          .map((p: number) => {
+            const pageNum = parseInt(String(p))
+            return isNaN(pageNum) || pageNum < 1 || pageNum > maxPageNumber ? null : pageNum.toString()
+          })
+          .filter((p: string | null): p is string => p !== null)
+
+        return {
+          project_id,
+          name: char.name || null,
+          role: char.role || null,
+          appears_in: validAppearances,
+          story_role: char.story_role || null,
+          is_main: false,
+        }
+      })
+
       const { error: createError } = await supabase
         .from('characters')
         .insert(charactersToCreate)
 
       if (createError) {
-        console.error('Error creating characters:', createError)
+        console.error('[Character ID] Error creating characters:', createError)
         return NextResponse.json(
-          { error: 'Failed to create character records' },
+          { error: 'Failed to create character records', details: createError.message },
           { status: 500 }
         )
       }
+      charactersCreated = charactersToCreate.length
     }
 
-    // Get all characters for this project (including newly created ones)
+    // STEP 11: Update pages with character_ids
+    // Get all characters (including newly created ones) WITH appears_in
     const { data: allCharacters } = await supabase
       .from('characters')
-      .select('id, name, role')
+      .select('id, name, role, appears_in')
       .eq('project_id', project_id)
 
-    // Create a map of character name/role to ID for fast lookup (case-insensitive)
+    // Create character map for lookup and track appears_in per character ID
     const characterMap = new Map<string, string>()
+    const characterAppearancesMap = new Map<string, string[]>()
+
     allCharacters?.forEach((c) => {
-      const key = (c.name || c.role || '').toLowerCase().trim()
-      if (key) characterMap.set(key, c.id)
+      const nameKey = c.name?.toLowerCase().trim()
+      const roleKey = c.role?.toLowerCase().trim()
+      if (nameKey) {
+        characterMap.set(nameKey, c.id)
+        characterAppearancesMap.set(c.id, c.appears_in || [])
+      }
+      if (roleKey) {
+        characterMap.set(roleKey, c.id)
+        characterAppearancesMap.set(c.id, c.appears_in || [])
+      }
     })
 
-    // Update pages with character_ids (use all identified characters, not just new ones)
+    // Update each page with character_ids
     const pageUpdates = pages.map((page) => {
-      const characterIds = identified.characters
-        .filter((char: any) => char.appears_in?.includes(page.page_number))
-        .map((char: any) => {
-          const key = (char.name || char.role || '').toLowerCase().trim()
-          return characterMap.get(key)
-        })
-        .filter(Boolean) as string[]
+      const characterIds: string[] = []
+      const pageNumberStr = page.page_number.toString()
+
+      // Add main character if they appear on this page
+      if (mainCharacter && mainCharAppearances.includes(pageNumberStr)) {
+        characterIds.push(mainCharacter.id)
+      }
+
+      // Add secondary characters that appear on this page
+      // Use validated appears_in from database (not AI response)
+      allCharacters?.forEach((char) => {
+        // Skip main character (already added above)
+        if (char.id === mainCharacter?.id) return
+
+        // Skip if already in list
+        if (characterIds.includes(char.id)) return
+
+        // Check if character appears on this page using validated appears_in from DB
+        const charAppearances = characterAppearancesMap.get(char.id) || []
+        if (charAppearances.includes(pageNumberStr)) {
+          characterIds.push(char.id)
+        }
+      })
 
       return { id: page.id, character_ids: characterIds }
     })
@@ -321,24 +535,31 @@ Respond in JSON format:
         .eq('id', update.id)
     }
 
-    // Update project status
+    // STEP 12: Update project status
     await supabase
       .from('projects')
       .update({ status: 'character_review' })
       .eq('id', project_id)
+
     return NextResponse.json({
       success: true,
-      count: newCharacters.length,
-      total_identified: identified.characters.length,
-      characters_created: newCharacters.length,
+      main_character_updated: mainCharUpdated,
+      main_character_appearances: mainCharAppearances.length,
+      main_character_appearances_list: mainCharAppearances,
+      secondary_characters_identified: identified.secondary_characters.length,
+      safety_net_removed: removedDuplicates.length,
+      safety_net_removed_list: removedDuplicates,
+      secondary_characters_after_safety_net: beforeFilterCount,
+      secondary_characters_created: charactersCreated,
+      filtered_out: beforeFilterCount - newCharacters.length,
       characters: newCharacters,
     })
+
   } catch (error: any) {
-    console.error('Error identifying characters:', error)
+    console.error('[Character ID] Error identifying characters:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to identify characters' },
       { status: 500 }
     )
   }
 }
-

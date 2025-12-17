@@ -22,9 +22,12 @@ export interface Character {
   is_resolved?: boolean
   form_pdf_url?: string | null
   generation_prompt?: string | null
+  generation_error?: string | null
   created_at: string
   updated_at: string
 }
+
+
 
 
 

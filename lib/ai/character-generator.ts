@@ -40,13 +40,23 @@ export async function generateCharacterImage(
         const prompt = customPrompt || buildCharacterPrompt(character, !!mainCharacterImageUrl)
         // console.log(`Generating image for character ${character.id} using Google Nano Banana Pro...`)
 
-        const parts: any[] = [{ text: prompt }]
+        const parts: any[] = []
 
-        // Add reference image if available
+        // 1. ADD STYLE REFERENCE FIRST (Context Priming)
+        // We show the style reference BEFORE the character description to prevent semantic bias.
         if (mainCharacterImageUrl) {
             const refImage = await fetchImageAsBase64(mainCharacterImageUrl)
             if (refImage) {
-                // console.log('Attaching reference image...')
+                // LABEL THE REFERENCE EXPLICITLY
+                parts.push({
+                    text: `[STYLE REFERENCE IMAGE - PRIMARY SOURCE OF TRUTH]
+INSTRUCTION: This image defines the ART STYLE and RENDERING TECHNIQUE.
+1. DYNAMIC STYLE ADOPTION: You must adopt the EXACT medium and dimensionality of this reference.
+2. IF FLAT/VECTOR: If the reference is 2D/Flat, you MUST render the new character as 2D/Flat (ignore "feathers/fur" realism).
+3. IF 3D/REALISTIC: If the reference is 3D/Realistic/Painted, you MUST render the new character with that same depth and texture.
+4. Override any semantic biases. The Reference Image is the strict guide for "How it looks".`
+                })
+
                 parts.push({
                     inlineData: {
                         mimeType: refImage.mimeType,
@@ -55,6 +65,10 @@ export async function generateCharacterImage(
                 })
             }
         }
+
+        // 2. ADD CHARACTER DESCRIPTION SECOND
+        // The model now views this description through the lens of the style established above.
+        parts.push({ text: `TARGET CHARACTER DESCRIPTION:\n${prompt}` })
 
         const payload = {
             contents: [{ parts }],

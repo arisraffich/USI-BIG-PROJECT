@@ -36,7 +36,7 @@ export function parsePages(text: string) {
 
   // Split by lines but keep empty lines for context
   const rawLines = text.split('\n')
-  
+
   // Process lines - trim but don't filter empty ones yet (we need to preserve structure)
   const lines = rawLines.map((l) => l.trim())
 
@@ -45,7 +45,7 @@ export function parsePages(text: string) {
 
   while (i < lines.length) {
     const line = lines[i]
-    
+
     // Skip empty lines but continue processing
     if (!line) {
       i++
@@ -69,7 +69,7 @@ export function parsePages(text: string) {
         scene_description: null,
         description_auto_generated: false,
       }
-      
+
       // If there's text after "Illustration X" on the same line, add it to the page
       // Text before "Illustration X" is ignored (like title/header text)
       const matchEnd = match.index! + match[0].length
@@ -77,7 +77,7 @@ export function parsePages(text: string) {
       if (afterMatch && !afterMatch.toLowerCase().startsWith('description:')) {
         currentPage.story_text = afterMatch
       }
-      
+
       i++
       continue
     }
@@ -113,7 +113,7 @@ export function parsePages(text: string) {
   return pages
 }
 
-// AI-powered story parsing using GPT-5.1
+// AI-powered story parsing using GPT-5.2
 export async function parsePagesWithAI(storyText: string): Promise<Array<{
   page_number: number
   story_text: string
@@ -124,7 +124,8 @@ export async function parsePagesWithAI(storyText: string): Promise<Array<{
     throw new Error('OpenAI API key is not configured')
   }
 
-  const prompt = `You are parsing a children's book story file to extract ONLY the relevant text for each illustration.
+  // STEP 1: Parse story structure and extract pages
+  const parsingPrompt = `You are a professional storyboard creator parsing a children's book story file to extract ONLY the relevant text for each illustration.
 
 STORY FILE CONTENT:
 ${storyText}
@@ -136,6 +137,8 @@ CRITICAL RULES:
 
 1. IDENTIFY ILLUSTRATION MARKERS:
    - Look for patterns like "Illustration 1", "Illustration 2", "Page 1", "Page 2", etc.
+   - Handle all formats uniformly (Word documents, PDFs, plain text)
+   - Detect page breaks and section markers intelligently
    - The number after "Illustration" or "Page" is the page_number
 
 2. EXTRACT STORY TEXT:
@@ -170,7 +173,7 @@ Return a JSON object with a "pages" array. Each page should have:
 - page_number: integer (from Illustration marker)
 - story_text: string (the actual story narrative for this illustration, cleaned)
 - scene_description: string | null (if "Description:" was found, otherwise null)
-- description_auto_generated: boolean (false if description was in file, true if we need to generate later)
+- description_auto_generated: boolean (false if description was in file, true if description needs to be generated)
 
 Example output format:
 {
@@ -180,49 +183,125 @@ Example output format:
       "story_text": "Zara and her mom loved to snuggle on the sofa reading and telling each other stories. Zara turned to her mom and asked if she could tell her about when she was born.",
       "scene_description": null,
       "description_auto_generated": false
-    },
-    {
-      "page_number": 2,
-      "story_text": "Her mom got comfortable and began \"Once upon a time, my sweet Zara,\" her mom began, as she nestled beside her in the cozy, dimly lit bedroom, there was a baby who came into the world a little earlier than expected...",
-      "scene_description": null,
-      "description_auto_generated": false
     }
   ]
 }`
 
+  let pages: Array<{
+    page_number: number
+    story_text: string
+    scene_description: string | null
+    description_auto_generated: boolean
+  }>
+
   try {
+    console.log('[parsePagesWithAI] Starting story parsing with GPT-5.2...')
     const completion = await openai.chat.completions.create({
-      model: 'gpt-5.1',
-      messages: [{ role: 'user', content: prompt }],
+      model: 'gpt-5.2', // Using GPT-5.2 for parsing
+      messages: [{ role: 'user', content: parsingPrompt }],
       response_format: { type: 'json_object' },
       reasoning_effort: 'none', // Fast parsing, no complex reasoning needed
       temperature: 0, // For consistent extraction
-    }).catch((error: any) => {
-      console.error('OpenAI API Error in parsePagesWithAI:', error.message)
-      throw error
     })
 
     const content = completion.choices[0].message.content || '{"pages": []}'
+    console.log('[parsePagesWithAI] Raw AI response length:', content.length)
     const result = JSON.parse(content)
-    
+
     if (!result.pages || !Array.isArray(result.pages)) {
-      throw new Error('Invalid response format from AI')
+      console.error('[parsePagesWithAI] Invalid JSON structure:', JSON.stringify(result).substring(0, 200))
+      throw new Error('Invalid response format from AI: missing or invalid pages array')
     }
+
+    console.log(`[parsePagesWithAI] Successfully parsed ${result.pages.length} pages.`)
 
     // Sort pages by page_number
     result.pages.sort((a: any, b: any) => a.page_number - b.page_number)
 
-    return result.pages.map((page: any) => ({
+    pages = result.pages.map((page: any) => ({
       page_number: page.page_number,
       story_text: page.story_text || '',
       scene_description: page.scene_description || null,
       description_auto_generated: page.description_auto_generated || false,
     }))
   } catch (error: any) {
-    console.error('Error parsing story with AI:', error.message)
-    // Fallback to pattern-based parsing if AI fails
-    return parsePages(storyText)
+    const errorMessage = error.message || String(error)
+    console.error('Error parsing story with GPT-5.2:', errorMessage)
+    console.error('Full parsing error details:', error)
+    throw new Error(`Failed to parse story with GPT-5.2: ${errorMessage}`)
   }
+
+  // STEP 2: Generate descriptions for pages that don't have them (sequential)
+  const pagesWithDescriptions = await Promise.all(
+    pages.map(async (page) => {
+      // If page already has a description from the file, keep it
+      if (page.scene_description) {
+        return {
+          ...page,
+          description_auto_generated: false,
+        }
+      }
+
+      // If no description and no story text, skip generation
+      if (!page.story_text || page.story_text.trim().length === 0) {
+        return {
+          ...page,
+          description_auto_generated: false,
+        }
+      }
+
+      // Generate description using GPT-5.2 as professional storyboard creator
+      const descriptionPrompt = `You are a professional storyboard creator for children's books. Create a visual scene description for an illustration based on the story text.
+
+Story text: "${page.story_text}"
+
+Your task is to create a professional storyboard description that will guide an illustrator. As a storyboard creator, decide what each illustration needs:
+- Scene and environment details
+- Character actions and emotions (if relevant)
+- Composition and framing
+- Mood, lighting, and atmosphere
+- Any other visual elements needed for a compelling children's book illustration
+
+Format your response as 2-3 sentences that capture:
+- The main visual elements and action
+- The setting and environment
+- The mood, lighting, and composition
+
+Focus on: storybook illustration style, hand-drawn aesthetic, warm and inviting atmosphere, child-friendly visuals.
+Avoid: photorealistic details, complex technical elements, adult themes.
+
+Return ONLY the description text, no additional formatting or labels.`
+
+      try {
+        if (!openai) throw new Error('OpenAI API key is not configured')
+
+        const descriptionCompletion = await openai.chat.completions.create({
+          model: 'gpt-5.2', // Using GPT-5.2 for description generation
+          messages: [{ role: 'user', content: descriptionPrompt }],
+          reasoning_effort: 'low', // Low reasoning for creative descriptions
+          // Note: temperature is not supported with reasoning_effort other than 'none'
+        })
+
+        const generatedDescription = descriptionCompletion.choices[0].message.content?.trim() || null
+
+        if (!generatedDescription) {
+          throw new Error('GPT-5.2 returned empty description')
+        }
+
+        return {
+          ...page,
+          scene_description: generatedDescription,
+          description_auto_generated: true,
+        }
+      } catch (error: any) {
+        const errorMessage = error.message || String(error)
+        console.error(`Error generating description for page ${page.page_number} with GPT-5.2:`, errorMessage)
+        throw new Error(`Failed to generate description for page ${page.page_number} with GPT-5.2: ${errorMessage}`)
+      }
+    })
+  )
+
+  return pagesWithDescriptions
 }
 
 

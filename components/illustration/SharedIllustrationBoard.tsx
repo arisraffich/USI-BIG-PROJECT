@@ -492,26 +492,28 @@ export function SharedIllustrationBoard({
                                 </div>
                             ) : (
                                 /* TEXT VIEW MODE */
-                                <div className="w-full h-full p-8 overflow-y-auto bg-white text-slate-900 pointer-events-auto cursor-text text-left">
+                                <div className="w-full p-8 bg-white text-slate-900 pointer-events-auto cursor-text text-left overflow-y-auto max-h-[60vh] md:max-h-none md:absolute md:inset-0 md:h-full">
                                     {/* 1. PAGE TEXT */}
                                     <div className="mb-8">
                                         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">Page {page.page_number}</span>
-                                        <p className="text-lg md:text-xl font-serif leading-relaxed text-slate-800">
-                                            {page.story_text || <span className="italic text-slate-300">No text content available.</span>}
-                                        </p>
-                                    </div>
-
-                                    {/* 2. ILLUSTRATION NOTES */}
-                                    {page.scene_description && (
-                                        <div className="bg-amber-50/50 p-5 rounded-lg border border-amber-100/60">
-                                            <span className="flex items-center gap-2 text-[10px] font-bold text-amber-600/80 uppercase tracking-widest mb-2">
-                                                🎨 Illustration Notes
-                                            </span>
-                                            <p className="text-sm leading-relaxed text-slate-600">
-                                                {page.scene_description}
+                                        <div className="max-h-[500px] overflow-y-auto pr-4 custom-scrollbar space-y-8">
+                                            <p className="text-lg md:text-xl font-serif leading-relaxed text-slate-800">
+                                                {page.story_text || <span className="italic text-slate-300">No text content available.</span>}
                                             </p>
+
+                                            {/* 2. ILLUSTRATION NOTES */}
+                                            {page.scene_description && (
+                                                <div className="bg-amber-50/50 p-5 rounded-lg border border-amber-100/60">
+                                                    <span className="flex items-center gap-2 text-[10px] font-bold text-amber-600/80 uppercase tracking-widest mb-2">
+                                                        🎨 Illustration Notes
+                                                    </span>
+                                                    <p className="text-sm leading-relaxed text-slate-600">
+                                                        {page.scene_description}
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
                             )}
                         </div>

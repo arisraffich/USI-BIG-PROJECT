@@ -108,11 +108,23 @@ export async function POST(request: NextRequest) {
         })
       } catch (error: any) {
         // Should catch errors that escaped generateCharacterImage
+        const errorMessage = error.message || 'Generation failed'
         console.error(`Error in loop for character ${character.id}:`, error)
+
+        // Persist error to database so UI knows to stop loading
+        try {
+          await supabase
+            .from('characters')
+            .update({ generation_error: errorMessage })
+            .eq('id', character.id)
+        } catch (dbError) {
+          console.error('Failed to save generation error to DB:', dbError)
+        }
+
         results.push({
           character_id: character.id,
           success: false,
-          error: error.message || 'Generation failed',
+          error: errorMessage,
         })
       }
     }
@@ -169,6 +181,8 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+
 
 
 

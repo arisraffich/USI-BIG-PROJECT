@@ -346,7 +346,9 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   }, [isIllustrationsUnlocked, searchParams])
 
   // Improved derivation of current tab for display
-  const currentTab = activeTab || (isIllustrationsUnlocked ? 'illustrations' : 'pages')
+  const currentTab = activeTab || (isIllustrationsUnlocked ? 'illustrations' :
+    (projectInfo.status === 'character_review' || projectInfo.status === 'character_generation' || projectInfo.status === 'draft' ? 'characters' : 'pages')
+  )
   const sectionTitle = currentTab.charAt(0).toUpperCase() + currentTab.slice(1)
 
   // ... (previous logic for stages, hooks, etc. remains same) ...

@@ -70,7 +70,7 @@ export const CharacterCard = memo(function CharacterCard({
       onSave={handleSave}
       onDelete={handleDelete}
       readOnly={readOnly}
-      alwaysEditing={!readOnly}
+      alwaysEditing={false}
       onChange={handleChange}
     />
   )

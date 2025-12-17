@@ -50,9 +50,9 @@ export function ProjectDevTools({ projectId }: ProjectDevToolsProps) {
     return (
         <div className="fixed bottom-4 right-4 z-50">
             <div className="bg-slate-900/90 text-white p-2 rounded-lg shadow-2xl border border-slate-700 backdrop-blur-sm flex items-center gap-2">
-                <ShieldAlert className="w-4 h-4 text-yellow-500" />
+                {/* <ShieldAlert className="w-4 h-4 text-yellow-500" />
                 <span className="text-xs font-mono font-bold text-slate-400">DEV TOOLS</span>
-                <div className="h-4 w-px bg-slate-700 mx-1"></div>
+                <div className="h-4 w-px bg-slate-700 mx-1"></div> */}
                 <Button
                     variant="destructive"
                     size="sm"
