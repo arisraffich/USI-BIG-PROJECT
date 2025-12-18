@@ -105,53 +105,29 @@ export function CustomerProjectHeader({
           currentTabId={currentTabId}
           tabs={tabs}
           centerContent={
-            <>
-              {/* Approve Characters Button (Centered) */}
-              {showApproveButton && onApprove && (
-                <Button
-                  onClick={onApprove}
-                  disabled={isApproving || isApproveDisabled}
-                  size="lg"
-                  className="bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-bold uppercase tracking-wide px-8"
-                >
-                  {isApproving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      APPROVING...
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4 mr-2" />
-                      APPROVE CHARACTERS
-                    </>
-                  )}
-                </Button>
-              )}
-              
-              {/* Approve Illustrations Button (Centered) */}
-              {showIllustrationsTab && showSubmitButton && (
-                <Button
-                  onClick={onSubmit}
-                  disabled={isSubmitting || isSubmitDisabled || isApprovedStage}
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-semibold"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Submitting...
-                    </>
-                  ) : isApprovedStage ? (
-                    <>
-                      <Check className="w-4 h-4 mr-2" />
-                      1st Illustration Approved
-                    </>
-                  ) : (
-                    "Approve Illustrations"
-                  )}
-                </Button>
-              )}
-            </>
+            // Show Approve Illustrations button centered when on illustrations tab
+            showIllustrationsTab && showSubmitButton ? (
+              <Button
+                onClick={onSubmit}
+                disabled={isSubmitting || isSubmitDisabled || isApprovedStage}
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-semibold"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Submitting...
+                  </>
+                ) : isApprovedStage ? (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    1st Illustration Approved
+                  </>
+                ) : (
+                  "Approve Illustrations"
+                )}
+              </Button>
+            ) : null
           }
           statusTag={
             showIllustrationsTab && isIllustrationsActive ? (
@@ -162,6 +138,28 @@ export function CustomerProjectHeader({
           }
           actions={
             <>
+              {/* Approve Button (Characters - Right Aligned) */}
+              {showApproveButton && onApprove && (
+                <Button
+                  onClick={onApprove}
+                  disabled={isApproving || isApproveDisabled}
+                  size="default"
+                  className="bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-bold uppercase tracking-wide"
+                >
+                  {isApproving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      APPROVING...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      APPROVE
+                    </>
+                  )}
+                </Button>
+              )}
+
               {/* Submit Button (Pages/General) */}
               {showSubmitButton && !showIllustrationsTab && (
                 <Button
