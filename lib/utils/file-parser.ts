@@ -242,11 +242,75 @@ Example output format:
   // STEP 2: Generate descriptions for pages that don't have them (sequential)
   const pagesWithDescriptions = await Promise.all(
     pages.map(async (page) => {
-      // If page already has a description from the file, keep it
-      if (page.scene_description) {
-        return {
-          ...page,
-          description_auto_generated: false,
+      // If page already has a description from the file, enhance it to cover all 3 topics
+      if (page.scene_description && page.scene_description.trim().length > 0) {
+        const enhancePrompt = `You are restructuring a scene description for a children's book illustration.
+
+ORIGINAL DESCRIPTION (by author):
+"${page.scene_description}"
+
+STORY TEXT (for context):
+"${page.story_text}"
+
+YOUR TASK:
+Rewrite this description as a natural 2-4 sentence paragraph that covers all 3 aspects:
+1. Character actions/emotions (what they're doing, how they feel)
+2. Environment/setting (where, what objects/details are present)
+3. Atmosphere (mood, lighting, weather, emotional tone)
+
+RULES:
+- Preserve the author's exact words and phrases wherever possible
+- Keep the author's tone and style
+- Add ONLY what's missing to complete all 3 aspects
+- Natural paragraph flow (not bullet points or lists)
+- 2-4 sentences total
+
+Focus on: preserving author intent, minimal additions, children's book illustration style, hand-drawn aesthetic, warm and inviting.
+
+Return ONLY the paragraph text, no labels or formatting.`
+
+        try {
+          if (!openai) throw new Error('OpenAI API key is not configured')
+
+          const enhanceCompletion = await openai.responses.create({
+            model: 'gpt-5.2',
+            input: enhancePrompt,
+            reasoning: {
+              effort: 'none' // Creative enhancement doesn't need reasoning
+            }
+          })
+
+          const firstOutput = enhanceCompletion.output?.[0]
+          let enhancedDescription = null
+          if (firstOutput && 'content' in firstOutput) {
+            const firstContent = firstOutput.content?.[0]
+            enhancedDescription = (firstContent && 'text' in firstContent ? firstContent.text?.trim() : null) || null
+          }
+
+          if (!enhancedDescription) {
+            console.warn(`GPT-5.2 returned empty enhanced description for page ${page.page_number}, using original`)
+            return {
+              ...page,
+              description_auto_generated: false,
+            }
+          }
+
+          console.log(`[Enhanced] Page ${page.page_number}: "${page.scene_description}" → "${enhancedDescription}"`)
+
+          return {
+            ...page,
+            scene_description: enhancedDescription,
+            description_auto_generated: false, // Still author-provided, just enhanced
+          }
+        } catch (error: any) {
+          const errorMessage = error.message || String(error)
+          console.error(`Error enhancing description for page ${page.page_number}:`, errorMessage)
+          // Fallback: use original description if enhancement fails
+          console.warn(`Using original description for page ${page.page_number} after enhancement error`)
+          return {
+            ...page,
+            description_auto_generated: false,
+          }
         }
       }
 
