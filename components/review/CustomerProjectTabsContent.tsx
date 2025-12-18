@@ -493,7 +493,6 @@ export function CustomerProjectTabsContent({
             isApproveDisabled={isApproveDisabled}
             showIllustrationsTab={showIllustrationsTab}
             projectStatus={projectStatus}
-            isStatusScreen={showStatusScreen}
           />
         }
         sidebar={
