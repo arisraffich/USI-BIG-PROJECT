@@ -236,13 +236,27 @@ export async function POST(
       // Update project status to generating
       await supabase.from('projects').update({ status: 'character_generation' }).eq('id', project.id)
 
-      // Send notification (non-blocking)
+      // Send notification with character data (non-blocking)
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
       notifyCustomerSubmission({
         projectId: project.id,
         projectTitle: project.book_title,
         authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim(),
         projectUrl: `${baseUrl}/admin/project/${project.id}`,
+        characters: secondaryCharacters.map(c => ({
+          name: c.name,
+          role: c.role,
+          age: c.age,
+          gender: c.gender,
+          description: c.description,
+          skin_color: c.skin_color,
+          hair_color: c.hair_color,
+          hair_style: c.hair_style,
+          eye_color: c.eye_color,
+          clothing: c.clothing,
+          accessories: c.accessories,
+          special_features: c.special_features,
+        })),
       }).catch(e => console.error('Notification error:', e))
 
       // Fire-and-forget generation

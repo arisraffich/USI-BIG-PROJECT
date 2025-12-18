@@ -7,32 +7,76 @@ export async function notifyCustomerSubmission(options: {
   projectTitle: string
   authorName: string
   projectUrl: string
+  characters?: Array<{
+    name?: string
+    role?: string
+    age?: string
+    gender?: string
+    description?: string
+    skin_color?: string
+    hair_color?: string
+    hair_style?: string
+    eye_color?: string
+    clothing?: string
+    accessories?: string
+    special_features?: string
+  }>
 }): Promise<void> {
-  const { projectId: _projectId, projectTitle, authorName, projectUrl } = options
+  const { projectId: _projectId, projectTitle, authorName, projectUrl, characters } = options
 
   try {
-    await sendSlackNotification({
-      text: `📝 Customer submitted character changes for "${projectTitle}"`,
-      blocks: [
-        {
+    const blocks: any[] = [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*Customer Submission*\n${authorName} has submitted character forms for "${projectTitle}".`,
+        },
+      },
+    ]
+
+    // Add character details if provided
+    if (characters && characters.length > 0) {
+      for (const char of characters) {
+        const charName = char.name || char.role || 'Character'
+        const details: string[] = []
+        
+        if (char.age) details.push(`Age: ${char.age}`)
+        if (char.gender) details.push(`Gender: ${char.gender}`)
+        if (char.description) details.push(`Description: ${char.description}`)
+        if (char.skin_color) details.push(`Skin: ${char.skin_color}`)
+        if (char.hair_color) details.push(`Hair Color: ${char.hair_color}`)
+        if (char.hair_style) details.push(`Hair Style: ${char.hair_style}`)
+        if (char.eye_color) details.push(`Eyes: ${char.eye_color}`)
+        if (char.clothing) details.push(`Clothing: ${char.clothing}`)
+        if (char.accessories) details.push(`Accessories: ${char.accessories}`)
+        if (char.special_features) details.push(`Special: ${char.special_features}`)
+
+        blocks.push({
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `*Customer Submission*\n${authorName} has submitted character changes for "${projectTitle}".`,
+            text: `*${charName}*\n${details.join('\n')}`,
           },
-        },
+        })
+      }
+    }
+
+    blocks.push({
+      type: 'actions',
+      elements: [
         {
-          type: 'actions',
-          elements: [
-            {
-              type: 'button',
-              text: { type: 'plain_text', text: 'View Project' },
-              url: projectUrl,
-              style: 'primary',
-            },
-          ],
+          type: 'button',
+          text: { type: 'plain_text', text: 'View Project' },
+          url: projectUrl,
+          style: 'primary',
         },
       ],
+    })
+
+    await sendSlackNotification({
+      text: `📝 Customer submitted character forms for "${projectTitle}"`,
+      blocks,
     })
   } catch (slackError: any) {
     console.error('Slack notification failed:', slackError)
