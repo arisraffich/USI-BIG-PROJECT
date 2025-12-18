@@ -295,8 +295,8 @@ export async function POST(request: NextRequest) {
           scene_description: sanitizeText(page.scene_description), // Display paragraph (backward compatible)
           description_auto_generated: page.description_auto_generated,
           character_actions: page.character_actions || null, // Structured: {"CharacterName": "action"}
-          background_elements: sanitizeText(page.background_elements), // Structured: environment text
-          atmosphere: sanitizeText(page.atmosphere), // Structured: mood/lighting text
+          background_elements: sanitizeText(page.background_elements ?? null), // Structured: environment text
+          atmosphere: sanitizeText(page.atmosphere ?? null), // Structured: mood/lighting text
           character_ids: [],
         }))
 

@@ -109,8 +109,8 @@ export async function POST(
       scene_description: sanitizeText(page.scene_description), // Display paragraph
       description_auto_generated: page.description_auto_generated,
       character_actions: page.character_actions || null, // Structured JSON
-      background_elements: sanitizeText(page.background_elements), // Structured text
-      atmosphere: sanitizeText(page.atmosphere), // Structured text
+      background_elements: sanitizeText(page.background_elements ?? null), // Structured text
+      atmosphere: sanitizeText(page.atmosphere ?? null), // Structured text
       character_ids: [],
     }))
 
