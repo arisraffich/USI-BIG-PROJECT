@@ -5,7 +5,7 @@ import { parseStoryFile, parsePagesWithAI } from '@/lib/utils/file-parser'
 import { v4 as uuidv4 } from 'uuid'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 300 // 5 minutes for story parsing + AI enhancement
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
@@ -242,49 +242,98 @@ export async function POST(request: NextRequest) {
       // Don't fail the whole request - character can be created manually
     }
 
-    // Update project status
+    // Update project status to indicate we're parsing
     await supabase
       .from('projects')
-      .update({ status: 'character_review' })
+      .update({ status: 'draft' }) // Keep as draft while parsing
       .eq('id', projectId)
 
-    // TRIGGER ASYNC PARSING & GENERATION
-    // We do NOT await this. We let it run in the background so the user can be redirected immediately.
-    // The flow handles: Parse Story -> Create Pages -> Identify Characters -> Create Characters
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    // PARSE STORY AND CREATE PAGES (Direct, Reliable Approach)
+    // Instead of unreliable background HTTP fetch, we do it here and wait for completion
+    console.log(`[Story Parsing] Starting for project ${projectId}...`)
+    
+    try {
+      // Determine file type from extension
+      const extension = storyFile.name.split('.').pop()?.toLowerCase() || 'txt'
+      let fileType: string
+      if (extension === 'pdf') {
+        fileType = 'application/pdf'
+      } else if (extension === 'docx') {
+        fileType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      } else {
+        fileType = 'text/plain'
+      }
 
-    // Add a small delay to ensure storage operations have completed
-    // This prevents race conditions where reparse-story tries to download files before they're fully saved
-    setTimeout(() => {
-      console.log(`[Background] Triggering story parsing for project ${projectId}...`)
+      // Parse story file into text
+      console.log(`[Story Parsing] Extracting text from ${fileType}...`)
+      const storyText = await parseStoryFile(storyBuffer, fileType)
       
-      // Add cache-busting parameter to prevent cached responses
-      const timestamp = Date.now()
-      fetch(`${baseUrl}/api/projects/${projectId}/reparse-story?t=${timestamp}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-        },
-        cache: 'no-store', // Prevent fetch API caching
-      })
-        .then(async (response) => {
-          console.log(`[Background] Reparse response received for ${projectId}: ${response.status}`)
-          if (response.ok) {
-            const data = await response.json()
-            console.log(`[Background] Story parsing succeeded for ${projectId}:`, data.message || data)
-          } else {
-            const errorText = await response.text()
-            console.error(`[Background] Story parsing failed for ${projectId} (${response.status}):`, errorText)
-          }
-        })
-        .catch(err => {
-          console.error(`[Background] Story parsing request failed for ${projectId}:`, err.message)
-        })
-    }, 5000) // 5 second delay to ensure storage operations complete
+      // Parse into pages with AI (this includes enhancement!)
+      console.log(`[Story Parsing] Analyzing story with GPT-5.2...`)
+      const pages = await parsePagesWithAI(storyText)
+      
+      if (pages.length === 0) {
+        console.warn(`[Story Parsing] No pages found for project ${projectId}`)
+        // Continue anyway - pages can be added manually later
+      } else {
+        console.log(`[Story Parsing] Successfully parsed ${pages.length} pages`)
+        
+        // Sanitize text to prevent Unicode escape sequence errors
+        const sanitizeText = (text: string | null): string | null => {
+          if (!text) return null
+          return text
+            .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
+            .replace(/\\/g, '\\\\') // Escape backslashes
+            .trim()
+        }
 
-    // Note: We removed the direct call to identify-characters here because reparse-story now calls it.
+        // Create pages in database
+        const pagesToInsert = pages.map(page => ({
+          project_id: projectId,
+          page_number: page.page_number,
+          story_text: sanitizeText(page.story_text),
+          scene_description: sanitizeText(page.scene_description), // Already enhanced!
+          description_auto_generated: page.description_auto_generated,
+          character_ids: [],
+        }))
+
+        const { error: pagesError } = await supabase
+          .from('pages')
+          .insert(pagesToInsert)
+
+        if (pagesError) {
+          console.error(`[Story Parsing] Error creating pages:`, pagesError.message)
+          throw new Error(`Failed to create pages: ${pagesError.message}`)
+        }
+
+        console.log(`[Story Parsing] Created ${pages.length} pages with enhanced descriptions`)
+      }
+
+      // Update project status to character_review now that pages are ready
+      await supabase
+        .from('projects')
+        .update({ status: 'character_review' })
+        .eq('id', projectId)
+
+      // Trigger character identification in the background (fire-and-forget is OK here)
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+      fetch(`${baseUrl}/api/ai/identify-characters`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: projectId }),
+      }).catch(err => console.error('[Story Parsing] Failed to trigger character identification:', err.message))
+
+    } catch (parsingError: any) {
+      console.error(`[Story Parsing] Error for project ${projectId}:`, parsingError.message)
+      // Update status to indicate parsing failed
+      await supabase
+        .from('projects')
+        .update({ status: 'draft' })
+        .eq('id', projectId)
+      // Don't fail the whole request - pages can be created manually via reparse
+    }
+
+    console.log(`[Project Created] ${projectId} - Pages created with enhanced descriptions`)
 
     return NextResponse.json({
       success: true,
