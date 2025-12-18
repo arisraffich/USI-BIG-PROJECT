@@ -40,6 +40,51 @@ export async function notifyCustomerSubmission(options: {
   }
 }
 
+export async function notifyCharacterReview(options: {
+  projectTitle: string
+  authorName: string
+  characterName: string
+  feedbackText: string
+  projectUrl: string
+}): Promise<void> {
+  const { projectTitle, authorName, characterName, feedbackText, projectUrl } = options
+
+  try {
+    await sendSlackNotification({
+      text: `📝 New Character Review: ${authorName} added feedback for ${characterName}`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*New Character Review*\n${authorName} added a review for character *${characterName}* in "${projectTitle}".`,
+          },
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `> ${feedbackText}`,
+          },
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'View Project' },
+              url: projectUrl,
+              style: 'primary',
+            },
+          ],
+        },
+      ],
+    })
+  } catch (slackError: any) {
+    console.error('Slack notification failed:', slackError)
+  }
+}
+
 export async function notifyProjectSentToCustomer(options: {
   projectTitle: string
   authorName: string

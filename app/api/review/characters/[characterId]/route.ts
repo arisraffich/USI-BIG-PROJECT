@@ -84,11 +84,12 @@ export async function PATCH(
 
       if (fullProject) {
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-        const { notifyCustomerSubmission } = await import('@/lib/notifications')
-        notifyCustomerSubmission({
-          projectId: character.project_id,
+        const { notifyCharacterReview } = await import('@/lib/notifications')
+        notifyCharacterReview({
           projectTitle: fullProject.book_title || 'Untitled Project',
           authorName: `${fullProject.author_firstname || ''} ${fullProject.author_lastname || ''}`.trim() || 'Customer',
+          characterName: updatedCharacter.name || updatedCharacter.role || 'Character',
+          feedbackText: body.feedback_notes,
           projectUrl: `${baseUrl}/admin/project/${character.project_id}?tab=characters`,
         }).catch(e => console.error('Notification error:', e))
       }
