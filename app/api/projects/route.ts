@@ -276,7 +276,7 @@ export async function POST(request: NextRequest) {
         .catch(err => {
           console.error(`[Background] Story parsing request failed for ${projectId}:`, err.message)
         })
-    }, 2000) // 2 second delay to ensure storage operations complete
+    }, 5000) // 5 second delay to ensure storage operations complete
 
     // Note: We removed the direct call to identify-characters here because reparse-story now calls it.
 
