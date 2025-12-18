@@ -74,6 +74,26 @@ export async function PATCH(
       )
     }
 
+    // Send Slack notification if feedback was added (non-blocking)
+    if (body.feedback_notes && body.feedback_notes.trim()) {
+      const { data: fullProject } = await supabase
+        .from('projects')
+        .select('book_title, author_firstname, author_lastname')
+        .eq('id', character.project_id)
+        .single()
+
+      if (fullProject) {
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+        const { notifyCustomerSubmission } = await import('@/lib/notifications')
+        notifyCustomerSubmission({
+          projectId: character.project_id,
+          projectTitle: fullProject.book_title || 'Untitled Project',
+          authorName: `${fullProject.author_firstname || ''} ${fullProject.author_lastname || ''}`.trim() || 'Customer',
+          projectUrl: `${baseUrl}/admin/project/${character.project_id}?tab=characters`,
+        }).catch(e => console.error('Notification error:', e))
+      }
+    }
+
     return NextResponse.json(updatedCharacter)
   } catch (error: any) {
     console.error('Error updating character:', error)
