@@ -487,7 +487,6 @@ export function CustomerProjectTabsContent({
             onSubmit={handleSubmitChanges}
             showSubmitButton={showIllustrationsTab || (!isLocked && !isEditMode && !showGallery)}
             isSubmitDisabled={isSubmitDisabled}
-            hideOnMobile={activeTab === 'characters' && showGallery}
             showApproveButton={showGallery && !isLocked && !isEditMode && !showIllustrationsTab}
             onApprove={handleApproveCharacters}
             isApproving={isApproving}
