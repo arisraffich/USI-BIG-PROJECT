@@ -258,13 +258,19 @@ export async function POST(request: NextRequest) {
     setTimeout(() => {
       console.log(`[Background] Triggering story parsing for project ${projectId}...`)
       
-      fetch(`${baseUrl}/api/projects/${projectId}/reparse-story`, {
+      // Add cache-busting parameter to prevent cached responses
+      const timestamp = Date.now()
+      fetch(`${baseUrl}/api/projects/${projectId}/reparse-story?t=${timestamp}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
         },
+        cache: 'no-store', // Prevent fetch API caching
       })
         .then(async (response) => {
+          console.log(`[Background] Reparse response received for ${projectId}: ${response.status}`)
           if (response.ok) {
             const data = await response.json()
             console.log(`[Background] Story parsing succeeded for ${projectId}:`, data.message || data)
