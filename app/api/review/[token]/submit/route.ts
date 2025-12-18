@@ -111,10 +111,6 @@ export async function POST(
       const { data: pages } = await supabase.from('pages').select('feedback_notes, is_resolved').eq('project_id', project.id)
       const hasFeedback = pages?.some(p => !!p.feedback_notes && !p.is_resolved)
 
-      // Only check Page 1 for trial
-      // const page1 = pages?.find(...) 
-      // Safe to check all for now as only Page 1 exists/has images.
-
       let newStatus = 'illustration_approved'
       let message = 'Illustration trial approved!'
 
@@ -128,15 +124,13 @@ export async function POST(
         illustration_status: newStatus
       }).eq('id', project.id)
 
-      // Notify
-      try {
-        await notifyCustomerSubmission({
-          projectId: project.id,
-          projectTitle: project.book_title,
-          authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim(),
-          projectUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/project/${project.id}`,
-        })
-      } catch (e) { console.error('Notification error:', e) }
+      // Notify (non-blocking)
+      notifyCustomerSubmission({
+        projectId: project.id,
+        projectTitle: project.book_title,
+        authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim(),
+        projectUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/project/${project.id}`,
+      }).catch(e => console.error('Notification error:', e))
 
       return NextResponse.json({
         success: true,
@@ -243,15 +237,13 @@ export async function POST(
       await supabase.from('projects').update({ status: 'character_generation' }).eq('id', project.id)
 
       // Send notification (non-blocking)
-      try {
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-        await notifyCustomerSubmission({
-          projectId: project.id,
-          projectTitle: project.book_title,
-          authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim(),
-          projectUrl: `${baseUrl}/admin/project/${project.id}`,
-        })
-      } catch (e) { console.error('Notification error:', e) }
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+      notifyCustomerSubmission({
+        projectId: project.id,
+        projectTitle: project.book_title,
+        authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim(),
+        projectUrl: `${baseUrl}/admin/project/${project.id}`,
+      }).catch(e => console.error('Notification error:', e))
 
       // Fire-and-forget generation
       const charactersToGenerate = secondaryCharacters.filter(c => !c.image_url || c.image_url.trim() === '')
@@ -312,16 +304,14 @@ export async function POST(
 
       await supabase.from('projects').update({ status: newStatus }).eq('id', project.id)
 
-      // Notify Admin
-      try {
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-        await notifyCustomerSubmission({
-          projectId: project.id,
-          projectTitle: project.book_title,
-          authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim(),
-          projectUrl: `${baseUrl}/admin/project/${project.id}`,
-        })
-      } catch (e) { console.error('Notification error:', e) }
+      // Notify Admin (non-blocking)
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+      notifyCustomerSubmission({
+        projectId: project.id,
+        projectTitle: project.book_title,
+        authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim(),
+        projectUrl: `${baseUrl}/admin/project/${project.id}`,
+      }).catch(e => console.error('Notification error:', e))
 
       return NextResponse.json({
         success: true,
@@ -329,12 +319,6 @@ export async function POST(
         status: newStatus
       })
     }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Changes submitted and character generation started in background',
-      processing_in_background: true
-    })
   } catch (error: any) {
     console.error('Error submitting changes:', error)
     return NextResponse.json(
@@ -343,9 +327,6 @@ export async function POST(
     )
   }
 }
-
-
-
 
 
 

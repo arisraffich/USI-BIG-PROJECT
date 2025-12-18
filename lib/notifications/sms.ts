@@ -55,8 +55,6 @@ export async function sendSMS(options: {
   const normalizedTo = normalizePhoneNumber(options.to)
 
   try {
-    // console.log(`[SMS] Sending SMS to ${normalizedTo} (original: ${options.to}) from ${normalizedFrom}`)
-    // console.log(`[SMS] Message length: ${options.message.length} characters`)
 
     // Get phone number ID if we need it
     // First, try to get the phone number ID for the from number

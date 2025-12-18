@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { v4 as uuidv4 } from 'uuid'
 import { notifyProjectSentToCustomer } from '@/lib/notifications'
+import { getAppBaseUrl } from '@/lib/utils'
 
 export async function POST(
   request: NextRequest,
@@ -53,7 +54,6 @@ export async function POST(
 
     if (isIllustrationMode) {
       // --- ILLUSTRATION REVIEW MODE ---
-      console.log(`[Send to Customer] Processing Illustrations for project ${id}`)
 
       // 1. Get ALL Pages
       const { data: pages } = await supabase
@@ -113,7 +113,7 @@ export async function POST(
       if (updateError) throw updateError
 
       // 4. Notify
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+      const baseUrl = getAppBaseUrl()
       const reviewUrl = `${baseUrl}/review/${reviewToken}?tab=illustrations`
       const projectUrl = `${baseUrl}/admin/project/${id}`
 
@@ -166,10 +166,14 @@ export async function POST(
         .eq('project_id', id)
 
       const hasImages = characters?.some(c => c.image_url && c.image_url.trim() !== '' && !c.is_main) || false
+      
 
       if (characters) {
-        // ... (Keep existing character resolution logic)
+        // Process each character: resolve feedback AND sync customer_image_url
         const charUpdates = characters.map(async (char) => {
+          const updateData: any = {}
+          
+          // Resolve feedback if exists
           if (char.feedback_notes) {
             const currentHistory = Array.isArray(char.feedback_history) ? char.feedback_history : []
             const newHistory = [
@@ -177,11 +181,20 @@ export async function POST(
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               { note: char.feedback_notes, created_at: new Date().toISOString() } as any
             ]
-            return supabase.from('characters').update({
-              feedback_history: newHistory,
-              feedback_notes: null,
-              is_resolved: true
-            }).eq('id', char.id)
+            updateData.feedback_history = newHistory
+            updateData.feedback_notes = null
+            updateData.is_resolved = true
+          }
+          
+          // Sync customer_image_url (mirrors illustration approach)
+          // Customer should see the latest admin-approved image
+          if (char.image_url) {
+            updateData.customer_image_url = char.image_url
+          }
+          
+          // Only update if there's something to update
+          if (Object.keys(updateData).length > 0) {
+            return supabase.from('characters').update(updateData).eq('id', char.id)
           }
           return Promise.resolve()
         })
@@ -216,20 +229,65 @@ export async function POST(
       }
 
       // Generate review URL
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+      const baseUrl = getAppBaseUrl()
       const reviewUrl = `${baseUrl}/review/${reviewToken}?tab=characters`
       const projectUrl = `${baseUrl}/admin/project/${id}`
 
       // Send notifications
       if (project.author_email) {
-        notifyProjectSentToCustomer({
-          projectTitle: project.book_title || 'Untitled Project',
-          authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer',
+        // Fix: Use the NEW count to determine stage.
+        // If we found images (hasImages=true), we incremented the count in DB above.
+        // We must reflect that here.
+        const currentCount = project.character_send_count || 0
+        const newCount = hasImages ? currentCount + 1 : currentCount
+
+        console.log('[Send to Customer] Email decision:', {
+          hasImages,
+          currentCount,
+          newCount,
           authorEmail: project.author_email,
-          authorPhone: project.author_phone || undefined,
-          reviewUrl,
-          projectUrl,
-        }).catch((error) => console.error('[Send to Customer] Error sending notifications:', error))
+          willSendStage1: newCount === 0,
+          willSendStage2: newCount === 1,
+          willSendStage3Revision: newCount >= 2
+        })
+
+        // Determine which email template to use
+        if (newCount >= 2) {
+          // Stage 3: Revisions (Resend 1, 2, 3...)
+          const revisionRound = newCount - 1 // Round 1 = 2nd send, Round 2 = 3rd send, etc.
+          console.log('[Send to Customer] ✅ Triggering Stage 3 email (Character Revisions Round', revisionRound, ')')
+          const { notifyCharacterRevisions } = await import('@/lib/notifications')
+          notifyCharacterRevisions({
+            projectTitle: project.book_title || 'Untitled Project',
+            authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer',
+            authorEmail: project.author_email,
+            reviewUrl,
+            projectUrl,
+            revisionRound,
+          }).catch((error) => console.error('[Send to Customer] ❌ Error sending Stage 3 notifications:', error))
+        } else if (newCount === 1) {
+          // Stage 2: First-time characters ready
+          const { notifySecondaryCharactersReady } = await import('@/lib/notifications')
+          notifySecondaryCharactersReady({
+            projectTitle: project.book_title || 'Untitled Project',
+            authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer',
+            authorEmail: project.author_email,
+            reviewUrl,
+            projectUrl,
+          }).catch((error) => console.error('[Send to Customer] ❌ Error sending Stage 2 notifications:', error))
+        } else {
+          // Stage 1: Initial Definition (Count remains 0)
+          notifyProjectSentToCustomer({
+            projectTitle: project.book_title || 'Untitled Project',
+            authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer',
+            authorEmail: project.author_email,
+            authorPhone: project.author_phone || undefined,
+            reviewUrl,
+            projectUrl,
+          }).catch((error) => console.error('[Send to Customer] ❌ Error sending Stage 1 notifications:', error))
+        }
+      } else {
+        console.warn('[Send to Customer] ⚠️ No author_email found, skipping notifications')
       }
 
       return NextResponse.json({
@@ -249,9 +307,6 @@ export async function POST(
     )
   }
 }
-
-
-
 
 
 

@@ -1,12 +1,3 @@
-// export async function removeMetadata(
-//   imageBuffer: Buffer | ArrayBuffer
-// ): Promise<Buffer> {
-//   // Temporary bypass: Sharp might be creating corrupted buffers in this env.
-//   // Returning raw buffer is safer for now.
-//   return Buffer.isBuffer(imageBuffer) ? imageBuffer : Buffer.from(imageBuffer)
-// }
-
-// Keeping the function signature but making it a pass-through
 export async function removeMetadata(
   imageBuffer: Buffer | ArrayBuffer
 ): Promise<Buffer> {

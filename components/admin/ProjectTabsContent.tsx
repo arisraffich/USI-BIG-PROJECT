@@ -40,49 +40,78 @@ export function ProjectTabsContent({
   const router = useRouter()
   const pathname = usePathname()
 
+  // Local state for characters to support instant realtime updates
+  const [localCharacters, setLocalCharacters] = useState<Character[]>(characters || [])
+  
+  // Local state for project status to support instant realtime updates
+  const [localProjectStatus, setLocalProjectStatus] = useState<string>(projectStatus || 'draft')
+
+  // Sync local characters when server props update
+  useEffect(() => {
+    if (characters) {
+      setLocalCharacters(characters)
+    }
+  }, [characters])
+  
+  // Sync local project status when server props update
+  useEffect(() => {
+    if (projectStatus) {
+      setLocalProjectStatus(projectStatus)
+    }
+  }, [projectStatus])
+
   // Check if Illustrations are unlocked
-  const isIllustrationsUnlocked = projectStatus === 'characters_approved' ||
-    projectStatus === 'sketch_generation' ||
-    projectStatus === 'sketch_ready' ||
-    projectStatus === 'completed'
+  const isIllustrationsUnlocked = localProjectStatus === 'characters_approved' ||
+    localProjectStatus === 'sketch_generation' ||
+    localProjectStatus === 'sketch_ready' ||
+    localProjectStatus === 'completed'
 
   // Auto-heal status mismatch
   useEffect(() => {
-    if (projectStatus === 'illustration_approved' && illustrationStatus !== 'illustration_approved') {
+    if (localProjectStatus === 'illustration_approved' && illustrationStatus !== 'illustration_approved') {
       const supabase = createClient()
       supabase.from('projects')
         .update({ illustration_status: 'illustration_approved' })
         .eq('id', projectId)
         .then(() => {
           toast.success('Project status synchronized')
-          router.refresh()
+          // Project status update will be reflected via props on next server render
         })
     }
-  }, [projectStatus, illustrationStatus, projectId, router])
+  }, [localProjectStatus, illustrationStatus, projectId, router])
 
-  // Realtime Project Status Subscription (Admin)
+  // Automatic Switch to Illustrations Tab on Approval
+  const prevStatusRef = useRef(localProjectStatus)
   useEffect(() => {
-    const supabase = createClient()
-    const channel = supabase
-      .channel(`admin-project-status-${projectId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'projects',
-          filter: `id=eq.${projectId}`
-        },
-        () => {
-          router.refresh()
-        }
-      )
-      .subscribe()
+    const isApprovalTransition = prevStatusRef.current !== 'characters_approved' && localProjectStatus === 'characters_approved'
+    const isCharactersTab = searchParams?.get('tab') === 'characters' || (!searchParams?.get('tab') && (localProjectStatus === 'character_review' || localProjectStatus === 'character_generation'))
 
-    return () => {
-      supabase.removeChannel(channel)
+    if (isApprovalTransition && isCharactersTab) {
+      toast.success('Characters Approved! Switching to Illustrations...')
+      const params = new URLSearchParams(searchParams?.toString() || '')
+      params.set('tab', 'illustrations')
+      router.replace(`${pathname}?${params.toString()}`)
     }
-  }, [projectId, router])
+
+    prevStatusRef.current = localProjectStatus
+  }, [localProjectStatus, searchParams, router, pathname])
+
+  // Admin polling - Check for customer submission AND generation completion
+  useEffect(() => {
+    // Poll when:
+    // 1. In character_review (waiting for customer to submit)
+    // 2. In character_generation (waiting for generation to complete)
+    const shouldPoll = localProjectStatus === 'character_review' || 
+                       localProjectStatus === 'character_generation'
+    
+    if (!shouldPoll) return
+
+    const interval = setInterval(() => {
+      router.refresh()
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [localProjectStatus, router])
 
   // 1. Determine Active Tab (Hoist to top)
   const activeTab = useMemo(() => {
@@ -106,17 +135,17 @@ export function ProjectTabsContent({
   const showIllustrationsSidebar = isIllustrationsActive
   const showSidebar = showPagesSidebar || showIllustrationsSidebar
 
-  const isGenerating = projectStatus === 'character_generation'
+  const isGenerating = localProjectStatus === 'character_generation'
   const isCharactersLoading = isGenerating
   const isAnalyzing = illustrationStatus === 'analyzing'
 
   const pageCount = pages?.length || 0
-  const characterCount = characters?.length || 0
+  const characterCount = localCharacters?.length || 0
 
   // Sort characters
   const sortedCharacters = useMemo(() => {
-    if (!characters) return { main: null, secondary: [] }
-    const sorted = [...characters].sort((a, b) => {
+    if (!localCharacters) return { main: null, secondary: [] }
+    const sorted = [...localCharacters].sort((a, b) => {
       if (a.is_main && !b.is_main) return -1
       if (!a.is_main && b.is_main) return 1
       if (!a.is_main && !b.is_main) {
@@ -125,7 +154,7 @@ export function ProjectTabsContent({
       return 0
     })
     return { main: sorted.find(c => c.is_main) || null, secondary: sorted.filter(c => !c.is_main) }
-  }, [characters])
+  }, [localCharacters])
 
 
 
@@ -154,9 +183,9 @@ export function ProjectTabsContent({
 
   // Initialize forms when entering manual mode (or when characters load)
   useEffect(() => {
-    if (characters && characters.length > 0) {
+    if (localCharacters && localCharacters.length > 0) {
       const initialForms: Record<string, { data: any; isValid: boolean }> = {}
-      characters.forEach(char => {
+      localCharacters.forEach(char => {
         if (!char.is_main) {
           const isValid = !!(char.name && char.age && char.gender)
           initialForms[char.id] = { data: char, isValid }
@@ -345,8 +374,13 @@ export function ProjectTabsContent({
 
 
   const showGallery = useMemo(() => {
-    return sortedCharacters.secondary.some(c => c.image_url !== null && c.image_url !== '')
-  }, [sortedCharacters.secondary])
+    // Show gallery if:
+    // 1. Any secondary character has an image (normal case)
+    // 2. OR we're generating (so we can show cards with loading spinners)
+    const hasImages = sortedCharacters.secondary.some(c => c.image_url !== null && c.image_url !== '')
+    const isGeneratingOrComplete = localProjectStatus === 'character_generation' || localProjectStatus === 'character_generation_complete'
+    return hasImages || (isGeneratingOrComplete && sortedCharacters.secondary.length > 0)
+  }, [sortedCharacters.secondary, localProjectStatus])
 
   // Realtime subscription for character updates
   useEffect(() => {
@@ -354,27 +388,29 @@ export function ProjectTabsContent({
     const channelName = `admin-project-characters-${projectId}`
     const channel = supabase.channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'characters', filter: `project_id=eq.${projectId}` }, (payload) => {
-        if (payload.eventType === 'UPDATE') {
-          const newChar = payload.new as any
-          if (newChar.image_url && !payload.old.image_url) {
-            router.refresh()
-            toast.success('New character illustration ready', { description: `${newChar.name || newChar.role} has been generated.` })
+        if (payload.eventType === 'UPDATE' && payload.new) {
+          const updatedChar = payload.new as Character
+          setLocalCharacters(prev => prev.map(c => c.id === updatedChar.id ? { ...c, ...updatedChar } : c))
+          
+          // Toast for new image generation
+          const oldChar = payload.old as any
+          if (updatedChar.image_url && !oldChar.image_url) {
+            toast.success('New character illustration ready', { description: `${updatedChar.name || updatedChar.role} has been generated.` })
+          }
+          
+          // Toast for new customer feedback
+          if (updatedChar.feedback_notes && !oldChar.feedback_notes) {
+            toast.info('Customer feedback received', { description: `${updatedChar.name || updatedChar.role} has feedback.` })
           }
         }
-        if (payload.eventType === 'INSERT') {
-          router.refresh()
+        if (payload.eventType === 'INSERT' && payload.new) {
+          setLocalCharacters(prev => [...prev, payload.new as Character])
+          toast.info('New character added')
         }
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [projectId, router])
-
-  // Polling fallback
-  useEffect(() => {
-    if (!isGenerating) return
-    const intervalId = setInterval(() => { router.refresh() }, 4000)
-    return () => clearInterval(intervalId)
-  }, [isGenerating, router])
 
   // Realtime Pages
   useEffect(() => {
@@ -399,40 +435,10 @@ export function ProjectTabsContent({
         } else if (payload.eventType === 'INSERT' && payload.new) {
           setLocalPages(prev => [...prev, payload.new as Page])
         }
-        router.refresh()
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [projectId, router])
-
-  // Force Client-Side Fetch
-  useEffect(() => {
-    const fetchFreshPages = async () => {
-      try {
-        const response = await fetch(`/api/projects/${projectId}/pages`, {
-          cache: 'no-store',
-          headers: { 'Pragma': 'no-cache' }
-        })
-
-        if (!response.ok) return
-
-        const { pages: freshPages } = await response.json()
-
-        if (freshPages && freshPages.length > 0) {
-          setLocalPages(prev => {
-            return freshPages.map((freshPage: Page) => {
-              const existing = prev.find(p => p.id === freshPage.id)
-              return { ...existing, ...freshPage } as Page
-            })
-          })
-        }
-      } catch (e) {
-        console.error('Error fetching fresh pages:', e)
-      }
-    }
-
-    fetchFreshPages()
-  }, [projectId])
 
   // Calculate Trial Readiness
   const isTrialReady = useMemo(() => {
@@ -440,21 +446,7 @@ export function ProjectTabsContent({
     return !!(page1?.illustration_url && page1?.sketch_url)
   }, [localPages])
 
-  // Loading State
-  if (projectStatus === 'character_generation' && !showGallery) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
-        <div className="relative">
-          <div className="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-75"></div>
-          <div className="relative bg-blue-600 rounded-full p-4">
-            <Loader2 className="w-8 h-8 text-white animate-spin" />
-          </div>
-        </div>
-        <h2 className="text-xl font-semibold text-gray-900">Generating Character Images...</h2>
-        <p className="text-gray-500">The customer has submitted changes. AI is creating the illustrations.</p>
-      </div>
-    )
-  }
+  // No full-page loading - show character gallery with individual card spinners instead
 
 
 
@@ -468,14 +460,15 @@ export function ProjectTabsContent({
             book_title: projectInfo.book_title,
             author_firstname: projectInfo.author_firstname || '',
             author_lastname: projectInfo.author_lastname || '',
-            status: (projectStatus as ProjectStatus) || 'draft',
+            status: (localProjectStatus as ProjectStatus) || 'draft',
             character_send_count: projectInfo.character_send_count || 0,
             illustration_send_count: projectInfo.illustration_send_count || 0,
             review_token: projectInfo.review_token
           }}
           pageCount={pageCount}
           characterCount={characterCount}
-          hasImages={false}
+          hasImages={sortedCharacters.secondary.some(c => c.image_url !== null && c.image_url !== '')}
+          hasUnresolvedFeedback={localCharacters.some(c => c.feedback_notes && !c.is_resolved)}
           isTrialReady={isTrialReady}
           generatedIllustrationCount={localPages.filter(p => !!p.illustration_url).length}
           onCreateIllustrations={() => {
@@ -485,7 +478,7 @@ export function ProjectTabsContent({
           }}
           centerContent={
             // 1. Characters Manual Mode
-            (activeTab === 'characters' && characters && characters.length > 1 && (
+            (activeTab === 'characters' && localCharacters && localCharacters.length > 1 && (
               <div className="flex items-center gap-2">
                 {!isManualMode ? (
                   <Button
@@ -568,23 +561,23 @@ export function ProjectTabsContent({
 
         {/* Characters Tab Content */}
         <div className={activeTab === 'characters' ? 'block space-y-4' : 'hidden'}>
-          {showGallery && characters && !isManualMode ? (
+          {showGallery && localCharacters && !isManualMode ? (
             <AdminCharacterGallery
-              characters={characters}
+              characters={localCharacters}
               projectId={projectId}
-              isGenerating={projectStatus === 'character_generation'}
+              isGenerating={localProjectStatus === 'character_generation'}
             />
           ) : (
             <>
               {/* Manual mode controls moved to header */}
 
-              {characters && characters.length > 0 ? (
+              {localCharacters && localCharacters.length > 0 ? (
                 <div className="w-full">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
                     {sortedCharacters.main && (
                       <CharacterCard key={sortedCharacters.main.id} character={sortedCharacters.main} />
                     )}
-                    {characters.length <= 1 && (
+                    {localCharacters.length <= 1 && (
                       <div className="bg-[#f65952]/5 border border-[#f65952]/20 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-4 text-center min-h-[300px] animate-pulse">
                         <div className="relative">
                           <div className="absolute inset-0 bg-[#f65952] rounded-full animate-ping opacity-20"></div>
@@ -608,7 +601,7 @@ export function ProjectTabsContent({
                         onChange={handleCharacterFormChange}
                       />
                     ))}
-                    {characters.length > 1 && !isManualMode && (
+                    {localCharacters.length > 1 && !isManualMode && (
                       <div className="h-full">
                         <AddCharacterButton
                           mode="card"
@@ -624,11 +617,12 @@ export function ProjectTabsContent({
                 </p>
               )}
             </>
-          )}
-        </div>
+          )
+          }
+        </div >
 
         {/* Illustrations Tab Content */}
-        <div className={activeTab === 'illustrations' ? 'block space-y-4' : 'hidden'}>
+        < div className={activeTab === 'illustrations' ? 'block space-y-4' : 'hidden'}>
           <IllustrationsTabContent
             projectId={projectId}
             pages={localPages}
@@ -640,8 +634,8 @@ export function ProjectTabsContent({
             activePageId={activeIllustrationPageId}
             onPageChange={setActiveIllustrationPageId}
           />
-        </div>
-      </div>
-    </UnifiedProjectLayout>
+        </div >
+      </div >
+    </UnifiedProjectLayout >
   )
 }
