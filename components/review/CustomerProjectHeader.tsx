@@ -105,29 +105,53 @@ export function CustomerProjectHeader({
           currentTabId={currentTabId}
           tabs={tabs}
           centerContent={
-            // Show Approve Illustrations button centered when on illustrations tab
-            showIllustrationsTab && showSubmitButton ? (
-              <Button
-                onClick={onSubmit}
-                disabled={isSubmitting || isSubmitDisabled || isApprovedStage}
-                size="sm"
-                className="bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-semibold"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Submitting...
-                  </>
-                ) : isApprovedStage ? (
-                  <>
-                    <Check className="w-4 h-4 mr-2" />
-                    1st Illustration Approved
-                  </>
-                ) : (
-                  "Approve Illustrations"
-                )}
-              </Button>
-            ) : null
+            <>
+              {/* Approve Characters Button (Desktop - Centered) */}
+              {showApproveButton && onApprove && (
+                <Button
+                  onClick={onApprove}
+                  disabled={isApproving || isApproveDisabled}
+                  size="default"
+                  className="hidden md:flex bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-bold uppercase tracking-wide"
+                >
+                  {isApproving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      APPROVING...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      APPROVE CHARACTERS
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {/* Approve Illustrations Button (Centered) */}
+              {showIllustrationsTab && showSubmitButton && (
+                <Button
+                  onClick={onSubmit}
+                  disabled={isSubmitting || isSubmitDisabled || isApprovedStage}
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-semibold"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : isApprovedStage ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      1st Illustration Approved
+                    </>
+                  ) : (
+                    "Approve Illustrations"
+                  )}
+                </Button>
+              )}
+            </>
           }
           statusTag={
             showIllustrationsTab && isIllustrationsActive ? (
@@ -138,13 +162,13 @@ export function CustomerProjectHeader({
           }
           actions={
             <>
-              {/* Approve Button (Characters - Right Aligned) */}
+              {/* Approve Button (Mobile - Right Aligned) */}
               {showApproveButton && onApprove && (
                 <Button
                   onClick={onApprove}
                   disabled={isApproving || isApproveDisabled}
                   size="default"
-                  className="bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-bold uppercase tracking-wide"
+                  className="md:hidden bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-bold uppercase tracking-wide"
                 >
                   {isApproving ? (
                     <>
