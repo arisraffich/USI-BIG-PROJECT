@@ -253,10 +253,30 @@ export async function POST(request: NextRequest) {
     // The flow handles: Parse Story -> Create Pages -> Identify Characters -> Create Characters
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 
-    // Trigger "Reparse Story" (which now chains into "Identify Characters")
-    fetch(`${baseUrl}/api/projects/${projectId}/reparse-story`, {
-      method: 'POST',
-    }).catch(err => console.error('Failed to trigger background story parsing:', err))
+    // Add a small delay to ensure storage operations have completed
+    // This prevents race conditions where reparse-story tries to download files before they're fully saved
+    setTimeout(() => {
+      console.log(`[Background] Triggering story parsing for project ${projectId}...`)
+      
+      fetch(`${baseUrl}/api/projects/${projectId}/reparse-story`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+        .then(async (response) => {
+          if (response.ok) {
+            const data = await response.json()
+            console.log(`[Background] Story parsing succeeded for ${projectId}:`, data.message || data)
+          } else {
+            const errorText = await response.text()
+            console.error(`[Background] Story parsing failed for ${projectId} (${response.status}):`, errorText)
+          }
+        })
+        .catch(err => {
+          console.error(`[Background] Story parsing request failed for ${projectId}:`, err.message)
+        })
+    }, 2000) // 2 second delay to ensure storage operations complete
 
     // Note: We removed the direct call to identify-characters here because reparse-story now calls it.
 
