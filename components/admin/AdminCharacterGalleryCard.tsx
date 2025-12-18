@@ -70,7 +70,7 @@ export function AdminCharacterGalleryCard({ character, projectId, isGenerating =
             }
 
             toast.success('Character generated successfully')
-            router.refresh()
+            // Character update handled by realtime subscription
         } catch (error: any) {
             console.error('Regeneration error:', error)
             toast.error(error.message || 'Failed to regenerate')
@@ -95,10 +95,15 @@ export function AdminCharacterGalleryCard({ character, projectId, isGenerating =
         <div className="flex flex-col w-full gap-4">
             <Card className="flex flex-col w-full p-0 gap-0 border-0 shadow-md relative">
                 {showLoadingOverlay && (
-                    <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-50 rounded-lg">
-                        <div className="flex flex-col items-center gap-2 bg-white p-3 rounded-lg shadow-sm border">
-                            <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                            <span className="text-xs font-semibold text-blue-700">
+                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+                        <div className="flex flex-col items-center gap-3 bg-white p-4 rounded-lg shadow-lg border border-blue-200">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-75"></div>
+                                <div className="relative">
+                                    <Loader2 className="w-7 h-7 animate-spin text-blue-600" />
+                                </div>
+                            </div>
+                            <span className="text-sm font-medium text-gray-700">
                                 {isRegenerating ? 'Regenerating...' : 'Generating...'}
                             </span>
                         </div>

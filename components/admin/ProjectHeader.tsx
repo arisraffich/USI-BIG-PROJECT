@@ -45,6 +45,7 @@ interface ProjectHeaderProps {
   onCreateIllustrations?: () => void
   generatedIllustrationCount?: number
   centerContent?: React.ReactNode
+  hasUnresolvedFeedback?: boolean
 }
 
 // Define clear stage configuration
@@ -57,7 +58,7 @@ interface StageConfig {
   buttonDisabled: boolean
 }
 
-export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations, generatedIllustrationCount = 0, centerContent }: ProjectHeaderProps) {
+export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations, generatedIllustrationCount = 0, centerContent, hasUnresolvedFeedback = false }: ProjectHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -133,12 +134,12 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     // STAGE 5.5: Waiting for Review (Sent to Customer)
     if (status === 'character_review' && sendCount > 0) {
       return {
-        tag: 'Waiting for Review',
-        tagStyle: 'bg-blue-100 text-blue-800 border-blue-300',
+        tag: hasUnresolvedFeedback ? 'Customer Feedback Received' : 'Waiting for Review',
+        tagStyle: hasUnresolvedFeedback ? 'bg-yellow-100 text-yellow-800 border-yellow-300' : 'bg-blue-100 text-blue-800 border-blue-300',
         buttonLabel: 'Resend Characters',
         showCount: true,
         isResend: true,
-        buttonDisabled: true
+        buttonDisabled: !hasUnresolvedFeedback
       }
     }
 
@@ -178,15 +179,39 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
     }
 
+    // STAGE 2.3: Generating Characters (Show button but disabled)
+    if (status === 'character_generation') {
+      return {
+        tag: 'Generating Characters',
+        tagStyle: 'bg-blue-100 text-blue-800 border-blue-300',
+        buttonLabel: sendCount > 0 ? 'Resend Characters' : 'Send Characters',
+        showCount: sendCount > 0,
+        isResend: sendCount > 0,
+        buttonDisabled: true
+      }
+    }
+
     // STAGE 2.5: Characters Generated (Explicit Status)
-    // This handles cases where status is explicitly set (e.g. after customer submission), regardless of send count
+    // This handles cases where status is explicitly set (e.g. after customer submission or regeneration)
     if (status === 'character_generation_complete') {
+      // If already sent before (count > 0), this is a resend scenario
+      if (sendCount > 0) {
+        return {
+          tag: 'Characters Regenerated',
+          tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+          buttonLabel: 'Resend Characters',
+          showCount: true,
+          isResend: true,
+          buttonDisabled: false
+        }
+      }
+      // First time send
       return {
         tag: 'Characters Generated',
         tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
         buttonLabel: 'Send Characters',
         showCount: false,
-        isResend: sendCount > 0,
+        isResend: false,
         buttonDisabled: false
       }
     }
@@ -200,6 +225,19 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         buttonLabel: 'Send Characters',
         showCount: false,
         isResend: false,
+        buttonDisabled: false
+      }
+    }
+    
+    // STAGE 2.1: Images Ready (Resend Implicit)
+    // Condition: Has images and already sent before (count > 0)
+    if (hasImages && sendCount > 0) {
+      return {
+        tag: 'Characters Ready',
+        tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        buttonLabel: 'Resend Characters',
+        showCount: true,
+        isResend: true,
         buttonDisabled: false
       }
     }
@@ -312,6 +350,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       toast.success(stage.isResend ? 'Project resent to customer' : 'Project sent to customer review', {
         description: `Review URL: ${data.reviewUrl}`,
       })
+      
+      // Force immediate refresh to show updated count and resolved feedback
       router.refresh()
     } catch (error: any) {
       console.error('Error sending to customer:', error)

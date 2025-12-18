@@ -28,10 +28,10 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
 
     const handleDownload = async (e: React.MouseEvent) => {
         e.stopPropagation()
-        if (!character.image_url) return
+        if (!character.customer_image_url) return
 
         try {
-            const response = await fetch(character.image_url)
+            const response = await fetch(character.customer_image_url)
             const blob = await response.blob()
             const url = window.URL.createObjectURL(blob)
             const link = document.createElement('a')
@@ -77,7 +77,7 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
 
             toast.success('Change request saved')
             setIsEditing(false)
-            router.refresh() // Refresh to show the new note
+            // Update handled by realtime subscription
         } catch (error: any) {
             toast.error(error.message || 'Failed to save change request')
             console.error('Save error:', error)
@@ -94,9 +94,9 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
                     className="relative aspect-[9/16] w-full bg-gray-100 cursor-pointer hover:opacity-95 transition-opacity rounded-t-lg overflow-hidden"
                     onClick={() => setShowImage(true)}
                 >
-                    {character.image_url ? (
+                    {character.customer_image_url ? (
                         <img
-                            src={character.image_url}
+                            src={character.customer_image_url}
                             alt={displayName}
                             className="w-full h-full object-cover"
                         />
@@ -114,7 +114,7 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
                         </h3>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                             {/* Download Button */}
-                            {character.image_url && (
+                            {character.customer_image_url && (
                                 <div
                                     className="relative flex-shrink-0 cursor-pointer group rounded-full hover:bg-slate-100 p-1 transition-colors"
                                     onClick={handleDownload}
@@ -210,7 +210,7 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
                                 onClick={() => setIsEditing(true)}
                             >
                                 <MessageSquarePlus className="w-4 h-4" />
-                                Add Edits
+                                Request Edits
                             </Button>
                         )
                     )}
@@ -233,9 +233,9 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
                 <DialogContent className="max-w-[95vw] max-h-[95vh] w-auto h-auto p-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none">
                     <DialogTitle className="sr-only">{displayName}</DialogTitle>
                     <DialogDescription className="sr-only">Full size preview of {displayName}</DialogDescription>
-                    {character.image_url && (
+                    {character.customer_image_url && (
                         <img
-                            src={character.image_url}
+                            src={character.customer_image_url}
                             alt={displayName}
                             className="max-w-full max-h-[90vh] object-contain rounded-md"
                         />

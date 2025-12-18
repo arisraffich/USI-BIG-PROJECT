@@ -17,6 +17,7 @@ export interface Character {
   special_features?: string | null
   gender?: string | null
   image_url?: string | null
+  customer_image_url?: string | null
   feedback_notes?: string | null
   feedback_history?: Array<{ note: string; created_at: string }> | null
   is_resolved?: boolean

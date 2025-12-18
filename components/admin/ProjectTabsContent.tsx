@@ -122,9 +122,9 @@ export function ProjectTabsContent({
 
     // Default tab logic based on status
     if (isIllustrationsUnlocked) return 'illustrations'
-    if (projectStatus === 'character_review' || projectStatus === 'character_generation' || projectStatus === 'draft') return 'characters'
+    if (localProjectStatus === 'character_review' || localProjectStatus === 'character_generation' || localProjectStatus === 'draft') return 'characters'
     return 'pages'
-  }, [searchParams, isIllustrationsUnlocked, projectStatus])
+  }, [searchParams, isIllustrationsUnlocked, localProjectStatus])
 
   const isPagesActive = activeTab === 'pages'
   const isCharactersActive = activeTab === 'characters'
