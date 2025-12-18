@@ -44,11 +44,17 @@ export async function sendEmail(options: {
     const from = options.from || 'US Illustrations <info@usillustrations.com>'
 
     console.log(`[Email] Sending email to ${options.to} with subject: ${options.subject}`)
+
+    // Anti-Threading footer to prevent Gmail from collapsing emails
+    // Uses hidden div with timestamp + random string
+    const uniqueFooter = `<div style="display:none; max-height:0px; overflow:hidden;">${Date.now()}-${Math.random()}</div>`
+    const finalHtml = options.html + uniqueFooter
+
     const result = await transporter.sendMail({
       from,
       to: options.to,
       subject: options.subject,
-      html: options.html,
+      html: finalHtml,
     })
     console.log(`[Email] Email sent successfully. Message ID: ${result.messageId}`)
   } catch (error: any) {

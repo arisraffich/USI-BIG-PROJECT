@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { v4 as uuidv4 } from 'uuid'
 import { notifyProjectSentToCustomer } from '@/lib/notifications'
-import { getAppBaseUrl } from '@/lib/utils'
 
 export async function POST(
   request: NextRequest,
@@ -113,7 +112,7 @@ export async function POST(
       if (updateError) throw updateError
 
       // 4. Notify
-      const baseUrl = getAppBaseUrl()
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
       const reviewUrl = `${baseUrl}/review/${reviewToken}?tab=illustrations`
       const projectUrl = `${baseUrl}/admin/project/${id}`
 
@@ -229,7 +228,7 @@ export async function POST(
       }
 
       // Generate review URL
-      const baseUrl = getAppBaseUrl()
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
       const reviewUrl = `${baseUrl}/review/${reviewToken}?tab=characters`
       const projectUrl = `${baseUrl}/admin/project/${id}`
 
