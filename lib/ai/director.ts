@@ -56,7 +56,7 @@ export async function analyzeScene(
                 format: { type: "json_object" }
             },
             reasoning: {
-                effort: "low" // Scene analysis needs some reasoning
+                effort: "medium" // Complex multi-character coordination and spatial reasoning
             }
         })
 
