@@ -258,16 +258,19 @@ Rewrite this description as a natural 2-4 sentence paragraph that covers all 3 a
 2. Environment/setting (where, what objects/details are present)
 3. Atmosphere (mood, lighting, weather, emotional tone)
 
-RULES:
-- Preserve the author's exact words and phrases wherever possible
-- Keep the author's tone and style
+CRITICAL RULES:
+- IGNORE any meta-instructions like "This should emphasize...", "Make sure to include...", "The illustration should show...", etc.
+- These are author notes TO YOU, NOT part of the scene description
+- DO NOT include them in your output
+- Preserve the author's descriptive words and phrases, but filter out instructions
+- Keep the author's tone and style for actual scene elements
 - Add ONLY what's missing to complete all 3 aspects
 - Natural paragraph flow (not bullet points or lists)
 - 2-4 sentences total
 
 Focus on: preserving author intent, minimal additions, children's book illustration style, hand-drawn aesthetic, warm and inviting.
 
-Return ONLY the paragraph text, no labels or formatting.`
+Return ONLY the paragraph text describing the visual scene, no meta-instructions or labels.`
 
         try {
           if (!openai) throw new Error('OpenAI API key is not configured')
@@ -339,8 +342,13 @@ Format your response as 2-3 sentences that capture:
 - The setting and environment
 - The mood, lighting, and composition
 
+IMPORTANT:
+- Write ONLY the visual scene description
+- Do NOT include meta-instructions like "This should emphasize...", "Make sure to include...", etc.
+- Write as if describing what you SEE in the illustration, not what should be done
+
 Focus on: storybook illustration style, hand-drawn aesthetic, warm and inviting atmosphere, child-friendly visuals.
-Avoid: photorealistic details, complex technical elements, adult themes.
+Avoid: photorealistic details, complex technical elements, adult themes, meta-instructions.
 
 Return ONLY the description text, no additional formatting or labels.`
 
