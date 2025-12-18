@@ -276,7 +276,7 @@ Return ONLY the paragraph text, no labels or formatting.`
             model: 'gpt-5.2',
             input: enhancePrompt,
             reasoning: {
-              effort: 'none' // Creative enhancement doesn't need reasoning
+              effort: 'low' // Light reasoning to preserve author intent and balance topics
             }
           })
 
@@ -351,7 +351,7 @@ Return ONLY the description text, no additional formatting or labels.`
           model: 'gpt-5.2',
           input: descriptionPrompt,
           reasoning: {
-            effort: 'none' // Creative descriptions don't need reasoning
+            effort: 'low' // Light reasoning to analyze story and balance visual elements
           }
         })
 
