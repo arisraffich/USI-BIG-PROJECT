@@ -32,6 +32,9 @@ export function parsePages(text: string) {
     story_text: string
     scene_description: string | null
     description_auto_generated: boolean
+    character_actions?: Record<string, string> | null
+    background_elements?: string | null
+    atmosphere?: string | null
   }> = []
 
   // Split by lines but keep empty lines for context
@@ -119,6 +122,9 @@ export async function parsePagesWithAI(storyText: string): Promise<Array<{
   story_text: string
   scene_description: string | null
   description_auto_generated: boolean
+  character_actions?: Record<string, string> | null
+  background_elements?: string | null
+  atmosphere?: string | null
 }>> {
   if (!openai) {
     throw new Error('OpenAI API key is not configured')
