@@ -49,16 +49,23 @@ export async function analyzeScene(
         Only include characters that should be visible in the scene.
         `
 
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                { role: "system", content: "You are a helpful AI Director outputting valid JSON." },
-                { role: "user", content: prompt }
-            ],
-            response_format: { type: "json_object" }
+        const completion = await openai.responses.create({
+            model: "gpt-5.2",
+            input: `You are a helpful AI Director outputting valid JSON.\n\n${prompt}`,
+            text: {
+                format: { type: "json_object" }
+            },
+            reasoning: {
+                effort: "low" // Scene analysis needs some reasoning
+            }
         })
 
-        const content = completion.choices[0].message.content
+        const firstOutput = completion.output?.[0]
+        let content = null
+        if (firstOutput && 'content' in firstOutput) {
+            const firstContent = firstOutput.content?.[0]
+            content = firstContent && 'text' in firstContent ? firstContent.text : null
+        }
         if (!content) throw new Error('No content from OpenAI')
 
         const result = JSON.parse(content)

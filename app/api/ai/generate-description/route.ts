@@ -49,14 +49,20 @@ Avoid: photorealistic details, complex technical elements, adult themes.`
       )
     }
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-5.1', // Updated to GPT-5.1 with low reasoning
-      messages: [{ role: 'user', content: prompt }],
-      reasoning_effort: 'low', // Low reasoning for creative descriptions
-      // Note: temperature is not supported with reasoning_effort other than 'none'
+    const completion = await openai.responses.create({
+      model: 'gpt-5.2',
+      input: prompt,
+      reasoning: {
+        effort: 'none' // Creative descriptions don't need reasoning
+      }
     })
 
-    const description = completion.choices[0].message.content?.trim() || ''
+    const firstOutput = completion.output?.[0]
+    let description = ''
+    if (firstOutput && 'content' in firstOutput) {
+      const firstContent = firstOutput.content?.[0]
+      description = (firstContent && 'text' in firstContent ? firstContent.text?.trim() : null) || ''
+    }
 
     return NextResponse.json({ description })
   } catch (error) {

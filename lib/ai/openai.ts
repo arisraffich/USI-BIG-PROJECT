@@ -90,11 +90,15 @@ Return valid JSON only with this structure:
 
   try {
     console.log('[parseCharacterForm] Sending request to OpenAI...')
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o', // Reverting to proven model (GPT-4o) that handles PDF text reliably
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-      temperature: 0, // Standard deterministic setting for GPT-4o
+    const completion = await openai.responses.create({
+      model: 'gpt-5.2',
+      input: prompt,
+      text: {
+        format: { type: 'json_object' }
+      },
+      reasoning: {
+        effort: 'none' // Pure data extraction, no reasoning needed
+      }
     })
 
     console.log('[parseCharacterForm] OpenAI response received')
@@ -126,7 +130,12 @@ function createEmptyCharacterData() {
 }
 
 async function processCompletion(completion: any) {
-  const content = completion.choices[0].message.content || '{}'
+  const firstOutput = completion.output?.[0]
+  let content = '{}'
+  if (firstOutput && 'content' in firstOutput) {
+    const firstContent = firstOutput.content?.[0]
+    content = (firstContent && 'text' in firstContent ? firstContent.text : null) || '{}'
+  }
 
   let result
   try {

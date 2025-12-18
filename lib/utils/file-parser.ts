@@ -196,15 +196,23 @@ Example output format:
 
   try {
     console.log('[parsePagesWithAI] Starting story parsing with GPT-5.2...')
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-5.2', // Using GPT-5.2 for parsing
-      messages: [{ role: 'user', content: parsingPrompt }],
-      response_format: { type: 'json_object' },
-      reasoning_effort: 'none', // Fast parsing, no complex reasoning needed
-      temperature: 0, // For consistent extraction
+    const completion = await openai.responses.create({
+      model: 'gpt-5.2',
+      input: parsingPrompt,
+      text: {
+        format: { type: 'json_object' }
+      },
+      reasoning: {
+        effort: 'none' // Fast parsing, no complex reasoning needed
+      }
     })
 
-    const content = completion.choices[0].message.content || '{"pages": []}'
+    const firstOutput = completion.output?.[0]
+    let content = '{"pages": []}'
+    if (firstOutput && 'content' in firstOutput) {
+      const firstContent = firstOutput.content?.[0]
+      content = (firstContent && 'text' in firstContent ? firstContent.text : null) || '{"pages": []}'
+    }
     console.log('[parsePagesWithAI] Raw AI response length:', content.length)
     const result = JSON.parse(content)
 
@@ -275,14 +283,20 @@ Return ONLY the description text, no additional formatting or labels.`
       try {
         if (!openai) throw new Error('OpenAI API key is not configured')
 
-        const descriptionCompletion = await openai.chat.completions.create({
-          model: 'gpt-5.2', // Using GPT-5.2 for description generation
-          messages: [{ role: 'user', content: descriptionPrompt }],
-          reasoning_effort: 'low', // Low reasoning for creative descriptions
-          // Note: temperature is not supported with reasoning_effort other than 'none'
+        const descriptionCompletion = await openai.responses.create({
+          model: 'gpt-5.2',
+          input: descriptionPrompt,
+          reasoning: {
+            effort: 'none' // Creative descriptions don't need reasoning
+          }
         })
 
-        const generatedDescription = descriptionCompletion.choices[0].message.content?.trim() || null
+        const firstOutput = descriptionCompletion.output?.[0]
+        let generatedDescription = null
+        if (firstOutput && 'content' in firstOutput) {
+          const firstContent = firstOutput.content?.[0]
+          generatedDescription = (firstContent && 'text' in firstContent ? firstContent.text?.trim() : null) || null
+        }
 
         if (!generatedDescription) {
           throw new Error('GPT-5.2 returned empty description')

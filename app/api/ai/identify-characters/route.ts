@@ -273,11 +273,15 @@ IMPORTANT:
     let completion
     try {
       console.log('[Character ID] Calling GPT-5.2 for analysis...')
-      completion = await openai.chat.completions.create({
-        model: 'gpt-5.2', // GPT-5.2
-        messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' },
-        temperature: 0.3, // Lower temperature for more consistent identification
+      completion = await openai.responses.create({
+        model: 'gpt-5.2',
+        input: prompt,
+        text: {
+          format: { type: 'json_object' }
+        },
+        reasoning: {
+          effort: 'low' // Character identification needs some reasoning but not deep analysis
+        }
       })
     } catch (error: any) {
       const errorMessage = error.message || String(error)
@@ -286,7 +290,12 @@ IMPORTANT:
       throw new Error(`Failed to identify characters with GPT-5.2: ${errorMessage}`)
     }
 
-    const responseContent = completion.choices[0].message.content || '{}'
+    const firstOutput = completion.output?.[0]
+    let responseContent = '{}'
+    if (firstOutput && 'content' in firstOutput) {
+      const firstContent = firstOutput.content?.[0]
+      responseContent = (firstContent && 'text' in firstContent ? firstContent.text : null) || '{}'
+    }
     console.log('[Character ID] Raw AI response length:', responseContent.length)
     let identified
 
