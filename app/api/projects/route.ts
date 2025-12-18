@@ -292,8 +292,11 @@ export async function POST(request: NextRequest) {
           project_id: projectId,
           page_number: page.page_number,
           story_text: sanitizeText(page.story_text),
-          scene_description: sanitizeText(page.scene_description), // Already enhanced!
+          scene_description: sanitizeText(page.scene_description), // Display paragraph (backward compatible)
           description_auto_generated: page.description_auto_generated,
+          character_actions: page.character_actions || null, // Structured: {"CharacterName": "action"}
+          background_elements: sanitizeText(page.background_elements), // Structured: environment text
+          atmosphere: sanitizeText(page.atmosphere), // Structured: mood/lighting text
           character_ids: [],
         }))
 

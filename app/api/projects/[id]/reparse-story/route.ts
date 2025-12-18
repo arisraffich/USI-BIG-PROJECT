@@ -106,8 +106,11 @@ export async function POST(
       project_id: id,
       page_number: page.page_number,
       story_text: sanitizeText(page.story_text),
-      scene_description: sanitizeText(page.scene_description),
+      scene_description: sanitizeText(page.scene_description), // Display paragraph
       description_auto_generated: page.description_auto_generated,
+      character_actions: page.character_actions || null, // Structured JSON
+      background_elements: sanitizeText(page.background_elements), // Structured text
+      atmosphere: sanitizeText(page.atmosphere), // Structured text
       character_ids: [],
     }))
 

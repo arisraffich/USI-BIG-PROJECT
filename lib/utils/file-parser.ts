@@ -244,7 +244,7 @@ Example output format:
     pages.map(async (page) => {
       // If page already has a description from the file, enhance it to cover all 3 topics
       if (page.scene_description && page.scene_description.trim().length > 0) {
-        const enhancePrompt = `You are restructuring a scene description for a children's book illustration.
+        const enhancePrompt = `You are restructuring a scene description for a children's book illustration into a structured format.
 
 ORIGINAL DESCRIPTION (by author):
 "${page.scene_description}"
@@ -253,10 +253,22 @@ STORY TEXT (for context):
 "${page.story_text}"
 
 YOUR TASK:
-Rewrite this description as a natural 2-4 sentence paragraph that covers all 3 aspects:
-1. Character actions/emotions (what they're doing, how they feel)
-2. Environment/setting (where, what objects/details are present)
-3. Atmosphere (mood, lighting, weather, emotional tone)
+Extract and structure this description into 3 components:
+
+1. **character_actions**: Object with character names as keys and their actions/emotions as values
+   - Format: {"CharacterName": "what they're doing and how they feel"}
+   - Only include characters visible in THIS scene
+   - If no specific characters, use general descriptions like {"child": "...", "parent": "..."}
+
+2. **background_elements**: Text describing the environment/setting
+   - Where the scene takes place
+   - Objects, props, and visual details present
+   - Single descriptive text string
+
+3. **atmosphere**: Text describing mood and emotional tone
+   - Lighting, weather, time of day
+   - Emotional feeling of the scene
+   - Single descriptive text string
 
 CRITICAL RULES:
 - IGNORE any meta-instructions like "This should emphasize...", "Make sure to include...", "The illustration should show...", etc.
@@ -265,12 +277,15 @@ CRITICAL RULES:
 - Preserve the author's descriptive words and phrases, but filter out instructions
 - Keep the author's tone and style for actual scene elements
 - Add ONLY what's missing to complete all 3 aspects
-- Natural paragraph flow (not bullet points or lists)
-- 2-4 sentences total
 
 Focus on: preserving author intent, minimal additions, children's book illustration style, hand-drawn aesthetic, warm and inviting.
 
-Return ONLY the paragraph text describing the visual scene, no meta-instructions or labels.`
+Return ONLY valid JSON in this exact format:
+{
+  "character_actions": {"CharacterName": "action description"},
+  "background_elements": "environment description",
+  "atmosphere": "mood and lighting description"
+}`
 
         try {
           if (!openai) throw new Error('OpenAI API key is not configured')
@@ -278,31 +293,51 @@ Return ONLY the paragraph text describing the visual scene, no meta-instructions
           const enhanceCompletion = await openai.responses.create({
             model: 'gpt-5.2',
             input: enhancePrompt,
+            text: {
+              format: { type: 'json_object' }
+            },
             reasoning: {
               effort: 'low' // Light reasoning to preserve author intent and balance topics
             }
           })
 
           const firstOutput = enhanceCompletion.output?.[0]
-          let enhancedDescription = null
+          let enhancedJson = null
           if (firstOutput && 'content' in firstOutput) {
             const firstContent = firstOutput.content?.[0]
-            enhancedDescription = (firstContent && 'text' in firstContent ? firstContent.text?.trim() : null) || null
+            const jsonText = (firstContent && 'text' in firstContent ? firstContent.text?.trim() : null) || null
+            if (jsonText) {
+              try {
+                enhancedJson = JSON.parse(jsonText)
+              } catch (parseError) {
+                console.error(`Failed to parse JSON for page ${page.page_number}:`, parseError)
+                enhancedJson = null
+              }
+            }
           }
 
-          if (!enhancedDescription) {
-            console.warn(`GPT-5.2 returned empty enhanced description for page ${page.page_number}, using original`)
+          if (!enhancedJson || !enhancedJson.character_actions || !enhancedJson.background_elements || !enhancedJson.atmosphere) {
+            console.warn(`GPT-5.2 returned invalid structured description for page ${page.page_number}, using original`)
             return {
               ...page,
               description_auto_generated: false,
             }
           }
 
-          console.log(`[Enhanced] Page ${page.page_number}: "${page.scene_description}" → "${enhancedDescription}"`)
+          // Create display paragraph from structured data
+          const characterParts = Object.entries(enhancedJson.character_actions)
+            .map(([name, action]) => `${name} ${action}`)
+            .join(', ')
+          const displayParagraph = `${characterParts}. ${enhancedJson.background_elements}. ${enhancedJson.atmosphere}`
+
+          console.log(`[Enhanced] Page ${page.page_number}: "${page.scene_description}" → Structured JSON`)
 
           return {
             ...page,
-            scene_description: enhancedDescription,
+            scene_description: displayParagraph, // For display/backward compatibility
+            character_actions: enhancedJson.character_actions,
+            background_elements: enhancedJson.background_elements,
+            atmosphere: enhancedJson.atmosphere,
             description_auto_generated: false, // Still author-provided, just enhanced
           }
         } catch (error: any) {
@@ -326,31 +361,45 @@ Return ONLY the paragraph text describing the visual scene, no meta-instructions
       }
 
       // Generate description using GPT-5.2 as professional storyboard creator
-      const descriptionPrompt = `You are a professional storyboard creator for children's books. Create a visual scene description for an illustration based on the story text.
+      const descriptionPrompt = `You are a professional storyboard creator for children's books. Create a structured visual scene description for an illustration based on the story text.
 
 Story text: "${page.story_text}"
 
-Your task is to create a professional storyboard description that will guide an illustrator. As a storyboard creator, decide what each illustration needs:
-- Scene and environment details
-- Character actions and emotions (if relevant)
-- Composition and framing
-- Mood, lighting, and atmosphere
-- Any other visual elements needed for a compelling children's book illustration
+Your task is to create a professional storyboard description structured into 3 components:
 
-Format your response as 2-3 sentences that capture:
-- The main visual elements and action
-- The setting and environment
-- The mood, lighting, and composition
+1. **character_actions**: Object with character names as keys and their actions/emotions as values
+   - Format: {"CharacterName": "what they're doing and how they feel"}
+   - Only include characters visible in THIS scene
+   - If no specific characters named in text, use descriptive names like {"young girl": "...", "mother": "..."}
+   - Analyze the story text to identify who is present
+
+2. **background_elements**: Text describing the environment/setting
+   - Where the scene takes place
+   - Objects, props, and visual details present
+   - What the illustrator should draw in the background
+   - Single descriptive text string
+
+3. **atmosphere**: Text describing mood and emotional tone
+   - Lighting, weather, time of day
+   - Emotional feeling and composition style
+   - What mood should the illustration convey
+   - Single descriptive text string
 
 IMPORTANT:
 - Write ONLY the visual scene description
 - Do NOT include meta-instructions like "This should emphasize...", "Make sure to include...", etc.
-- Write as if describing what you SEE in the illustration, not what should be done
+- Write as if describing what you SEE in the illustration, not instructions about what should be done
+- Analyze the story text carefully to determine which characters are present
 
 Focus on: storybook illustration style, hand-drawn aesthetic, warm and inviting atmosphere, child-friendly visuals.
 Avoid: photorealistic details, complex technical elements, adult themes, meta-instructions.
 
-Return ONLY the description text, no additional formatting or labels.`
+Return ONLY valid JSON in this exact format:
+{
+  "character_actions": {"CharacterName": "action description"},
+  "background_elements": "environment description",
+  "atmosphere": "mood and lighting description"
+}`
 
       try {
         if (!openai) throw new Error('OpenAI API key is not configured')
@@ -358,25 +407,47 @@ Return ONLY the description text, no additional formatting or labels.`
         const descriptionCompletion = await openai.responses.create({
           model: 'gpt-5.2',
           input: descriptionPrompt,
+          text: {
+            format: { type: 'json_object' }
+          },
           reasoning: {
             effort: 'low' // Light reasoning to analyze story and balance visual elements
           }
         })
 
         const firstOutput = descriptionCompletion.output?.[0]
-        let generatedDescription = null
+        let generatedJson = null
         if (firstOutput && 'content' in firstOutput) {
           const firstContent = firstOutput.content?.[0]
-          generatedDescription = (firstContent && 'text' in firstContent ? firstContent.text?.trim() : null) || null
+          const jsonText = (firstContent && 'text' in firstContent ? firstContent.text?.trim() : null) || null
+          if (jsonText) {
+            try {
+              generatedJson = JSON.parse(jsonText)
+            } catch (parseError) {
+              console.error(`Failed to parse generated JSON for page ${page.page_number}:`, parseError)
+              generatedJson = null
+            }
+          }
         }
 
-        if (!generatedDescription) {
-          throw new Error('GPT-5.2 returned empty description')
+        if (!generatedJson || !generatedJson.character_actions || !generatedJson.background_elements || !generatedJson.atmosphere) {
+          throw new Error('GPT-5.2 returned invalid structured description')
         }
+
+        // Create display paragraph from structured data
+        const characterParts = Object.entries(generatedJson.character_actions)
+          .map(([name, action]) => `${name} ${action}`)
+          .join(', ')
+        const displayParagraph = `${characterParts}. ${generatedJson.background_elements}. ${generatedJson.atmosphere}`
+
+        console.log(`[Generated] Page ${page.page_number}: Structured JSON created`)
 
         return {
           ...page,
-          scene_description: generatedDescription,
+          scene_description: displayParagraph, // For display/backward compatibility
+          character_actions: generatedJson.character_actions,
+          background_elements: generatedJson.background_elements,
+          atmosphere: generatedJson.atmosphere,
           description_auto_generated: true,
         }
       } catch (error: any) {
