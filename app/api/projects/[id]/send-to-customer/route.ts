@@ -161,7 +161,7 @@ export async function POST(
       // Process "Resend" logic: Resolve feedback for regenerated characters
       const { data: characters } = await supabase
         .from('characters')
-        .select('id, feedback_notes, feedback_history, is_resolved, image_url, is_main')
+        .select('id, feedback_notes, feedback_history, is_resolved, image_url, sketch_url, is_main')
         .eq('project_id', id)
 
       const hasImages = characters?.some(c => c.image_url && c.image_url.trim() !== '' && !c.is_main) || false

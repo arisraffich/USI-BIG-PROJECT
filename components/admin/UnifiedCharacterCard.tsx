@@ -328,7 +328,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
 
     return (
         <div className="flex flex-col w-full gap-4">
-            <Card className="flex flex-col w-full p-0 gap-0 border-0 shadow-lg">
+            <Card className="flex flex-col w-full p-0 gap-0 border-0 shadow-[0_0_15px_rgba(0,0,0,0.12)]">
                 <CardContent className="flex-1 flex flex-col p-4 bg-white rounded-t-lg">
                     <div className="flex justify-between items-center gap-2 relative">
                         <div className="flex items-center gap-2">
