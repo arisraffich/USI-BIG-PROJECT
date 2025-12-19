@@ -187,6 +187,21 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
                             </h3>
                         </div>
 
+                        {/* Center: Request Edits Button (Desktop only, secondary characters only) */}
+                        {!isMain && !isEditing && !character.feedback_notes && (
+                            <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 shadow-sm bg-white"
+                                    onClick={() => setIsEditing(true)}
+                                >
+                                    <MessageSquarePlus className="w-4 h-4" />
+                                    Request Edits
+                                </Button>
+                            </div>
+                        )}
+
                         <div className="flex items-center gap-2 flex-shrink-0">
                             {/* Download Button */}
                             <button
@@ -283,7 +298,7 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
                             <Button
                                 variant="outline"
                                 size="sm"
-                                className="w-full h-10 gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 shadow-sm bg-white"
+                                className="w-full h-10 gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 shadow-sm bg-white lg:hidden"
                                 onClick={() => setIsEditing(true)}
                             >
                                 <MessageSquarePlus className="w-4 h-4" />
