@@ -29,3 +29,4 @@ CREATE INDEX IF NOT EXISTS idx_characters_is_main ON characters(is_main) WHERE i
 
 
 
+

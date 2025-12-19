@@ -9,3 +9,4 @@ WHERE project_id IN (
   WHERE character_send_count = 0 OR character_send_count IS NULL
 );
 
+

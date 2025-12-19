@@ -169,8 +169,16 @@ export async function POST(
 
       if (characters) {
         // Process each character: resolve feedback AND sync customer_image_url
+        console.log('[Send Characters] Processing', characters.length, 'characters')
+        
         const charUpdates = characters.map(async (char) => {
           const updateData: any = {}
+          
+          console.log(`[Send Characters] Character ${char.id}:`, {
+            has_image_url: !!char.image_url,
+            has_sketch_url: !!char.sketch_url,
+            is_main: char.is_main
+          })
           
           // Resolve feedback if exists
           if (char.feedback_notes) {
@@ -189,15 +197,25 @@ export async function POST(
           // Customer should see the latest admin-approved images
           if (char.image_url) {
             updateData.customer_image_url = char.image_url
+            console.log(`[Send Characters] ✅ Will sync customer_image_url for ${char.id}`)
           }
           if (char.sketch_url) {
             updateData.customer_sketch_url = char.sketch_url
+            console.log(`[Send Characters] ✅ Will sync customer_sketch_url for ${char.id}`)
           }
           
           // Only update if there's something to update
           if (Object.keys(updateData).length > 0) {
-            return supabase.from('characters').update(updateData).eq('id', char.id)
+            console.log(`[Send Characters] Updating character ${char.id} with:`, Object.keys(updateData))
+            const result = await supabase.from('characters').update(updateData).eq('id', char.id)
+            if (result.error) {
+              console.error(`[Send Characters] ❌ Error updating ${char.id}:`, result.error)
+            } else {
+              console.log(`[Send Characters] ✅ Successfully updated ${char.id}`)
+            }
+            return result
           }
+          console.log(`[Send Characters] ⏭️ Skipping ${char.id} - nothing to update`)
           return Promise.resolve()
         })
         await Promise.all(charUpdates)
@@ -309,6 +327,7 @@ export async function POST(
     )
   }
 }
+
 
 
 

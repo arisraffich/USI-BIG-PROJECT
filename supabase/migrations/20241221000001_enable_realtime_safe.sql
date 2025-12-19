@@ -41,3 +41,4 @@ BEGIN
   RAISE NOTICE 'characters already in publication (skipped)';
 END $$;
 
+

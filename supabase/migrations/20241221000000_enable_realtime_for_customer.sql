@@ -16,3 +16,4 @@ ALTER PUBLICATION supabase_realtime ADD TABLE "projects";
 -- Note: RLS policies should already allow read access via review_token
 -- If realtime still doesn't work, we may need to adjust RLS policies
 
+

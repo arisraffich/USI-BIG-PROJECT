@@ -19,3 +19,4 @@ WHERE image_url IS NOT NULL
     WHERE character_send_count > 0
   );
 
+

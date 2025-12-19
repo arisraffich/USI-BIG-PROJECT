@@ -492,3 +492,4 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
         </div>
     )
 }
+

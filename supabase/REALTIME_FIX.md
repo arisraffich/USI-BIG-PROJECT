@@ -55,3 +55,4 @@ After running the SQL, check browser console for:
 
 These logs will show if realtime events are being received.
 
+
