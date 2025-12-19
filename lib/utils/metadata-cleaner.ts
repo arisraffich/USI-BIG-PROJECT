@@ -5,14 +5,16 @@ export async function removeMetadata(
 }
 
 export function sanitizeFilename(name: string): string {
-  // Preserve case, allow spaces and apostrophes, but remove dangerous path characters
+  // Sanitize for storage bucket keys: only alphanumeric, hyphens, underscores, dots
   return name
     .trim()
-    // Remove characters invalid in file paths or URLs that cause issues
-    .replace(/[<>:"/\\|?*]+/g, '')
-    // Remove control characters
-    .replace(/[\x00-\x1F\x7F]/g, '')
-    // Replaces multiple spaces with single space
-    .replace(/\s+/g, ' ')
+    // Replace invalid characters with hyphen (including spaces, parentheses, special chars)
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    // Remove duplicate hyphens
+    .replace(/-+/g, '-')
+    // Trim hyphens from start/end
+    .replace(/^-|-$/g, '')
+    // Ensure at least some valid content
+    || 'character'
 }
 
