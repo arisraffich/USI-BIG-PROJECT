@@ -311,10 +311,7 @@ IMPORTANT:
     // STEP 5: Validate response structure
     if (!identified.secondary_characters || !Array.isArray(identified.secondary_characters)) {
       console.error('[Character ID] Invalid response structure - missing secondary_characters')
-      return NextResponse.json(
-        { error: 'Invalid response format from AI - missing secondary_characters array' },
-        { status: 500 }
-      )
+      throw new Error('Invalid response format from AI - missing secondary_characters array')
     }
 
     // Validate main_character structure if main character exists
