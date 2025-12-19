@@ -318,6 +318,30 @@ export async function POST(
               } else {
                 console.log('[Form Submit] Skipping main character sketch (no image_url)')
               }
+
+              // Trigger sketch generation for secondary characters (newly generated colored images)
+              console.log('[Form Submit] Triggering sketch generation for', results.length, 'secondary characters...')
+              results.forEach((result, idx) => {
+                if (result.success && result.imageUrl) {
+                  const character = charactersToGenerate[idx]
+                  console.log(`[Form Submit] Starting sketch for secondary character ${idx + 1}: ${character.name || character.role}`)
+                  
+                  // Fire-and-forget async sketch generation
+                  ;(async () => {
+                    const { generateCharacterSketch } = await import('@/lib/ai/character-sketch-generator')
+                    await generateCharacterSketch(
+                      character.id,
+                      result.imageUrl,
+                      project.id,
+                      character.name || character.role || 'Character'
+                    )
+                  })().catch(err => {
+                    console.error(`[Form Submit] Secondary character sketch failed for ${character.name}:`, err)
+                  })
+                } else {
+                  console.log(`[Form Submit] Skipping sketch for character ${idx + 1} (generation failed or no image)`)
+                }
+              })
             }
 
             // Notification logic...

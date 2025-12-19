@@ -26,9 +26,10 @@ export function CustomerCharacterGallery({ characters, mainCharacter }: Customer
                 </p>
             </div>
 
+            {/* Flexbox layout: Centered cards, max 3 pairs per row */}
             <div className="flex flex-wrap justify-center gap-6">
                 {displayList.map((char) => (
-                    <div key={char.id} className="w-full max-w-[220px]">
+                    <div key={char.id} className="w-full md:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)]">
                         <CustomerCharacterGalleryCard
                             character={char}
                             isMain={char.is_main}

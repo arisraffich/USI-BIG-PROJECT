@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { Character } from '@/types/character'
 import { Button } from '@/components/ui/button'
@@ -7,54 +7,121 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { MessageSquarePlus, Save, Loader2, CheckCircle2, Info, Download } from 'lucide-react'
-
-// ... existing imports ...
+import { createClient } from '@/lib/supabase/client'
 
 interface CustomerCharacterGalleryCardProps {
     character: Character
     isMain?: boolean
 }
 
+interface SubCardProps {
+    title: string
+    imageUrl: string | null | undefined
+    onClick: () => void
+    characterName: string
+}
+
+function SubCard({ title, imageUrl, onClick, characterName }: SubCardProps) {
+    return (
+        <div className="relative">
+            {/* Image Container */}
+            <div 
+                className="aspect-[9/16] bg-gray-100 rounded-lg cursor-pointer hover:opacity-95 transition-opacity overflow-hidden"
+                onClick={imageUrl ? onClick : undefined}
+            >
+                {imageUrl ? (
+                    <img 
+                        src={imageUrl} 
+                        alt={`${characterName} - ${title}`} 
+                        className="w-full h-full object-cover"
+                    />
+                ) : (
+                    <div className="flex items-center justify-center h-full text-gray-400">
+                        <span className="text-sm">No Image</span>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
 export function CustomerCharacterGalleryCard({ character, isMain = false }: CustomerCharacterGalleryCardProps) {
     const [isEditing, setIsEditing] = useState(false)
     const [notes, setNotes] = useState(character.feedback_notes || '')
     const [isSaving, setIsSaving] = useState(false)
-    const [showImage, setShowImage] = useState(false)
+    const [showLightbox, setShowLightbox] = useState(false)
+    const [lightboxImage, setLightboxImage] = useState<'sketch' | 'colored' | null>(null)
     const [showTooltip, setShowTooltip] = useState(false)
+    const [localCharacter, setLocalCharacter] = useState(character)
+    const router = useRouter()
+
+    // Update local character when prop changes
+    useEffect(() => {
+        setLocalCharacter(character)
+    }, [character])
+
+    // Realtime subscription for sketch updates
+    useEffect(() => {
+        const supabase = createClient()
+        const channel = supabase
+            .channel(`customer-character-sketch-${character.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'characters',
+                    filter: `id=eq.${character.id}`
+                },
+                (payload) => {
+                    if (payload.new) {
+                        setLocalCharacter(payload.new as Character)
+                        router.refresh()
+                    }
+                }
+            )
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [character.id, router])
 
     const displayName = isMain
         ? 'Main Character'
         : (character.name || character.role || 'Unnamed Character')
 
-    const handleDownload = async (e: React.MouseEvent) => {
+    const handleDownload = async (type: 'sketch' | 'colored', e: React.MouseEvent) => {
         e.stopPropagation()
-        if (!character.customer_image_url) return
+        const imageUrl = type === 'sketch' ? localCharacter.customer_sketch_url : localCharacter.customer_image_url
+        if (!imageUrl) {
+            toast.error('No image to download')
+            return
+        }
 
         try {
-            const response = await fetch(character.customer_image_url)
+            const response = await fetch(imageUrl)
             const blob = await response.blob()
             const url = window.URL.createObjectURL(blob)
             const link = document.createElement('a')
             link.href = url
-            const cleanName = `${character.name || character.role || 'Character'}.png`
-            link.download = cleanName
+            const filename = `${character.name || character.role || 'Character'}-${type}.png`
+            link.download = filename
             document.body.appendChild(link)
             link.click()
             document.body.removeChild(link)
             window.URL.revokeObjectURL(url)
-            toast.success('Image downloaded')
+            toast.success(`${type === 'sketch' ? 'Sketch' : 'Colored image'} downloaded`)
         } catch (error) {
             console.error('Download failed:', error)
             toast.error('Failed to download image')
         }
     }
 
-    // ... handleSaveNotes ...
-
-
-    const router = useRouter() // Initialize router
-
-    // ...
+    const handleOpenLightbox = (type: 'sketch' | 'colored') => {
+        setLightboxImage(type)
+        setShowLightbox(true)
+    }
 
     const handleSaveNotes = async () => {
         if (!notes.trim()) {
@@ -86,44 +153,18 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
         }
     }
 
+    const displaySketchImageUrl = localCharacter.customer_sketch_url
+    const displayColoredImageUrl = localCharacter.customer_image_url
+    const lightboxImageUrl = lightboxImage === 'sketch' ? displaySketchImageUrl : displayColoredImageUrl
+
     return (
         <div className="flex flex-col w-full gap-4">
-            {/* Character Card */}
-            <Card className="flex flex-col w-full p-0 gap-0 border-0 shadow-md relative">
-                <div
-                    className="relative aspect-[9/16] w-full bg-gray-100 cursor-pointer hover:opacity-95 transition-opacity rounded-t-lg overflow-hidden"
-                    onClick={() => setShowImage(true)}
-                >
-                    {character.customer_image_url ? (
-                        <img
-                            src={character.customer_image_url}
-                            alt={displayName}
-                            className="w-full h-full object-cover"
-                        />
-                    ) : (
-                        <div className="flex items-center justify-center w-full h-full text-gray-400">
-                            <span className="text-lg">No Image</span>
-                        </div>
-                    )}
-                </div>
-
-                <CardContent className="flex-1 flex flex-col p-4 bg-white rounded-b-lg">
-                    <div className="flex justify-between items-start gap-2 relative">
-                        <h3 className="font-bold text-lg text-gray-900 leading-tight">
-                            {displayName.length > 14 ? `${displayName.slice(0, 14)}...` : displayName}
-                        </h3>
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                            {/* Download Button */}
-                            {character.customer_image_url && (
-                                <div
-                                    className="relative flex-shrink-0 cursor-pointer group rounded-full hover:bg-slate-100 p-1 transition-colors"
-                                    onClick={handleDownload}
-                                    title="Download image"
-                                >
-                                    <Download className="w-5 h-5 text-slate-400 group-hover:text-slate-700" />
-                                </div>
-                            )}
-
+            {/* Character Card with Paired Images */}
+            <Card className="flex flex-col w-full p-0 gap-0 border-0 shadow-md">
+                <CardContent className="flex-1 flex flex-col p-4 bg-white rounded-t-lg">
+                    <div className="flex justify-between items-center gap-2 relative">
+                        <div className="flex items-center gap-2">
+                            {/* Info Button - Left Side */}
                             {(character.story_role || character.role) && (
                                 <div
                                     className="relative flex-shrink-0"
@@ -132,17 +173,53 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
                                 >
                                     <Info className="w-5 h-5 fill-slate-900 text-white hover:fill-slate-700 cursor-help transition-colors" />
                                     {showTooltip && (
-                                        <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-md shadow-xl z-50">
-                                            <div className="absolute bottom-[-4px] right-1 w-2 h-2 bg-slate-800 rotate-45"></div>
+                                        <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-md shadow-xl z-50 text-left">
+                                            <div className="absolute bottom-[-4px] left-1 w-2 h-2 bg-slate-800 rotate-45"></div>
                                             <p className="font-bold mb-1 text-sm">{isMain ? `${character.name || character.role || 'Character'} | Main Character` : displayName}</p>
                                             <p className="leading-relaxed whitespace-pre-wrap select-text">{character.story_role || character.role}</p>
                                         </div>
                                     )}
                                 </div>
                             )}
+                            
+                            <h3 className="font-bold text-lg text-gray-900 leading-tight">
+                                {displayName.length > 14 ? `${displayName.slice(0, 14)}...` : displayName}
+                            </h3>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            {/* Download Button */}
+                            <button
+                                onClick={(e) => handleDownload('colored', e)}
+                                disabled={!displayColoredImageUrl}
+                                className="transition-opacity disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
+                                title="Download"
+                            >
+                                <Download className="w-[18px] h-[18px] text-gray-700" />
+                            </button>
                         </div>
                     </div>
                 </CardContent>
+
+                {/* Inner Grid: Sketch + Colored */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4">
+                    <div className="order-2 sm:order-1">
+                        <SubCard
+                            title="Sketch"
+                            imageUrl={displaySketchImageUrl}
+                            onClick={() => handleOpenLightbox('sketch')}
+                            characterName={displayName}
+                        />
+                    </div>
+                    <div className="order-1 sm:order-2">
+                        <SubCard
+                            title="Colored"
+                            imageUrl={displayColoredImageUrl}
+                            onClick={() => handleOpenLightbox('colored')}
+                            characterName={displayName}
+                        />
+                    </div>
+                </div>
             </Card>
 
             {/* Actions & Feedback Section - Outside Card */}
@@ -229,14 +306,14 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
             )}
 
             {/* Full View Lightbox */}
-            <Dialog open={showImage} onOpenChange={setShowImage}>
+            <Dialog open={showLightbox} onOpenChange={setShowLightbox}>
                 <DialogContent className="max-w-[95vw] max-h-[95vh] w-auto h-auto p-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none">
-                    <DialogTitle className="sr-only">{displayName}</DialogTitle>
-                    <DialogDescription className="sr-only">Full size preview of {displayName}</DialogDescription>
-                    {character.customer_image_url && (
+                    <DialogTitle className="sr-only">{displayName} - {lightboxImage}</DialogTitle>
+                    <DialogDescription className="sr-only">Full size preview of {displayName} - {lightboxImage}</DialogDescription>
+                    {lightboxImageUrl && (
                         <img
-                            src={character.customer_image_url}
-                            alt={displayName}
+                            src={lightboxImageUrl}
+                            alt={`${displayName} - ${lightboxImage}`}
                             className="max-w-full max-h-[90vh] object-contain rounded-md"
                         />
                     )}

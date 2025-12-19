@@ -23,16 +23,17 @@ export function AdminCharacterGallery({ characters, projectId, isGenerating = fa
     })
 
     return (
-        <div className="container mx-auto max-w-7xl">
-            {/* 6-column grid: Each UnifiedCharacterCard spans 2 columns = 3 pairs per row on desktop */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
+        <div className="container mx-auto max-w-7xl px-4">
+            {/* Flexbox layout: Centered cards, max 3 pairs per row */}
+            <div className="flex flex-wrap justify-center gap-6">
                 {sortedCharacters.map((character) => (
-                    <UnifiedCharacterCard
-                        key={character.id}
-                        character={character}
-                        projectId={projectId}
-                        isGenerating={isGenerating}
-                    />
+                    <div key={character.id} className="w-full md:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)]">
+                        <UnifiedCharacterCard
+                            character={character}
+                            projectId={projectId}
+                            isGenerating={isGenerating}
+                        />
+                    </div>
                 ))}
             </div>
         </div>

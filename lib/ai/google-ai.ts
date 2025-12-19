@@ -6,6 +6,52 @@ const ILLUSTRATION_MODEL = 'gemini-3-pro-image-preview' // Nano Banana Pro
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 
+// Retry configuration
+const MAX_RETRIES = 3
+const INITIAL_DELAY_MS = 2000 // 2 seconds
+const MAX_DELAY_MS = 30000 // 30 seconds
+
+/**
+ * Retry wrapper with exponential backoff for API calls
+ * Handles transient errors like 503 (Service Unavailable)
+ */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  context: string,
+  maxRetries = MAX_RETRIES
+): Promise<T> {
+  let lastError: Error | null = null
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (error: any) {
+      lastError = error
+      
+      // Check if error is retryable (503, 429, or network errors)
+      const isRetryable = 
+        error.message?.includes('503') || 
+        error.message?.includes('429') ||
+        error.message?.includes('overloaded') ||
+        error.message?.includes('UNAVAILABLE')
+      
+      if (!isRetryable || attempt === maxRetries) {
+        console.error(`[${context}] ❌ Non-retryable error or max retries reached:`, error.message)
+        throw error
+      }
+      
+      // Calculate delay with exponential backoff
+      const delay = Math.min(INITIAL_DELAY_MS * Math.pow(2, attempt), MAX_DELAY_MS)
+      console.log(`[${context}] ⚠️ Attempt ${attempt + 1}/${maxRetries + 1} failed: ${error.message}`)
+      console.log(`[${context}] ⏳ Retrying in ${delay}ms...`)
+      
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+  
+  throw lastError || new Error('All retries failed')
+}
+
 interface CharacterReference {
     name: string
     imageUrl: string
@@ -159,18 +205,21 @@ export async function generateIllustration({
             }
         }
 
-        const response = await fetch(`${BASE_URL}/${ILLUSTRATION_MODEL}:generateContent?key=${API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
+        // Wrap API call in retry logic
+        const result = await retryWithBackoff(async () => {
+            const response = await fetch(`${BASE_URL}/${ILLUSTRATION_MODEL}:generateContent?key=${API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
 
-        if (!response.ok) {
-            const txt = await response.text()
-            throw new Error(`Google API Error: ${response.status} - ${txt}`)
-        }
+            if (!response.ok) {
+                const txt = await response.text()
+                throw new Error(`Google API Error: ${response.status} - ${txt}`)
+            }
 
-        const result = await response.json()
+            return await response.json()
+        }, 'Generate Illustration')
 
         const candidate = result.candidates?.[0]?.content?.parts?.[0]
         const base64Image = candidate?.inline_data?.data || candidate?.inlineData?.data
@@ -230,18 +279,21 @@ export async function generateSketch(
         }
 
         // Use the same image generation model for sketches for now, as 1.5 Flash is text-only
-        const response = await fetch(`${BASE_URL}/${ILLUSTRATION_MODEL}:generateContent?key=${API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
+        // Wrap API call in retry logic
+        const result = await retryWithBackoff(async () => {
+            const response = await fetch(`${BASE_URL}/${ILLUSTRATION_MODEL}:generateContent?key=${API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
 
-        if (!response.ok) {
-            const txt = await response.text()
-            throw new Error(`Google API Error (Sketch): ${response.status} - ${txt}`)
-        }
+            if (!response.ok) {
+                const txt = await response.text()
+                throw new Error(`Google API Error (Sketch): ${response.status} - ${txt}`)
+            }
 
-        const result = await response.json()
+            return await response.json()
+        }, 'Generate Sketch')
         const candidate = result.candidates?.[0]?.content?.parts?.[0]
         const base64Image = candidate?.inline_data?.data || candidate?.inlineData?.data
         if (!base64Image) {

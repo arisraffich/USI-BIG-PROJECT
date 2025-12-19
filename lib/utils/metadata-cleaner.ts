@@ -1,7 +1,26 @@
+import sharp from 'sharp'
+
 export async function removeMetadata(
   imageBuffer: Buffer | ArrayBuffer
 ): Promise<Buffer> {
-  return Buffer.isBuffer(imageBuffer) ? imageBuffer : Buffer.from(imageBuffer)
+  try {
+    const buffer = Buffer.isBuffer(imageBuffer)
+      ? imageBuffer
+      : Buffer.from(imageBuffer)
+
+    // Remove all metadata (EXIF, IPTC, XMP)
+    const cleanedBuffer = await sharp(buffer)
+      .withMetadata(false)
+      .toBuffer()
+
+    console.log('✅ [METADATA] Removed AI metadata from image')
+
+    return cleanedBuffer
+
+  } catch (error) {
+    console.error('❌ [METADATA] Error during removal:', error)
+    return Buffer.isBuffer(imageBuffer) ? imageBuffer : Buffer.from(imageBuffer)
+  }
 }
 
 export function sanitizeFilename(name: string): string {

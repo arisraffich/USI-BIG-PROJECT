@@ -89,7 +89,10 @@ export async function POST(request: NextRequest) {
     // Dynamically import to avoid top-level issues if any
     const { generateCharacterImage } = await import('@/lib/ai/character-generator')
 
+    console.log(`[Character Generate] 🎨 Starting generation for ${charactersToGenerate.length} character(s)`)
+    
     for (const character of charactersToGenerate) {
+      console.log(`[Character Generate] Processing: ${character.name || character.role || character.id}`)
       try {
         // Pass custom_prompt only if generating a single character (implied by this loop structure if simple)
         // But logical safety: if bulk, we probably don't want same prompt for all.
@@ -100,6 +103,8 @@ export async function POST(request: NextRequest) {
 
         const result = await generateCharacterImage(character, referenceImage, project_id, custom_prompt)
 
+        console.log(`[Character Generate] Result for ${character.name || character.role}: ${result.success ? '✅ SUCCESS' : '❌ FAILED'}`)
+        
         results.push({
           character_id: character.id,
           success: result.success,
@@ -109,15 +114,22 @@ export async function POST(request: NextRequest) {
 
         // Trigger sketch generation asynchronously after successful colored generation
         if (result.success && result.imageUrl) {
+          console.log(`[Character Generate] ✅ Colored complete for ${character.name || character.role}, triggering sketch...`)
           ;(async () => {
-            const { generateCharacterSketch } = await import('@/lib/ai/character-sketch-generator')
-            await generateCharacterSketch(
-              character.id,
-              result.imageUrl,
-              project_id,
-              character.name || character.role || 'Character'
-            )
+            try {
+              const { generateCharacterSketch } = await import('@/lib/ai/character-sketch-generator')
+              await generateCharacterSketch(
+                character.id,
+                result.imageUrl,
+                project_id,
+                character.name || character.role || 'Character'
+              )
+            } catch (sketchError) {
+              console.error(`[Character Generate] ❌ Sketch generation failed for ${character.name || character.role}:`, sketchError)
+            }
           })()
+        } else {
+          console.log(`[Character Generate] ⚠️ Skipping sketch for ${character.name || character.role} - colored generation failed or no image URL`)
         }
       } catch (error: any) {
         // Should catch errors that escaped generateCharacterImage
@@ -144,6 +156,8 @@ export async function POST(request: NextRequest) {
 
     // Update project status if all succeeded
     const allSucceeded = results.every((r) => r.success)
+    console.log(`[Character Generate] 📊 Summary: ${results.filter(r => r.success).length}/${results.length} succeeded`)
+    
     if (allSucceeded && results.length > 0) {
       // Determine appropriate status based on whether this is first generation or regeneration
       const { data: project } = await supabase

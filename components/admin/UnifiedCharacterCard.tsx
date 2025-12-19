@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
-import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info } from 'lucide-react'
+import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, Download, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { Character } from '@/types/character'
 import { useRouter } from 'next/navigation'
@@ -21,16 +21,15 @@ interface SubCardProps {
     isLoading: boolean
     onClick: () => void
     characterName: string
+    onDownload?: (e: React.MouseEvent) => void
+    onUpload?: (e: React.ChangeEvent<HTMLInputElement>) => void
+    showUpload?: boolean
+    showDownload?: boolean
 }
 
-function SubCard({ title, imageUrl, isLoading, onClick, characterName }: SubCardProps) {
+function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownload, onUpload, showUpload = false, showDownload = true }: SubCardProps) {
     return (
         <div className="relative">
-            {/* Title Badge */}
-            <div className="absolute top-2 left-2 z-10 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-xs font-semibold shadow-sm">
-                {title}
-            </div>
-            
             {/* Image Container */}
             <div 
                 className="aspect-[9/16] bg-gray-100 rounded-lg cursor-pointer hover:opacity-95 transition-opacity overflow-hidden"
@@ -172,6 +171,77 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
         setShowLightbox(true)
     }
 
+    const handleDownload = async (type: 'sketch' | 'colored', e: React.MouseEvent) => {
+        e.stopPropagation()
+        const imageUrl = type === 'sketch' ? displaySketchImageUrl : displayColoredImageUrl
+        if (!imageUrl) {
+            toast.error('No image to download')
+            return
+        }
+
+        try {
+            const response = await fetch(imageUrl)
+            const blob = await response.blob()
+            const url = window.URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            const filename = `${character.name || character.role || 'Character'}-${type}.png`
+            link.download = filename
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            window.URL.revokeObjectURL(url)
+            toast.success(`${type === 'sketch' ? 'Sketch' : 'Colored image'} downloaded`)
+        } catch (error) {
+            console.error('Download failed:', error)
+            toast.error('Failed to download image')
+        }
+    }
+
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('character_id', character.id)
+        formData.append('project_id', projectId)
+
+        setIsRegenerating(true)
+        try {
+            const response = await fetch('/api/characters/upload', {
+                method: 'POST',
+                body: formData,
+            })
+
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(data.error || 'Upload failed')
+            }
+
+            const data = await response.json()
+            toast.success('Image uploaded successfully')
+            
+            // Preload the new image
+            if (data.imageUrl) {
+                await new Promise((resolve) => {
+                    const img = new Image()
+                    img.onload = resolve
+                    img.onerror = resolve
+                    img.src = data.imageUrl
+                })
+                setOptimisticColoredImage(data.imageUrl)
+            }
+        } catch (error: any) {
+            console.error('Upload error:', error)
+            toast.error(error.message || 'Failed to upload image')
+        } finally {
+            setIsRegenerating(false)
+            // Reset file input
+            e.target.value = ''
+        }
+    }
+
     const displayName = character.is_main
         ? 'Main Character'
         : (character.name || character.role || 'Unnamed Character')
@@ -188,33 +258,57 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     const lightboxImageUrl = lightboxImage === 'sketch' ? displaySketchImageUrl : displayColoredImageUrl
 
     return (
-        <div className="col-span-1 md:col-span-1 lg:col-span-2 flex flex-col w-full gap-4">
+        <div className="flex flex-col w-full gap-4">
             <Card className="flex flex-col w-full p-0 gap-0 border-0 shadow-md">
-                {/* Inner Grid: Sketch + Colored */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4">
-                    <SubCard
-                        title="Sketch"
-                        imageUrl={displaySketchImageUrl}
-                        isLoading={showSketchLoading}
-                        onClick={() => handleOpenLightbox('sketch')}
-                        characterName={displayName}
-                    />
-                    <SubCard
-                        title="Colored"
-                        imageUrl={displayColoredImageUrl}
-                        isLoading={showColoredLoading}
-                        onClick={() => handleOpenLightbox('colored')}
-                        characterName={displayName}
-                    />
-                </div>
-
-                <CardContent className="flex-1 flex flex-col p-4 bg-white rounded-b-lg">
+                <CardContent className="flex-1 flex flex-col p-4 bg-white rounded-t-lg">
                     <div className="flex justify-between items-center gap-2 relative">
-                        <h3 className="font-bold text-lg text-gray-900 leading-tight">
-                            {displayName.length > 14 ? `${displayName.slice(0, 14)}...` : displayName}
-                        </h3>
+                        <div className="flex items-center gap-2">
+                            {/* Info Button - Left Side */}
+                            {character.story_role && (
+                                <div
+                                    className="relative flex-shrink-0"
+                                    onMouseEnter={() => setShowTooltip(true)}
+                                    onMouseLeave={() => setShowTooltip(false)}
+                                >
+                                    <Info className="w-5 h-5 fill-slate-900 text-white hover:fill-slate-700 cursor-help transition-colors" />
+                                    {showTooltip && (
+                                        <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-md shadow-xl z-50 text-left">
+                                            <div className="absolute bottom-[-4px] left-1 w-2 h-2 bg-slate-800 rotate-45"></div>
+                                            <p className="font-bold mb-1 text-sm">{character.is_main ? `${character.name || character.role || 'Character'} | Main Character` : displayName}</p>
+                                            <p className="leading-relaxed whitespace-pre-wrap select-text">{character.story_role}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            
+                            <h3 className="font-bold text-lg text-gray-900 leading-tight">
+                                {displayName.length > 14 ? `${displayName.slice(0, 14)}...` : displayName}
+                            </h3>
+                        </div>
 
                         <div className="flex items-center gap-2 flex-shrink-0">
+                            {/* Download Button */}
+                            <button
+                                onClick={(e) => handleDownload('colored', e)}
+                                disabled={!displayColoredImageUrl}
+                                className="transition-opacity disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
+                                title="Download"
+                            >
+                                <Download className="w-[18px] h-[18px] text-gray-700" />
+                            </button>
+
+                            {/* Upload Button */}
+                            <label className="transition-opacity cursor-pointer hover:opacity-80">
+                                <Upload className="w-[18px] h-[18px] text-orange-600" />
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleUpload}
+                                    disabled={isRegenerating}
+                                />
+                            </label>
+
                             {/* Regenerate Dialog Trigger - Icon Only */}
                             {!character.is_main && (
                                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -255,26 +349,37 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                                     </DialogContent>
                                 </Dialog>
                             )}
-
-                            {character.story_role && (
-                                <div
-                                    className="relative flex-shrink-0"
-                                    onMouseEnter={() => setShowTooltip(true)}
-                                    onMouseLeave={() => setShowTooltip(false)}
-                                >
-                                    <Info className="w-5 h-5 fill-slate-900 text-white hover:fill-slate-700 cursor-help transition-colors" />
-                                    {showTooltip && (
-                                        <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-md shadow-xl z-50 text-left">
-                                            <div className="absolute bottom-[-4px] right-1 w-2 h-2 bg-slate-800 rotate-45"></div>
-                                            <p className="font-bold mb-1 text-sm">{character.is_main ? `${character.name || character.role || 'Character'} | Main Character` : displayName}</p>
-                                            <p className="leading-relaxed whitespace-pre-wrap select-text">{character.story_role}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     </div>
                 </CardContent>
+
+                {/* Inner Grid: Sketch + Colored */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4">
+                    <div className="order-2 sm:order-1">
+                        <SubCard
+                            title="Sketch"
+                            imageUrl={displaySketchImageUrl}
+                            isLoading={showSketchLoading}
+                            onClick={() => handleOpenLightbox('sketch')}
+                            characterName={displayName}
+                            showDownload={false}
+                            showUpload={false}
+                        />
+                    </div>
+                    <div className="order-1 sm:order-2">
+                        <SubCard
+                            title="Colored"
+                            imageUrl={displayColoredImageUrl}
+                            isLoading={showColoredLoading}
+                            onClick={() => handleOpenLightbox('colored')}
+                            characterName={displayName}
+                            onDownload={(e) => handleDownload('colored', e)}
+                            onUpload={handleUpload}
+                            showDownload={true}
+                            showUpload={true}
+                        />
+                    </div>
+                </div>
             </Card>
 
             {/* Actions & Feedback Section - Outside Card */}
