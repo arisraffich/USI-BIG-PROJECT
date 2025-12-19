@@ -109,17 +109,60 @@ export async function POST(request: NextRequest) {
 
         // Trigger sketch generation asynchronously after successful colored generation
         if (result.success && result.imageUrl) {
-          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-          fetch(`${baseUrl}/api/characters/generate-sketch`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              characterId: character.id,
-              imageUrl: result.imageUrl
-            })
-          }).catch(err => {
-            console.error(`[Character Generation] Failed to trigger sketch for ${character.id}:`, err)
-          })
+          ;(async () => {
+            try {
+              const { generateSketch } = await import('@/lib/ai/google-ai')
+              const { sanitizeFilename } = await import('@/lib/utils/metadata-cleaner')
+              
+              const prompt = `Convert the illustration into a loose, natural pencil draft sketch with real pencil texture. 
+Black and white only. Use rough graphite lines with visible grain, uneven pressure, slight wobble, and broken strokes. 
+Include light construction lines, faint smudges, and subtle overlapping marks. 
+No digital-looking smooth lines. No fills or gradients.
+
+Preserve every character, pose, expression, and composition exactly, but make the linework look hand-drawn with a physical pencil on paper.
+
+ABSOLUTE FIDELITY RULES — NO EXCEPTIONS:
+
+1. Do NOT add, invent, or complete any element that does not exist in the original illustration. 
+2. Do NOT remove or omit any element from the original illustration. 
+3. The sketch must be a 1:1 structural replica of the original illustration.`
+              
+              const sketchResult = await generateSketch(result.imageUrl, prompt)
+              
+              if (sketchResult.success && sketchResult.imageBuffer) {
+                const timestamp = Date.now()
+                const characterName = sanitizeFilename(character.name || character.role || 'character')
+                const filename = `${project_id}/characters/${characterName}-sketch-${timestamp}.png`
+                
+                const { error: uploadError } = await supabase.storage
+                  .from('character-sketches')
+                  .upload(filename, sketchResult.imageBuffer, {
+                    contentType: 'image/png',
+                    upsert: true
+                  })
+                
+                if (!uploadError) {
+                  const { data: urlData } = supabase.storage
+                    .from('character-sketches')
+                    .getPublicUrl(filename)
+                  
+                  await supabase
+                    .from('characters')
+                    .update({
+                      sketch_url: urlData.publicUrl,
+                      sketch_prompt: prompt
+                    })
+                    .eq('id', character.id)
+                  
+                  console.log(`[Character Generation] ✅ Sketch generated for ${character.name || character.role}`)
+                } else {
+                  console.error(`[Character Generation] Sketch upload error for ${character.id}:`, uploadError)
+                }
+              }
+            } catch (err) {
+              console.error(`[Character Generation] Failed to generate sketch for ${character.id}:`, err)
+            }
+          })()
         }
       } catch (error: any) {
         // Should catch errors that escaped generateCharacterImage
