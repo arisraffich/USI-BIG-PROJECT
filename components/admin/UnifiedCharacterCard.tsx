@@ -46,6 +46,25 @@ function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownloa
                         <span className="text-sm">No Image</span>
                     </div>
                 )}
+
+                {/* Upload Button Overlay - Top Right ONLY */}
+                {imageUrl && showUpload && onUpload && (
+                    <div className="absolute top-2 right-2">
+                        <label 
+                            className="bg-white/90 hover:bg-white p-2 rounded-md shadow-md transition-all backdrop-blur-sm cursor-pointer"
+                            onClick={(e) => e.stopPropagation()}
+                            title="Upload"
+                        >
+                            <Upload className="w-4 h-4 text-orange-600" />
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={onUpload}
+                            />
+                        </label>
+                    </div>
+                )}
             </div>
             
             {/* Loading Overlay */}
@@ -198,7 +217,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
         }
     }
 
-    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleUploadColored = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
 
@@ -220,7 +239,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             }
 
             const data = await response.json()
-            toast.success('Image uploaded successfully')
+            toast.success('Colored image uploaded successfully')
             
             // Preload the new image
             if (data.imageUrl) {
@@ -234,7 +253,55 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             }
         } catch (error: any) {
             console.error('Upload error:', error)
-            toast.error(error.message || 'Failed to upload image')
+            toast.error(error.message || 'Failed to upload colored image')
+        } finally {
+            setIsRegenerating(false)
+            // Reset file input
+            e.target.value = ''
+        }
+    }
+
+    const handleUploadSketch = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('character_id', character.id)
+        formData.append('project_id', projectId)
+
+        setIsRegenerating(true)
+        try {
+            const response = await fetch('/api/characters/upload-sketch', {
+                method: 'POST',
+                body: formData,
+            })
+
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(data.error || 'Upload failed')
+            }
+
+            const data = await response.json()
+            toast.success('Sketch uploaded successfully')
+            
+            // Preload the new sketch
+            if (data.sketchUrl) {
+                await new Promise((resolve) => {
+                    const img = new Image()
+                    img.onload = resolve
+                    img.onerror = resolve
+                    img.src = data.sketchUrl
+                })
+                // Update local character with new sketch
+                setLocalCharacter({
+                    ...localCharacter,
+                    sketch_url: data.sketchUrl
+                })
+            }
+        } catch (error: any) {
+            console.error('Upload error:', error)
+            toast.error(error.message || 'Failed to upload sketch')
         } finally {
             setIsRegenerating(false)
             // Reset file input
@@ -287,27 +354,15 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                         </div>
 
                         <div className="flex items-center gap-2 flex-shrink-0">
-                            {/* Download Button */}
+                            {/* Download Button - Back in header */}
                             <button
                                 onClick={(e) => handleDownload('colored', e)}
                                 disabled={!displayColoredImageUrl}
                                 className="transition-opacity disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
-                                title="Download"
+                                title="Download Colored"
                             >
                                 <Download className="w-[18px] h-[18px] text-gray-700" />
                             </button>
-
-                            {/* Upload Button */}
-                            <label className="transition-opacity cursor-pointer hover:opacity-80">
-                                <Upload className="w-[18px] h-[18px] text-orange-600" />
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={handleUpload}
-                                    disabled={isRegenerating}
-                                />
-                            </label>
 
                             {/* Regenerate Dialog Trigger - Icon Only */}
                             {!character.is_main && (
@@ -362,8 +417,9 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                             isLoading={showSketchLoading}
                             onClick={() => handleOpenLightbox('sketch')}
                             characterName={displayName}
+                            onUpload={handleUploadSketch}
                             showDownload={false}
-                            showUpload={false}
+                            showUpload={true}
                         />
                     </div>
                     <div className="order-1 sm:order-2">
@@ -373,9 +429,8 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                             isLoading={showColoredLoading}
                             onClick={() => handleOpenLightbox('colored')}
                             characterName={displayName}
-                            onDownload={(e) => handleDownload('colored', e)}
-                            onUpload={handleUpload}
-                            showDownload={true}
+                            onUpload={handleUploadColored}
+                            showDownload={false}
                             showUpload={true}
                         />
                     </div>
