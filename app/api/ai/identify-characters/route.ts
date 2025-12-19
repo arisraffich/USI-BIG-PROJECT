@@ -100,18 +100,16 @@ function isLikelyMainCharacter(
   return false
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const { project_id } = await request.json()
+// Exported function for direct calls (e.g., from project creation)
+export async function identifyCharactersForProject(project_id: string) {
+  const supabase = await createAdminClient()
+  
+  // Run the character identification logic
+  return await runCharacterIdentification(project_id, supabase)
+}
 
-    if (!project_id) {
-      return NextResponse.json(
-        { error: 'project_id is required' },
-        { status: 400 }
-      )
-    }
-
-    const supabase = await createAdminClient()
+// Core logic extracted for reusability
+async function runCharacterIdentification(project_id: string, supabase: any) {
 
     // STEP 1: Fetch main character FIRST (before building prompt)
     const { data: mainCharacter } = await supabase
@@ -149,7 +147,7 @@ export async function POST(request: NextRequest) {
 
     // Build full story text
     const fullStory = pages
-      .map((p) => `Page ${p.page_number}: ${p.story_text}`)
+      .map((p: any) => `Page ${p.page_number}: ${p.story_text}`)
       .join('\n\n')
 
     // STEP 3: Build enhanced prompt with main character context
@@ -375,7 +373,7 @@ IMPORTANT:
       // FALLBACK: If AI didn't return valid appearances, use conservative approach
       if (!mainCharUpdated || mainCharAppearances.length === 0) {
         console.log('[Character ID] Using fallback: assuming main character appears on all pages')
-        const allPageNumbers = pages.map(p => p.page_number.toString())
+        const allPageNumbers = pages.map((p: any) => p.page_number.toString())
         await supabase
           .from('characters')
           .update({ appears_in: allPageNumbers })
@@ -395,7 +393,7 @@ IMPORTANT:
     // Create sets for quick lookup
     const existingNames = new Set<string>()
     const existingRoles = new Set<string>()
-    existingCharacters?.forEach((c) => {
+    existingCharacters?.forEach((c: any) => {
       const nameKey = c.name?.toLowerCase().trim()
       const roleKey = c.role?.toLowerCase().trim()
       if (nameKey) existingNames.add(nameKey)
@@ -494,7 +492,7 @@ IMPORTANT:
     const characterMap = new Map<string, string>()
     const characterAppearancesMap = new Map<string, string[]>()
 
-    allCharacters?.forEach((c) => {
+    allCharacters?.forEach((c: any) => {
       const nameKey = c.name?.toLowerCase().trim()
       const roleKey = c.role?.toLowerCase().trim()
       if (nameKey) {
@@ -508,7 +506,7 @@ IMPORTANT:
     })
 
     // Update each page with character_ids
-    const pageUpdates = pages.map((page) => {
+    const pageUpdates = pages.map((page: any) => {
       const characterIds: string[] = []
       const pageNumberStr = page.page_number.toString()
 
@@ -519,7 +517,7 @@ IMPORTANT:
 
       // Add secondary characters that appear on this page
       // Use validated appears_in from database (not AI response)
-      allCharacters?.forEach((char) => {
+      allCharacters?.forEach((char: any) => {
         // Skip main character (already added above)
         if (char.id === mainCharacter?.id) return
 
@@ -550,7 +548,7 @@ IMPORTANT:
       .update({ status: 'character_review' })
       .eq('id', project_id)
 
-    return NextResponse.json({
+    return {
       success: true,
       main_character_updated: mainCharUpdated,
       main_character_appearances: mainCharAppearances.length,
@@ -562,7 +560,22 @@ IMPORTANT:
       secondary_characters_created: charactersCreated,
       filtered_out: beforeFilterCount - newCharacters.length,
       characters: newCharacters,
-    })
+    }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const { project_id } = await request.json()
+
+    if (!project_id) {
+      return NextResponse.json(
+        { error: 'project_id is required' },
+        { status: 400 }
+      )
+    }
+
+    const result = await identifyCharactersForProject(project_id)
+    return NextResponse.json(result)
 
   } catch (error: any) {
     console.error('[Character ID] Error identifying characters:', error)

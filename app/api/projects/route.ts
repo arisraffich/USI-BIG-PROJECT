@@ -318,13 +318,20 @@ export async function POST(request: NextRequest) {
         .update({ status: 'character_review' })
         .eq('id', projectId)
 
-      // Trigger character identification in the background (fire-and-forget is OK here)
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-      fetch(`${baseUrl}/api/ai/identify-characters`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: projectId }),
-      }).catch(err => console.error('[Story Parsing] Failed to trigger character identification:', err.message))
+      // IDENTIFY CHARACTERS (Synchronous, Reliable Approach)
+      // Call character identification directly and wait for completion
+      console.log(`[Character Identification] Starting for project ${projectId}...`)
+      try {
+        const { identifyCharactersForProject } = await import('@/app/api/ai/identify-characters/route')
+        const result = await identifyCharactersForProject(projectId)
+        console.log(`[Character Identification] Completed for ${projectId}:`, {
+          secondary_created: result.secondary_characters_created,
+          main_updated: result.main_character_updated
+        })
+      } catch (charError: any) {
+        console.error(`[Character Identification] Error for project ${projectId}:`, charError.message)
+        // Don't fail the whole request - characters can be identified manually later
+      }
 
     } catch (parsingError: any) {
       console.error(`[Story Parsing] Error for project ${projectId}:`, parsingError.message)
