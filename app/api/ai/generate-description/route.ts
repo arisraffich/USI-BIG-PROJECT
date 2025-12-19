@@ -57,10 +57,11 @@ Avoid: photorealistic details, complex technical elements, adult themes.`
       }
     })
 
-    const firstOutput = completion.output?.[0]
+    // Find the message output (not reasoning)
+    const messageOutput = completion.output?.find((o: any) => o.type === 'message')
     let description = ''
-    if (firstOutput && 'content' in firstOutput) {
-      const firstContent = firstOutput.content?.[0]
+    if (messageOutput && 'content' in messageOutput) {
+      const firstContent = messageOutput.content?.[0]
       description = (firstContent && 'text' in firstContent ? firstContent.text?.trim() : null) || ''
     }
 

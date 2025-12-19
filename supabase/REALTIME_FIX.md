@@ -54,3 +54,4 @@ After running the SQL, check browser console for:
 - `[Customer] showGallery check:`
 
 These logs will show if realtime events are being received.
+

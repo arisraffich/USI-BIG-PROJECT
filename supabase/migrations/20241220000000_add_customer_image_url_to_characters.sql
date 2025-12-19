@@ -18,3 +18,4 @@ WHERE image_url IS NOT NULL
     SELECT id FROM projects 
     WHERE character_send_count > 0
   );
+

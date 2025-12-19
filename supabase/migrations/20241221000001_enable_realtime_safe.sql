@@ -40,3 +40,4 @@ BEGIN
   -- characters is already there, so we skip it
   RAISE NOTICE 'characters already in publication (skipped)';
 END $$;
+

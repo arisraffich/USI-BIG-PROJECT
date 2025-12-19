@@ -213,10 +213,11 @@ Example output format:
       }
     })
 
-    const firstOutput = completion.output?.[0]
+    // Find the message output (not reasoning)
+    const messageOutput = completion.output?.find((o: any) => o.type === 'message')
     let content = '{"pages": []}'
-    if (firstOutput && 'content' in firstOutput) {
-      const firstContent = firstOutput.content?.[0]
+    if (messageOutput && 'content' in messageOutput) {
+      const firstContent = messageOutput.content?.[0]
       content = (firstContent && 'text' in firstContent ? firstContent.text : null) || '{"pages": []}'
     }
     console.log('[parsePagesWithAI] Raw AI response length:', content.length)
@@ -307,10 +308,11 @@ Return ONLY valid JSON in this exact format:
             }
           })
 
-          const firstOutput = enhanceCompletion.output?.[0]
+          // Find the message output (not reasoning)
+          const messageOutput = enhanceCompletion.output?.find((o: any) => o.type === 'message')
           let enhancedJson = null
-          if (firstOutput && 'content' in firstOutput) {
-            const firstContent = firstOutput.content?.[0]
+          if (messageOutput && 'content' in messageOutput) {
+            const firstContent = messageOutput.content?.[0]
             const jsonText = (firstContent && 'text' in firstContent ? firstContent.text?.trim() : null) || null
             if (jsonText) {
               try {
@@ -421,10 +423,11 @@ Return ONLY valid JSON in this exact format:
           }
         })
 
-        const firstOutput = descriptionCompletion.output?.[0]
+        // Find the message output (not reasoning)
+        const messageOutput = descriptionCompletion.output?.find((o: any) => o.type === 'message')
         let generatedJson = null
-        if (firstOutput && 'content' in firstOutput) {
-          const firstContent = firstOutput.content?.[0]
+        if (messageOutput && 'content' in messageOutput) {
+          const firstContent = messageOutput.content?.[0]
           const jsonText = (firstContent && 'text' in firstContent ? firstContent.text?.trim() : null) || null
           if (jsonText) {
             try {

@@ -130,10 +130,11 @@ function createEmptyCharacterData() {
 }
 
 async function processCompletion(completion: any) {
-  const firstOutput = completion.output?.[0]
+  // Find the message output (not reasoning)
+  const messageOutput = completion.output?.find((o: any) => o.type === 'message')
   let content = '{}'
-  if (firstOutput && 'content' in firstOutput) {
-    const firstContent = firstOutput.content?.[0]
+  if (messageOutput && 'content' in messageOutput) {
+    const firstContent = messageOutput.content?.[0]
     content = (firstContent && 'text' in firstContent ? firstContent.text : null) || '{}'
   }
 
