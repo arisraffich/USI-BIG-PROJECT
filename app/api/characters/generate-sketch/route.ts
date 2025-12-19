@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { generateSketch } from '@/lib/ai/google-ai'
+import { sanitizeFilename } from '@/lib/utils/metadata-cleaner'
 
 // Allow max duration
 export const maxDuration = 60
@@ -66,8 +67,8 @@ The result must look like a faithful pencil-line tracing of the original image â
 
         // Upload to Storage
         const timestamp = Date.now()
-        const characterName = (character.name || character.role || 'character').replace(/\s+/g, '-').toLowerCase()
-        const filename = `${character.project_id}/characters/${characterName}-${characterId}-${timestamp}.png`
+        const characterName = sanitizeFilename(character.name || character.role || 'character')
+        const filename = `${character.project_id}/characters/${characterName}-sketch-${timestamp}.png`
 
         const { error: uploadError } = await supabase.storage
             .from('character-sketches')
