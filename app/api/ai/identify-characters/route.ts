@@ -261,10 +261,7 @@ IMPORTANT:
 - Filter out plural characters programmatically (they will be filtered again as a safety measure)`
 
     if (!openai) {
-      return NextResponse.json(
-        { error: 'OpenAI API key is not configured' },
-        { status: 500 }
-      )
+      throw new Error('OpenAI API key is not configured')
     }
 
     // STEP 4: Call AI with GPT-5.2 (best model for reasoning)
@@ -295,6 +292,8 @@ IMPORTANT:
       responseContent = (firstContent && 'text' in firstContent ? firstContent.text : null) || '{}'
     }
     console.log('[Character ID] Raw AI response length:', responseContent.length)
+    console.log('[Character ID] Full completion object:', JSON.stringify(completion, null, 2))
+    console.log('[Character ID] Response content:', responseContent)
     let identified
 
     try {
