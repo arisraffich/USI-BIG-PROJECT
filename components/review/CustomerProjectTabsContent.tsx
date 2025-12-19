@@ -191,11 +191,15 @@ export function CustomerProjectTabsContent({
     }
   }, [characters])
 
-  // Customer polling - ONLY when generation complete (NOT during form filling!)
+  // Customer polling - Poll when:
+  // 1. character_generation_complete (waiting for images to be generated)
+  // 2. character_review (first send - waiting for character forms to appear)
   useEffect(() => {
-    // Poll ONLY when status is character_generation_complete
-    // Do NOT poll during character_review (customer might be filling forms)
-    if (localProjectStatus !== 'character_generation_complete') return
+    // Poll when waiting for character generation OR when in character_review mode
+    const shouldPoll = localProjectStatus === 'character_generation_complete' || 
+                       localProjectStatus === 'character_review'
+    
+    if (!shouldPoll) return
 
     const interval = setInterval(() => {
       router.refresh()
