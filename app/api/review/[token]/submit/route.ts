@@ -305,61 +305,15 @@ export async function POST(
               console.log('[Form Submit] Main character for sketch:', mainChar ? `ID: ${mainChar.id}, has image: ${!!mainChar.image_url}` : 'NOT FOUND')
               if (mainChar?.image_url) {
                 console.log('[Form Submit] Triggering main character sketch generation...')
-                // Call sketch generation directly (async fire-and-forget)
+                // Call shared sketch generation function (async fire-and-forget)
                 ;(async () => {
-                  try {
-                    const { generateSketch } = await import('@/lib/ai/google-ai')
-                    const { sanitizeFilename } = await import('@/lib/utils/metadata-cleaner')
-                    
-                    const prompt = `Convert the illustration into a loose, natural pencil draft sketch with real pencil texture. 
-Black and white only. Use rough graphite lines with visible grain, uneven pressure, slight wobble, and broken strokes. 
-Include light construction lines, faint smudges, and subtle overlapping marks. 
-No digital-looking smooth lines. No fills or gradients.
-
-Preserve every character, pose, expression, and composition exactly, but make the linework look hand-drawn with a physical pencil on paper.
-
-ABSOLUTE FIDELITY RULES — NO EXCEPTIONS:
-
-1. Do NOT add, invent, or complete any element that does not exist in the original illustration. 
-2. Do NOT remove or omit any element from the original illustration. 
-3. The sketch must be a 1:1 structural replica of the original illustration.`
-                    
-                    const result = await generateSketch(mainChar.image_url, prompt)
-                    
-                    if (result.success && result.imageBuffer) {
-                      const timestamp = Date.now()
-                      const characterName = sanitizeFilename(mainChar.name || mainChar.role || 'character')
-                      const filename = `${project.id}/characters/${characterName}-sketch-${timestamp}.png`
-                      
-                      const supabaseAdmin = await createAdminClient()
-                      const { error: uploadError } = await supabaseAdmin.storage
-                        .from('character-sketches')
-                        .upload(filename, result.imageBuffer, {
-                          contentType: 'image/png',
-                          upsert: true
-                        })
-                      
-                      if (!uploadError) {
-                        const { data: urlData } = supabaseAdmin.storage
-                          .from('character-sketches')
-                          .getPublicUrl(filename)
-                        
-                        await supabaseAdmin
-                          .from('characters')
-                          .update({
-                            sketch_url: urlData.publicUrl,
-                            sketch_prompt: prompt
-                          })
-                          .eq('id', mainChar.id)
-                        
-                        console.log('[Form Submit] ✅ Main character sketch generated successfully')
-                      } else {
-                        console.error('[Form Submit] Sketch upload error:', uploadError)
-                      }
-                    }
-                  } catch (err) {
-                    console.error('[Form Submit] Failed to generate main character sketch:', err)
-                  }
+                  const { generateCharacterSketch } = await import('@/lib/ai/character-sketch-generator')
+                  await generateCharacterSketch(
+                    mainChar.id,
+                    mainChar.image_url,
+                    project.id,
+                    mainChar.name || mainChar.role || 'Main Character'
+                  )
                 })()
               } else {
                 console.log('[Form Submit] Skipping main character sketch (no image_url)')
