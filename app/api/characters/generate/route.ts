@@ -94,6 +94,16 @@ export async function POST(request: NextRequest) {
     for (const character of charactersToGenerate) {
       console.log(`[Character Generate] Processing: ${character.name || character.role || character.id}`)
       try {
+        // Clear sketch_url for regeneration (if character already has images)
+        // This ensures the loading spinner appears on the sketch card during regeneration
+        if (character.image_url && character.sketch_url) {
+          console.log(`[Character Generate] 🧹 Clearing old sketch_url for regeneration: ${character.name || character.role}`)
+          await supabase
+            .from('characters')
+            .update({ sketch_url: null })
+            .eq('id', character.id)
+        }
+
         // Pass custom_prompt only if generating a single character (implied by this loop structure if simple)
         // But logical safety: if bulk, we probably don't want same prompt for all.
         // But for single character (character_id present), custom_prompt is valid.
