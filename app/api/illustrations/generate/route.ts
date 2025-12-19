@@ -190,7 +190,7 @@ IMPORTANT: Do NOT render any text in the illustration. The story text will be pr
                 styleInstructions = `STYLE & RENDERING RULES (STRICT CONSISTENCY):
 1. GLOBAL STYLE ANCHOR:
    - Use the "Main Character" reference image as the MASTER STYLE for the entire scene.
-   - Render the FOREST (and all background elements) in the EXACT SAME ART STYLE (Medium, Brushwork, Dimensionality) as the character.
+   - Render the BACKGROUND (and all environmental elements) in the EXACT SAME ART STYLE (Medium, Brushwork, Dimensionality) as the character.
    - If the character is 2D/Flat, the background MUST be 2D/Flat. If the character is 3D/Realistic, the background MUST be 3D/Realistic.
    - The goal is perfect stylistic unity.
 
