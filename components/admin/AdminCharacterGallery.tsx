@@ -1,7 +1,7 @@
 'use client'
 
 import { Character } from '@/types/character'
-import { AdminCharacterGalleryCard } from './AdminCharacterGalleryCard'
+import { UnifiedCharacterCard } from './UnifiedCharacterCard'
 
 interface AdminCharacterGalleryProps {
     characters: Character[]
@@ -24,15 +24,15 @@ export function AdminCharacterGallery({ characters, projectId, isGenerating = fa
 
     return (
         <div className="container mx-auto max-w-7xl">
-            <div className="flex flex-wrap justify-center gap-6">
+            {/* 6-column grid: Each UnifiedCharacterCard spans 2 columns = 3 pairs per row on desktop */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
                 {sortedCharacters.map((character) => (
-                    <div key={character.id} className="w-full max-w-[220px]">
-                        <AdminCharacterGalleryCard
-                            character={character}
-                            projectId={projectId}
-                            isGenerating={isGenerating}
-                        />
-                    </div>
+                    <UnifiedCharacterCard
+                        key={character.id}
+                        character={character}
+                        projectId={projectId}
+                        isGenerating={isGenerating}
+                    />
                 ))}
             </div>
         </div>

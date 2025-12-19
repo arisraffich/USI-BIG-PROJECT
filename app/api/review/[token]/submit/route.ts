@@ -278,6 +278,22 @@ export async function POST(
             if (allSucceeded) {
               const supabaseAdmin = await createAdminClient()
               await supabaseAdmin.from('projects').update({ status: 'character_generation_complete' }).eq('id', project.id)
+
+              // Trigger sketch generation for main character (already has colored image)
+              const mainChar = latestCharacters.find(c => c.is_main)
+              if (mainChar?.image_url) {
+                const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+                fetch(`${baseUrl}/api/characters/generate-sketch`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    characterId: mainChar.id,
+                    imageUrl: mainChar.image_url
+                  })
+                }).catch(err => {
+                  console.error('[Form Submit] Failed to trigger main character sketch:', err)
+                })
+              }
             }
 
             // Notification logic...

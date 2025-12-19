@@ -106,6 +106,21 @@ export async function POST(request: NextRequest) {
           image_url: result.imageUrl,
           error: result.error
         })
+
+        // Trigger sketch generation asynchronously after successful colored generation
+        if (result.success && result.imageUrl) {
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+          fetch(`${baseUrl}/api/characters/generate-sketch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              characterId: character.id,
+              imageUrl: result.imageUrl
+            })
+          }).catch(err => {
+            console.error(`[Character Generation] Failed to trigger sketch for ${character.id}:`, err)
+          })
+        }
       } catch (error: any) {
         // Should catch errors that escaped generateCharacterImage
         const errorMessage = error.message || 'Generation failed'
