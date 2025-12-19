@@ -128,7 +128,7 @@ export function CustomerProjectHeader({
                 </Button>
               )}
 
-              {/* Submit Changes Button (Desktop - Centered) */}
+              {/* Submit Forms Button (Desktop - Centered) */}
               {showSubmitButton && !showIllustrationsTab && !showApproveButton && (
                 <Button
                   onClick={onSubmit}
@@ -142,7 +142,7 @@ export function CustomerProjectHeader({
                       SUBMITTING...
                     </>
                   ) : (
-                    "SUBMIT CHANGES"
+                    "SUBMIT FORMS"
                   )}
                 </Button>
               )}
@@ -217,7 +217,7 @@ export function CustomerProjectHeader({
                       SUBMITTING...
                     </>
                   ) : (
-                    "SUBMIT CHANGES"
+                    "SUBMIT FORMS"
                   )}
                 </Button>
               )}

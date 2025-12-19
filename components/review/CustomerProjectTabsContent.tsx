@@ -15,10 +15,18 @@ import { CustomerCharacterCard } from './CustomerCharacterCard'
 import { Page } from '@/types/page'
 import { Character } from '@/types/character'
 import { Button } from '@/components/ui/button'
-import { Send, Check } from 'lucide-react'
+import { Send, Check, PartyPopper } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { UnifiedProjectLayout } from '@/components/layout/UnifiedProjectLayout'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 interface CustomerProjectTabsContentProps {
   projectId: string
@@ -52,6 +60,10 @@ export function CustomerProjectTabsContent({
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'loading' | 'success'>('idle')
   // Lifted state for Edit Mode to coordinate Header and Editor
   const [isEditMode, setIsEditMode] = useState(false)
+  
+  // Completion popup state
+  const [showCompletionPopup, setShowCompletionPopup] = useState(false)
+  const popupDismissedKey = `character-forms-popup-dismissed-${projectId}`
 
   // Local project status state for realtime updates
   const [localProjectStatus, setLocalProjectStatus] = useState(projectStatus)
@@ -273,6 +285,33 @@ export function CustomerProjectTabsContent({
     }))
   }, [])
 
+  // Detect when all character forms are complete and show popup
+  useEffect(() => {
+    // Skip if already dismissed this session
+    const wasDismissed = sessionStorage.getItem(popupDismissedKey)
+    if (wasDismissed) return
+
+    // Skip if no secondary characters
+    if (!sortedCharacters.secondary.length) return
+
+    // Skip if gallery is showing (means forms are already submitted)
+    if (showGallery) return
+
+    // Skip if not in character review mode
+    if (!isCharacterMode) return
+
+    // Check if ALL secondary characters are valid (have Ready badge)
+    const allReady = sortedCharacters.secondary.every(char => {
+      const formInfo = characterForms[char.id]
+      return formInfo && formInfo.isValid
+    })
+
+    // Show popup IMMEDIATELY when last form becomes valid
+    if (allReady && !showCompletionPopup) {
+      setShowCompletionPopup(true)
+    }
+  }, [characterForms, sortedCharacters.secondary, popupDismissedKey, showGallery, isCharacterMode, showCompletionPopup])
+
   // Read active tab directly from search params
   const activeTab = useMemo(() => {
     const tab = searchParams?.get('tab')
@@ -374,6 +413,18 @@ export function CustomerProjectTabsContent({
     // Character addition handled by realtime subscription
     // No manual refresh needed
   }, [])
+
+  // Handle completion popup actions
+  const handlePopupSubmit = useCallback(() => {
+    sessionStorage.setItem(popupDismissedKey, 'true')
+    setShowCompletionPopup(false)
+    handleSubmitChanges() // Same as navbar button
+  }, [popupDismissedKey])
+
+  const handlePopupCancel = useCallback(() => {
+    sessionStorage.setItem(popupDismissedKey, 'true')
+    setShowCompletionPopup(false)
+  }, [popupDismissedKey])
 
   const handleSubmitChanges = async () => {
     if (isLocked) {
@@ -587,6 +638,46 @@ export function CustomerProjectTabsContent({
         isOpen={submissionStatus !== 'idle'}
         status={submissionStatus}
       />
+
+      {/* Character Forms Completion Popup */}
+      <Dialog open={showCompletionPopup} onOpenChange={(open) => {
+        if (!open) handlePopupCancel()
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-center flex items-center justify-center gap-2">
+              <PartyPopper className="w-6 h-6 text-green-600" />
+              All Forms Complete!
+            </DialogTitle>
+            <DialogDescription className="text-center text-base pt-2">
+              Thank you for filling out the character forms. Ready to submit?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-center mt-4">
+            <Button
+              onClick={handlePopupCancel}
+              variant="outline"
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handlePopupSubmit}
+              disabled={isSubmitting}
+              className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold uppercase tracking-wide"
+            >
+              {isSubmitting ? (
+                <>
+                  <Check className="w-4 h-4 mr-2 animate-spin" />
+                  SUBMITTING...
+                </>
+              ) : (
+                "SUBMIT FORMS"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
