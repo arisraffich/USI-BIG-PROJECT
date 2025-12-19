@@ -250,10 +250,10 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     const displaySketchImageUrl = localCharacter.sketch_url
 
     // Show loading on colored if regenerating OR if project generating and no image
-    const showColoredLoading = isRegenerating || (isGenerating && !displayColoredImageUrl)
+    const showColoredLoading = !!(isRegenerating || (isGenerating && !displayColoredImageUrl))
     
     // Show loading on sketch if colored exists but sketch doesn't (sketch generation in progress)
-    const showSketchLoading = displayColoredImageUrl && !displaySketchImageUrl && !isRegenerating
+    const showSketchLoading = !!(displayColoredImageUrl && !displaySketchImageUrl && !isRegenerating)
 
     const lightboxImageUrl = lightboxImage === 'sketch' ? displaySketchImageUrl : displayColoredImageUrl
 
