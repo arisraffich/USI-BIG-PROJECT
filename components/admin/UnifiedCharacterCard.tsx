@@ -29,60 +29,62 @@ interface SubCardProps {
 
 function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownload, onUpload, showUpload = false, showDownload = true }: SubCardProps) {
     return (
-        <div className="relative">
+        <div className="relative w-full">
             {/* Image Container */}
             <div 
-                className="aspect-[9/16] bg-gray-100 rounded-lg cursor-pointer hover:opacity-95 transition-opacity overflow-hidden"
+                className="relative aspect-[9/16] bg-gray-100 rounded-lg cursor-pointer hover:opacity-95 transition-opacity overflow-hidden"
                 onClick={imageUrl ? onClick : undefined}
             >
                 {imageUrl ? (
-                    <img 
-                        src={imageUrl} 
-                        alt={`${characterName} - ${title}`} 
-                        className="w-full h-full object-cover"
-                    />
+                    <>
+                        <img 
+                            src={imageUrl} 
+                            alt={`${characterName} - ${title}`} 
+                            className="w-full h-full object-cover"
+                        />
+                        
+                        {/* Upload Button Overlay - Inside image container */}
+                        {showUpload && onUpload && (
+                            <div className="absolute top-2 right-2 z-10">
+                                <label 
+                                    className="block bg-white/90 hover:bg-white p-2 rounded-md shadow-md transition-all backdrop-blur-sm cursor-pointer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    title="Upload"
+                                >
+                                    <Upload className="w-4 h-4 text-orange-600" />
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={onUpload}
+                                    />
+                                </label>
+                            </div>
+                        )}
+                    </>
                 ) : (
                     <div className="flex items-center justify-center h-full text-gray-400">
                         <span className="text-sm">No Image</span>
                     </div>
                 )}
 
-                {/* Upload Button Overlay - Top Right ONLY */}
-                {imageUrl && showUpload && onUpload && (
-                    <div className="absolute top-2 right-2">
-                        <label 
-                            className="bg-white/90 hover:bg-white p-2 rounded-md shadow-md transition-all backdrop-blur-sm cursor-pointer"
-                            onClick={(e) => e.stopPropagation()}
-                            title="Upload"
-                        >
-                            <Upload className="w-4 h-4 text-orange-600" />
-                            <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={onUpload}
-                            />
-                        </label>
+                {/* Loading Overlay */}
+                {isLoading && (
+                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center rounded-lg z-20">
+                        <div className="flex flex-col items-center gap-3 bg-white p-4 rounded-lg shadow-lg border border-blue-200">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-75"></div>
+                                <div className="relative">
+                                    <Loader2 className="w-7 h-7 animate-spin text-blue-600" />
+                                </div>
+                            </div>
+                            <span className="text-sm font-medium text-gray-700">
+                                Generating...
+                            </span>
+                        </div>
                     </div>
                 )}
             </div>
-            
-            {/* Loading Overlay */}
-            {isLoading && (
-                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center rounded-lg">
-                    <div className="flex flex-col items-center gap-3 bg-white p-4 rounded-lg shadow-lg border border-blue-200">
-                        <div className="relative">
-                            <div className="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-75"></div>
-                            <div className="relative">
-                                <Loader2 className="w-7 h-7 animate-spin text-blue-600" />
-                            </div>
-                        </div>
-                        <span className="text-sm font-medium text-gray-700">
-                            Generating...
-                        </span>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }
