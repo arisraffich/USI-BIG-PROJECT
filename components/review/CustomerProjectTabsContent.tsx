@@ -351,17 +351,25 @@ export function CustomerProjectTabsContent({
     // Skip if not in character review mode
     if (!isCharacterMode) return
 
-    // Check if ALL secondary characters are valid (have Ready badge)
+    // Check if ALL secondary characters are SAVED (in database, not just form state)
+    // A character is "ready" when it has all required fields saved to database
     const allReady = sortedCharacters.secondary.every(char => {
-      const formInfo = characterForms[char.id]
-      return formInfo && formInfo.isValid
+      return !!(
+        char.age?.trim() &&
+        char.gender?.trim() &&
+        char.skin_color?.trim() &&
+        char.hair_color?.trim() &&
+        char.hair_style?.trim() &&
+        char.eye_color?.trim() &&
+        (char.clothing?.trim() || char.accessories?.trim() || char.special_features?.trim())
+      )
     })
 
-    // Show popup IMMEDIATELY when last form becomes valid
+    // Show popup IMMEDIATELY when last form is SAVED (not just filled)
     if (allReady && !showCompletionPopup) {
       setShowCompletionPopup(true)
     }
-  }, [characterForms, sortedCharacters.secondary, popupDismissedKey, showGallery, isCharacterMode, showCompletionPopup])
+  }, [sortedCharacters.secondary, popupDismissedKey, showGallery, isCharacterMode, showCompletionPopup])
 
   const handleIllustrationFeedbackChange = useCallback(async (pageId: string, notes: string) => {
     // 1. Optimistic Update
