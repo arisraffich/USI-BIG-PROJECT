@@ -232,16 +232,27 @@ export function CustomerProjectTabsContent({
           filter: `project_id=eq.${projectId}`
         },
         (payload) => {
+          console.log('[Customer Characters] Realtime update received:', payload.eventType, payload.new)
+          
           if (payload.eventType === 'UPDATE' && payload.new) {
             const updatedChar = payload.new as Character
-            setLocalCharacters(prev => prev.map(c => c.id === updatedChar.id ? { ...c, ...updatedChar } : c))
             
-            // Check if character images were synced (customer_image_url added)
-            if (updatedChar.customer_image_url && !characters?.find(c => c.id === updatedChar.id)?.customer_image_url) {
-              toast.success('New character illustrations available!', {
-                description: 'Character gallery has been updated.'
+            setLocalCharacters(prev => {
+              const updated = prev.map(c => c.id === updatedChar.id ? { ...c, ...updatedChar } : c)
+              console.log('[Customer Characters] Local state updated:', updated)
+              return updated
+            })
+            
+            // If character has customer_image_url, trigger notification and refresh
+            if (updatedChar.customer_image_url) {
+              console.log('[Customer Characters] Customer image URL detected, refreshing...')
+              toast.success('Character illustrations updated!', {
+                description: 'Gallery is now available.'
               })
-              router.refresh() // Force full refresh to ensure gallery shows
+              // Delay refresh slightly to ensure state updates propagate
+              setTimeout(() => {
+                router.refresh()
+              }, 500)
             }
           } else if (payload.eventType === 'INSERT' && payload.new) {
             setLocalCharacters(prev => [...prev, payload.new as Character])
