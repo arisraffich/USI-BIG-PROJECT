@@ -128,26 +128,45 @@ export function CustomerProjectHeader({
                 </Button>
               )}
 
+              {/* Submit Changes Button (Desktop - Centered) */}
+              {showSubmitButton && !showIllustrationsTab && !showApproveButton && (
+                <Button
+                  onClick={onSubmit}
+                  disabled={isSubmitting || isSubmitDisabled}
+                  size="default"
+                  className="hidden md:flex bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-bold uppercase tracking-wide"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      SUBMITTING...
+                    </>
+                  ) : (
+                    "SUBMIT CHANGES"
+                  )}
+                </Button>
+              )}
+
               {/* Approve Illustrations Button (Centered) */}
               {showIllustrationsTab && showSubmitButton && (
                 <Button
                   onClick={onSubmit}
                   disabled={isSubmitting || isSubmitDisabled || isApprovedStage}
                   size="sm"
-                  className="bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-semibold"
+                  className="bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-semibold uppercase"
                 >
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Submitting...
+                      SUBMITTING...
                     </>
                   ) : isApprovedStage ? (
                     <>
                       <Check className="w-4 h-4 mr-2" />
-                      1st Illustration Approved
+                      1ST ILLUSTRATION APPROVED
                     </>
                   ) : (
-                    "Approve Illustrations"
+                    "APPROVE ILLUSTRATIONS"
                   )}
                 </Button>
               )}
@@ -184,21 +203,21 @@ export function CustomerProjectHeader({
                 </Button>
               )}
 
-              {/* Submit Button (Pages/General) */}
+              {/* Submit Button (Pages/General - Mobile Only) */}
               {showSubmitButton && !showIllustrationsTab && (
                 <Button
                   onClick={onSubmit}
                   disabled={isSubmitting || isSubmitDisabled}
                   size="sm"
-                  className="bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-semibold"
+                  className="md:hidden bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-semibold uppercase"
                 >
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Submitting...
+                      SUBMITTING...
                     </>
                   ) : (
-                    "Submit Changes"
+                    "SUBMIT CHANGES"
                   )}
                 </Button>
               )}
@@ -210,20 +229,20 @@ export function CustomerProjectHeader({
                     onClick={onSubmit}
                     disabled={isSubmitting || isSubmitDisabled || isApprovedStage}
                     size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-semibold"
+                    className="bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-semibold uppercase"
                   >
                     {isSubmitting ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Submitting...
+                        SUBMITTING...
                       </>
                     ) : isApprovedStage ? (
                       <>
                         <Check className="w-4 h-4 mr-2" />
-                        1st Illustration Approved
+                        1ST ILLUSTRATION APPROVED
                       </>
                     ) : (
-                      "Approve Illustrations"
+                      "APPROVE ILLUSTRATIONS"
                     )}
                   </Button>
                 </div>
