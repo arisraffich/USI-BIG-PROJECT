@@ -285,33 +285,6 @@ export function CustomerProjectTabsContent({
     }))
   }, [])
 
-  // Detect when all character forms are complete and show popup
-  useEffect(() => {
-    // Skip if already dismissed this session
-    const wasDismissed = sessionStorage.getItem(popupDismissedKey)
-    if (wasDismissed) return
-
-    // Skip if no secondary characters
-    if (!sortedCharacters.secondary.length) return
-
-    // Skip if gallery is showing (means forms are already submitted)
-    if (showGallery) return
-
-    // Skip if not in character review mode
-    if (!isCharacterMode) return
-
-    // Check if ALL secondary characters are valid (have Ready badge)
-    const allReady = sortedCharacters.secondary.every(char => {
-      const formInfo = characterForms[char.id]
-      return formInfo && formInfo.isValid
-    })
-
-    // Show popup IMMEDIATELY when last form becomes valid
-    if (allReady && !showCompletionPopup) {
-      setShowCompletionPopup(true)
-    }
-  }, [characterForms, sortedCharacters.secondary, popupDismissedKey, showGallery, isCharacterMode, showCompletionPopup])
-
   // Read active tab directly from search params
   const activeTab = useMemo(() => {
     const tab = searchParams?.get('tab')
@@ -362,6 +335,33 @@ export function CustomerProjectTabsContent({
       router.replace(`${pathname}?tab=characters`)
     }
   }, [showIllustrationsTab, showGallery, searchParams, pathname, router, isCharacterMode])
+
+  // Detect when all character forms are complete and show popup
+  useEffect(() => {
+    // Skip if already dismissed this session
+    const wasDismissed = sessionStorage.getItem(popupDismissedKey)
+    if (wasDismissed) return
+
+    // Skip if no secondary characters
+    if (!sortedCharacters.secondary.length) return
+
+    // Skip if gallery is showing (means forms are already submitted)
+    if (showGallery) return
+
+    // Skip if not in character review mode
+    if (!isCharacterMode) return
+
+    // Check if ALL secondary characters are valid (have Ready badge)
+    const allReady = sortedCharacters.secondary.every(char => {
+      const formInfo = characterForms[char.id]
+      return formInfo && formInfo.isValid
+    })
+
+    // Show popup IMMEDIATELY when last form becomes valid
+    if (allReady && !showCompletionPopup) {
+      setShowCompletionPopup(true)
+    }
+  }, [characterForms, sortedCharacters.secondary, popupDismissedKey, showGallery, isCharacterMode, showCompletionPopup])
 
   const handleIllustrationFeedbackChange = useCallback(async (pageId: string, notes: string) => {
     // 1. Optimistic Update
