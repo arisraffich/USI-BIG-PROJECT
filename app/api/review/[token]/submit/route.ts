@@ -228,7 +228,12 @@ export async function POST(
     // Note: We check ALL characters for feedback, including Main.
     const hasFeedback = latestCharacters.some(c => !!c.feedback_notes && !c.is_resolved)
 
-
+    console.log('[Form Submit] Decision Tree:', {
+      secondaryCount: secondaryCharacters.length,
+      pendingGeneration,
+      hasFeedback,
+      secondaryWithoutImages: secondaryCharacters.filter(c => !c.image_url || c.image_url.trim() === '').length
+    })
 
     // DECISION TREE
     if (pendingGeneration) {
@@ -261,12 +266,15 @@ export async function POST(
 
       // Fire-and-forget generation
       const charactersToGenerate = secondaryCharacters.filter(c => !c.image_url || c.image_url.trim() === '')
+      console.log('[Form Submit] Characters to generate:', charactersToGenerate.length)
       if (charactersToGenerate.length > 0) {
         (async () => {
           try {
+            console.log('[Bg Generation] Starting background generation for', charactersToGenerate.length, 'characters')
             const { generateCharacterImage } = await import('@/lib/ai/character-generator')
             const mainChar = latestCharacters.find(c => c.is_main)
             const mainCharImage = mainChar?.image_url || ''
+            console.log('[Bg Generation] Main character image:', mainCharImage ? 'EXISTS' : 'MISSING')
 
             // Run in parallel
             const results = await Promise.all(
@@ -281,7 +289,9 @@ export async function POST(
 
               // Trigger sketch generation for main character (already has colored image)
               const mainChar = latestCharacters.find(c => c.is_main)
+              console.log('[Form Submit] Main character for sketch:', mainChar ? `ID: ${mainChar.id}, has image: ${!!mainChar.image_url}` : 'NOT FOUND')
               if (mainChar?.image_url) {
+                console.log('[Form Submit] Triggering main character sketch generation...')
                 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
                 fetch(`${baseUrl}/api/characters/generate-sketch`, {
                   method: 'POST',
@@ -290,9 +300,13 @@ export async function POST(
                     characterId: mainChar.id,
                     imageUrl: mainChar.image_url
                   })
+                }).then(() => {
+                  console.log('[Form Submit] Main character sketch request sent')
                 }).catch(err => {
                   console.error('[Form Submit] Failed to trigger main character sketch:', err)
                 })
+              } else {
+                console.log('[Form Submit] Skipping main character sketch (no image_url)')
               }
             }
 
