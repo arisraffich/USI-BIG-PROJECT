@@ -223,6 +223,9 @@ ${cleanActionDescription}
 BACKGROUND:
 ${pageData.background_elements || 'Appropriate background for the scene.'}
 
+ATMOSPHERE:
+${pageData.atmosphere || 'Natural lighting and mood.'}
+
 ${styleInstructions}
 
 ${textPromptSection}`

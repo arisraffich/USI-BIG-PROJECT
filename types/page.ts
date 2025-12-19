@@ -21,6 +21,7 @@ export interface Page {
   // Illustration Module
   character_actions?: any | null // JSONB
   background_elements?: string | null
+  atmosphere?: string | null
   illustration_prompt?: string | null
   illustration_status?: 'pending' | 'generating' | 'completed' | 'sketch_ready'
   illustration_version?: number
