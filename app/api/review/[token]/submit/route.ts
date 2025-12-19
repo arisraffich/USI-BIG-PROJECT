@@ -276,10 +276,23 @@ export async function POST(
             const mainCharImage = mainChar?.image_url || ''
             console.log('[Bg Generation] Main character image:', mainCharImage ? 'EXISTS' : 'MISSING')
 
-            // Run in parallel
+            // Run in parallel with timeout logging
+            console.log('[Bg Generation] Calling generateCharacterImage for each character...')
             const results = await Promise.all(
-              charactersToGenerate.map(char => generateCharacterImage(char, mainCharImage, project.id))
+              charactersToGenerate.map((char, idx) => {
+                console.log(`[Bg Generation] Starting generation for character ${idx + 1}: ${char.name || char.role}`)
+                return generateCharacterImage(char, mainCharImage, project.id)
+                  .then(result => {
+                    console.log(`[Bg Generation] Character ${idx + 1} completed:`, result.success ? 'SUCCESS' : 'FAILED')
+                    return result
+                  })
+                  .catch(err => {
+                    console.error(`[Bg Generation] Character ${idx + 1} ERROR:`, err)
+                    throw err
+                  })
+              })
             )
+            console.log('[Bg Generation] All characters processed')
 
             // If successful, update status to complete
             const allSucceeded = results.every(r => r.success)
@@ -326,8 +339,14 @@ export async function POST(
               console.error('Error sending completion notification', e)
             }
 
-          } catch (err) { console.error('Bg generation failed:', err) }
-        })()
+          } catch (err: any) { 
+            console.error('[Bg Generation] CRITICAL ERROR:', err)
+            console.error('[Bg Generation] Error stack:', err?.stack)
+            console.error('[Bg Generation] Error message:', err?.message)
+          }
+        })().catch(err => {
+          console.error('[Bg Generation] Unhandled rejection:', err)
+        })
       }
 
       return NextResponse.json({
