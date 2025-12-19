@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 
 export async function POST(request: Request) {
-    // Only allow in development or if specific secret header is present (skipping secret for now as this is a prototype)
+    // Only allow in development
     if (process.env.NODE_ENV !== 'development') {
-        // Optional: add a bypass key check if you want to test on preview envs
+        return NextResponse.json({ error: 'Not available in production' }, { status: 403 })
     }
 
     try {
