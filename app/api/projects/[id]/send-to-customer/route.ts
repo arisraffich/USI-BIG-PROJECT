@@ -185,10 +185,13 @@ export async function POST(
             updateData.is_resolved = true
           }
           
-          // Sync customer_image_url (mirrors illustration approach)
-          // Customer should see the latest admin-approved image
+          // Sync customer_image_url and customer_sketch_url (mirrors illustration approach)
+          // Customer should see the latest admin-approved images
           if (char.image_url) {
             updateData.customer_image_url = char.image_url
+          }
+          if (char.sketch_url) {
+            updateData.customer_sketch_url = char.sketch_url
           }
           
           // Only update if there's something to update

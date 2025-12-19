@@ -47,11 +47,11 @@ function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownloa
                         {showUpload && onUpload && (
                             <div className="absolute top-2 right-2 z-10">
                                 <label 
-                                    className="block bg-white/90 hover:bg-white p-2 rounded-md shadow-md transition-all backdrop-blur-sm cursor-pointer"
+                                    className="block cursor-pointer"
                                     onClick={(e) => e.stopPropagation()}
                                     title="Upload"
                                 >
-                                    <Upload className="w-4 h-4 text-orange-600" />
+                                    <Upload className="w-5 h-5 text-orange-600 drop-shadow-lg" />
                                     <input
                                         type="file"
                                         accept="image/*"

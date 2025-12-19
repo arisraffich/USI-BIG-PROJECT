@@ -18,7 +18,7 @@ export function CustomerCharacterGallery({ characters, mainCharacter }: Customer
         : secondaryCharacters
 
     return (
-        <div className="w-full max-w-7xl mx-auto py-8 px-4">
+        <div className="w-full max-w-[1600px] mx-auto py-8 px-4">
             <div className="text-center mb-10">
                 <h2 className="text-3xl font-bold text-gray-900 mb-3 font-serif">Character Design</h2>
                 <p className="text-gray-600 max-w-2xl mx-auto">

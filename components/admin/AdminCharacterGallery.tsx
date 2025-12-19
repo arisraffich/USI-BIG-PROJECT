@@ -23,8 +23,8 @@ export function AdminCharacterGallery({ characters, projectId, isGenerating = fa
     })
 
     return (
-        <div className="container mx-auto max-w-7xl px-4">
-            {/* Flexbox layout: Centered cards, max 3 pairs per row */}
+        <div className="container mx-auto max-w-[1600px] px-4">
+            {/* Flexbox layout: Centered cards, max 3 pairs per row (6 images total) */}
             <div className="flex flex-wrap justify-center gap-6">
                 {sortedCharacters.map((character) => (
                     <div key={character.id} className="w-full md:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)]">
