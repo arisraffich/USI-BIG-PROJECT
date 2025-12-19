@@ -9,8 +9,8 @@ export async function removeMetadata(
       : Buffer.from(imageBuffer)
 
     // Remove all metadata (EXIF, IPTC, XMP)
+    // By default, sharp strips metadata when no .withMetadata() is called
     const cleanedBuffer = await sharp(buffer)
-      .withMetadata(false)
       .toBuffer()
 
     console.log('✅ [METADATA] Removed AI metadata from image')
