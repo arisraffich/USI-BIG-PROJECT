@@ -324,10 +324,16 @@ export async function POST(request: NextRequest) {
       try {
         const { identifyCharactersForProject } = await import('@/app/api/ai/identify-characters/route')
         const result = await identifyCharactersForProject(projectId)
-        console.log(`[Character Identification] Completed for ${projectId}:`, {
-          secondary_created: result.secondary_characters_created,
-          main_updated: result.main_character_updated
-        })
+        
+        // Check if result is an error response (NextResponse) or success object
+        if (result && 'secondary_characters_created' in result) {
+          console.log(`[Character Identification] Completed for ${projectId}:`, {
+            secondary_created: result.secondary_characters_created,
+            main_updated: result.main_character_updated
+          })
+        } else {
+          console.log(`[Character Identification] Completed for ${projectId} (response format unknown)`)
+        }
       } catch (charError: any) {
         console.error(`[Character Identification] Error for project ${projectId}:`, charError.message)
         // Don't fail the whole request - characters can be identified manually later
