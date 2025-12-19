@@ -120,8 +120,11 @@ IMAGE CONTEXT:
             }
 
             // FETCH ANCHOR IMAGE
+            // Detect if this is Environment Reference Mode (manual selection)
+            const isEnvironmentReference = !!referenceImageUrl
+            
             if (referenceImageUrl) {
-                // MANUAL OVERRIDE
+                // MANUAL OVERRIDE - Environment Consistency Mode
                 anchorImage = referenceImageUrl
             } else if (pageData.page_number > 1) {
                 // PAGES 2-N: Use Page 1 as Style Anchor
@@ -183,10 +186,19 @@ Your task is to CREATE appropriate text-safe areas or text containers that will 
 IMPORTANT: Do NOT render any text in the illustration. The story text will be printed on a separate page.`
             }
 
-            // Determine Style Instructions Block - UPDATED FOR GENERIC NAMES
+            // Determine Style Instructions Block - Differentiated Logic
             let styleInstructions: string;
-            // Note: anchorImage is now TRUE for Page 1 too (Self-Anchoring)
-            if (anchorImage) {
+            
+            if (isEnvironmentReference) {
+                // MANUAL MODE: Environment Consistency
+                styleInstructions = `ENVIRONMENT REFERENCE (SPATIAL CONSISTENCY):
+- The reference image shows the EXACT SAME physical location
+- Recreate this SAME room/space from a different angle or time
+- Match: furniture placement, spatial layout, architecture, props, decor
+- Character appearances should follow the character reference images provided
+- Minor lighting/atmosphere adjustments allowed per the ATMOSPHERE description`
+            } else if (anchorImage) {
+                // DEFAULT MODE: Style Consistency
                 styleInstructions = `STYLE & RENDERING RULES (STRICT CONSISTENCY):
 1. GLOBAL STYLE ANCHOR:
    - Use the "Main Character" reference image as the MASTER STYLE for the entire scene.
@@ -211,6 +223,14 @@ IMPORTANT: Do NOT render any text in the illustration. The story text will be pr
    - The Main Character's style dictates the scene style.`
             }
 
+            // Build BACKGROUND section conditionally
+            const backgroundSection = isEnvironmentReference 
+                ? '' // Omit in environment mode - let reference image define environment
+                : `BACKGROUND:
+${pageData.background_elements || 'Appropriate background for the scene.'}
+
+`
+
             fullPrompt = `TASK: ILLUSTRATION GENERATION
 
 SCENE Context:
@@ -220,10 +240,7 @@ CHARACTER ACTION:
 ${cleanActionDescription}
 (Character: "[MAIN CHARACTER]").
 
-BACKGROUND:
-${pageData.background_elements || 'Appropriate background for the scene.'}
-
-ATMOSPHERE:
+${backgroundSection}ATMOSPHERE:
 ${pageData.atmosphere || 'Natural lighting and mood.'}
 
 ${styleInstructions}
