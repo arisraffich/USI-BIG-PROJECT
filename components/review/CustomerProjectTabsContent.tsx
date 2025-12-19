@@ -235,6 +235,14 @@ export function CustomerProjectTabsContent({
           if (payload.eventType === 'UPDATE' && payload.new) {
             const updatedChar = payload.new as Character
             setLocalCharacters(prev => prev.map(c => c.id === updatedChar.id ? { ...c, ...updatedChar } : c))
+            
+            // Check if character images were synced (customer_image_url added)
+            if (updatedChar.customer_image_url && !characters?.find(c => c.id === updatedChar.id)?.customer_image_url) {
+              toast.success('New character illustrations available!', {
+                description: 'Character gallery has been updated.'
+              })
+              router.refresh() // Force full refresh to ensure gallery shows
+            }
           } else if (payload.eventType === 'INSERT' && payload.new) {
             setLocalCharacters(prev => [...prev, payload.new as Character])
           }
