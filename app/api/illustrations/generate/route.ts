@@ -238,17 +238,28 @@ IMPORTANT: Do NOT render any text in the illustration. The story text will be pr
                 // SCENE RECREATION MODE: Edit the reference image, keep background, change characters
                 styleInstructions = `TASK: SCENE RECREATION WITH NEW CHARACTER ACTIONS
 
-STEP 1 - BACKGROUND PRESERVATION (CRITICAL):
+STORY CONTEXT:
+${cleanSceneDescription}
+
+CHARACTER ACTIONS & EMOTIONS (CRITICAL - BRING CHARACTERS TO LIFE):
+${cleanActionDescription}
+
+IMPORTANT CHARACTER DIRECTION:
+- Make characters EXPRESSIVE and DYNAMIC - not static or stiff
+- Show CLEAR EMOTIONS on faces: joy, surprise, curiosity, concern, excitement, etc.
+- Use DYNAMIC body language: leaning, reaching, gesturing, reacting
+- Characters should feel ALIVE and IN THE MOMENT
+- Capture the FEELING of the scene, not just the pose
+
+BACKGROUND PRESERVATION:
 - The provided scene image is your BASE - use it as the foundation
 - REMOVE all animated characters currently visible in the scene
 - Keep ONLY the environment/background EXACTLY as shown
 
-STEP 2 - NEW CHARACTER POSES (CRITICAL):
-- Draw the character references in COMPLETELY NEW poses
-- DO NOT copy the poses from the reference scene image
-- The characters must perform these SPECIFIC actions:
-
-${cleanActionDescription}
+CHARACTER PLACEMENT:
+- Draw the character references performing the actions described above
+- Use COMPLETELY NEW poses (not copied from reference image)
+- Position characters naturally within the preserved environment
 
 STYLE & QUALITY:
 - Maintain the same art style as the reference image
@@ -259,25 +270,22 @@ ATMOSPHERE/LIGHTING:
 ${pageData.atmosphere || 'Natural lighting and mood.'}
 Apply this mood through lighting, colors, and overall tone.
 
-SCENE VARIETY (choose ONE approach from each):
+SCENE VARIETY (choose ONE from each):
 
 FRAMING (pick ONE):
 • Show more of the left or right side of the scene
 • Include more of the ceiling/sky or floor/ground in the frame
 • Frame the scene as a closer or wider view
-• Shift the composition to reveal different parts of the environment
 
 SHOT TYPE (pick ONE):
-• WIDE SHOT: Show full environment with characters smaller in frame
+• WIDE SHOT: Full environment with characters smaller in frame
 • MEDIUM SHOT: Characters from waist up, balanced with environment
 • CLOSE-UP: Focus on character emotions, environment as backdrop
 
-Apply your choices to create natural variety while preserving the same environment.
-
-OUTPUT:
+OUTPUT REQUIREMENTS:
 - SAME environment/background (preserved from reference)
-- DIFFERENT character poses/actions (as described above)
-- SLIGHTLY different camera angle
+- EXPRESSIVE, DYNAMIC characters performing described actions
+- Clear emotions visible on character faces
 - High quality, seamless integration`
             } else if (anchorImage) {
                 // DEFAULT MODE: Style Consistency
