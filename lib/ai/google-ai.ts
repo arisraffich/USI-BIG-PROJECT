@@ -66,9 +66,10 @@ interface GenerateOptions {
     styleReferenceImages?: string[] // Optional extra style refs
     aspectRatio?: string
     textIntegration?: string
+    isSceneRecreation?: boolean // Scene Recreation mode - uses higher quality input/output
 }
 
-async function fetchImageAsBase64(input: string): Promise<{ mimeType: string, data: string } | null> {
+async function fetchImageAsBase64(input: string, highQuality: boolean = false): Promise<{ mimeType: string, data: string } | null> {
     try {
         let buffer: Buffer;
         let mimeType: string;
@@ -94,12 +95,20 @@ async function fetchImageAsBase64(input: string): Promise<{ mimeType: string, da
             mimeType = response.headers.get('content-type') || 'image/jpeg'
         }
 
-        // 3. Rezise & Standardize (For BOTH URL and Data URI)
-        // Resize image to max 1024px to prevent payload issues (500 errors)
+        // 3. Resize & Standardize (For BOTH URL and Data URI)
+        // High quality mode (Scene Recreation): 2048px, 95% JPEG - preserves detail for image editing
+        // Standard mode: 1024px, 80% JPEG - prevents payload issues (500 errors)
         try {
+            const maxSize = highQuality ? 2048 : 1024
+            const quality = highQuality ? 95 : 80
+            
+            if (highQuality) {
+                console.log('[fetchImageAsBase64] 🎨 Using HIGH QUALITY mode (2048px, 95% JPEG)')
+            }
+            
             buffer = await sharp(buffer)
-                .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true }) // Added withoutEnlargement
-                .jpeg({ quality: 80 }) // standardized to jpeg
+                .resize(maxSize, maxSize, { fit: 'inside', withoutEnlargement: true })
+                .jpeg({ quality })
                 .toBuffer()
 
             return {
@@ -125,12 +134,13 @@ export async function generateIllustration({
     characterReferences = [],
     anchorImage,
     styleReferenceImages = [],
-    aspectRatio = "1:1"
+    aspectRatio = "1:1",
+    isSceneRecreation = false
 }: GenerateOptions): Promise<{ success: boolean, imageBuffer: Buffer | null, error: string | null }> {
 
     if (!API_KEY) throw new Error('Google API Key missing')
 
-    console.log(`[GoogleAI] processing ${characterReferences.length} chars + anchor: ${!!anchorImage}`)
+    console.log(`[GoogleAI] processing ${characterReferences.length} chars + anchor: ${!!anchorImage} + sceneRecreation: ${isSceneRecreation}`)
 
     try {
         const parts: any[] = []
@@ -164,10 +174,15 @@ export async function generateIllustration({
         }
 
         // 2. Anchor Image (Style Reference) - If provided (Page 2+)
+        // ALWAYS use HIGH QUALITY for anchor images to prevent quality degradation cascade
+        // (Each generation uses previous page as reference - quality loss compounds)
         if (anchorImage) {
-            const anchorData = await fetchImageAsBase64(anchorImage)
+            const anchorData = await fetchImageAsBase64(anchorImage, true) // Always high quality
             if (anchorData) {
-                parts.push({ text: "STYLE REFERENCE (Maintain the art style, lighting, and rendering of this previous page):" })
+                const anchorLabel = isSceneRecreation 
+                    ? "SCENE BASE IMAGE (Edit this scene - preserve environment, change characters):"
+                    : "STYLE REFERENCE (Maintain the art style, lighting, and rendering of this previous page):"
+                parts.push({ text: anchorLabel })
                 parts.push({
                     inline_data: {
                         mime_type: anchorData.mimeType,
@@ -194,13 +209,21 @@ export async function generateIllustration({
         // 4. Final Instruction Prompt (The Scene)
         parts.push({ text: prompt })
 
+        // Always use 4K output for maximum quality (premium product)
+        const outputSize = "4K"
+        
+        console.log('[GoogleAI] 📸 Generating at 4K resolution')
+        if (isSceneRecreation) {
+            console.log('[GoogleAI] 🎬 Scene Recreation Mode active')
+        }
+        
         const payload = {
             contents: [{ parts }],
             generationConfig: {
                 responseModalities: ['IMAGE'], // We only want image
                 imageConfig: {
                     aspectRatio: aspectRatio,
-                    imageSize: "2K" // High res for final
+                    imageSize: outputSize
                 }
             }
         }

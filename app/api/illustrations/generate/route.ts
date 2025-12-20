@@ -2,84 +2,6 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { generateIllustration } from '@/lib/ai/google-ai'
 import { sanitizeFilename } from '@/lib/utils/metadata-cleaner'
-import { openai } from '@/lib/ai/openai'
-
-/**
- * Extract spatial layout description from a reference image using OpenAI Vision
- * This helps achieve environment consistency across illustrations
- */
-async function extractSpatialLayout(imageUrl: string): Promise<string> {
-    if (!openai) {
-        throw new Error('OpenAI API key is not configured - cannot perform spatial analysis')
-    }
-
-    console.log('[Spatial Analysis] 🔍 Analyzing reference image for spatial layout...')
-    console.log('[Spatial Analysis] 📥 Downloading image first to avoid OpenAI timeout...')
-
-    // Download image and convert to base64 (OpenAI times out on some URLs)
-    let imageBase64: string
-    try {
-        const imageResponse = await fetch(imageUrl)
-        if (!imageResponse.ok) {
-            throw new Error(`Failed to download image: ${imageResponse.status}`)
-        }
-        const arrayBuffer = await imageResponse.arrayBuffer()
-        const buffer = Buffer.from(arrayBuffer)
-        imageBase64 = buffer.toString('base64')
-        const mimeType = imageResponse.headers.get('content-type') || 'image/png'
-        imageBase64 = `data:${mimeType};base64,${imageBase64}`
-        console.log('[Spatial Analysis] ✅ Image downloaded, size:', Math.round(buffer.length / 1024), 'KB')
-    } catch (downloadError: any) {
-        throw new Error(`Failed to download reference image: ${downloadError.message}`)
-    }
-
-    const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-            {
-                role: 'user',
-                content: [
-                    {
-                        type: 'text',
-                        text: `Analyze this illustration and describe its SPATIAL LAYOUT in precise detail.
-
-For EVERY visible element, specify its EXACT position using these terms:
-- LEFT, RIGHT, CENTER, FAR-LEFT, FAR-RIGHT
-- TOP, BOTTOM, MIDDLE
-- BEHIND, IN FRONT OF, NEXT TO
-- FOREGROUND, MIDGROUND, BACKGROUND
-
-Include:
-1. All furniture/objects and their exact positions
-2. Architectural features (windows, doors, walls) and where they are
-3. Decorations, props, and details
-4. The camera angle/perspective
-5. Lighting sources and direction
-
-Be specific. This description will be used to recreate the EXACT SAME environment from a different moment in time.
-Format as a dense, detailed paragraph (not a list). Keep it under 300 words.`
-                    },
-                    {
-                        type: 'image_url',
-                        image_url: { url: imageBase64 }
-                    }
-                ]
-            }
-        ],
-        max_tokens: 500
-    })
-
-    const spatialDescription = response.choices[0]?.message?.content
-
-    if (!spatialDescription) {
-        throw new Error('OpenAI Vision returned empty spatial analysis')
-    }
-
-    console.log('[Spatial Analysis] ✅ Spatial layout extracted successfully')
-    console.log('[Spatial Analysis] 📝 Description:', spatialDescription.substring(0, 200) + '...')
-
-    return spatialDescription
-}
 
 // Allow max duration for AI generation
 export const maxDuration = 60
@@ -204,22 +126,11 @@ IMAGE CONTEXT:
             }
 
             // FETCH ANCHOR IMAGE
-            // Detect if this is Environment Reference Mode (manual selection)
-            const isEnvironmentReference = !!referenceImageUrl
-            
-            // If manual reference selected, extract spatial layout using OpenAI Vision
-            let spatialLayoutDescription = ''
-            if (isEnvironmentReference) {
-                try {
-                    spatialLayoutDescription = await extractSpatialLayout(referenceImageUrl)
-                } catch (spatialError: any) {
-                    console.error('[Spatial Analysis] ❌ Failed:', spatialError.message)
-                    // User chose: Fail the whole generation if spatial analysis fails
-                    throw new Error(`Spatial analysis failed: ${spatialError.message}`)
-                }
-            }
+            // Detect if this is Scene Recreation Mode (manual reference selection)
+            const isSceneRecreation = !!referenceImageUrl
             
             if (referenceImageUrl) {
+                console.log('[Illustration Generate] 🎬 Scene Recreation Mode - using reference image as base scene')
                 // MANUAL OVERRIDE - Environment Consistency Mode
                 anchorImage = referenceImageUrl
             } else if (pageData.page_number > 1) {
@@ -265,16 +176,54 @@ IMAGE CONTEXT:
 
             if (isIntegrated) {
                 textPromptSection = `TEXT INTEGRATION & LAYOUT INSTRUCTIONS:
+
 The following story text is provided ONLY to determine layout and spacing.
 It must NOT be drawn or rendered inside the illustration.
 
 "${storyText}"
 
 You must plan the illustration composition around this text BEFORE finalizing the scene.
-CRITICAL RULE — NO TEXT DRAWING:
-The illustration must contain ZERO visible text of any kind.
+
+CRITICAL RULE — NO TEXT DRAWING (ABSOLUTE):
+Do NOT draw, write, paint, render, or include ANY visible text, letters, words, symbols, handwriting, or placeholder typography inside the illustration.
+The illustration must contain ZERO visible text of any kind — not even placeholder or dummy text.
+NEVER place any text inside the text-safe areas. These areas must remain completely empty and clean.
+Your responsibility is layout planning only.
+
+IMPORTANT:
 You are NOT responsible for final typography.
-Your task is to CREATE appropriate text-safe areas or text containers that will later receive the final text rendered by the application.`
+Your task is to CREATE appropriate text-safe areas or text containers that will later receive the final text rendered by the application.
+
+TEXT PLANNING RULES:
+- Analyze the length, structure, and paragraph count of the provided story text.
+- Based on the text length, intentionally reserve sufficient visual space for the text.
+- For short text, reserve one calm text area.
+- For long or multi-paragraph text, reserve larger areas, typically at the TOP and/or BOTTOM of the illustration.
+- If the text contains multiple paragraphs, you may split the layout into multiple text-safe areas.
+
+TEXT AREA DESIGN:
+- Use harmonious visual solutions appropriate to the illustration style (soft background washes, framed negative space, sky, walls, floor, or other calm zones).
+- Text-safe areas must NOT resemble signs, banners, labels, or UI elements.
+- Do NOT use speech bubbles, thought bubbles, captions, or dialogue containers.
+- Text areas must feel intentionally designed as part of the composition, not overlaid.
+- Text-safe areas must be COMPLETELY EMPTY — no text, no placeholders, no symbols.
+
+EDGE SAFETY & MARGINS (STRICT):
+- Text-safe areas must NEVER touch or intersect the edges of the illustration.
+- Always maintain a clear inner margin between the text-safe area and all illustration borders.
+- The text-safe area must appear comfortably inset, with visible breathing space from the page edges.
+
+SAFETY & READABILITY RULES (STRICT):
+- NEVER place text-safe areas over characters.
+- NEVER cover faces, eyes, hands, or emotional focal points.
+- NEVER place text-safe areas on busy or highly textured backgrounds.
+- ALWAYS ensure sufficient contrast for future readability.
+
+FINAL REQUIREMENT:
+The illustration must look intentionally composed to include text, following professional children's book layout standards, while containing NO drawn text at all.
+
+FAILSAFE RULE:
+If there is any conflict between illustration detail and text readability, text readability takes priority over background decoration.`
             } else {
                 textPromptSection = `STORY CONTEXT (FOR SCENE MOOD ONLY):
 "${storyText}"
@@ -285,20 +234,51 @@ IMPORTANT: Do NOT render any text in the illustration. The story text will be pr
             // Determine Style Instructions Block - Differentiated Logic
             let styleInstructions: string;
             
-            if (isEnvironmentReference) {
-                // MANUAL MODE: Environment Consistency with AI-Analyzed Spatial Layout
-                styleInstructions = `ENVIRONMENT REFERENCE (SPATIAL CONSISTENCY - CRITICAL):
-You are recreating the EXACT SAME physical location shown in the reference image.
+            if (isSceneRecreation) {
+                // SCENE RECREATION MODE: Edit the reference image, keep background, change characters
+                styleInstructions = `TASK: SCENE RECREATION WITH NEW CHARACTER ACTIONS
 
-SPATIAL LAYOUT (AI-ANALYZED - FOLLOW PRECISELY):
-${spatialLayoutDescription}
+STEP 1 - BACKGROUND PRESERVATION (CRITICAL):
+- The provided scene image is your BASE - use it as the foundation
+- REMOVE all animated characters currently visible in the scene
+- Keep ONLY the environment/background EXACTLY as shown
 
-RULES:
-- This is the SAME room/space from a different moment in time
-- Every element described above MUST appear in its EXACT position
-- Window positions, furniture placement, wall decorations - keep them IDENTICAL
-- Character appearances should follow the character reference images provided
-- Only changes allowed: character poses/actions and minor lighting per ATMOSPHERE`
+STEP 2 - NEW CHARACTER POSES (CRITICAL):
+- Draw the character references in COMPLETELY NEW poses
+- DO NOT copy the poses from the reference scene image
+- The characters must perform these SPECIFIC actions:
+
+${cleanActionDescription}
+
+STYLE & QUALITY:
+- Maintain the same art style as the reference image
+- Render at high vector-like quality (crisp, clean lines)
+- Match the color palette and rendering technique
+
+ATMOSPHERE/LIGHTING:
+${pageData.atmosphere || 'Natural lighting and mood.'}
+Apply this mood through lighting, colors, and overall tone.
+
+SCENE VARIETY (choose ONE approach from each):
+
+FRAMING (pick ONE):
+• Show more of the left or right side of the scene
+• Include more of the ceiling/sky or floor/ground in the frame
+• Frame the scene as a closer or wider view
+• Shift the composition to reveal different parts of the environment
+
+SHOT TYPE (pick ONE):
+• WIDE SHOT: Show full environment with characters smaller in frame
+• MEDIUM SHOT: Characters from waist up, balanced with environment
+• CLOSE-UP: Focus on character emotions, environment as backdrop
+
+Apply your choices to create natural variety while preserving the same environment.
+
+OUTPUT:
+- SAME environment/background (preserved from reference)
+- DIFFERENT character poses/actions (as described above)
+- SLIGHTLY different camera angle
+- High quality, seamless integration`
             } else if (anchorImage) {
                 // DEFAULT MODE: Style Consistency
                 styleInstructions = `STYLE & RENDERING RULES (STRICT CONSISTENCY):
@@ -326,14 +306,22 @@ RULES:
             }
 
             // Build BACKGROUND section conditionally
-            const backgroundSection = isEnvironmentReference 
-                ? '' // Omit in environment mode - let reference image define environment
+            const backgroundSection = isSceneRecreation 
+                ? '' // Omit in scene recreation mode - reference image defines environment
                 : `BACKGROUND:
 ${pageData.background_elements || 'Appropriate background for the scene.'}
 
 `
 
-            fullPrompt = `TASK: ILLUSTRATION GENERATION
+            // Build fullPrompt differently for scene recreation vs standard generation
+            if (isSceneRecreation) {
+                // Scene Recreation: Use the streamlined prompt (styleInstructions has everything)
+                fullPrompt = `${styleInstructions}
+
+${textPromptSection}`
+            } else {
+                // Standard Generation: Full detailed prompt
+                fullPrompt = `TASK: ILLUSTRATION GENERATION
 
 SCENE Context:
 ${cleanSceneDescription}
@@ -348,15 +336,19 @@ ${pageData.atmosphere || 'Natural lighting and mood.'}
 ${styleInstructions}
 
 ${textPromptSection}`
+            }
         }
 
         // 5. Generate with Google AI
+        // Pass isSceneRecreation flag for higher quality input/output in Scene Recreation mode
+        // (referenceImageUrl indicates manual page selection = Scene Recreation mode)
         const result = await generateIllustration({
             prompt: fullPrompt,
             characterReferences: characterReferences,
             anchorImage: anchorImage,
             styleReferenceImages: styleReferenceImages,
-            aspectRatio: mappedAspectRatio
+            aspectRatio: mappedAspectRatio,
+            isSceneRecreation: !!referenceImageUrl
         })
 
         if (!result.success || !result.imageBuffer) {
