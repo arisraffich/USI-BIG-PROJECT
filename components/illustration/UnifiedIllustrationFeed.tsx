@@ -234,7 +234,7 @@ export function UnifiedIllustrationFeed({
                             onSaveFeedback={async (notes) => {
                                 if (onSaveFeedback) await onSaveFeedback(page.id, notes)
                             }}
-                            onGenerate={onGenerate ? (() => onGenerate(page)) : undefined}
+                            onGenerate={onGenerate ? ((refUrl?: string) => onGenerate(page, refUrl)) : undefined}
                             onRegenerate={onRegenerate ? (prompt, referenceImages) => onRegenerate(page, prompt, referenceImages) : undefined}
                             onUpload={async (type, file) => {
                                 if (onUpload) onUpload(page, type, file)

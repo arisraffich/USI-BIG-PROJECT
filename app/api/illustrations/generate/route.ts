@@ -2,6 +2,84 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { generateIllustration } from '@/lib/ai/google-ai'
 import { sanitizeFilename } from '@/lib/utils/metadata-cleaner'
+import { openai } from '@/lib/ai/openai'
+
+/**
+ * Extract spatial layout description from a reference image using OpenAI Vision
+ * This helps achieve environment consistency across illustrations
+ */
+async function extractSpatialLayout(imageUrl: string): Promise<string> {
+    if (!openai) {
+        throw new Error('OpenAI API key is not configured - cannot perform spatial analysis')
+    }
+
+    console.log('[Spatial Analysis] 🔍 Analyzing reference image for spatial layout...')
+    console.log('[Spatial Analysis] 📥 Downloading image first to avoid OpenAI timeout...')
+
+    // Download image and convert to base64 (OpenAI times out on some URLs)
+    let imageBase64: string
+    try {
+        const imageResponse = await fetch(imageUrl)
+        if (!imageResponse.ok) {
+            throw new Error(`Failed to download image: ${imageResponse.status}`)
+        }
+        const arrayBuffer = await imageResponse.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
+        imageBase64 = buffer.toString('base64')
+        const mimeType = imageResponse.headers.get('content-type') || 'image/png'
+        imageBase64 = `data:${mimeType};base64,${imageBase64}`
+        console.log('[Spatial Analysis] ✅ Image downloaded, size:', Math.round(buffer.length / 1024), 'KB')
+    } catch (downloadError: any) {
+        throw new Error(`Failed to download reference image: ${downloadError.message}`)
+    }
+
+    const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+            {
+                role: 'user',
+                content: [
+                    {
+                        type: 'text',
+                        text: `Analyze this illustration and describe its SPATIAL LAYOUT in precise detail.
+
+For EVERY visible element, specify its EXACT position using these terms:
+- LEFT, RIGHT, CENTER, FAR-LEFT, FAR-RIGHT
+- TOP, BOTTOM, MIDDLE
+- BEHIND, IN FRONT OF, NEXT TO
+- FOREGROUND, MIDGROUND, BACKGROUND
+
+Include:
+1. All furniture/objects and their exact positions
+2. Architectural features (windows, doors, walls) and where they are
+3. Decorations, props, and details
+4. The camera angle/perspective
+5. Lighting sources and direction
+
+Be specific. This description will be used to recreate the EXACT SAME environment from a different moment in time.
+Format as a dense, detailed paragraph (not a list). Keep it under 300 words.`
+                    },
+                    {
+                        type: 'image_url',
+                        image_url: { url: imageBase64 }
+                    }
+                ]
+            }
+        ],
+        max_tokens: 500
+    })
+
+    const spatialDescription = response.choices[0]?.message?.content
+
+    if (!spatialDescription) {
+        throw new Error('OpenAI Vision returned empty spatial analysis')
+    }
+
+    console.log('[Spatial Analysis] ✅ Spatial layout extracted successfully')
+    console.log('[Spatial Analysis] 📝 Description:', spatialDescription.substring(0, 200) + '...')
+
+    return spatialDescription
+}
 
 // Allow max duration for AI generation
 export const maxDuration = 60
@@ -21,6 +99,12 @@ export async function POST(request: Request) {
         const body = await request.json()
         const { projectId, pageId, customPrompt, currentImageUrl, referenceImages: uploadedReferenceImages, referenceImageUrl } = body
 
+        // Debug: Log if manual reference was selected
+        if (referenceImageUrl) {
+            console.log('[Illustration Generate] 🎯 Manual reference image selected:', referenceImageUrl.substring(0, 80) + '...')
+        } else {
+            console.log('[Illustration Generate] 📄 Using default reference (Page 1 or main character)')
+        }
 
         if (!projectId) {
             return NextResponse.json({ error: 'Missing projectId' }, { status: 400 })
@@ -123,6 +207,18 @@ IMAGE CONTEXT:
             // Detect if this is Environment Reference Mode (manual selection)
             const isEnvironmentReference = !!referenceImageUrl
             
+            // If manual reference selected, extract spatial layout using OpenAI Vision
+            let spatialLayoutDescription = ''
+            if (isEnvironmentReference) {
+                try {
+                    spatialLayoutDescription = await extractSpatialLayout(referenceImageUrl)
+                } catch (spatialError: any) {
+                    console.error('[Spatial Analysis] ❌ Failed:', spatialError.message)
+                    // User chose: Fail the whole generation if spatial analysis fails
+                    throw new Error(`Spatial analysis failed: ${spatialError.message}`)
+                }
+            }
+            
             if (referenceImageUrl) {
                 // MANUAL OVERRIDE - Environment Consistency Mode
                 anchorImage = referenceImageUrl
@@ -190,13 +286,19 @@ IMPORTANT: Do NOT render any text in the illustration. The story text will be pr
             let styleInstructions: string;
             
             if (isEnvironmentReference) {
-                // MANUAL MODE: Environment Consistency
-                styleInstructions = `ENVIRONMENT REFERENCE (SPATIAL CONSISTENCY):
-- The reference image shows the EXACT SAME physical location
-- Recreate this SAME room/space from a different angle or time
-- Match: furniture placement, spatial layout, architecture, props, decor
+                // MANUAL MODE: Environment Consistency with AI-Analyzed Spatial Layout
+                styleInstructions = `ENVIRONMENT REFERENCE (SPATIAL CONSISTENCY - CRITICAL):
+You are recreating the EXACT SAME physical location shown in the reference image.
+
+SPATIAL LAYOUT (AI-ANALYZED - FOLLOW PRECISELY):
+${spatialLayoutDescription}
+
+RULES:
+- This is the SAME room/space from a different moment in time
+- Every element described above MUST appear in its EXACT position
+- Window positions, furniture placement, wall decorations - keep them IDENTICAL
 - Character appearances should follow the character reference images provided
-- Minor lighting/atmosphere adjustments allowed per the ATMOSPHERE description`
+- Only changes allowed: character poses/actions and minor lighting per ATMOSPHERE`
             } else if (anchorImage) {
                 // DEFAULT MODE: Style Consistency
                 styleInstructions = `STYLE & RENDERING RULES (STRICT CONSISTENCY):

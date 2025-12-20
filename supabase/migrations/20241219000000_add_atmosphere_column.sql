@@ -7,3 +7,4 @@ ALTER TABLE pages ADD COLUMN IF NOT EXISTS atmosphere TEXT;
 COMMENT ON COLUMN pages.atmosphere IS 'Mood, lighting, and emotional tone of the scene (part of structured scene description)';
 
 
+

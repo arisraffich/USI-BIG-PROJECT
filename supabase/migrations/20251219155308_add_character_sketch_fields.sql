@@ -6,3 +6,4 @@ ALTER TABLE characters ADD COLUMN IF NOT EXISTS sketch_prompt TEXT;
 COMMENT ON COLUMN characters.sketch_url IS 'URL to the sketch version of the character illustration';
 COMMENT ON COLUMN characters.sketch_prompt IS 'Prompt used to generate the sketch from colored illustration';
 
+

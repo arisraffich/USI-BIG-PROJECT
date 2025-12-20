@@ -17,3 +17,4 @@ ALTER PUBLICATION supabase_realtime ADD TABLE "projects";
 -- If realtime still doesn't work, we may need to adjust RLS policies
 
 
+
