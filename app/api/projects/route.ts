@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { parseCharacterForm } from '@/lib/ai/openai'
 import { parseStoryFile, parsePagesWithAI } from '@/lib/utils/file-parser'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -36,7 +35,6 @@ export async function POST(request: NextRequest) {
     const authorEmail = formData.get('author_email') as string
     const authorPhone = formData.get('author_phone') as string
     const mainCharacterImage = formData.get('main_character_image') as File | null
-    const characterFormPdf = formData.get('character_form_pdf') as File | null
     const storyFile = formData.get('story_file') as File | null
 
     // Validate required fields
@@ -47,17 +45,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!mainCharacterImage || !characterFormPdf || !storyFile) {
+    if (!mainCharacterImage || !storyFile) {
       return NextResponse.json(
-        { error: 'All files are required', received: { image: !!mainCharacterImage, pdf: !!characterFormPdf, story: !!storyFile } },
+        { error: 'Main character image and story file are required', received: { image: !!mainCharacterImage, story: !!storyFile } },
         { status: 400 }
       )
     }
 
     // Validate file types
-    if (!(mainCharacterImage instanceof File) || !(characterFormPdf instanceof File) || !(storyFile instanceof File)) {
+    if (!(mainCharacterImage instanceof File) || !(storyFile instanceof File)) {
       return NextResponse.json(
-        { error: 'Invalid file types', details: 'All file fields must be File objects' },
+        { error: 'Invalid file types', details: 'File fields must be File objects' },
         { status: 400 }
       )
     }
@@ -95,12 +93,10 @@ export async function POST(request: NextRequest) {
 
     // Upload files to Supabase Storage
     let mainCharacterBuffer: Buffer
-    let pdfBuffer: Buffer
     let storyBuffer: Buffer
 
     try {
       mainCharacterBuffer = Buffer.from(await mainCharacterImage.arrayBuffer())
-      pdfBuffer = Buffer.from(await characterFormPdf.arrayBuffer())
       storyBuffer = Buffer.from(await storyFile.arrayBuffer())
     } catch (bufferError: any) {
       console.error('Error converting files to buffers:', bufferError)
@@ -132,27 +128,6 @@ export async function POST(request: NextRequest) {
       .getPublicUrl(mainCharacterPath)
     const mainCharacterUrl = imageUrlData.publicUrl
 
-    // Upload PDF form
-    const pdfPath = `${projectId}/character-form.pdf`
-    const { error: pdfError } = await supabase.storage
-      .from('project-files')
-      .upload(pdfPath, pdfBuffer, {
-        contentType: 'application/pdf',
-      })
-
-    if (pdfError) {
-      console.error('Error uploading PDF:', pdfError)
-      return NextResponse.json(
-        { error: 'Failed to upload PDF', details: pdfError.message },
-        { status: 500 }
-      )
-    }
-
-    const { data: pdfUrlData } = supabase.storage
-      .from('project-files')
-      .getPublicUrl(pdfPath)
-    const formPdfUrl = pdfUrlData.publicUrl
-
     // Upload story file
     const storyExtension = storyFile.name?.split('.').pop() || 'txt'
     const storyPath = `${projectId}/story.${storyExtension}`
@@ -175,71 +150,25 @@ export async function POST(request: NextRequest) {
       .getPublicUrl(storyPath)
     const storyUrl = storyUrlData.publicUrl
 
-    // Parse character form PDF
-    let characterData = {
-      name: null,
-      biography: null,
-      age: null,
-      ethnicity: null,
-      skin_color: null,
-      hair_color: null,
-      hair_style: null,
-      eye_color: null,
-      clothing: null,
-      accessories: null,
-      special_features: null,
-      gender: null,
-    }
-
-    if (!process.env.OPENAI_API_KEY) {
-      console.error('OPENAI_API_KEY is missing. Character form PDF will not be parsed.')
-    } else {
-      try {
-        characterData = await parseCharacterForm(pdfBuffer)
-      } catch (error: any) {
-        console.error('Error parsing character form:', error.message)
-        // Continue without character data - can be filled manually later
-        // This allows project creation to succeed even if PDF parsing fails
-      }
-    }
-
-    // Merge clothing, accessories, and special_features into a single clothing field
-    const clothingParts = [
-      characterData.clothing,
-      characterData.accessories,
-      characterData.special_features,
-    ].filter(Boolean)
-    const mergedClothing = clothingParts.length > 0 ? clothingParts.join('\n') : null
-
-    // Create main character record
+    // Create main character record (minimal - name will be extracted from story by character identification)
     const { data: createdCharacter, error: characterError } = await supabase
       .from('characters')
       .insert({
         project_id: projectId,
-        name: characterData.name,
+        name: null, // Will be extracted from story by character identification
         role: 'Main Character',
-        story_role: characterData.biography,
         is_main: true,
-        age: characterData.age,
-        ethnicity: characterData.ethnicity,
-        skin_color: characterData.skin_color,
-        hair_color: characterData.hair_color,
-        hair_style: characterData.hair_style,
-        eye_color: characterData.eye_color,
-        clothing: mergedClothing,
-        accessories: null,
-        special_features: null,
-        gender: characterData.gender,
         image_url: mainCharacterUrl,
-        form_pdf_url: formPdfUrl,
         appears_in: [],
       })
       .select()
       .single()
 
     if (characterError) {
-      console.error('Error creating character:', characterError.message)
+      console.error('Error creating main character:', characterError.message)
       // Don't fail the whole request - character can be created manually
+    } else {
+      console.log(`[Project Creation] Main character created with image, name will be extracted from story`)
     }
 
     // Update project status to indicate we're parsing

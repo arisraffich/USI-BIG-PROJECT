@@ -38,7 +38,6 @@ export default function CreateProjectForm() {
 
   // File uploads
   const [mainCharacterImage, setMainCharacterImage] = useState<FileWithPreview | null>(null)
-  const [characterFormPdf, setCharacterFormPdf] = useState<File | null>(null)
   const [storyFile, setStoryFile] = useState<File | null>(null)
 
   // Dropzone for main character image
@@ -58,24 +57,6 @@ export default function CreateProjectForm() {
           preview: URL.createObjectURL(acceptedFiles[0]),
         })
         setMainCharacterImage(file)
-      }
-    },
-  })
-
-  // Dropzone for character form PDF
-  const {
-    getRootProps: getPdfRootProps,
-    getInputProps: getPdfInputProps,
-    isDragActive: isPdfDragActive,
-  } = useDropzone({
-    accept: {
-      'application/pdf': ['.pdf'],
-    },
-    maxSize: 5 * 1024 * 1024, // 5MB
-    multiple: false,
-    onDrop: (acceptedFiles) => {
-      if (acceptedFiles[0]) {
-        setCharacterFormPdf(acceptedFiles[0])
       }
     },
   })
@@ -116,7 +97,7 @@ export default function CreateProjectForm() {
     e.preventDefault()
 
     // Validate files
-    if (!mainCharacterImage || !characterFormPdf || !storyFile) {
+    if (!mainCharacterImage || !storyFile) {
       toast.error('Please upload all required files')
       return
     }
@@ -124,10 +105,6 @@ export default function CreateProjectForm() {
     // Validate file sizes
     if (mainCharacterImage.size > 10 * 1024 * 1024) {
       toast.error('Main character image must be less than 10MB')
-      return
-    }
-    if (characterFormPdf.size > 5 * 1024 * 1024) {
-      toast.error('Character form PDF must be less than 5MB')
       return
     }
     if (storyFile.size > 10 * 1024 * 1024) {
@@ -146,7 +123,6 @@ export default function CreateProjectForm() {
       formDataToSend.append('author_email', formData.author_email)
       formDataToSend.append('author_phone', formData.author_phone)
       formDataToSend.append('main_character_image', mainCharacterImage)
-      formDataToSend.append('character_form_pdf', characterFormPdf)
       formDataToSend.append('story_file', storyFile)
 
       setProcessingStep('Creating project and uploading files...')
@@ -234,14 +210,12 @@ export default function CreateProjectForm() {
     }
   }
 
-  function removeFile(type: 'image' | 'pdf' | 'story') {
+  function removeFile(type: 'image' | 'story') {
     if (type === 'image') {
       if (mainCharacterImage?.preview) {
         URL.revokeObjectURL(mainCharacterImage.preview)
       }
       setMainCharacterImage(null)
-    } else if (type === 'pdf') {
-      setCharacterFormPdf(null)
     } else {
       setStoryFile(null)
     }
@@ -404,43 +378,6 @@ export default function CreateProjectForm() {
                     <p className="text-sm text-gray-600">
                       {isImageDragActive
                         ? 'Drop the image here'
-                        : 'Drag & drop or click to select'}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Character Form PDF */}
-              <div>
-                <Label>Character Form PDF *</Label>
-                <p className="text-sm text-gray-600 mb-2">
-                  PDF (max 5MB)
-                </p>
-                {characterFormPdf ? (
-                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border">
-                    <File className="w-5 h-5 text-gray-600" />
-                    <span className="flex-1 text-sm">{characterFormPdf.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeFile('pdf')}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div
-                    {...getPdfRootProps()}
-                    className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${isPdfDragActive
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                  >
-                    <input {...getPdfInputProps()} />
-                    <Upload className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-600">
-                      {isPdfDragActive
-                        ? 'Drop the PDF here'
                         : 'Drag & drop or click to select'}
                     </p>
                   </div>

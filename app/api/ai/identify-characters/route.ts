@@ -150,40 +150,35 @@ async function runCharacterIdentification(project_id: string, supabase: any) {
       .map((p: any) => `Page ${p.page_number}: ${p.story_text}`)
       .join('\n\n')
 
-    // STEP 3: Build enhanced prompt with main character context
+    // STEP 3: Build prompt for character identification
+    // Main character exists but may not have a name yet (will be extracted from story)
     const mainCharContext = mainCharacter ? `
-CRITICAL: MAIN CHARACTER INFORMATION
-The main character for this story has already been created from a character form. You must recognize this character in the story and handle it separately.
-
-MAIN CHARACTER DETAILS:
-- Name: ${mainCharacter.name || 'Not specified in form (may be referred to by role in story)'}
-- Role/Description: ${mainCharacter.story_role || mainCharacter.biography || 'Main character'}
-- Age: ${mainCharacter.age || 'Not specified'}
-- Gender: ${mainCharacter.gender || 'Not specified'}
+CRITICAL: MAIN CHARACTER IDENTIFICATION
+A main character has been designated for this story (their image has been uploaded).
+${mainCharacter.name ? `The main character's name is: "${mainCharacter.name}"` : `The main character's name needs to be EXTRACTED from the story text.`}
 
 YOUR TASK HAS TWO PARTS:
 
-PART 1: TRACK MAIN CHARACTER APPEARANCES
-- Identify which pages the main character appears on
-- The main character may be referred to by:
-  * Their exact name: "${mainCharacter.name}"
-  * Name variations: nicknames, titles, or descriptive phrases (e.g., "Zara" might be called "Zara the Explorer", "Little Zara", "our hero")
-  * Role-based references: "the girl", "the boy", "Mom", "Dad", "the hero", "the main character", etc.
-  * If a character appears frequently throughout the story and matches the main character's description, it's likely the same person
-- Return the main character's page appearances in the "main_character.appears_in" field
-- If the main character appears on most or all pages, include all relevant page numbers
+PART 1: IDENTIFY AND TRACK THE MAIN CHARACTER
+- Identify WHO the main character/protagonist is in the story
+- EXTRACT their name from the story text (this is CRITICAL)
+- The main character is typically:
+  * The character who appears most frequently
+  * The protagonist or central figure of the story
+  * The character the story revolves around
+- Track which pages they appear on
+- Return the main character's NAME and page appearances
 
 PART 2: IDENTIFY SECONDARY CHARACTERS ONLY
 - Find all OTHER characters (excluding the main character)
-- DO NOT create a duplicate entry for the main character
-- If you identify a character that matches the main character (by name, role, or description), DO NOT include it in secondary_characters
+- DO NOT include the main character in secondary_characters
 - Only include characters that are DIFFERENT from the main character
 
-IMPORTANT RULES FOR MAIN CHARACTER RECOGNITION:
-1. If the main character has a name and you see that name (or variations) in the story → it's the main character
-2. If the main character has no name but has a role/description, match by role/description
-3. If a character appears on many pages and matches the main character's description → it's likely the main character
-4. When in doubt, exclude the character from secondary_characters (better to miss a secondary than duplicate the main)` : ''
+IMPORTANT:
+- You MUST extract the main character's name from the story
+- If the character has a proper name (e.g., "Zara", "Tactile Tabby"), use that
+- If the character is referred to by a descriptive title (e.g., "the little bear", "the brave knight"), use that as the name
+- The name field is REQUIRED - every story has a way of referring to its main character` : ''
 
     const prompt = `You are analyzing a children's book story to identify characters that need to be illustrated.
 ${mainCharContext}
@@ -193,24 +188,30 @@ ${fullStory}
 
 CRITICAL RULES - CHARACTER IDENTIFICATION:
 
-1. SINGULAR CHARACTERS ONLY:
+1. MAIN CHARACTER NAME EXTRACTION (MOST IMPORTANT):
+   - You MUST identify and extract the main character's name from the story
+   - Look for the protagonist - the character the story is about
+   - Use their proper name if they have one (e.g., "Zara", "Max", "Tactile Tabby")
+   - If no proper name, use their most common reference (e.g., "the little girl", "the brave bear")
+
+2. SINGULAR CHARACTERS ONLY:
    - ONLY identify individual, singular characters
    - Each character must be a specific, identifiable individual
    - Characters must be able to be illustrated as a single entity
 
-2. EXCLUDE PLURAL/GROUP REFERENCES:
+3. EXCLUDE PLURAL/GROUP REFERENCES:
    - DO NOT identify plural nouns (words ending in -s, -es, or indicating multiple entities)
    - DO NOT identify collective groups (e.g., groups of people, animals, or objects)
    - DO NOT identify generic categories or types
    - If a reference describes multiple entities, exclude it
 
-3. INCLUDE SPECIFIC INDIVIDUALS:
+4. INCLUDE SPECIFIC INDIVIDUALS:
    - Include characters with proper names (first names, full names, or specific titles with names)
    - Include singular role-based characters that represent ONE specific person/animal/object (e.g., "Mom", "Dad", "the dog", "Grandma")
    - Include personified objects that are singular and specific (e.g., "Blue Truck", "Magic Wand")
    - If a character appears multiple times and is clearly the same individual, include it
 
-4. VALIDATION CHECK - WRITER INTENT & CHARACTER FORM NECESSITY:
+5. VALIDATION CHECK - WRITER INTENT & CHARACTER FORM NECESSITY:
 
    The ultimate question: "Would the writer want to fill out a character form for this character?"
    
@@ -240,8 +241,9 @@ RESPONSE FORMAT:
 You must return a JSON object with this exact structure:
 {
   "main_character": {
-    "name": "${mainCharacter?.name || 'Main Character'}",
-    "appears_in": [1, 2, 3, 5, 8]
+    "name": "EXTRACTED NAME FROM STORY (REQUIRED - e.g., 'Zara', 'Tactile Tabby', 'the little bear')",
+    "appears_in": [1, 2, 3, 5, 8],
+    "story_role": "Brief description of who they are in the story"
   },
   "secondary_characters": [
     {
@@ -254,7 +256,8 @@ You must return a JSON object with this exact structure:
 }
 
 IMPORTANT:
-- If main character exists, you MUST include their page appearances in "main_character.appears_in"
+- "main_character.name" is REQUIRED - extract from story text
+- "main_character.appears_in" must include all pages where the main character appears
 - "secondary_characters" should ONLY contain characters that are NOT the main character
 - Each secondary character must have either a "name" OR a "role" (or both)
 - "appears_in" must be an array of page numbers (integers between 1 and ${maxPageNumber})
@@ -336,9 +339,10 @@ IMPORTANT:
       })
     }
 
-    // STEP 7: Update main character's appears_in (if main character exists)
+    // STEP 7: Update main character's name and appears_in (if main character exists)
     let mainCharAppearances: string[] = []
     let mainCharUpdated = false
+    let extractedMainCharName: string | null = null
 
     if (mainCharacter) {
       if (identified.main_character?.appears_in && Array.isArray(identified.main_character.appears_in)) {
@@ -350,14 +354,27 @@ IMPORTANT:
           })
           .filter((p: string | null): p is string => p !== null)
 
+        // Extract main character name from AI response (CRITICAL - this populates the name field)
+        extractedMainCharName = identified.main_character?.name || null
+        
         if (mainCharAppearances.length > 0) {
+          // Build update object - always update appears_in and story_role
+          const updateData: any = {
+            appears_in: mainCharAppearances,
+            story_role: identified.main_character.story_role || mainCharacter.story_role || mainCharacter.biography
+          }
+          
+          // Update name if it was extracted and main character doesn't have one yet
+          if (extractedMainCharName && !mainCharacter.name) {
+            updateData.name = extractedMainCharName
+            console.log(`[Character ID] ✅ Extracted main character name from story: "${extractedMainCharName}"`)
+          } else if (extractedMainCharName && mainCharacter.name) {
+            console.log(`[Character ID] Main character already has name "${mainCharacter.name}", keeping it (AI found: "${extractedMainCharName}")`)
+          }
+
           await supabase
             .from('characters')
-            .update({
-              appears_in: mainCharAppearances,
-              // Optionally update story_role if AI provided better description
-              story_role: identified.main_character.story_role || mainCharacter.story_role || mainCharacter.biography
-            })
+            .update(updateData)
             .eq('id', mainCharacter.id)
 
           mainCharUpdated = true
@@ -371,9 +388,18 @@ IMPORTANT:
       if (!mainCharUpdated || mainCharAppearances.length === 0) {
         console.log('[Character ID] Using fallback: assuming main character appears on all pages')
         const allPageNumbers = pages.map((p: any) => p.page_number.toString())
+        
+        // Still try to extract name even in fallback
+        const fallbackUpdateData: any = { appears_in: allPageNumbers }
+        if (identified.main_character?.name && !mainCharacter.name) {
+          fallbackUpdateData.name = identified.main_character.name
+          extractedMainCharName = identified.main_character.name
+          console.log(`[Character ID] ✅ Extracted main character name (fallback): "${extractedMainCharName}"`)
+        }
+        
         await supabase
           .from('characters')
-          .update({ appears_in: allPageNumbers })
+          .update(fallbackUpdateData)
           .eq('id', mainCharacter.id)
 
         mainCharAppearances = allPageNumbers
@@ -432,7 +458,9 @@ IMPORTANT:
     console.log(`[Character ID] Total Pages: ${maxPageNumber}`)
     console.log(`[Character ID] Main Character Exists: ${!!mainCharacter}`)
     if (mainCharacter) {
-      console.log(`[Character ID] Main Character Name: ${mainCharacter.name || 'Unnamed'}`)
+      console.log(`[Character ID] Main Character Name (before): ${mainCharacter.name || 'NULL'}`)
+      console.log(`[Character ID] Main Character Name (extracted): ${extractedMainCharName || 'Not extracted'}`)
+      console.log(`[Character ID] Main Character Name Updated: ${!mainCharacter.name && !!extractedMainCharName ? 'YES' : 'NO'}`)
       console.log(`[Character ID] Main Character Appearances: ${mainCharAppearances.length} pages`)
     }
     console.log(`[Character ID] AI Response - Secondary Characters Identified: ${identified.secondary_characters.length}`)
@@ -548,6 +576,8 @@ IMPORTANT:
     return {
       success: true,
       main_character_updated: mainCharUpdated,
+      main_character_name_extracted: extractedMainCharName,
+      main_character_name_was_updated: !mainCharacter?.name && !!extractedMainCharName,
       main_character_appearances: mainCharAppearances.length,
       main_character_appearances_list: mainCharAppearances,
       secondary_characters_identified: identified.secondary_characters.length,

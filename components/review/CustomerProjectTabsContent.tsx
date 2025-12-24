@@ -611,15 +611,9 @@ export function CustomerProjectTabsContent({
                   mainCharacter={sortedCharacters.main || undefined}
                 />
               ) : (
-                // ... Existing Character Forms ...
+                // Character Forms - only show secondary characters (main character has no form data)
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {sortedCharacters.main && (
-                    <CustomerCharacterCard
-                      key={sortedCharacters.main.id}
-                      character={sortedCharacters.main!}
-                      onChange={handleCharacterChange}
-                    />
-                  )}
+                  {/* Main character form is no longer shown - main character data comes from uploaded image and story extraction */}
                   {sortedCharacters.secondary.map((character) => (
                     <CustomerCharacterCard
                       key={character.id}

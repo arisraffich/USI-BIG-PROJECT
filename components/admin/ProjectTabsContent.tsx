@@ -574,9 +574,7 @@ export function ProjectTabsContent({
               {localCharacters && localCharacters.length > 0 ? (
                 <div className="w-full">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
-                    {sortedCharacters.main && (
-                      <CharacterCard key={sortedCharacters.main.id} character={sortedCharacters.main} />
-                    )}
+                    {/* Main character form is no longer shown - main character data comes from uploaded image and story extraction */}
                     {localCharacters.length <= 1 && (
                       <div className="bg-[#f65952]/5 border border-[#f65952]/20 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-4 text-center min-h-[300px] animate-pulse">
                         <div className="relative">
