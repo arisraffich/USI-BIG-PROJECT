@@ -112,12 +112,19 @@ export async function identifyCharactersForProject(project_id: string) {
 async function runCharacterIdentification(project_id: string, supabase: any) {
 
     // STEP 1: Fetch main character FIRST (before building prompt)
-    const { data: mainCharacter } = await supabase
+    // Use maybeSingle() instead of single() to avoid throwing on no results
+    const { data: mainCharacter, error: mainCharError } = await supabase
       .from('characters')
       .select('id, name, role, story_role, biography, age, gender, is_main')
       .eq('project_id', project_id)
       .eq('is_main', true)
-      .single()
+      .maybeSingle()
+    
+    if (mainCharError) {
+      console.warn(`[Character ID] Warning: Could not fetch main character: ${mainCharError.message}`)
+    }
+    
+    console.log(`[Character ID] Main character query result: ${mainCharacter ? `Found (id: ${mainCharacter.id})` : 'Not found'}`)
 
     // STEP 2: Get all pages for this project
     const { data: pages, error: pagesError } = await supabase
@@ -339,11 +346,14 @@ IMPORTANT:
       })
     }
 
-    // STEP 7: Update main character's name and appears_in (if main character exists)
+    // STEP 7: Update main character's name and appears_in
     let mainCharAppearances: string[] = []
     let mainCharUpdated = false
     let extractedMainCharName: string | null = null
 
+    // Extract main character name from AI response first (we need this regardless)
+    extractedMainCharName = identified.main_character?.name || null
+    
     if (mainCharacter) {
       if (identified.main_character?.appears_in && Array.isArray(identified.main_character.appears_in)) {
         // Validate and sanitize page numbers
@@ -353,9 +363,6 @@ IMPORTANT:
             return isNaN(pageNum) || pageNum < 1 || pageNum > maxPageNumber ? null : pageNum.toString()
           })
           .filter((p: string | null): p is string => p !== null)
-
-        // Extract main character name from AI response (CRITICAL - this populates the name field)
-        extractedMainCharName = identified.main_character?.name || null
         
         if (mainCharAppearances.length > 0) {
           // Build update object - always update appears_in and story_role
@@ -404,6 +411,41 @@ IMPORTANT:
 
         mainCharAppearances = allPageNumbers
         mainCharUpdated = true
+      }
+    } else {
+      // FALLBACK: Main character not found in initial query, but we can still update by project_id
+      // This handles race conditions where the main character was just created
+      if (extractedMainCharName || identified.main_character?.appears_in) {
+        console.log('[Character ID] ⚠️ Main character not found in initial query, attempting update by project_id...')
+        
+        const allPageNumbers = pages.map((p: any) => p.page_number.toString())
+        mainCharAppearances = identified.main_character?.appears_in?.map((p: number) => {
+          const pageNum = parseInt(String(p))
+          return isNaN(pageNum) || pageNum < 1 || pageNum > maxPageNumber ? null : pageNum.toString()
+        }).filter((p: string | null): p is string => p !== null) || allPageNumbers
+        
+        const updateData: any = {
+          appears_in: mainCharAppearances.length > 0 ? mainCharAppearances : allPageNumbers,
+          story_role: identified.main_character?.story_role || null
+        }
+        
+        if (extractedMainCharName) {
+          updateData.name = extractedMainCharName
+          console.log(`[Character ID] ✅ Updating main character name by project_id: "${extractedMainCharName}"`)
+        }
+        
+        const { error: updateError } = await supabase
+          .from('characters')
+          .update(updateData)
+          .eq('project_id', project_id)
+          .eq('is_main', true)
+        
+        if (updateError) {
+          console.error(`[Character ID] Failed to update main character by project_id: ${updateError.message}`)
+        } else {
+          mainCharUpdated = true
+          console.log(`[Character ID] ✅ Main character updated via project_id fallback`)
+        }
       }
     }
 
