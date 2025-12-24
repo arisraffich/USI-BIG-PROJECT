@@ -126,6 +126,7 @@ export async function POST(
             authorPhone: project.author_phone || undefined,
             reviewUrl,
             projectUrl,
+            revisionRound: currentCount, // Track revision rounds (1st revision = round 1, etc.)
           }).catch(err => console.error('Notification error:', err))
         } else {
           const { notifyIllustrationTrialSent } = await import('@/lib/notifications')

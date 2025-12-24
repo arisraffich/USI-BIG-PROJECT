@@ -446,19 +446,19 @@ export async function notifyIllustrationTrialSent(options: {
   try {
     await sendEmail({
       to: authorEmail,
-      subject: `Illustration Trial Ready: "${projectTitle}"`,
+      subject: `Stage 3: Your First Illustration is Ready`,
       html: `
         <div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
-          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">Your Illustration Trial is Ready</h2>
-          <p style="margin-bottom: 16px;">Hello ${authorFirstName},</p>
-          <p style="margin-bottom: 16px;">Great news! We have prepared the initial illustration trial for your project "<strong>${projectTitle}</strong>".</p>
-          <p style="margin-bottom: 16px;">Please review the illustration and sketch for the first page and let us know what you think:</p>
+          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">First Illustration Preview</h2>
+          <p style="margin-bottom: 16px;">Hi ${authorFirstName},</p>
+          <p style="margin-bottom: 16px;">Great news – your first illustration is ready!</p>
+          <p style="margin-bottom: 16px;">This one sets the tone for the rest of the book, so take your time looking it over. If anything feels off or you'd like tweaks to the style, colors, or details, just let me know. If it looks good to you, give me the green light and I'll get started on the remaining illustrations.</p>
+          <p style="margin-bottom: 16px;">Take a look here:</p>
           <p style="margin: 24px 0;">
-            <a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Review Illustration Trial</a>
+            <a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Review Illustration</a>
           </p>
-          <p style="margin-bottom: 16px;">Or copy and paste this link into your browser:</p>
-          <p style="color: #666; word-break: break-all; margin-bottom: 16px;">${reviewUrl}</p>
-          <p style="margin-bottom: 8px;">Thank you!</p>
+          <p style="margin-bottom: 16px;">Looking forward to hearing what you think!</p>
+          <p style="margin-bottom: 8px;">Best,</p>
           <p style="font-weight: bold;">US Illustrations Team</p>
         </div>
       `,
@@ -509,28 +509,29 @@ export async function notifyIllustrationsUpdate(options: {
   authorPhone?: string
   reviewUrl: string
   projectUrl: string
+  revisionRound?: number
 }): Promise<void> {
-  const { projectTitle, authorName, authorEmail, authorPhone, reviewUrl, projectUrl } = options
+  const { projectTitle, authorName, authorEmail, authorPhone, reviewUrl, projectUrl, revisionRound } = options
 
   const authorFirstName = authorName.trim().split(/\s+/)[0] || authorName
+  const roundText = revisionRound ? ` | Round ${revisionRound}` : ''
 
   // Send email to customer
   try {
     await sendEmail({
       to: authorEmail,
-      subject: `New Illustrations Ready: "${projectTitle}"`,
+      subject: `Stage 3: First Illustration Revision${roundText}`,
       html: `
         <div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
-          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">New Illustrations Are Ready</h2>
-          <p style="margin-bottom: 16px;">Hello ${authorFirstName},</p>
-          <p style="margin-bottom: 16px;">We have uploaded new illustrations for your project "<strong>${projectTitle}</strong>".</p>
-          <p style="margin-bottom: 16px;">Please review the latest updates:</p>
+          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">First Illustration Revision${roundText}</h2>
+          <p style="margin-bottom: 16px;">Hi ${authorFirstName},</p>
+          <p style="margin-bottom: 16px;">We've made the changes you requested – take a look at the updated illustration and let us know what you think.</p>
+          <p style="margin-bottom: 16px;">If it still needs some tweaking, no problem – just click <strong style="color: #d66700;">Request Edits</strong> and send over your notes. If everything looks good, click <strong style="color: #00a53d;">Approve Illustration</strong> and we'll move forward with the rest of the book.</p>
+          <p style="margin-bottom: 16px;">You can review it here:</p>
           <p style="margin: 24px 0;">
-            <a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Review Illustrations</a>
+            <a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Review Illustration</a>
           </p>
-          <p style="margin-bottom: 16px;">Or copy and paste this link into your browser:</p>
-          <p style="color: #666; word-break: break-all; margin-bottom: 16px;">${reviewUrl}</p>
-          <p style="margin-bottom: 8px;">Thank you!</p>
+          <p style="margin-bottom: 8px;">Talk soon,</p>
           <p style="font-weight: bold;">US Illustrations Team</p>
         </div>
       `,
@@ -542,13 +543,13 @@ export async function notifyIllustrationsUpdate(options: {
   // Send Slack notification to PM
   try {
     await sendSlackNotification({
-      text: `🎨 New Illustrations sent to customer for "${projectTitle}"`,
+      text: `🎨 First Illustration Revision${roundText} sent to customer for "${projectTitle}"`,
       blocks: [
         {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `*New Illustrations Sent*\nUpdated illustrations for "${projectTitle}" by ${authorName} have been sent for review.`,
+            text: `*First Illustration Revision${roundText}*\nRevision for "${projectTitle}" by ${authorName} has been sent for review.`,
           },
         },
         {
