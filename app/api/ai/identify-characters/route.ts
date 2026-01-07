@@ -115,7 +115,7 @@ async function runCharacterIdentification(project_id: string, supabase: any) {
     // Use maybeSingle() instead of single() to avoid throwing on no results
     const { data: mainCharacter, error: mainCharError } = await supabase
       .from('characters')
-      .select('id, name, role, story_role, biography, age, gender, is_main')
+      .select('id, name, role, story_role, age, gender, is_main')
       .eq('project_id', project_id)
       .eq('is_main', true)
       .maybeSingle()
@@ -124,7 +124,7 @@ async function runCharacterIdentification(project_id: string, supabase: any) {
       console.warn(`[Character ID] Warning: Could not fetch main character: ${mainCharError.message}`)
     }
     
-    console.log(`[Character ID] Main character query result: ${mainCharacter ? `Found (id: ${mainCharacter.id})` : 'Not found'}`)
+    console.log(`[Character ID] Main character query result: ${mainCharacter ? `Found (id: ${mainCharacter.id}, name: "${mainCharacter.name || 'NULL'}")` : 'Not found'}`)
 
     // STEP 2: Get all pages for this project
     const { data: pages, error: pagesError } = await supabase
@@ -330,29 +330,70 @@ IMPORTANT:
       // We'll handle this in fallback logic below
     }
 
-    // STEP 6: SAFETY NET - Remove main character duplicates from secondary_characters
+    // STEP 6: Determine the main character name to use for filtering
+    // Priority: 1) Admin-provided name (from DB), 2) AI-extracted name
+    let extractedMainCharName: string | null = identified.main_character?.name || null
+    const adminProvidedName = mainCharacter?.name || null
+    const mainCharNameForFiltering = adminProvidedName || extractedMainCharName
+    
+    console.log(`[Character ID] Admin-provided main character name: "${adminProvidedName || 'NULL'}"`)
+    console.log(`[Character ID] AI-extracted main character name: "${extractedMainCharName || 'NULL'}"`)
+    console.log(`[Character ID] Using for safety net filtering: "${mainCharNameForFiltering || 'NULL'}"`)
+
+    // STEP 7: SAFETY NET - Remove main character duplicates from secondary_characters
+    // Uses BOTH the DB main character AND the name for comparison
     let filteredSecondary = identified.secondary_characters
     const removedDuplicates: string[] = []
 
+    // Filter using existing main character data (fuzzy matching on role, story_role, etc.)
     if (mainCharacter) {
       filteredSecondary = identified.secondary_characters.filter((char: any) => {
         if (isLikelyMainCharacter(char, mainCharacter)) {
           const identifier = char.name || char.role || 'unnamed'
           removedDuplicates.push(identifier)
-          console.warn(`[Safety Net] Removed main character duplicate from secondary: ${identifier}`)
+          console.warn(`[Safety Net] Removed main character duplicate from secondary (DB match): ${identifier}`)
           return false
         }
         return true
       })
     }
 
-    // STEP 7: Update main character's name and appears_in
+    // ADDITIONAL SAFETY NET: Filter using main character name (admin-provided OR AI-extracted)
+    // This is the PRIMARY filter - catches the main character by name
+    if (mainCharNameForFiltering) {
+      const mainNameLower = mainCharNameForFiltering.toLowerCase().trim()
+      filteredSecondary = filteredSecondary.filter((char: any) => {
+        const charName = char.name?.toLowerCase().trim() || ''
+        const charRole = char.role?.toLowerCase().trim() || ''
+        
+        // Exact match on name
+        if (charName && charName === mainNameLower) {
+          removedDuplicates.push(char.name || char.role || 'unnamed')
+          console.warn(`[Safety Net] Removed main character duplicate from secondary (exact name match): ${char.name}`)
+          return false
+        }
+        
+        // Name contains main name (e.g., "Tactile Tabby the Explorer" contains "Tactile Tabby")
+        if (charName && (charName.includes(mainNameLower) || mainNameLower.includes(charName)) && charName.length > 2) {
+          removedDuplicates.push(char.name || char.role || 'unnamed')
+          console.warn(`[Safety Net] Removed main character duplicate from secondary (partial name match): ${char.name}`)
+          return false
+        }
+        
+        // Role matches main name
+        if (charRole && charRole === mainNameLower) {
+          removedDuplicates.push(char.name || char.role || 'unnamed')
+          console.warn(`[Safety Net] Removed main character duplicate from secondary (role match): ${char.role}`)
+          return false
+        }
+        
+        return true
+      })
+    }
+
+    // STEP 8: Update main character's name and appears_in
     let mainCharAppearances: string[] = []
     let mainCharUpdated = false
-    let extractedMainCharName: string | null = null
-
-    // Extract main character name from AI response first (we need this regardless)
-    extractedMainCharName = identified.main_character?.name || null
     
     if (mainCharacter) {
       if (identified.main_character?.appears_in && Array.isArray(identified.main_character.appears_in)) {
@@ -371,12 +412,12 @@ IMPORTANT:
             story_role: identified.main_character.story_role || mainCharacter.story_role || mainCharacter.biography
           }
           
-          // Update name if it was extracted and main character doesn't have one yet
-          if (extractedMainCharName && !mainCharacter.name) {
+          // Update name ONLY if admin didn't provide one
+          if (!adminProvidedName && extractedMainCharName) {
             updateData.name = extractedMainCharName
-            console.log(`[Character ID] ✅ Extracted main character name from story: "${extractedMainCharName}"`)
-          } else if (extractedMainCharName && mainCharacter.name) {
-            console.log(`[Character ID] Main character already has name "${mainCharacter.name}", keeping it (AI found: "${extractedMainCharName}")`)
+            console.log(`[Character ID] ✅ No admin-provided name, using AI-extracted: "${extractedMainCharName}"`)
+          } else if (adminProvidedName) {
+            console.log(`[Character ID] ✅ Admin provided name "${adminProvidedName}", keeping it (AI found: "${extractedMainCharName || 'nothing'}")`)
           }
 
           await supabase
@@ -449,7 +490,7 @@ IMPORTANT:
       }
     }
 
-    // STEP 8: Filter secondary characters (plural check + existing character check)
+    // STEP 9: Filter secondary characters (plural check + existing character check)
     const { data: existingCharacters } = await supabase
       .from('characters')
       .select('name, role, is_main')
@@ -494,15 +535,15 @@ IMPORTANT:
       return true
     })
 
-    // STEP 9: LOGGING - Comprehensive logging for monitoring
+    // STEP 10: LOGGING - Comprehensive logging for monitoring
     console.log('[Character ID] ===== CHARACTER IDENTIFICATION SUMMARY =====')
     console.log(`[Character ID] Project ID: ${project_id}`)
     console.log(`[Character ID] Total Pages: ${maxPageNumber}`)
     console.log(`[Character ID] Main Character Exists: ${!!mainCharacter}`)
     if (mainCharacter) {
-      console.log(`[Character ID] Main Character Name (before): ${mainCharacter.name || 'NULL'}`)
-      console.log(`[Character ID] Main Character Name (extracted): ${extractedMainCharName || 'Not extracted'}`)
-      console.log(`[Character ID] Main Character Name Updated: ${!mainCharacter.name && !!extractedMainCharName ? 'YES' : 'NO'}`)
+      console.log(`[Character ID] Main Character Name (admin-provided): ${adminProvidedName || 'NULL'}`)
+      console.log(`[Character ID] Main Character Name (AI-extracted): ${extractedMainCharName || 'NULL'}`)
+      console.log(`[Character ID] Main Character Name (used for filtering): ${mainCharNameForFiltering || 'NULL'}`)
       console.log(`[Character ID] Main Character Appearances: ${mainCharAppearances.length} pages`)
     }
     console.log(`[Character ID] AI Response - Secondary Characters Identified: ${identified.secondary_characters.length}`)
@@ -512,7 +553,7 @@ IMPORTANT:
     console.log(`[Character ID] Filtered Out: ${beforeFilterCount - newCharacters.length} characters`)
     console.log('[Character ID] ============================================')
 
-    // STEP 10: Create secondary character records
+    // STEP 11: Create secondary character records
     let charactersCreated = 0
     if (newCharacters.length > 0) {
       const charactersToCreate = newCharacters.map((char: any) => {
@@ -548,7 +589,7 @@ IMPORTANT:
       charactersCreated = charactersToCreate.length
     }
 
-    // STEP 11: Update pages with character_ids
+    // STEP 12: Update pages with character_ids
     // Get all characters (including newly created ones) WITH appears_in
     const { data: allCharacters } = await supabase
       .from('characters')
@@ -609,7 +650,7 @@ IMPORTANT:
         .eq('id', update.id)
     }
 
-    // STEP 12: Update project status
+    // STEP 13: Update project status
     await supabase
       .from('projects')
       .update({ status: 'character_review' })

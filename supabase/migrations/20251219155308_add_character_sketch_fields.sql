@@ -7,3 +7,6 @@ COMMENT ON COLUMN characters.sketch_url IS 'URL to the sketch version of the cha
 COMMENT ON COLUMN characters.sketch_prompt IS 'Prompt used to generate the sketch from colored illustration';
 
 
+
+
+

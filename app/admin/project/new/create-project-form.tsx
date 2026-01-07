@@ -34,6 +34,7 @@ export default function CreateProjectForm() {
     author_fullname: '',
     author_email: '',
     author_phone: '',
+    main_character_name: '',
   })
 
   // File uploads
@@ -122,6 +123,7 @@ export default function CreateProjectForm() {
       formDataToSend.append('author_fullname', formData.author_fullname)
       formDataToSend.append('author_email', formData.author_email)
       formDataToSend.append('author_phone', formData.author_phone)
+      formDataToSend.append('main_character_name', formData.main_character_name)
       formDataToSend.append('main_character_image', mainCharacterImage)
       formDataToSend.append('story_file', storyFile)
 
@@ -344,6 +346,23 @@ export default function CreateProjectForm() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleFinalSubmit} className="space-y-6">
+              {/* Main Character Name */}
+              <div>
+                <Label htmlFor="main_character_name">Main Character Name *</Label>
+                <p className="text-sm text-gray-600 mb-2">
+                  The name of the main character as it appears in the story
+                </p>
+                <Input
+                  id="main_character_name"
+                  value={formData.main_character_name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, main_character_name: e.target.value })
+                  }
+                  required
+                  placeholder="e.g., Tactile Tabby, Luna, Max"
+                />
+              </div>
+
               {/* Main Character Image */}
               <div>
                 <Label>Main Character Image *</Label>

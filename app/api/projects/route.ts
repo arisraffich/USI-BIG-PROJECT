@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
     const authorFullname = formData.get('author_fullname') as string
     const authorEmail = formData.get('author_email') as string
     const authorPhone = formData.get('author_phone') as string
+    const mainCharacterName = formData.get('main_character_name') as string
     const mainCharacterImage = formData.get('main_character_image') as File | null
     const storyFile = formData.get('story_file') as File | null
 
@@ -150,12 +151,12 @@ export async function POST(request: NextRequest) {
       .getPublicUrl(storyPath)
     const storyUrl = storyUrlData.publicUrl
 
-    // Create main character record (minimal - name will be extracted from story by character identification)
+    // Create main character record with the name provided by the admin
     const { data: createdCharacter, error: characterError } = await supabase
       .from('characters')
       .insert({
         project_id: projectId,
-        name: null, // Will be extracted from story by character identification
+        name: mainCharacterName || null, // Name provided by admin in the form
         role: 'Main Character',
         is_main: true,
         image_url: mainCharacterUrl,
@@ -168,7 +169,7 @@ export async function POST(request: NextRequest) {
       console.error('Error creating main character:', characterError.message)
       // Don't fail the whole request - character can be created manually
     } else {
-      console.log(`[Project Creation] Main character created with image, name will be extracted from story`)
+      console.log(`[Project Creation] Main character created: "${mainCharacterName}" with image`)
     }
 
     // Update project status to indicate we're parsing

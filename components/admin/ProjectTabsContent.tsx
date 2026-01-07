@@ -96,15 +96,11 @@ export function ProjectTabsContent({
     prevStatusRef.current = localProjectStatus
   }, [localProjectStatus, searchParams, router, pathname])
 
-  // Admin polling - Check for customer submission AND generation completion
+  // Admin polling - ONLY when waiting for generation to complete
+  // DO NOT poll during character_review (admin may be manually filling forms - polling would reset their input!)
   useEffect(() => {
-    // Poll when:
-    // 1. In character_review (waiting for customer to submit)
-    // 2. In character_generation (waiting for generation to complete)
-    const shouldPoll = localProjectStatus === 'character_review' || 
-                       localProjectStatus === 'character_generation'
-    
-    if (!shouldPoll) return
+    // Poll ONLY when status is character_generation (waiting for AI to finish)
+    if (localProjectStatus !== 'character_generation') return
 
     const interval = setInterval(() => {
       router.refresh()

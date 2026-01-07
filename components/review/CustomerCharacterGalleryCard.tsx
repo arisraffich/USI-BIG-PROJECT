@@ -193,7 +193,7 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="h-8 gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 shadow-sm bg-white"
+                                    className="h-8 gap-2 text-orange-600 border-orange-200 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-300 shadow-sm bg-white"
                                     onClick={() => setIsEditing(true)}
                                 >
                                     <MessageSquarePlus className="w-4 h-4" />
@@ -298,7 +298,7 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
                             <Button
                                 variant="outline"
                                 size="sm"
-                                className="w-full h-10 gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 shadow-sm bg-white lg:hidden"
+                                className="w-full h-10 gap-2 text-orange-600 border-orange-200 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-300 shadow-sm bg-white lg:hidden"
                                 onClick={() => setIsEditing(true)}
                             >
                                 <MessageSquarePlus className="w-4 h-4" />
