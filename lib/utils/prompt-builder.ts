@@ -28,47 +28,19 @@ export function buildCharacterPrompt(character: Character, hasReferenceImage: bo
   const nameRef = character.name || character.role || 'Character'
 
   // SCENARIO 1: Style Reference is available (Secondary Characters)
-  // Use the detailed user-provided prompt
+  // Style instructions are now in character-generator.ts label - keep this focused on character traits
   if (hasReferenceImage) {
-    const charDescription = `[${details.join(', ')}]`
+    const charDescription = details.join(', ')
 
-    return `Use the attached image as the STYLE REFERENCE.
-Analyze it thoroughly and extract its complete visual style AND drawing technique.
-Identify and replicate the medium used in the reference (e.g., watercolor, digital watercolor, gouache, soft digital painting, pencil, ink, marker, or any other).
-Match the same stroke style, texture, pigment behavior, shading softness, edge quality, color blending method, and overall rendering technique.
+    return `TARGET CHARACTER: ${nameRef}
+Physical traits: ${charDescription || 'As described'}
 
-Recreate this exact style and technique in the new character illustration.
-The new character must look like it was created by the same illustrator using the same tools and the same artistic method.
-Do NOT copy the reference character’s identity — only its stylistic technique.
-OVERRIDE SEMANTIC BIAS:
-- If the reference image is 2D/Stylized/Flat:
-  * Do NOT render "feathers", "fur", or "scales" realistically even if the text mentions them.
-  * NO 3D shading, NO photorealism, NO complex texture maps.
-- If the reference image is 3D/Realistic:
-  * You MAY match the realism of the reference.
-- IMPERATIVE: The Reference Image is the SOLE TRUTH for the rendering style.
-
-Character Description:
-${charDescription}
-
-Generate a full-body children’s book character illustration that shows the character from head to toes, standing on a clean, plain white background (no scenery, no additional objects, no background colors).
-The illustration must match the reference image in:
-
-line quality
-
-brush/pen/pencil stroke behavior
-
-shading + highlights technique
-
-color palette + saturation
-
-texture of the medium (e.g., watercolor softness, pigment pooling, grain, etc.)
-
-proportions and facial style
-
-overall aesthetic consistency
-
-The output MUST feel like it belongs in the same book series, drawn by the same artist using the same medium and technique, with the character shown full-height on a pure white background.`
+OUTPUT REQUIREMENTS:
+- Full-body children's book character illustration
+- Show character from head to toes
+- Standing on clean, plain white background
+- No scenery, no additional objects, no background colors
+- Must feel like it belongs in the same book series, drawn by the same artist`
   }
 
   // SCENARIO 2: No Reference (Main Character / First Gen)
@@ -116,24 +88,3 @@ export function buildSketchPrompt(
 
   return prompt
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

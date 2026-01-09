@@ -6,7 +6,7 @@ import { removeMetadata, sanitizeFilename } from '@/lib/utils/metadata-cleaner'
 
 export async function POST(request: NextRequest) {
   try {
-    const { project_id, character_id, custom_prompt } = await request.json()
+    const { project_id, character_id, custom_prompt, visual_reference_image } = await request.json()
 
     if (!project_id) {
       return NextResponse.json(
@@ -107,11 +107,13 @@ export async function POST(request: NextRequest) {
         // Pass custom_prompt only if generating a single character (implied by this loop structure if simple)
         // But logical safety: if bulk, we probably don't want same prompt for all.
         // But for single character (character_id present), custom_prompt is valid.
-        // Use the character's own image as reference if it exists (for refinement/regeneration)
-        // If not (first gen), use Main Character for style reference
-        const referenceImage = character.image_url || mainCharacter.image_url
+        // ALWAYS use Main Character image as style reference (for both first-gen and regeneration)
+        const referenceImage = mainCharacter.image_url
 
-        const result = await generateCharacterImage(character, referenceImage, project_id, custom_prompt)
+        // Pass visual_reference_image only for single character regeneration
+        const visualRef = character_id ? visual_reference_image : undefined
+
+        const result = await generateCharacterImage(character, referenceImage, project_id, custom_prompt, visualRef)
 
         console.log(`[Character Generate] Result for ${character.name || character.role}: ${result.success ? '✅ SUCCESS' : '❌ FAILED'}`)
         

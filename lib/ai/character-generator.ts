@@ -30,7 +30,8 @@ export async function generateCharacterImage(
     character: Character,
     mainCharacterImageUrl: string | null | undefined,
     projectId: string,
-    customPrompt?: string
+    customPrompt?: string,
+    visualReferenceImage?: string // base64 data URL for appearance reference
 ) {
     if (!GOOGLE_API_KEY) {
         throw new Error('Google Generative AI API Key not configured')
@@ -50,11 +51,31 @@ export async function generateCharacterImage(
                 // LABEL THE REFERENCE EXPLICITLY
                 parts.push({
                     text: `[STYLE REFERENCE IMAGE - PRIMARY SOURCE OF TRUTH]
-INSTRUCTION: This image defines the ART STYLE and RENDERING TECHNIQUE.
-1. DYNAMIC STYLE ADOPTION: You must adopt the EXACT medium and dimensionality of this reference.
-2. IF FLAT/VECTOR: If the reference is 2D/Flat, you MUST render the new character as 2D/Flat (ignore "feathers/fur" realism).
-3. IF 3D/REALISTIC: If the reference is 3D/Realistic/Painted, you MUST render the new character with that same depth and texture.
-4. Override any semantic biases. The Reference Image is the strict guide for "How it looks".`
+
+Analyze this image thoroughly and extract its complete visual style AND drawing technique.
+Identify and replicate the medium used (e.g., watercolor, digital watercolor, gouache, soft digital painting, pencil, ink, marker, or any other).
+
+MATCH FROM THIS REFERENCE:
+- Stroke style, texture, shading softness, edge quality
+- Color blending method and overall rendering technique
+- Color palette and saturation levels
+- Line quality and proportions
+- Facial style and overall aesthetic
+
+The new character must look like it was created by the SAME ILLUSTRATOR using the same tools and artistic method.
+Do NOT copy the reference character's identity — only its stylistic technique.
+
+OVERRIDE SEMANTIC BIAS:
+- If the reference is 2D/Stylized/Flat: Do NOT render fur, feathers, or scales realistically. NO 3D shading, NO photorealism.
+- If the reference is 3D/Realistic: Match that realism level.
+- The Reference Image is the SOLE TRUTH for rendering style.
+
+MUST AVOID:
+- Disney/Pixar 3D CGI aesthetic
+- Plastic, glossy, or shiny surfaces
+- Generic stock illustration look
+- Over-detailed or hyper-realistic rendering
+- Harsh lighting or over-rendered shading`
                 })
 
                 parts.push({
@@ -66,8 +87,35 @@ INSTRUCTION: This image defines the ART STYLE and RENDERING TECHNIQUE.
             }
         }
 
-        // 2. ADD CHARACTER DESCRIPTION SECOND
-        // The model now views this description through the lens of the style established above.
+        // 2. ADD VISUAL REFERENCE IMAGE (if provided)
+        // This guides the character's physical appearance, separate from style
+        if (visualReferenceImage) {
+            // Parse base64 data URL
+            const matches = visualReferenceImage.match(/^data:(.+);base64,(.+)$/)
+            if (matches) {
+                const mimeType = matches[1]
+                const base64Data = matches[2]
+                
+                parts.push({
+                    text: `[APPEARANCE REFERENCE IMAGE]
+INSTRUCTION: This image shows what the character should LOOK LIKE physically.
+1. Use this image to guide the CHARACTER'S PHYSICAL APPEARANCE, PROPORTIONS, and DISTINCTIVE FEATURES.
+2. DO NOT copy the art style from this image - the STYLE REFERENCE IMAGE above defines the art style.
+3. Match the body shape, pose references, and physical characteristics shown here.
+4. The goal is: "Draw this subject in the style of the main character reference."`
+                })
+                
+                parts.push({
+                    inlineData: {
+                        mimeType: mimeType,
+                        data: base64Data
+                    }
+                })
+            }
+        }
+
+        // 3. ADD CHARACTER DESCRIPTION
+        // The model now views this description through the lens of the style and appearance established above.
         parts.push({ text: `TARGET CHARACTER DESCRIPTION:\n${prompt}` })
 
         const payload = {

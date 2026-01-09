@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
-import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info } from 'lucide-react'
+import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Character } from '@/types/character'
 import { useRouter } from 'next/navigation'
@@ -236,15 +236,30 @@ export function AdminCharacterGalleryCard({ character, projectId, isGenerating =
 
             {/* Full View Lightbox */}
             <Dialog open={showImage} onOpenChange={setShowImage}>
-                <DialogContent className="max-w-[95vw] max-h-[95vh] w-auto h-auto p-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none">
+                <DialogContent 
+                    showCloseButton={false}
+                    className="!max-w-none !w-screen !h-screen !p-0 !m-0 !translate-x-0 !translate-y-0 !top-0 !left-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none"
+                >
                     <DialogTitle className="sr-only">{displayName}</DialogTitle>
-                    {displayImageUrl && (
-                        <img
-                            src={displayImageUrl}
-                            alt={displayName}
-                            className="max-w-full max-h-[90vh] object-contain rounded-md"
-                        />
-                    )}
+                    <div className="relative w-full h-full flex items-center justify-center p-4" onClick={() => setShowImage(false)}>
+                        {displayImageUrl && (
+                            <img
+                                src={displayImageUrl}
+                                alt={displayName}
+                                className="max-w-full max-h-full object-contain rounded-md shadow-2xl"
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        )}
+                        <button
+                            className="absolute top-4 right-4 text-white hover:text-white/80 transition-colors bg-black/50 hover:bg-black/70 rounded-full p-2 z-50"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowImage(false);
+                            }}
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
                 </DialogContent>
             </Dialog>
         </div>

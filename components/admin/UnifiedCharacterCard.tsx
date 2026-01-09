@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
-import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, Download, Upload } from 'lucide-react'
+import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, Download, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Character } from '@/types/character'
 import { useRouter } from 'next/navigation'
@@ -99,6 +100,8 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     const [showTooltip, setShowTooltip] = useState(false)
     const [optimisticColoredImage, setOptimisticColoredImage] = useState<string | null>(null)
     const [localCharacter, setLocalCharacter] = useState(character)
+    const [referenceImage, setReferenceImage] = useState<{ file: File; preview: string } | null>(null)
+    const referenceInputRef = useRef<HTMLInputElement>(null)
 
     // Update local character when prop changes
     useEffect(() => {
@@ -138,20 +141,65 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             prompt = `CUSTOMER REQUEST: ${character.feedback_notes}\n\n${prompt}`
         }
         setCustomPrompt(prompt)
+        setReferenceImage(null) // Reset reference image when opening
         setIsDialogOpen(true)
+    }
+
+    const handleReferenceSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        
+        // Validate file size (max 2MB)
+        if (file.size > 2 * 1024 * 1024) {
+            toast.error('Image must be less than 2MB')
+            return
+        }
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please select an image file')
+            return
+        }
+        
+        const preview = URL.createObjectURL(file)
+        setReferenceImage({ file, preview })
+        
+        // Reset input so same file can be selected again
+        if (referenceInputRef.current) {
+            referenceInputRef.current.value = ''
+        }
+    }
+
+    const removeReferenceImage = () => {
+        if (referenceImage?.preview) {
+            URL.revokeObjectURL(referenceImage.preview)
+        }
+        setReferenceImage(null)
     }
 
     const handleRegenerate = async () => {
         setIsDialogOpen(false)
         setIsRegenerating(true)
         try {
+            // Convert reference image to base64 if provided
+            let visualReferenceImage: string | undefined
+            if (referenceImage?.file) {
+                visualReferenceImage = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader()
+                    reader.onload = () => resolve(reader.result as string)
+                    reader.onerror = reject
+                    reader.readAsDataURL(referenceImage.file)
+                })
+            }
+
             const response = await fetch('/api/characters/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     project_id: projectId,
                     character_id: character.id,
-                    custom_prompt: customPrompt.trim() || undefined
+                    custom_prompt: customPrompt.trim() || undefined,
+                    visual_reference_image: visualReferenceImage
                 }),
             })
 
@@ -178,6 +226,8 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             }
 
             toast.success('Character regenerated successfully')
+            // Clear reference image after successful regeneration
+            removeReferenceImage()
         } catch (error: any) {
             console.error('Regeneration error:', error)
             toast.error(error.message || 'Failed to regenerate')
@@ -378,13 +428,13 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                                             <RefreshCw className="w-3.5 h-3.5" />
                                         </div>
                                     </DialogTrigger>
-                                    <DialogContent>
+                                    <DialogContent className="sm:max-w-[500px]">
                                         <DialogHeader>
                                             <DialogTitle>Regenerate {displayName}</DialogTitle>
                                         </DialogHeader>
                                         <div className="py-4 space-y-4">
                                             <div className="space-y-2">
-                                                <label className="text-sm font-medium">Generation Prompt</label>
+                                                <Label className="text-sm font-medium">Generation Prompt</Label>
                                                 <Textarea
                                                     value={customPrompt}
                                                     onChange={(e) => setCustomPrompt(e.target.value)}
@@ -395,9 +445,56 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                                                     Includes customer feedback if available.
                                                 </p>
                                             </div>
+
+                                            {/* Visual Reference Image Upload */}
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <Label className="text-sm font-medium">Visual Reference (Optional)</Label>
+                                                    <span className="text-xs text-gray-400">Max 2MB</span>
+                                                </div>
+
+                                                <input
+                                                    type="file"
+                                                    ref={referenceInputRef}
+                                                    className="hidden"
+                                                    accept="image/*"
+                                                    onChange={handleReferenceSelect}
+                                                />
+
+                                                {referenceImage ? (
+                                                    <div className="relative w-20 h-20 rounded-md overflow-hidden border border-gray-200 group">
+                                                        <img 
+                                                            src={referenceImage.preview} 
+                                                            alt="Reference" 
+                                                            className="w-full h-full object-cover" 
+                                                        />
+                                                        <button
+                                                            onClick={removeReferenceImage}
+                                                            className="absolute top-0.5 right-0.5 bg-black/50 hover:bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        >
+                                                            <X className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="w-full border-dashed border-gray-300 text-gray-500 hover:text-gray-700 hover:border-gray-400 hover:bg-gray-50 gap-2 h-16"
+                                                        onClick={() => referenceInputRef.current?.click()}
+                                                    >
+                                                        <Upload className="w-4 h-4" />
+                                                        Add Reference Image
+                                                    </Button>
+                                                )}
+
+                                                <p className="text-xs text-gray-500">
+                                                    Upload an image to guide the character's appearance (e.g., a real hawk photo).
+                                                </p>
+                                            </div>
                                         </div>
                                         <DialogFooter>
-                                            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                                            <Button variant="outline" onClick={() => { setIsDialogOpen(false); removeReferenceImage(); }}>Cancel</Button>
                                             <Button onClick={handleRegenerate} disabled={isRegenerating}>
                                                 {isRegenerating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                                                 Regenerate
@@ -478,15 +575,30 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
 
             {/* Full View Lightbox */}
             <Dialog open={showLightbox} onOpenChange={setShowLightbox}>
-                <DialogContent className="max-w-[95vw] max-h-[95vh] w-auto h-auto p-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none">
+                <DialogContent 
+                    showCloseButton={false}
+                    className="!max-w-none !w-screen !h-screen !p-0 !m-0 !translate-x-0 !translate-y-0 !top-0 !left-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none"
+                >
                     <DialogTitle className="sr-only">{displayName} - {lightboxImage}</DialogTitle>
-                    {lightboxImageUrl && (
-                        <img
-                            src={lightboxImageUrl}
-                            alt={`${displayName} - ${lightboxImage}`}
-                            className="max-w-full max-h-[90vh] object-contain rounded-md"
-                        />
-                    )}
+                    <div className="relative w-full h-full flex items-center justify-center p-4" onClick={() => setShowLightbox(false)}>
+                        {lightboxImageUrl && (
+                            <img
+                                src={lightboxImageUrl}
+                                alt={`${displayName} - ${lightboxImage}`}
+                                className="max-w-full max-h-full object-contain rounded-md shadow-2xl"
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        )}
+                        <button
+                            className="absolute top-4 right-4 text-white hover:text-white/80 transition-colors bg-black/50 hover:bg-black/70 rounded-full p-2 z-50"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowLightbox(false);
+                            }}
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
                 </DialogContent>
             </Dialog>
         </div>

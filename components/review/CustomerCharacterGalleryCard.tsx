@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { MessageSquarePlus, Save, Loader2, CheckCircle2, Info, Download } from 'lucide-react'
+import { MessageSquarePlus, Save, Loader2, CheckCircle2, Info, Download, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 interface CustomerCharacterGalleryCardProps {
@@ -322,16 +322,31 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
 
             {/* Full View Lightbox */}
             <Dialog open={showLightbox} onOpenChange={setShowLightbox}>
-                <DialogContent className="max-w-[95vw] max-h-[95vh] w-auto h-auto p-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none">
+                <DialogContent 
+                    showCloseButton={false}
+                    className="!max-w-none !w-screen !h-screen !p-0 !m-0 !translate-x-0 !translate-y-0 !top-0 !left-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none"
+                >
                     <DialogTitle className="sr-only">{displayName} - {lightboxImage}</DialogTitle>
                     <DialogDescription className="sr-only">Full size preview of {displayName} - {lightboxImage}</DialogDescription>
-                    {lightboxImageUrl && (
-                        <img
-                            src={lightboxImageUrl}
-                            alt={`${displayName} - ${lightboxImage}`}
-                            className="max-w-full max-h-[90vh] object-contain rounded-md"
-                        />
-                    )}
+                    <div className="relative w-full h-full flex items-center justify-center p-4" onClick={() => setShowLightbox(false)}>
+                        {lightboxImageUrl && (
+                            <img
+                                src={lightboxImageUrl}
+                                alt={`${displayName} - ${lightboxImage}`}
+                                className="max-w-full max-h-full object-contain rounded-md shadow-2xl"
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        )}
+                        <button
+                            className="absolute top-4 right-4 text-white hover:text-white/80 transition-colors bg-black/50 hover:bg-black/70 rounded-full p-2 z-50"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowLightbox(false);
+                            }}
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
                 </DialogContent>
             </Dialog>
         </div>
