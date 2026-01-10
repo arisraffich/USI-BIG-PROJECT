@@ -256,10 +256,10 @@ export async function POST(request: NextRequest) {
         const result = await identifyCharactersForProject(projectId)
         
         // Check if result is an error response (NextResponse) or success object
-        if (result && 'secondary_characters_created' in result) {
+        if (result && 'success' in result && result.success) {
           console.log(`[Character Identification] Completed for ${projectId}:`, {
-            secondary_created: result.secondary_characters_created,
-            main_updated: result.main_character_updated
+            characters_created: result.characters_created,
+            main_character: result.main_character
           })
         } else {
           console.log(`[Character Identification] Completed for ${projectId} (response format unknown)`)
