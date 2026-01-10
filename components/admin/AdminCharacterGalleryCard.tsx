@@ -89,8 +89,8 @@ export function AdminCharacterGalleryCard({ character, projectId, isGenerating =
     const rawImageUrl = optimisticImage || character.image_url
     
     // Check if image_url contains an error
-    const isError = rawImageUrl?.startsWith('error:')
-    const errorMessage = isError ? rawImageUrl.replace('error:', '') : null
+    const isError = rawImageUrl?.startsWith('error:') ?? false
+    const errorMessage = isError && rawImageUrl ? rawImageUrl.replace('error:', '') : null
     const displayImageUrl = isError ? null : rawImageUrl
 
     // Show loading overlay if explicitly regenerating OR if project is generating and this card has no image

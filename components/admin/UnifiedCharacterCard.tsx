@@ -30,8 +30,8 @@ interface SubCardProps {
 
 function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownload, onUpload, showUpload = false, showDownload = true }: SubCardProps) {
     // Check if imageUrl contains an error
-    const isError = imageUrl?.startsWith('error:')
-    const errorMessage = isError ? imageUrl.replace('error:', '') : null
+    const isError = imageUrl?.startsWith('error:') ?? false
+    const errorMessage = isError && imageUrl ? imageUrl.replace('error:', '') : null
     const actualImageUrl = isError ? null : imageUrl
 
     return (
