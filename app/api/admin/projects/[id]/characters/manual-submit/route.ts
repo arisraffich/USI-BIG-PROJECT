@@ -106,50 +106,69 @@ export async function POST(
                             charactersToGenerate.map(char => generateCharacterImage(char, mainCharImage, project.id))
                         )
 
-                        const allSucceeded = results.every(r => r.success)
-                        if (allSucceeded) {
-                            const supabaseAdmin = await createAdminClient()
-                            await supabaseAdmin.from('projects').update({ status: 'character_generation_complete' }).eq('id', project.id)
+                        // Save errors to image_url field for failed generations
+                        const supabaseForErrors = await createAdminClient()
+                        for (let i = 0; i < results.length; i++) {
+                            const result = results[i]
+                            if (!result.success && result.error) {
+                                const char = charactersToGenerate[i]
+                                console.log(`[Manual Submit] ⚠️ Saving error state for ${char.name || char.role}: ${result.error}`)
+                                await supabaseForErrors
+                                    .from('characters')
+                                    .update({ image_url: `error:${result.error}` })
+                                    .eq('id', char.id)
+                            }
+                        }
 
-                            // Trigger sketch generation for main character (already has colored image)
-                            if (mainChar?.image_url) {
-                                console.log('[Manual Submit] Triggering main character sketch generation...')
+                        const successCount = results.filter(r => r.success).length
+                        const failCount = results.length - successCount
+                        console.log(`[Manual Submit] Generation results: ${successCount}/${results.length} succeeded, ${failCount} failed`)
+
+                        // Update project status (even if some failed, we move forward)
+                        const supabaseAdmin = await createAdminClient()
+                        await supabaseAdmin.from('projects').update({ status: 'character_generation_complete' }).eq('id', project.id)
+
+                        // Trigger sketch generation for main character (already has colored image)
+                        // Do this regardless of secondary character results
+                        if (mainChar?.image_url && !mainChar.image_url.startsWith('error:')) {
+                            console.log('[Manual Submit] Triggering main character sketch generation...')
+                            ;(async () => {
+                                try {
+                                    const { generateCharacterSketch } = await import('@/lib/ai/character-sketch-generator')
+                                    await generateCharacterSketch(
+                                        mainChar.id,
+                                        mainChar.image_url,
+                                        project.id,
+                                        mainChar.name || mainChar.role || 'Main Character'
+                                    )
+                                } catch (sketchErr) {
+                                    console.error('[Manual Submit] Main character sketch failed:', sketchErr)
+                                }
+                            })()
+                        }
+
+                        // Trigger sketch generation for EACH secondary character that succeeded
+                        // (Don't skip all sketches just because one character failed)
+                        const succeededResults = results.filter(r => r.success && r.imageUrl)
+                        console.log('[Manual Submit] Triggering sketch generation for', succeededResults.length, 'successful secondary characters...')
+                        results.forEach((result, idx) => {
+                            if (result.success && result.imageUrl) {
+                                const character = charactersToGenerate[idx]
                                 ;(async () => {
                                     try {
                                         const { generateCharacterSketch } = await import('@/lib/ai/character-sketch-generator')
                                         await generateCharacterSketch(
-                                            mainChar.id,
-                                            mainChar.image_url,
+                                            character.id,
+                                            result.imageUrl,
                                             project.id,
-                                            mainChar.name || mainChar.role || 'Main Character'
+                                            character.name || character.role || 'Character'
                                         )
                                     } catch (sketchErr) {
-                                        console.error('[Manual Submit] Main character sketch failed:', sketchErr)
+                                        console.error(`[Manual Submit] Secondary character sketch failed for ${character.name}:`, sketchErr)
                                     }
                                 })()
                             }
-
-                            // Trigger sketch generation for secondary characters (newly generated)
-                            console.log('[Manual Submit] Triggering sketch generation for', results.length, 'secondary characters...')
-                            results.forEach((result, idx) => {
-                                if (result.success && result.imageUrl) {
-                                    const character = charactersToGenerate[idx]
-                                    ;(async () => {
-                                        try {
-                                            const { generateCharacterSketch } = await import('@/lib/ai/character-sketch-generator')
-                                            await generateCharacterSketch(
-                                                character.id,
-                                                result.imageUrl,
-                                                project.id,
-                                                character.name || character.role || 'Character'
-                                            )
-                                        } catch (sketchErr) {
-                                            console.error(`[Manual Submit] Secondary character sketch failed for ${character.name}:`, sketchErr)
-                                        }
-                                    })()
-                                }
-                            })
-                        }
+                        })
                     } catch (err) { console.error('Bg generation failed:', err) }
                 })()
             }

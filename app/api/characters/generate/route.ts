@@ -94,9 +94,11 @@ export async function POST(request: NextRequest) {
     for (const character of charactersToGenerate) {
       console.log(`[Character Generate] Processing: ${character.name || character.role || character.id}`)
       try {
-        // Clear sketch_url for regeneration (if character already has images)
+        // Clear sketch_url for regeneration (if character already has valid images)
         // This ensures the loading spinner appears on the sketch card during regeneration
-        if (character.image_url && character.sketch_url) {
+        const hasValidImage = character.image_url && !character.image_url.startsWith('error:')
+        const hasValidSketch = character.sketch_url && !character.sketch_url.startsWith('error:')
+        if (hasValidImage && hasValidSketch) {
           console.log(`[Character Generate] 🧹 Clearing old sketch_url for regeneration: ${character.name || character.role}`)
           await supabase
             .from('characters')
@@ -107,8 +109,9 @@ export async function POST(request: NextRequest) {
         // Pass custom_prompt only if generating a single character (implied by this loop structure if simple)
         // But logical safety: if bulk, we probably don't want same prompt for all.
         // But for single character (character_id present), custom_prompt is valid.
-        // ALWAYS use Main Character image as style reference (for both first-gen and regeneration)
-        const referenceImage = mainCharacter.image_url
+        // Use character's image as reference, but skip if it's an error state
+        const hasValidCharacterImage = character.image_url && !character.image_url.startsWith('error:')
+        const referenceImage = hasValidCharacterImage ? character.image_url : mainCharacter.image_url
 
         // Pass visual_reference_image only for single character regeneration
         const visualRef = character_id ? visual_reference_image : undefined
@@ -116,6 +119,15 @@ export async function POST(request: NextRequest) {
         const result = await generateCharacterImage(character, referenceImage, project_id, custom_prompt, visualRef)
 
         console.log(`[Character Generate] Result for ${character.name || character.role}: ${result.success ? '✅ SUCCESS' : '❌ FAILED'}`)
+        
+        // If generation failed, save error to image_url field so UI can display it
+        if (!result.success && result.error) {
+          console.log(`[Character Generate] ⚠️ Saving error state for ${character.name || character.role}: ${result.error}`)
+          await supabase
+            .from('characters')
+            .update({ image_url: `error:${result.error}` })
+            .eq('id', character.id)
+        }
         
         results.push({
           character_id: character.id,

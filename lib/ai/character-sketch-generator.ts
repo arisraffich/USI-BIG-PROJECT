@@ -109,6 +109,18 @@ The result must look like a faithful pencil-line tracing of the original image �
       imageUrl
     })
     
+    // Save error to sketch_url so UI knows to stop showing loading spinner
+    try {
+      const supabase = await createAdminClient()
+      await supabase
+        .from('characters')
+        .update({ sketch_url: `error:${error.message || 'Sketch generation failed'}` })
+        .eq('id', characterId)
+      console.log(`[Character Sketch] ⚠️ Saved error state for ${characterName}`)
+    } catch (dbErr) {
+      console.error(`[Character Sketch] Failed to save error state:`, dbErr)
+    }
+    
     return {
       success: false,
       sketchUrl: null,

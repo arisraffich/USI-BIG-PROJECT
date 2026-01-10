@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
-import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, X } from 'lucide-react'
+import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, X, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Character } from '@/types/character'
 import { useRouter } from 'next/navigation'
@@ -86,10 +86,16 @@ export function AdminCharacterGalleryCard({ character, projectId, isGenerating =
         : (character.name || character.role || 'Unnamed Character')
 
     // Use optimistic image if available, otherwise use character image
-    const displayImageUrl = optimisticImage || character.image_url
+    const rawImageUrl = optimisticImage || character.image_url
+    
+    // Check if image_url contains an error
+    const isError = rawImageUrl?.startsWith('error:')
+    const errorMessage = isError ? rawImageUrl.replace('error:', '') : null
+    const displayImageUrl = isError ? null : rawImageUrl
 
     // Show loading overlay if explicitly regenerating OR if project is generating and this card has no image
-    const showLoadingOverlay = isRegenerating || (isGenerating && !displayImageUrl)
+    // Don't show loading if there's an error
+    const showLoadingOverlay = !isError && (isRegenerating || (isGenerating && !displayImageUrl))
 
     return (
         <div className="flex flex-col w-full gap-4">
@@ -110,10 +116,16 @@ export function AdminCharacterGalleryCard({ character, projectId, isGenerating =
                     </div>
                 )}
                 <div
-                    className="relative aspect-[9/16] w-full bg-gray-100 cursor-pointer hover:opacity-95 transition-opacity rounded-t-lg overflow-hidden"
-                    onClick={() => setShowImage(true)}
+                    className={`relative aspect-[9/16] w-full cursor-pointer hover:opacity-95 transition-opacity rounded-t-lg overflow-hidden ${isError ? 'bg-red-50' : 'bg-gray-100'}`}
+                    onClick={() => !isError && setShowImage(true)}
                 >
-                    {displayImageUrl ? (
+                    {isError ? (
+                        <div className="flex flex-col items-center justify-center w-full h-full text-red-600 p-4">
+                            <AlertTriangle className="w-10 h-10 mb-3" />
+                            <span className="text-sm font-medium text-center">Generation Failed</span>
+                            <span className="text-xs text-red-400 text-center mt-2 line-clamp-3">{errorMessage}</span>
+                        </div>
+                    ) : displayImageUrl ? (
                         <img
                             src={displayImageUrl}
                             alt={displayName}

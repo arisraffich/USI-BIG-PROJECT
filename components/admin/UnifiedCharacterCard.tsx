@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
-import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, Download, Upload, X } from 'lucide-react'
+import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, Download, Upload, X, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Character } from '@/types/character'
 import { useRouter } from 'next/navigation'
@@ -29,17 +29,28 @@ interface SubCardProps {
 }
 
 function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownload, onUpload, showUpload = false, showDownload = true }: SubCardProps) {
+    // Check if imageUrl contains an error
+    const isError = imageUrl?.startsWith('error:')
+    const errorMessage = isError ? imageUrl.replace('error:', '') : null
+    const actualImageUrl = isError ? null : imageUrl
+
     return (
         <div className="relative w-full">
             {/* Image Container */}
             <div 
-                className="relative aspect-[9/16] bg-gray-100 rounded-lg cursor-pointer hover:opacity-95 transition-opacity overflow-hidden"
-                onClick={imageUrl ? onClick : undefined}
+                className={`relative aspect-[9/16] rounded-lg cursor-pointer hover:opacity-95 transition-opacity overflow-hidden ${isError ? 'bg-red-50 border-2 border-red-200' : 'bg-gray-100'}`}
+                onClick={actualImageUrl ? onClick : undefined}
             >
-                {imageUrl ? (
+                {isError ? (
+                    <div className="flex flex-col items-center justify-center h-full text-red-600 p-3">
+                        <AlertTriangle className="w-8 h-8 mb-2" />
+                        <span className="text-xs font-medium text-center">Generation Failed</span>
+                        <span className="text-[10px] text-red-400 text-center mt-1 line-clamp-3">{errorMessage}</span>
+                    </div>
+                ) : actualImageUrl ? (
                     <>
                         <img 
-                            src={imageUrl} 
+                            src={actualImageUrl} 
                             alt={`${characterName} - ${title}`} 
                             className="w-full h-full object-cover"
                         />
@@ -69,8 +80,8 @@ function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownloa
                     </div>
                 )}
 
-                {/* Loading Overlay */}
-                {isLoading && (
+                {/* Loading Overlay - Don't show if there's an error */}
+                {isLoading && !isError && (
                     <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center rounded-lg z-20">
                         <div className="flex flex-col items-center gap-3 bg-white p-4 rounded-lg shadow-lg border border-blue-200">
                             <div className="relative">

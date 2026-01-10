@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { MessageSquarePlus, Save, Loader2, CheckCircle2, Info, Download, X } from 'lucide-react'
+import { MessageSquarePlus, Save, Loader2, CheckCircle2, Info, Download, X, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 interface CustomerCharacterGalleryCardProps {
@@ -22,16 +22,26 @@ interface SubCardProps {
 }
 
 function SubCard({ title, imageUrl, onClick, characterName }: SubCardProps) {
+    // Check if imageUrl contains an error
+    const isError = imageUrl?.startsWith('error:')
+    const errorMessage = isError ? imageUrl.replace('error:', '') : null
+    const actualImageUrl = isError ? null : imageUrl
+
     return (
         <div className="relative">
             {/* Image Container */}
             <div 
-                className="aspect-[9/16] bg-gray-100 rounded-lg cursor-pointer hover:opacity-95 transition-opacity overflow-hidden"
-                onClick={imageUrl ? onClick : undefined}
+                className={`aspect-[9/16] rounded-lg cursor-pointer hover:opacity-95 transition-opacity overflow-hidden ${isError ? 'bg-red-50' : 'bg-gray-100'}`}
+                onClick={actualImageUrl ? onClick : undefined}
             >
-                {imageUrl ? (
+                {isError ? (
+                    <div className="flex flex-col items-center justify-center h-full text-red-600 p-3">
+                        <AlertTriangle className="w-8 h-8 mb-2" />
+                        <span className="text-xs font-medium text-center">Generation Failed</span>
+                    </div>
+                ) : actualImageUrl ? (
                     <img 
-                        src={imageUrl} 
+                        src={actualImageUrl} 
                         alt={`${characterName} - ${title}`} 
                         className="w-full h-full object-cover"
                     />
