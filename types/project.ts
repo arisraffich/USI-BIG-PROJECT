@@ -39,4 +39,6 @@ export interface Project {
   illustration_text_integration?: string | null
   illustration_status?: 'not_started' | 'analyzing' | 'generating' | 'completed' | 'sketch_review'
   style_reference_page_id?: string | null
+  // Style Reference Images (for sequel books or specific style requirements)
+  style_reference_urls?: string[] | null
 }

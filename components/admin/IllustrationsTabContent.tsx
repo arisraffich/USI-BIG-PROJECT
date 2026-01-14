@@ -226,6 +226,7 @@ export function IllustrationsTabContent({
             onPageChange={onPageChange}
             illustrationStatus={illustrationStatus}
             isAnalyzing={isAnalyzing}
+            projectId={projectId}
 
             // Handlers
             onGenerate={handleGenerate}

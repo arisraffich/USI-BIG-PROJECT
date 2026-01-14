@@ -47,6 +47,7 @@ export function UnifiedIllustrationFeed({
     illustrationStatus = 'draft',
     onSaveFeedback,
     isAnalyzing = false,
+    projectId,
     loadingState,
     onGenerate,
     onRegenerate,
@@ -224,6 +225,7 @@ export function UnifiedIllustrationFeed({
                         <SharedIllustrationBoard
                             mode={mode}
                             page={page}
+                            projectId={projectId}
                             illustrationStatus={illustrationStatus as any}
 
                             // Pass candidates

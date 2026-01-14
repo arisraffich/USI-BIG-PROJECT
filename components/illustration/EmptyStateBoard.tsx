@@ -1,13 +1,16 @@
 import { Page } from '@/types/page'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Sparkles, Loader2, Bookmark, ChevronDown } from 'lucide-react'
+import { Sparkles, Loader2, Bookmark, ChevronDown, ImagePlus, X, Info } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
+import Image from 'next/image'
 
 interface EmptyStateBoardProps {
     page: Page
+    projectId?: string
     isGenerating: boolean
     isCustomer: boolean
     aspectRatio?: string
@@ -20,6 +23,7 @@ interface EmptyStateBoardProps {
 
 export function EmptyStateBoard({
     page,
+    projectId,
     isGenerating,
     isCustomer,
     aspectRatio,
@@ -31,6 +35,93 @@ export function EmptyStateBoard({
 }: EmptyStateBoardProps) {
     // Local state for the dropdown
     const [selectedRefPageId, setSelectedRefPageId] = useState<string | null>(null)
+    
+    // Style Reference Upload State (only for Page 1)
+    const [styleRefs, setStyleRefs] = useState<string[]>([])
+    const [isUploadingStyleRef, setIsUploadingStyleRef] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    // Load existing style references on mount (for Page 1 only)
+    useEffect(() => {
+        if (page.page_number !== 1 || !projectId || isCustomer) return
+
+        const loadStyleRefs = async () => {
+            const supabase = createClient()
+            const { data } = await supabase
+                .from('projects')
+                .select('style_reference_urls')
+                .eq('id', projectId)
+                .single()
+            
+            if (data?.style_reference_urls?.length) {
+                setStyleRefs(data.style_reference_urls)
+            }
+        }
+        loadStyleRefs()
+    }, [projectId, page.page_number, isCustomer])
+
+    // Handle style reference upload
+    const handleStyleRefUpload = useCallback(async (files: FileList | null) => {
+        if (!files || files.length === 0 || !projectId) return
+        
+        const currentCount = styleRefs.length
+        const remainingSlots = 3 - currentCount
+        
+        if (remainingSlots === 0) {
+            toast.error('Maximum 3 style references allowed')
+            return
+        }
+
+        const filesToUpload = Array.from(files).slice(0, remainingSlots)
+        setIsUploadingStyleRef(true)
+
+        try {
+            const formData = new FormData()
+            filesToUpload.forEach((file, i) => {
+                formData.append(`file${i}`, file)
+            })
+
+            const response = await fetch(`/api/projects/${projectId}/style-references`, {
+                method: 'POST',
+                body: formData
+            })
+
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(data.error || 'Upload failed')
+            }
+
+            const data = await response.json()
+            setStyleRefs(data.urls)
+            toast.success(`Uploaded ${filesToUpload.length} style reference(s)`)
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to upload style references')
+        } finally {
+            setIsUploadingStyleRef(false)
+            if (fileInputRef.current) fileInputRef.current.value = ''
+        }
+    }, [projectId, styleRefs.length])
+
+    // Handle removing all style references
+    const handleRemoveStyleRefs = useCallback(async () => {
+        if (!projectId) return
+        
+        try {
+            const response = await fetch(`/api/projects/${projectId}/style-references`, {
+                method: 'DELETE'
+            })
+
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(data.error || 'Failed to remove')
+            }
+
+            setStyleRefs([])
+            toast.success('Style references removed')
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to remove style references')
+        }
+    }, [projectId])
 
     // BEAUTIFUL LOADING STATE
     if (isGenerating) {
@@ -69,10 +160,7 @@ export function EmptyStateBoard({
                         <div className="bg-purple-50 p-6 rounded-full mb-4">
                             <Sparkles className="w-10 h-10 text-purple-600" />
                         </div>
-                        <h2 className="text-2xl font-semibold text-slate-900">Ready to Create Art</h2>
-                        <p className="text-slate-500 mt-2">
-                            The AI Director has analyzed the story. We will now generate <b>Page {page.page_number}</b> to establish the artistic style for the entire book.
-                        </p>
+                        <h2 className="text-2xl font-semibold text-slate-900">Illustration {page.page_number}</h2>
                     </div>
 
                     <div className="bg-slate-50/50 p-6 rounded-xl border border-slate-100 space-y-6 text-left">
@@ -80,18 +168,18 @@ export function EmptyStateBoard({
                         <div className="space-y-3">
                             <Label className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Aspect Ratio</Label>
                             {page.page_number === 1 ? (
-                                <div className="flex flex-col space-y-2">
+                                <div className="grid grid-cols-3 gap-2">
                                     {[
-                                        { value: '8:10', label: '8:10 (Portrait)' },
-                                        { value: '8.5:8.5', label: '8.5x8.5 (Square)' },
-                                        { value: '8.5:11', label: '8.5x11 (Letter)' }
+                                        { value: '8:10', label: '8:10' },
+                                        { value: '8.5:8.5', label: '8.5x8.5' },
+                                        { value: '8.5:11', label: '8.5x11' }
                                     ].map((option) => (
                                         <div
                                             key={option.value}
-                                            className={`flex items-center space-x-3 p-2 rounded-md cursor-pointer transition-colors ${aspectRatio === option.value ? 'bg-purple-50 border border-purple-200' : 'hover:bg-slate-100 border border-transparent'}`}
+                                            className={`flex flex-col items-center p-3 rounded-lg cursor-pointer transition-colors text-center ${aspectRatio === option.value ? 'bg-purple-50 border-2 border-purple-300' : 'hover:bg-slate-100 border-2 border-transparent bg-white'}`}
                                             onClick={() => setAspectRatio && setAspectRatio(option.value)}
                                         >
-                                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${aspectRatio === option.value ? 'border-purple-600' : 'border-slate-400'}`}>
+                                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mb-2 ${aspectRatio === option.value ? 'border-purple-600' : 'border-slate-300'}`}>
                                                 {aspectRatio === option.value && <div className="w-2 h-2 rounded-full bg-purple-600" />}
                                             </div>
                                             <span className={`font-medium text-sm ${aspectRatio === option.value ? 'text-purple-900' : 'text-slate-700'}`}>{option.label}</span>
@@ -101,7 +189,7 @@ export function EmptyStateBoard({
                             ) : (
                                 <div className="bg-white border border-slate-200 rounded-md p-3 text-sm text-slate-500">
                                     <span className="block font-medium text-slate-700 mb-1">Locked by Page 1</span>
-                                    {aspectRatio || '8:10'} (Consistent with Book)
+                                    {aspectRatio || '8:10'}
                                 </div>
                             )}
                         </div>
@@ -111,27 +199,104 @@ export function EmptyStateBoard({
                         {/* Text Placement Selection */}
                         <div className="space-y-3">
                             <Label className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Text Placement</Label>
-                            <div className="flex flex-col space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
                                 {[
                                     { value: 'integrated', label: 'Integrated', desc: 'Text inside illustration' },
                                     { value: 'separated', label: 'Separated', desc: 'Text on blank page' }
                                 ].map((option) => (
                                     <div
                                         key={option.value}
-                                        className={`flex items-center space-x-3 p-2 rounded-md cursor-pointer transition-colors ${textIntegration === option.value ? 'bg-purple-50 border border-purple-200' : 'hover:bg-slate-100 border border-transparent'}`}
+                                        className={`flex flex-col items-center p-3 rounded-lg cursor-pointer transition-colors text-center ${textIntegration === option.value ? 'bg-purple-50 border-2 border-purple-300' : 'hover:bg-slate-100 border-2 border-transparent bg-white'}`}
                                         onClick={() => setTextIntegration && setTextIntegration(option.value)}
                                     >
-                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${textIntegration === option.value ? 'border-purple-600' : 'border-slate-400'}`}>
+                                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mb-2 ${textIntegration === option.value ? 'border-purple-600' : 'border-slate-300'}`}>
                                             {textIntegration === option.value && <div className="w-2 h-2 rounded-full bg-purple-600" />}
                                         </div>
-                                        <div>
-                                            <span className={`font-medium text-sm block ${textIntegration === option.value ? 'text-purple-900' : 'text-slate-700'}`}>{option.label}</span>
-                                            <p className="text-xs text-slate-400">{option.desc}</p>
-                                        </div>
+                                        <span className={`font-medium text-sm ${textIntegration === option.value ? 'text-purple-900' : 'text-slate-700'}`}>{option.label}</span>
+                                        <p className="text-xs text-slate-400 mt-0.5">{option.desc}</p>
                                     </div>
                                 ))}
                             </div>
                         </div>
+
+                        {/* Style Reference Upload (Page 1 Admin Only) */}
+                        {page.page_number === 1 && !isCustomer && projectId && (
+                            <>
+                                <div className="h-px bg-slate-200"></div>
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                                            Style Reference
+                                        </Label>
+                                        <span className="text-xs text-slate-400">(Optional)</span>
+                                    </div>
+                                    
+                                    {/* Info text */}
+                                    <p className="text-xs text-slate-500 flex items-start gap-1.5">
+                                        <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400" />
+                                        Upload up to 3 images to match a specific illustration style. Useful for sequels or style matching.
+                                    </p>
+
+                                    {/* Uploaded style refs preview */}
+                                    {styleRefs.length > 0 && (
+                                        <div className="flex items-center gap-2">
+                                            {styleRefs.map((url, idx) => (
+                                                <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
+                                                    <Image
+                                                        src={url}
+                                                        alt={`Style ref ${idx + 1}`}
+                                                        fill
+                                                        className="object-cover"
+                                                    />
+                                                </div>
+                                            ))}
+                                            {/* Remove button */}
+                                            <button
+                                                onClick={handleRemoveStyleRefs}
+                                                className="w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 flex items-center justify-center transition-colors"
+                                                title="Remove all style references"
+                                            >
+                                                <X className="w-4 h-4 text-red-500" />
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Upload button */}
+                                    {styleRefs.length < 3 && (
+                                        <div>
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                accept="image/jpeg,image/jpg,image/png,image/webp"
+                                                multiple
+                                                onChange={(e) => handleStyleRefUpload(e.target.files)}
+                                                className="hidden"
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="w-full border-dashed border-slate-300 text-slate-600 hover:bg-slate-50 hover:border-slate-400"
+                                                onClick={() => fileInputRef.current?.click()}
+                                                disabled={isUploadingStyleRef}
+                                            >
+                                                {isUploadingStyleRef ? (
+                                                    <>
+                                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                        Uploading...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <ImagePlus className="w-4 h-4 mr-2" />
+                                                        {styleRefs.length === 0 ? 'Upload Style References' : `Add More (${3 - styleRefs.length} remaining)`}
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
 

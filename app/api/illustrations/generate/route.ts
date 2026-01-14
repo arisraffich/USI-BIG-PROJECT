@@ -35,10 +35,10 @@ export async function POST(request: Request) {
         // ... (existing code for fetching project and page) ...
         const supabase = await createAdminClient()
 
-        // 1. Fetch Project Configuration (Always needed for ratio)
+        // 1. Fetch Project Configuration (Always needed for ratio + style references)
         const { data: project } = await supabase
             .from('projects')
-            .select('illustration_aspect_ratio, illustration_text_integration, illustration_send_count, status')
+            .select('illustration_aspect_ratio, illustration_text_integration, illustration_send_count, status, style_reference_urls')
             .eq('id', projectId)
             .single()
 
@@ -63,6 +63,7 @@ export async function POST(request: Request) {
         let characterReferences: any[] = []
         let anchorImage: string | null = null
         let styleReferenceImages: string[] = []
+        let hasCustomStyleRefs = false // Declared at outer scope, set in Standard Mode
 
         // --- EDIT MODE vs STANDARD MODE ---
         const hasReferences = uploadedReferenceImages?.length > 0
@@ -129,12 +130,16 @@ IMAGE CONTEXT:
             // Detect if this is Scene Recreation Mode (manual reference selection)
             const isSceneRecreation = !!referenceImageUrl
             
+            // Check if project has custom style references (for sequels or style matching)
+            const projectStyleRefs = project?.style_reference_urls || []
+            hasCustomStyleRefs = projectStyleRefs.length > 0
+            
             if (referenceImageUrl) {
                 console.log('[Illustration Generate] 🎬 Scene Recreation Mode - using reference image as base scene')
                 // MANUAL OVERRIDE - Environment Consistency Mode
                 anchorImage = referenceImageUrl
             } else if (pageData.page_number > 1) {
-                // PAGES 2-N: Use Page 1 as Style Anchor
+                // PAGES 2-N: Use Page 1 as Style Anchor (maintains internal consistency)
                 const { data: p1 } = await supabase
                     .from('pages')
                     .select('illustration_url')
@@ -145,12 +150,22 @@ IMAGE CONTEXT:
                     anchorImage = p1.illustration_url
                 }
             } else if (pageData.page_number === 1) {
-                // PAGE 1: SELF-ANCHORING (CRITICAL FIX)
-                // Use the MAIN CHARACTER as the Style Anchor for the scene itself.
-                // This ensures the forest/background matches the character's vector style.
-                const mainChar = characters?.find(c => c.is_main)
-                if (mainChar?.image_url) {
-                    anchorImage = mainChar.image_url
+                // PAGE 1: Check for custom style references first
+                if (hasCustomStyleRefs) {
+                    // Use FIRST style reference as anchor, others go to styleReferenceImages
+                    console.log(`[Illustration Generate] 🎨 Using ${projectStyleRefs.length} custom style reference(s) for Page 1`)
+                    anchorImage = projectStyleRefs[0]
+                    // Add remaining style refs (if any) to the styleReferenceImages array
+                    if (projectStyleRefs.length > 1) {
+                        styleReferenceImages = projectStyleRefs.slice(1)
+                    }
+                } else {
+                    // DEFAULT: Use MAIN CHARACTER as the Style Anchor for the scene
+                    // This ensures the forest/background matches the character's vector style.
+                    const mainChar = characters?.find(c => c.is_main)
+                    if (mainChar?.image_url) {
+                        anchorImage = mainChar.image_url
+                    }
                 }
             }
 
@@ -234,6 +249,9 @@ IMPORTANT: Do NOT render any text in the illustration. The story text will be pr
             // Determine Style Instructions Block - Differentiated Logic
             let styleInstructions: string;
             
+            // Check if using custom style references (for Page 1)
+            const usingCustomStyleRefs = pageData.page_number === 1 && hasCustomStyleRefs
+            
             if (isSceneRecreation) {
                 // SCENE RECREATION MODE: Edit the reference image, keep background, change characters
                 styleInstructions = `TASK: SCENE RECREATION WITH NEW CHARACTER ACTIONS
@@ -287,8 +305,35 @@ OUTPUT REQUIREMENTS:
 - EXPRESSIVE, DYNAMIC characters performing described actions
 - Clear emotions visible on character faces
 - High quality, seamless integration`
+            } else if (usingCustomStyleRefs && anchorImage) {
+                // CUSTOM STYLE REFERENCE MODE: Use uploaded style references as the master style
+                const styleRefCount = 1 + styleReferenceImages.length // anchor + additional refs
+                styleInstructions = `STYLE & RENDERING RULES (CUSTOM STYLE REFERENCE MODE):
+
+IMPORTANT: You have been provided with ${styleRefCount} STYLE REFERENCE IMAGE(S).
+These images define the TARGET ARTISTIC STYLE for this illustration.
+
+1. STYLE EXTRACTION (CRITICAL):
+   - Analyze the style reference image(s) to extract: Art medium, color palette, line quality, shading technique, texture, and overall aesthetic.
+   - The combined style of these reference(s) is your MASTER STYLE GUIDE.
+   - Match this style PRECISELY across ALL elements of the illustration.
+
+2. STYLE APPLICATION:
+   - Apply the extracted style to: Characters, Background, Props, Lighting, and all environmental elements.
+   - Render the BACKGROUND in the EXACT SAME ART STYLE as shown in the style reference(s).
+   - If the style is 2D/Flat/Vector, keep everything 2D/Flat/Vector.
+   - If the style is painterly/textured, apply similar brushwork throughout.
+
+3. CHARACTER IDENTITY vs STYLE:
+   - The CHARACTER REFERENCE IMAGES define WHO appears (identity, features, clothing).
+   - The STYLE REFERENCE IMAGES define HOW everything is rendered (artistic style).
+   - Keep character identities intact but render them IN THE STYLE of the style references.
+
+4. UNIFIED DIMENSIONALITY:
+   - All elements must feel like they belong in the same artistic universe.
+   - Match the level of detail, saturation, and rendering technique from the style reference(s).`
             } else if (anchorImage) {
-                // DEFAULT MODE: Style Consistency
+                // DEFAULT MODE: Style Consistency (using main character as style anchor)
                 styleInstructions = `STYLE & RENDERING RULES (STRICT CONSISTENCY):
 1. GLOBAL STYLE ANCHOR:
    - Use the "Main Character" reference image as the MASTER STYLE for the entire scene.
@@ -350,13 +395,15 @@ ${textPromptSection}`
         // 5. Generate with Google AI
         // Pass isSceneRecreation flag for higher quality input/output in Scene Recreation mode
         // (referenceImageUrl indicates manual page selection = Scene Recreation mode)
+        // Pass hasCustomStyleRefs to disable main character style anchoring when custom style refs exist
         const result = await generateIllustration({
             prompt: fullPrompt,
             characterReferences: characterReferences,
             anchorImage: anchorImage,
             styleReferenceImages: styleReferenceImages,
             aspectRatio: mappedAspectRatio,
-            isSceneRecreation: !!referenceImageUrl
+            isSceneRecreation: !!referenceImageUrl,
+            hasCustomStyleRefs: hasCustomStyleRefs
         })
 
         if (!result.success || !result.imageBuffer) {

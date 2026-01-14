@@ -36,6 +36,7 @@ const AnimatedOverlay = ({ label }: { label: string }) => (
 export interface SharedIllustrationBoardProps {
     page: Page
     mode: 'admin' | 'customer'
+    projectId?: string
     illustrationStatus?: 'draft' | 'illustration_approved' | 'illustration_production' | 'completed'
     onSaveFeedback: (notes: string) => Promise<void>
     isGenerating?: boolean
@@ -54,6 +55,7 @@ export interface SharedIllustrationBoardProps {
 export function SharedIllustrationBoard({
     page,
     mode,
+    projectId,
     illustrationStatus = 'draft',
     onSaveFeedback,
     isGenerating = false,
@@ -184,6 +186,7 @@ export function SharedIllustrationBoard({
         return (
             <EmptyStateBoard
                 page={page}
+                projectId={projectId}
                 isGenerating={isGenerating}
                 isCustomer={isCustomer}
                 aspectRatio={aspectRatio}
@@ -200,6 +203,7 @@ export function SharedIllustrationBoard({
         return (
             <EmptyStateBoard
                 page={page}
+                projectId={projectId}
                 isGenerating={isGenerating}
                 isCustomer={isCustomer}
                 aspectRatio={aspectRatio}
