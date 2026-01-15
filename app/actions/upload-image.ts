@@ -85,7 +85,7 @@ export async function uploadImageAction(formData: FormData): Promise<UploadResul
 
         const updateData = type === 'sketch'
             ? { sketch_url: versionedUrl, sketch_generated_at: new Date().toISOString(), updated_at: new Date().toISOString() }
-            : { illustration_url: versionedUrl, illustration_generated_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+            : { illustration_url: versionedUrl, illustration_generated_at: new Date().toISOString(), updated_at: new Date().toISOString(), is_resolved: true }
 
         const { error: dbError } = await supabase
             .from('pages')

@@ -253,9 +253,18 @@ export function SharedIllustrationBoard({
                         <div className="mt-2">
                             {/* READ ONLY FEEDBACK */}
                             {!isEditing && page.feedback_notes && (
-                                <div className="bg-amber-50 border border-amber-100 rounded-md p-3 text-sm text-amber-900 relative group animate-in fade-in zoom-in-95 duration-200">
-                                    <p className="font-semibold text-xs text-amber-700 uppercase mb-1">Your Request:</p>
-                                    <p className="whitespace-pre-wrap">{page.feedback_notes}</p>
+                                <div className={`${page.is_resolved ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-100'} border rounded-md p-3 text-sm relative group animate-in fade-in zoom-in-95 duration-200`}>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <p className={`font-semibold text-xs uppercase ${page.is_resolved ? 'text-green-700' : 'text-amber-700'}`}>
+                                            {page.is_resolved ? 'Resolved:' : 'Your Request:'}
+                                        </p>
+                                        {page.is_resolved && (
+                                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                                                RESOLVED
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className={`whitespace-pre-wrap ${page.is_resolved ? 'text-green-900' : 'text-amber-900'}`}>{page.feedback_notes}</p>
                                     {isCustomer && !page.is_resolved && !isLocked && (
                                         <Button
                                             variant="ghost"

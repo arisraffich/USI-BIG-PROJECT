@@ -46,6 +46,7 @@ interface ProjectHeaderProps {
   generatedIllustrationCount?: number
   centerContent?: React.ReactNode
   hasUnresolvedFeedback?: boolean
+  hasResolvedFeedback?: boolean
 }
 
 // Define clear stage configuration
@@ -58,7 +59,7 @@ interface StageConfig {
   buttonDisabled: boolean
 }
 
-export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations, generatedIllustrationCount = 0, centerContent, hasUnresolvedFeedback = false }: ProjectHeaderProps) {
+export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations, generatedIllustrationCount = 0, centerContent, hasUnresolvedFeedback = false, hasResolvedFeedback = false }: ProjectHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -97,12 +98,12 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     // STAGE 6: Illustration Review (Sent)
     if (status === 'illustration_review') {
       return {
-        tag: 'Waiting for Review',
-        tagStyle: 'bg-blue-100 text-blue-800 border-blue-300',
+        tag: hasUnresolvedFeedback ? 'Customer Feedback Received' : (hasResolvedFeedback ? 'Ready to Resend' : 'Waiting for Review'),
+        tagStyle: hasUnresolvedFeedback ? 'bg-yellow-100 text-yellow-800 border-yellow-300' : (hasResolvedFeedback ? 'bg-green-100 text-green-800 border-green-300' : 'bg-blue-100 text-blue-800 border-blue-300'),
         buttonLabel: 'Resend Trial',
-        showCount: false, // Use illustration_send_count from projectInfo
+        showCount: true,
         isResend: true,
-        buttonDisabled: true
+        buttonDisabled: !hasResolvedFeedback // Enable ONLY when admin has resolved the feedback
       }
     }
 

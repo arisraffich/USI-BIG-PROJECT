@@ -427,12 +427,12 @@ ${textPromptSection}`
         const publicUrl = urlData.publicUrl
 
         // 7. Update Page Record
-        // Only update the internal illustration URL. 
-        // Resolution and history update will happen when Admin clicks "Resend Trial" (Send to Customer).
+        // Update illustration URL and mark any feedback as resolved (same pattern as character regeneration)
 
         await supabase.from('pages')
             .update({
                 illustration_url: publicUrl,
+                is_resolved: true, // Mark feedback as resolved after regeneration
             })
             .eq('id', pageData.id)
 

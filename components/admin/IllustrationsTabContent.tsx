@@ -41,12 +41,12 @@ export function IllustrationsTabContent({
     // Local state for wizard settings (propagated to pages if needed via DB)
     const [aspectRatio, setAspectRatio] = useState(initialAspectRatio || '')
     const [textIntegration, setTextIntegration] = useState(initialTextIntegration || '')
-    const [generatingPageId, setGeneratingPageId] = useState<string | null>(null)
+    const [generatingPageIds, setGeneratingPageIds] = useState<Set<string>>(new Set())
     const [loadingState, setLoadingState] = useState<{ [key: string]: { sketch: boolean; illustration: boolean } }>({})
 
     const handleGenerate = async (page: Page, referenceImageUrl?: string) => {
         try {
-            setGeneratingPageId(page.id)
+            setGeneratingPageIds(prev => new Set(prev).add(page.id))
             setLoadingState(prev => ({ ...prev, [page.id]: { ...prev[page.id], illustration: true, sketch: false } })) // Lock illustration initially
             // Actually, for NEW generation, we lock IS_GENERATING (empty state).
             // But for REGENERATION, we want granular.
@@ -73,9 +73,6 @@ export function IllustrationsTabContent({
             const data = await response.json()
             toast.success('Illustration Generated!', { description: 'Starting sketch generation...' })
 
-            // Clear Illus Loading, Start Sketch Loading
-            // Note: For initial gen, isGenerating hides this anyway?
-
             // 3. Chain: Generate Sketch Immediately
             if (data.illustrationUrl) {
                 try {
@@ -85,23 +82,37 @@ export function IllustrationsTabContent({
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ projectId, pageId: page.id, illustrationUrl: data.illustrationUrl })
                     })
-                    if (sketchRes.ok) toast.success('Sketch Generation Started')
+                    if (sketchRes.ok) {
+                        toast.success('Sketch Generated!')
+                    } else {
+                        const errData = await sketchRes.json().catch(() => ({}))
+                        console.error("Sketch generation failed:", errData)
+                        toast.error('Sketch generation failed')
+                    }
                 } catch (e) {
                     console.error("Sketch trigger failed", e)
+                    toast.error('Sketch generation failed')
                 }
             }
+            
+            // Refresh AFTER sketch generation to update UI with both illustration and sketch
+            router.refresh()
         } catch (error) {
             toast.error('Failed to start generation')
             console.error(error)
         } finally {
-            setGeneratingPageId(null)
+            setGeneratingPageIds(prev => {
+                const next = new Set(prev)
+                next.delete(page.id)
+                return next
+            })
             setLoadingState(prev => ({ ...prev, [page.id]: { illustration: false, sketch: false } }))
         }
     }
 
     const handleRegenerate = async (page: Page, prompt: string, referenceImages?: string[]) => {
         try {
-            setGeneratingPageId(page.id)
+            setGeneratingPageIds(prev => new Set(prev).add(page.id))
             setLoadingState(prev => ({ ...prev, [page.id]: { ...prev[page.id], illustration: true } }))
 
             const response = await fetch('/api/illustrations/generate', {
@@ -132,15 +143,29 @@ export function IllustrationsTabContent({
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ projectId, pageId: page.id, illustrationUrl: data.illustrationUrl })
                     })
-                    if (sketchRes.ok) toast.success('Sketch Updated')
+                    if (sketchRes.ok) {
+                        toast.success('Sketch Updated')
+                    } else {
+                        const errData = await sketchRes.json().catch(() => ({}))
+                        console.error("Sketch regeneration failed:", errData)
+                        toast.error('Sketch update failed')
+                    }
                 } catch (e) {
                     console.error("Sketch trigger failed", e)
+                    toast.error('Sketch update failed')
                 }
             }
+            
+            // Refresh AFTER sketch generation to update UI with both illustration and sketch
+            router.refresh()
         } catch (error) {
             toast.error('Failed to regenerate')
         } finally {
-            setGeneratingPageId(null)
+            setGeneratingPageIds(prev => {
+                const next = new Set(prev)
+                next.delete(page.id)
+                return next
+            })
             setLoadingState(prev => ({ ...prev, [page.id]: { illustration: false, sketch: false } }))
         }
     }
@@ -167,6 +192,9 @@ export function IllustrationsTabContent({
             if (result.error) throw new Error(result.error)
 
             toast.success('Image uploaded successfully')
+            
+            // Always refresh after successful upload to update is_resolved state
+            router.refresh()
 
             // --- CHAIN: Auto-Generate Sketch if Illustration Uploaded ---
             if (type === 'illustration' && result.url) {
@@ -238,7 +266,7 @@ export function IllustrationsTabContent({
             setAspectRatio={setAspectRatio}
             textIntegration={textIntegration}
             setTextIntegration={setTextIntegration}
-            generatingPageId={generatingPageId}
+            generatingPageIds={generatingPageIds}
             loadingStateMap={loadingState}
         />
     )

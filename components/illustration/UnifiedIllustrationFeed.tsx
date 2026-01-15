@@ -35,7 +35,7 @@ interface UnifiedIllustrationFeedProps {
     setTextIntegration?: (val: string) => void
 
     // UI Feedback
-    generatingPageId?: string | null
+    generatingPageIds?: Set<string>
     loadingStateMap?: { [key: string]: { sketch: boolean; illustration: boolean } }
 }
 
@@ -56,7 +56,7 @@ export function UnifiedIllustrationFeed({
     setAspectRatio,
     textIntegration,
     setTextIntegration,
-    generatingPageId,
+    generatingPageIds = new Set(),
     loadingStateMap
 }: UnifiedIllustrationFeedProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -243,7 +243,7 @@ export function UnifiedIllustrationFeed({
                             }}
 
                             // State Config
-                            isGenerating={page.id === generatingPageId}
+                            isGenerating={generatingPageIds.has(page.id)}
                             loadingState={loadingStateMap?.[page.id] || { sketch: false, illustration: false }}
 
                             // Wizard

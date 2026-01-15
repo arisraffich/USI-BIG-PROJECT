@@ -22,7 +22,7 @@ export async function POST(
     // Get project to check current status and ensure it exists
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id, status, review_token, book_title, author_firstname, author_lastname, author_email, author_phone, character_send_count')
+      .select('id, status, review_token, book_title, author_firstname, author_lastname, author_email, author_phone, character_send_count, illustration_send_count')
       .eq('id', id)
       .single()
 

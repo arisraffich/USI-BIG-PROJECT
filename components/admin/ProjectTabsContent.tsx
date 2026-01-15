@@ -464,7 +464,14 @@ export function ProjectTabsContent({
           pageCount={pageCount}
           characterCount={characterCount}
           hasImages={sortedCharacters.secondary.some(c => c.image_url !== null && c.image_url !== '')}
-          hasUnresolvedFeedback={localCharacters.some(c => c.feedback_notes && !c.is_resolved)}
+          hasUnresolvedFeedback={
+            localCharacters.some(c => c.feedback_notes && !c.is_resolved) ||
+            localPages.some(p => p.feedback_notes && !p.is_resolved)
+          }
+          hasResolvedFeedback={
+            localCharacters.some(c => c.feedback_notes && c.is_resolved) ||
+            localPages.some(p => p.feedback_notes && p.is_resolved)
+          }
           isTrialReady={isTrialReady}
           generatedIllustrationCount={localPages.filter(p => !!p.illustration_url).length}
           onCreateIllustrations={() => {
