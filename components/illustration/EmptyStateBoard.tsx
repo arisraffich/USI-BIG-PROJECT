@@ -1,12 +1,20 @@
 import { Page } from '@/types/page'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Sparkles, Loader2, Bookmark, ChevronDown, ImagePlus, X, Info } from 'lucide-react'
+import { Sparkles, Loader2, Bookmark, ChevronDown, ImagePlus, X, Info, Layers, Square } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
+
+interface BatchState {
+    isRunning: boolean
+    total: number
+    completed: number
+    failed: number
+    currentPageIds: Set<string>
+}
 
 interface EmptyStateBoardProps {
     page: Page
@@ -19,6 +27,12 @@ interface EmptyStateBoardProps {
     setTextIntegration?: (val: string) => void
     onGenerate?: (refUrl?: string) => void
     previousIllustratedPages?: Page[]
+    
+    // Batch Generation
+    allPages?: Page[]
+    onGenerateAllRemaining?: (startingPage: Page) => void
+    onCancelBatch?: () => void
+    batchState?: BatchState
 }
 
 export function EmptyStateBoard({
@@ -31,7 +45,11 @@ export function EmptyStateBoard({
     textIntegration,
     setTextIntegration,
     onGenerate,
-    previousIllustratedPages = []
+    previousIllustratedPages = [],
+    allPages = [],
+    onGenerateAllRemaining,
+    onCancelBatch,
+    batchState
 }: EmptyStateBoardProps) {
     // Local state for the dropdown
     const [selectedRefPageId, setSelectedRefPageId] = useState<string | null>(null)
@@ -300,74 +318,127 @@ export function EmptyStateBoard({
                     </div>
                 </div>
 
-                <div className="flex items-center justify-center gap-3 w-full max-w-md mt-6">
-                    {/* MANUAL REFERENCE DROPDOWN */}
-                    {previousIllustratedPages.length >= 2 && (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" className="min-w-[140px] justify-between border-slate-300 text-slate-700 hover:bg-slate-50">
-                                    <span className="truncate max-w-[100px]">
-                                        {selectedRefPageId
-                                            ? `Page ${previousIllustratedPages.find(p => p.id === selectedRefPageId)?.page_number}`
-                                            : `Page 1 (Default)`
-                                        }
-                                    </span>
-                                    <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent className="w-56" align="start">
-                                <DropdownMenuItem onClick={() => setSelectedRefPageId(null)} className="cursor-pointer font-medium">
-                                    <Sparkles className="w-4 h-4 mr-2 text-purple-500" />
-                                    Page 1 (Default Style)
-                                </DropdownMenuItem>
-
-                                {previousIllustratedPages.map(prevPage => (
-                                    <DropdownMenuItem
-                                        key={prevPage.id}
-                                        onClick={() => setSelectedRefPageId(prevPage.id)}
-                                        className="cursor-pointer"
-                                    >
-                                        <Bookmark className="w-4 h-4 mr-2 text-slate-400" />
-                                        Page {prevPage.page_number}
+                <div className="flex flex-col items-center gap-3 w-full max-w-md mt-6">
+                    <div className="flex items-center justify-center gap-3 w-full">
+                        {/* MANUAL REFERENCE DROPDOWN */}
+                        {previousIllustratedPages.length >= 2 && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" className="min-w-[140px] justify-between border-slate-300 text-slate-700 hover:bg-slate-50">
+                                        <span className="truncate max-w-[100px]">
+                                            {selectedRefPageId
+                                                ? `Page ${previousIllustratedPages.find(p => p.id === selectedRefPageId)?.page_number}`
+                                                : `Page 1 (Default)`
+                                            }
+                                        </span>
+                                        <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className="w-56" align="start">
+                                    <DropdownMenuItem onClick={() => setSelectedRefPageId(null)} className="cursor-pointer font-medium">
+                                        <Sparkles className="w-4 h-4 mr-2 text-purple-500" />
+                                        Page 1 (Default Style)
                                     </DropdownMenuItem>
-                                ))}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    )}
 
-                    <Button
-                        size="lg"
-                        className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-xl shadow-purple-200 transition-all hover:scale-105 flex-1"
-                        onClick={() => {
-                            if (!onGenerate) return
-                            // VALIDATION
-                            if (page.page_number === 1) {
-                                if (!aspectRatio) return toast.error('Please select an Aspect Ratio first')
-                                if (!textIntegration) return toast.error('Please select Text Placement first')
-                            } else {
-                                if (!textIntegration) return toast.error('Please select Text Placement first')
-                            }
-
-                            const refUrl = selectedRefPageId
-                                ? previousIllustratedPages.find(p => p.id === selectedRefPageId)?.illustration_url || undefined
-                                : undefined
-
-                            onGenerate(refUrl)
-                        }}
-                        disabled={isGenerating}
-                    >
-                        {isGenerating ? (
-                            <>
-                                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                                Initializing...
-                            </>
-                        ) : (
-                            <>
-                                <Sparkles className="w-5 h-5 mr-2" />
-                                Generate
-                            </>
+                                    {previousIllustratedPages.map(prevPage => (
+                                        <DropdownMenuItem
+                                            key={prevPage.id}
+                                            onClick={() => setSelectedRefPageId(prevPage.id)}
+                                            className="cursor-pointer"
+                                        >
+                                            <Bookmark className="w-4 h-4 mr-2 text-slate-400" />
+                                            Page {prevPage.page_number}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         )}
-                    </Button>
+
+                        <Button
+                            size="lg"
+                            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-xl shadow-purple-200 transition-all hover:scale-105 flex-1"
+                            onClick={() => {
+                                if (!onGenerate) return
+                                // VALIDATION
+                                if (page.page_number === 1) {
+                                    if (!aspectRatio) return toast.error('Please select an Aspect Ratio first')
+                                    if (!textIntegration) return toast.error('Please select Text Placement first')
+                                } else {
+                                    if (!textIntegration) return toast.error('Please select Text Placement first')
+                                }
+
+                                const refUrl = selectedRefPageId
+                                    ? previousIllustratedPages.find(p => p.id === selectedRefPageId)?.illustration_url || undefined
+                                    : undefined
+
+                                onGenerate(refUrl)
+                            }}
+                            disabled={isGenerating || batchState?.isRunning}
+                        >
+                            {isGenerating ? (
+                                <>
+                                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                    Initializing...
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkles className="w-5 h-5 mr-2" />
+                                    Generate
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                    
+                    {/* BATCH GENERATION: Progress Indicator */}
+                    {batchState?.isRunning && (
+                        <div className="w-full bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Loader2 className="w-4 h-4 text-purple-600 animate-spin" />
+                                    <span className="text-sm font-medium text-purple-900">
+                                        Generating {batchState.completed + 1}/{batchState.total} illustrations...
+                                    </span>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={onCancelBatch}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 px-2"
+                                >
+                                    <Square className="w-3 h-3 mr-1 fill-current" />
+                                    Cancel
+                                </Button>
+                            </div>
+                            {/* Progress bar */}
+                            <div className="w-full bg-purple-100 rounded-full h-2">
+                                <div 
+                                    className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                                    style={{ width: `${(batchState.completed / batchState.total) * 100}%` }}
+                                />
+                            </div>
+                            {batchState.failed > 0 && (
+                                <p className="text-xs text-red-600">{batchState.failed} failed</p>
+                            )}
+                        </div>
+                    )}
+                    
+                    {/* BATCH GENERATION: Generate All Remaining Button */}
+                    {!isCustomer && 
+                     page.page_number > 1 && 
+                     allPages.length > 0 &&
+                     page.page_number < Math.max(...allPages.map(p => p.page_number)) &&
+                     onGenerateAllRemaining &&
+                     !batchState?.isRunning && (
+                        <Button
+                            variant="outline"
+                            className="w-full border-purple-200 text-purple-700 hover:bg-purple-50 hover:border-purple-300"
+                            onClick={() => onGenerateAllRemaining(page)}
+                            disabled={isGenerating}
+                        >
+                            <Layers className="w-4 h-4 mr-2" />
+                            Generate All Remaining
+                        </Button>
+                    )}
                 </div>
             </div>
 

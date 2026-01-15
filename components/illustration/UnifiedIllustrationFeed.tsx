@@ -37,6 +37,18 @@ interface UnifiedIllustrationFeedProps {
     // UI Feedback
     generatingPageIds?: Set<string>
     loadingStateMap?: { [key: string]: { sketch: boolean; illustration: boolean } }
+    
+    // Batch Generation
+    allPages?: Page[]
+    onGenerateAllRemaining?: (startingPage: Page) => void
+    onCancelBatch?: () => void
+    batchState?: {
+        isRunning: boolean
+        total: number
+        completed: number
+        failed: number
+        currentPageIds: Set<string>
+    }
 }
 
 export function UnifiedIllustrationFeed({
@@ -57,7 +69,11 @@ export function UnifiedIllustrationFeed({
     textIntegration,
     setTextIntegration,
     generatingPageIds = new Set(),
-    loadingStateMap
+    loadingStateMap,
+    allPages,
+    onGenerateAllRemaining,
+    onCancelBatch,
+    batchState
 }: UnifiedIllustrationFeedProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const isScrollingRef = useRef(false)
@@ -251,6 +267,12 @@ export function UnifiedIllustrationFeed({
                             setAspectRatio={setAspectRatio}
                             textIntegration={textIntegration}
                             setTextIntegration={setTextIntegration}
+                            
+                            // Batch Generation
+                            allPages={allPages}
+                            onGenerateAllRemaining={onGenerateAllRemaining}
+                            onCancelBatch={onCancelBatch}
+                            batchState={batchState}
                         />
                     </div>
                 )

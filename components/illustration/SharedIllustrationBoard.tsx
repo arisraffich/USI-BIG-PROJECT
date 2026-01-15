@@ -50,6 +50,18 @@ export interface SharedIllustrationBoardProps {
     onRegenerate?: (prompt: string, referenceImages?: string[]) => void
     onUpload?: (type: 'sketch' | 'illustration', file: File) => Promise<void>
     previousIllustratedPages?: Page[]
+    
+    // Batch Generation
+    allPages?: Page[]
+    onGenerateAllRemaining?: (startingPage: Page) => void
+    onCancelBatch?: () => void
+    batchState?: {
+        isRunning: boolean
+        total: number
+        completed: number
+        failed: number
+        currentPageIds: Set<string>
+    }
 }
 
 export function SharedIllustrationBoard({
@@ -68,7 +80,11 @@ export function SharedIllustrationBoard({
     onGenerate,
     onRegenerate,
     onUpload,
-    previousIllustratedPages = []
+    previousIllustratedPages = [],
+    allPages,
+    onGenerateAllRemaining,
+    onCancelBatch,
+    batchState
 }: SharedIllustrationBoardProps) {
 
     // --------------------------------------------------------------------------
@@ -212,6 +228,10 @@ export function SharedIllustrationBoard({
                 setTextIntegration={setTextIntegration}
                 onGenerate={onGenerate}
                 previousIllustratedPages={previousIllustratedPages}
+                allPages={allPages}
+                onGenerateAllRemaining={onGenerateAllRemaining}
+                onCancelBatch={onCancelBatch}
+                batchState={batchState}
             />
         )
     }

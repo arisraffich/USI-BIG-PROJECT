@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Page } from '@/types/page'
 import { createClient } from '@/lib/supabase/client'
 import { UnifiedIllustrationFeed } from '@/components/illustration/UnifiedIllustrationFeed'
@@ -6,6 +6,15 @@ import { uploadImageAction } from '@/app/actions/upload-image'
 import { toast } from 'sonner'
 
 import { useRouter } from 'next/navigation'
+
+// Batch generation state type
+interface BatchGenerationState {
+    isRunning: boolean
+    total: number
+    completed: number
+    failed: number
+    currentPageIds: Set<string>
+}
 
 interface IllustrationsTabContentProps {
     projectId: string
@@ -43,6 +52,17 @@ export function IllustrationsTabContent({
     const [textIntegration, setTextIntegration] = useState(initialTextIntegration || '')
     const [generatingPageIds, setGeneratingPageIds] = useState<Set<string>>(new Set())
     const [loadingState, setLoadingState] = useState<{ [key: string]: { sketch: boolean; illustration: boolean } }>({})
+    
+    // Batch generation state
+    const [batchState, setBatchState] = useState<BatchGenerationState>({
+        isRunning: false,
+        total: 0,
+        completed: 0,
+        failed: 0,
+        currentPageIds: new Set()
+    })
+    const batchCancelledRef = useRef(false)
+    const MAX_CONCURRENT = 3
 
     const handleGenerate = async (page: Page, referenceImageUrl?: string) => {
         try {
@@ -246,6 +266,146 @@ export function IllustrationsTabContent({
         }
     }
 
+    // Generate a single page (for batch use) - returns promise
+    const generateSinglePage = async (page: Page): Promise<boolean> => {
+        try {
+            setGeneratingPageIds(prev => new Set(prev).add(page.id))
+            setLoadingState(prev => ({ ...prev, [page.id]: { illustration: true, sketch: false } }))
+
+            const response = await fetch('/api/illustrations/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pageId: page.id, projectId })
+            })
+
+            if (!response.ok) throw new Error('Generation failed')
+            
+            const data = await response.json()
+
+            // Generate sketch
+            if (data.illustrationUrl) {
+                setLoadingState(prev => ({ ...prev, [page.id]: { illustration: false, sketch: true } }))
+                await fetch('/api/illustrations/generate-sketch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ projectId, pageId: page.id, illustrationUrl: data.illustrationUrl })
+                })
+            }
+
+            return true
+        } catch (error) {
+            console.error(`Failed to generate page ${page.page_number}:`, error)
+            return false
+        } finally {
+            setGeneratingPageIds(prev => {
+                const next = new Set(prev)
+                next.delete(page.id)
+                return next
+            })
+            setLoadingState(prev => ({ ...prev, [page.id]: { illustration: false, sketch: false } }))
+        }
+    }
+
+    // Batch generate all remaining pages from a starting page
+    const handleGenerateAllRemaining = useCallback(async (startingPage: Page) => {
+        // Get pages to generate (from startingPage onwards, without existing illustrations)
+        const pagesToGenerate = pages.filter(p => 
+            p.page_number >= startingPage.page_number && !p.illustration_url
+        )
+
+        if (pagesToGenerate.length === 0) {
+            toast.info('No pages to generate')
+            return
+        }
+
+        // Confirmation dialog
+        const confirmed = window.confirm(
+            `Generate ${pagesToGenerate.length} illustration${pagesToGenerate.length > 1 ? 's' : ''}?\n\nPages: ${pagesToGenerate.map(p => p.page_number).join(', ')}\n\nThis will run up to ${MAX_CONCURRENT} generations in parallel.`
+        )
+        if (!confirmed) return
+
+        // Reset cancel flag and start batch
+        batchCancelledRef.current = false
+        setBatchState({
+            isRunning: true,
+            total: pagesToGenerate.length,
+            completed: 0,
+            failed: 0,
+            currentPageIds: new Set()
+        })
+
+        const queue = [...pagesToGenerate]
+        const activePromises: Promise<void>[] = []
+        let completed = 0
+        let failed = 0
+
+        const processNext = async () => {
+            if (batchCancelledRef.current || queue.length === 0) return
+
+            const page = queue.shift()!
+            setBatchState(prev => ({
+                ...prev,
+                currentPageIds: new Set(prev.currentPageIds).add(page.id)
+            }))
+
+            const success = await generateSinglePage(page)
+            
+            if (success) {
+                completed++
+            } else {
+                failed++
+            }
+
+            setBatchState(prev => ({
+                ...prev,
+                completed,
+                failed,
+                currentPageIds: (() => {
+                    const next = new Set(prev.currentPageIds)
+                    next.delete(page.id)
+                    return next
+                })()
+            }))
+
+            // Process next in queue if not cancelled
+            if (!batchCancelledRef.current && queue.length > 0) {
+                await processNext()
+            }
+        }
+
+        // Start up to MAX_CONCURRENT parallel processes
+        for (let i = 0; i < Math.min(MAX_CONCURRENT, pagesToGenerate.length); i++) {
+            activePromises.push(processNext())
+        }
+
+        // Wait for all to complete
+        await Promise.all(activePromises)
+
+        // Refresh UI
+        router.refresh()
+
+        // Show completion toast
+        if (batchCancelledRef.current) {
+            toast.info(`Batch cancelled. Completed: ${completed}, Failed: ${failed}`)
+        } else {
+            toast.success(`Batch complete! Generated: ${completed}, Failed: ${failed}`)
+        }
+
+        setBatchState({
+            isRunning: false,
+            total: 0,
+            completed: 0,
+            failed: 0,
+            currentPageIds: new Set()
+        })
+    }, [pages, projectId, router])
+
+    // Cancel batch generation
+    const handleCancelBatch = useCallback(() => {
+        batchCancelledRef.current = true
+        toast.info('Cancelling batch generation...')
+    }, [])
+
     return (
         <UnifiedIllustrationFeed
             mode="admin"
@@ -268,6 +428,12 @@ export function IllustrationsTabContent({
             setTextIntegration={setTextIntegration}
             generatingPageIds={generatingPageIds}
             loadingStateMap={loadingState}
+            
+            // Batch Generation
+            allPages={pages}
+            onGenerateAllRemaining={handleGenerateAllRemaining}
+            onCancelBatch={handleCancelBatch}
+            batchState={batchState}
         />
     )
 }
