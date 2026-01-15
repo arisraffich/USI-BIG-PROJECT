@@ -123,8 +123,8 @@ export function SharedIllustrationBoard({
 
         const files = Array.from(e.target.files)
         const validFiles = files.filter(file => {
-            if (file.size > 1024 * 1024) { // 1MB limit
-                toast.error(`"${file.name}" is too large (max 1MB).`)
+            if (file.size > 10 * 1024 * 1024) { // 10MB limit
+                toast.error(`"${file.name}" is too large (max 10MB).`)
                 return false
             }
             return true
@@ -673,7 +673,7 @@ export function SharedIllustrationBoard({
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
                                     <Label className="text-sm font-medium">Reference Images (Optional)</Label>
-                                    <span className="text-xs text-slate-400">{referenceImages.length}/5 • Max 1MB each</span>
+                                    <span className="text-xs text-slate-400">{referenceImages.length}/5 • Max 10MB each</span>
                                 </div>
 
                                 <input
