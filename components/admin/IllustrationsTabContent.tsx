@@ -16,6 +16,41 @@ interface BatchGenerationState {
     currentPageIds: Set<string>
 }
 
+// Error state for failed generations
+interface GenerationError {
+    message: string
+    technicalDetails: string
+}
+
+// Map API errors to user-friendly messages
+function mapErrorToUserMessage(error: string): { message: string; technicalDetails: string } {
+    const lowerError = error.toLowerCase()
+    
+    if (lowerError.includes('rate') || lowerError.includes('quota') || lowerError.includes('limit')) {
+        return {
+            message: 'Too many requests - please wait a moment and try again',
+            technicalDetails: error
+        }
+    }
+    if (lowerError.includes('safety') || lowerError.includes('blocked') || lowerError.includes('moderation') || lowerError.includes('policy')) {
+        return {
+            message: 'Content flagged by safety filters - please revise the scene description',
+            technicalDetails: error
+        }
+    }
+    if (lowerError.includes('no image generated')) {
+        return {
+            message: 'Generation failed - try editing the Illustration Notes and regenerating',
+            technicalDetails: error
+        }
+    }
+    
+    return {
+        message: 'Generation failed - please try editing the scene description',
+        technicalDetails: error
+    }
+}
+
 interface IllustrationsTabContentProps {
     projectId: string
     pages: Page[]
@@ -26,6 +61,10 @@ interface IllustrationsTabContentProps {
     initialTextIntegration?: string | null
     activePageId?: string | null
     onPageChange?: (pageId: string) => void
+    
+    // External error state (shared with sidebar)
+    pageErrors?: { [pageId: string]: { message: string; technicalDetails: string } }
+    onPageErrorsChange?: React.Dispatch<React.SetStateAction<{ [pageId: string]: { message: string; technicalDetails: string } }>>
 }
 
 export function IllustrationsTabContent({
@@ -36,7 +75,9 @@ export function IllustrationsTabContent({
     initialAspectRatio,
     initialTextIntegration,
     activePageId,
-    onPageChange
+    onPageChange,
+    pageErrors = {},
+    onPageErrorsChange
 }: IllustrationsTabContentProps) {
     const router = useRouter()
 
@@ -63,14 +104,29 @@ export function IllustrationsTabContent({
     })
     const batchCancelledRef = useRef(false)
     const MAX_CONCURRENT = 3
+    
+    // Helper to update page errors (uses external state if provided)
+    const setPageError = useCallback((pageId: string, error: GenerationError | null) => {
+        if (onPageErrorsChange) {
+            onPageErrorsChange(prev => {
+                const next = { ...prev }
+                if (error) {
+                    next[pageId] = error
+                } else {
+                    delete next[pageId]
+                }
+                return next
+            })
+        }
+    }, [onPageErrorsChange])
 
     const handleGenerate = async (page: Page, referenceImageUrl?: string) => {
         try {
+            // Clear any previous error for this page
+            setPageError(page.id, null)
+            
             setGeneratingPageIds(prev => new Set(prev).add(page.id))
-            setLoadingState(prev => ({ ...prev, [page.id]: { ...prev[page.id], illustration: true, sketch: false } })) // Lock illustration initially
-            // Actually, for NEW generation, we lock IS_GENERATING (empty state).
-            // But for REGENERATION, we want granular.
-            // Let's stick to the flow:
+            setLoadingState(prev => ({ ...prev, [page.id]: { ...prev[page.id], illustration: true, sketch: false } }))
 
             const supabase = createClient()
             // 1. Save preferences to Project
@@ -117,8 +173,14 @@ export function IllustrationsTabContent({
             
             // Refresh AFTER sketch generation to update UI with both illustration and sketch
             router.refresh()
-        } catch (error) {
-            toast.error('Failed to start generation')
+        } catch (error: any) {
+            const errorMessage = error?.message || 'Generation failed'
+            const mappedError = mapErrorToUserMessage(errorMessage)
+            
+            // Set error state for this page
+            setPageError(page.id, mappedError)
+            
+            toast.error('Generation failed', { description: mappedError.message })
             console.error(error)
         } finally {
             setGeneratingPageIds(prev => {
@@ -269,6 +331,9 @@ export function IllustrationsTabContent({
     // Generate a single page (for batch use) - returns promise
     const generateSinglePage = async (page: Page): Promise<boolean> => {
         try {
+            // Clear any previous error for this page
+            setPageError(page.id, null)
+            
             setGeneratingPageIds(prev => new Set(prev).add(page.id))
             setLoadingState(prev => ({ ...prev, [page.id]: { illustration: true, sketch: false } }))
 
@@ -278,7 +343,10 @@ export function IllustrationsTabContent({
                 body: JSON.stringify({ pageId: page.id, projectId })
             })
 
-            if (!response.ok) throw new Error('Generation failed')
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.error || 'Generation failed')
+            }
             
             const data = await response.json()
 
@@ -293,7 +361,13 @@ export function IllustrationsTabContent({
             }
 
             return true
-        } catch (error) {
+        } catch (error: any) {
+            const errorMessage = error?.message || 'Generation failed'
+            const mappedError = mapErrorToUserMessage(errorMessage)
+            
+            // Set error state for this page
+            setPageError(page.id, mappedError)
+            
             console.error(`Failed to generate page ${page.page_number}:`, error)
             return false
         } finally {
@@ -434,6 +508,9 @@ export function IllustrationsTabContent({
             onGenerateAllRemaining={handleGenerateAllRemaining}
             onCancelBatch={handleCancelBatch}
             batchState={batchState}
+            
+            // Error State
+            pageErrors={pageErrors}
         />
     )
 }

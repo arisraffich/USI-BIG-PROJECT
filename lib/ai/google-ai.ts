@@ -295,7 +295,32 @@ Apply the style uniformly to characters, backgrounds, props, and all scene eleme
         const base64Image = candidate?.inline_data?.data || candidate?.inlineData?.data
 
         if (!base64Image) {
-            throw new Error('No image generated')
+            // Log the full response to understand why no image was generated
+            console.error('[GoogleAI] No image in response. Full result:', JSON.stringify({
+                promptFeedback: result.promptFeedback,
+                candidates: result.candidates?.map((c: any) => ({
+                    finishReason: c.finishReason,
+                    safetyRatings: c.safetyRatings,
+                    contentPresent: !!c.content
+                })),
+                modelVersion: result.modelVersion
+            }, null, 2))
+            
+            // Check for specific block reasons
+            const blockReason = result.promptFeedback?.blockReason
+            const finishReason = result.candidates?.[0]?.finishReason
+            
+            if (blockReason) {
+                throw new Error(`Content blocked: ${blockReason}`)
+            }
+            if (finishReason === 'SAFETY' || finishReason === 'IMAGE_SAFETY') {
+                throw new Error('Image blocked by safety filters - try simplifying or revising the scene description')
+            }
+            if (finishReason === 'RECITATION') {
+                throw new Error('Content blocked due to recitation policy')
+            }
+            
+            throw new Error('No image generated - API returned empty response')
         }
 
         const rawBuffer = Buffer.from(base64Image, 'base64')

@@ -45,6 +45,9 @@ export function ProjectTabsContent({
   
   // Local state for project status to support instant realtime updates
   const [localProjectStatus, setLocalProjectStatus] = useState<string>(projectStatus || 'draft')
+  
+  // Page errors state (shared between IllustrationsTabContent and sidebar)
+  const [pageErrors, setPageErrors] = useState<{ [pageId: string]: { message: string; technicalDetails: string } }>({})
 
   // Sync local characters when server props update
   useEffect(() => {
@@ -546,6 +549,7 @@ export function ProjectTabsContent({
             activePageId={activeIllustrationPageId}
             onPageClick={(id) => setActiveIllustrationPageId(id)}
             illustrationStatus={illustrationStatus}
+            failedPageIds={Object.keys(pageErrors)}
           />
         ) : null
       }
@@ -634,6 +638,8 @@ export function ProjectTabsContent({
             initialTextIntegration={projectInfo?.illustration_text_integration}
             activePageId={activeIllustrationPageId}
             onPageChange={setActiveIllustrationPageId}
+            pageErrors={pageErrors}
+            onPageErrorsChange={setPageErrors}
           />
         </div >
       </div >

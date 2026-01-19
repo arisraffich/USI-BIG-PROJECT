@@ -1,7 +1,8 @@
 import { Page } from '@/types/page'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Sparkles, Loader2, Bookmark, ChevronDown, ImagePlus, X, Info, Layers, Square } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { Sparkles, Loader2, Bookmark, ChevronDown, ImagePlus, X, Info, Layers, Square, AlertCircle, ChevronRight, Save } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
@@ -33,6 +34,9 @@ interface EmptyStateBoardProps {
     onGenerateAllRemaining?: (startingPage: Page) => void
     onCancelBatch?: () => void
     batchState?: BatchState
+    
+    // Error State
+    generationError?: { message: string; technicalDetails: string }
 }
 
 export function EmptyStateBoard({
@@ -49,7 +53,8 @@ export function EmptyStateBoard({
     allPages = [],
     onGenerateAllRemaining,
     onCancelBatch,
-    batchState
+    batchState,
+    generationError
 }: EmptyStateBoardProps) {
     // Local state for the dropdown
     const [selectedRefPageId, setSelectedRefPageId] = useState<string | null>(null)
@@ -58,6 +63,41 @@ export function EmptyStateBoard({
     const [styleRefs, setStyleRefs] = useState<string[]>([])
     const [isUploadingStyleRef, setIsUploadingStyleRef] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    
+    // Editable Illustration Notes state
+    const [editedNotes, setEditedNotes] = useState(page.scene_description || '')
+    const [isSavingNotes, setIsSavingNotes] = useState(false)
+    const [showTechnicalDetails, setShowTechnicalDetails] = useState(false)
+    const hasNotesChanged = editedNotes !== (page.scene_description || '')
+    
+    // Sync editedNotes when page changes
+    useEffect(() => {
+        setEditedNotes(page.scene_description || '')
+    }, [page.scene_description, page.id])
+    
+    // Save illustration notes handler
+    const handleSaveNotes = useCallback(async () => {
+        if (!projectId) return
+        
+        setIsSavingNotes(true)
+        try {
+            const supabase = createClient()
+            const { error } = await supabase
+                .from('pages')
+                .update({ scene_description: editedNotes })
+                .eq('id', page.id)
+            
+            if (error) throw error
+            
+            toast.success('Illustration notes saved')
+            // Update the local page reference (will be refreshed on next render)
+        } catch (error: any) {
+            toast.error('Failed to save notes')
+            console.error(error)
+        } finally {
+            setIsSavingNotes(false)
+        }
+    }, [projectId, page.id, editedNotes])
 
     // Load existing style references on mount (for Page 1 only)
     useEffect(() => {
@@ -175,10 +215,37 @@ export function EmptyStateBoard({
             <div className="h-full flex flex-col items-center justify-center p-8 border-b md:border-b-0 md:border-r border-slate-200/60 bg-white order-1 overflow-y-auto">
                 <div className="space-y-4 max-w-md w-full">
                     <div className="flex flex-col items-center mb-6 text-center">
-                        <div className="bg-purple-50 p-6 rounded-full mb-4">
-                            <Sparkles className="w-10 h-10 text-purple-600" />
+                        <div className={`p-6 rounded-full mb-4 ${generationError ? 'bg-red-50' : 'bg-purple-50'}`}>
+                            {generationError ? (
+                                <AlertCircle className="w-10 h-10 text-red-500" />
+                            ) : (
+                                <Sparkles className="w-10 h-10 text-purple-600" />
+                            )}
                         </div>
                         <h2 className="text-2xl font-semibold text-slate-900">Illustration {page.page_number}</h2>
+                        
+                        {/* Error Display */}
+                        {generationError && (
+                            <div className="mt-4 w-full max-w-sm">
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left">
+                                    <p className="text-sm font-medium text-red-800">{generationError.message}</p>
+                                    
+                                    {/* Expandable Technical Details */}
+                                    <button
+                                        onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+                                        className="mt-2 flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
+                                    >
+                                        <ChevronRight className={`w-3 h-3 transition-transform ${showTechnicalDetails ? 'rotate-90' : ''}`} />
+                                        Technical details
+                                    </button>
+                                    {showTechnicalDetails && (
+                                        <pre className="mt-2 p-2 bg-red-100 rounded text-xs text-red-700 overflow-x-auto whitespace-pre-wrap">
+                                            {generationError.technicalDetails}
+                                        </pre>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="bg-slate-50/50 p-6 rounded-xl border border-slate-100 space-y-6 text-left">
@@ -459,17 +526,42 @@ export function EmptyStateBoard({
                             </p>
                         </div>
 
-                        {/* Scene Description Box */}
-                        {page.scene_description && (
-                            <div className="bg-amber-50 p-6 rounded-xl border border-amber-100">
-                                <h5 className="flex items-center gap-2 text-xs font-bold text-amber-600 uppercase tracking-widest mb-3">
+                        {/* Scene Description Box - Editable */}
+                        <div className={`p-6 rounded-xl border ${generationError ? 'bg-amber-50 border-amber-200' : 'bg-amber-50 border-amber-100'}`}>
+                            <div className="flex items-center justify-between mb-3">
+                                <h5 className="flex items-center gap-2 text-xs font-bold text-amber-600 uppercase tracking-widest">
                                     🎨 Illustration Notes
                                 </h5>
-                                <p className="text-sm text-slate-700 leading-relaxed">
-                                    {page.scene_description}
-                                </p>
+                                {hasNotesChanged && (
+                                    <Button
+                                        size="sm"
+                                        onClick={handleSaveNotes}
+                                        disabled={isSavingNotes}
+                                        className="h-7 px-3 bg-amber-600 hover:bg-amber-700 text-white text-xs"
+                                    >
+                                        {isSavingNotes ? (
+                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                        ) : (
+                                            <>
+                                                <Save className="w-3 h-3 mr-1" />
+                                                Save
+                                            </>
+                                        )}
+                                    </Button>
+                                )}
                             </div>
-                        )}
+                            <Textarea
+                                value={editedNotes}
+                                onChange={(e) => setEditedNotes(e.target.value)}
+                                placeholder="Describe the scene for the illustrator..."
+                                className="min-h-[120px] text-sm text-slate-700 leading-relaxed bg-white border-amber-200 focus:border-amber-400 focus:ring-amber-400 resize-none"
+                            />
+                            {generationError && (
+                                <p className="mt-2 text-xs text-amber-700">
+                                    💡 Try editing the notes above and regenerating
+                                </p>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

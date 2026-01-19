@@ -49,6 +49,9 @@ interface UnifiedIllustrationFeedProps {
         failed: number
         currentPageIds: Set<string>
     }
+    
+    // Error State
+    pageErrors?: { [pageId: string]: { message: string; technicalDetails: string } }
 }
 
 export function UnifiedIllustrationFeed({
@@ -73,7 +76,8 @@ export function UnifiedIllustrationFeed({
     allPages,
     onGenerateAllRemaining,
     onCancelBatch,
-    batchState
+    batchState,
+    pageErrors
 }: UnifiedIllustrationFeedProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const isScrollingRef = useRef(false)
@@ -273,6 +277,9 @@ export function UnifiedIllustrationFeed({
                             onGenerateAllRemaining={onGenerateAllRemaining}
                             onCancelBatch={onCancelBatch}
                             batchState={batchState}
+                            
+                            // Error State
+                            generationError={pageErrors?.[page.id]}
                         />
                     </div>
                 )

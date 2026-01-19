@@ -9,6 +9,7 @@ interface UnifiedIllustrationSidebarProps {
     illustrationStatus?: string
     mode: 'admin' | 'customer'
     disabled?: boolean
+    failedPageIds?: string[]
 }
 
 export function UnifiedIllustrationSidebar({
@@ -17,7 +18,8 @@ export function UnifiedIllustrationSidebar({
     onPageClick,
     illustrationStatus = 'draft',
     mode,
-    disabled = false
+    disabled = false,
+    failedPageIds = []
 }: UnifiedIllustrationSidebarProps) {
     // Locking logic: Pages 2+ are locked until status suggests approval
     // CUSTOMER: Lock until 'illustration_approved' etc.
@@ -60,11 +62,20 @@ export function UnifiedIllustrationSidebar({
                             >
                                 <span className="flex items-center gap-2">
                                     Page {page.page_number}
+                                    {/* Error indicator */}
+                                    {failedPageIds.includes(page.id) && (
+                                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" title="Generation failed" />
+                                    )}
                                 </span>
 
                                 {/* Status Indicators */}
-                                <span className={`w-2 h-2 rounded-full ${page.illustration_url ? 'bg-green-400' : 'bg-transparent'
-                                    }`} title={page.illustration_url ? "Completed" : "Pending"}></span>
+                                <span className={`w-2 h-2 rounded-full ${
+                                    failedPageIds.includes(page.id) 
+                                        ? 'bg-red-500' 
+                                        : page.illustration_url 
+                                            ? 'bg-green-400' 
+                                            : 'bg-transparent'
+                                    }`} title={failedPageIds.includes(page.id) ? "Failed" : page.illustration_url ? "Completed" : "Pending"}></span>
                             </button>
                         )
                     })}
@@ -83,17 +94,24 @@ export function UnifiedIllustrationSidebar({
                         const isLocked = !isProductionUnlocked && page.page_number > 1
 
                         return (
-                            <button
-                                key={page.id}
-                                onClick={() => !isLocked && onPageClick(page.id)}
-                                disabled={disabled || isLocked}
-                                className={`flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full text-xs font-bold transition-all shadow-sm ${isActive
-                                    ? 'bg-purple-600 text-white shadow-lg scale-110 border border-purple-500'
-                                    : 'bg-white/30 backdrop-blur-md border border-white/20 text-slate-900 ring-1 ring-white/30 hover:bg-white/50'
-                                    } ${(disabled || isLocked) ? 'opacity-40 cursor-not-allowed' : ''}`}
-                            >
-                                {page.page_number}
-                            </button>
+                            <div key={page.id} className="relative flex-shrink-0">
+                                <button
+                                    onClick={() => !isLocked && onPageClick(page.id)}
+                                    disabled={disabled || isLocked}
+                                    className={`w-9 h-9 flex items-center justify-center rounded-full text-xs font-bold transition-all shadow-sm ${isActive
+                                        ? 'bg-purple-600 text-white shadow-lg scale-110 border border-purple-500'
+                                        : failedPageIds.includes(page.id)
+                                            ? 'bg-red-100 border border-red-400 text-red-700'
+                                            : 'bg-white/30 backdrop-blur-md border border-white/20 text-slate-900 ring-1 ring-white/30 hover:bg-white/50'
+                                        } ${(disabled || isLocked) ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                >
+                                    {page.page_number}
+                                </button>
+                                {/* Error dot indicator */}
+                                {failedPageIds.includes(page.id) && (
+                                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 border border-white animate-pulse" />
+                                )}
+                            </div>
                         )
                     })}
                 </div>

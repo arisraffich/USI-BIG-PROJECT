@@ -62,6 +62,9 @@ export interface SharedIllustrationBoardProps {
         failed: number
         currentPageIds: Set<string>
     }
+    
+    // Error State
+    generationError?: { message: string; technicalDetails: string }
 }
 
 export function SharedIllustrationBoard({
@@ -84,7 +87,8 @@ export function SharedIllustrationBoard({
     allPages,
     onGenerateAllRemaining,
     onCancelBatch,
-    batchState
+    batchState,
+    generationError
 }: SharedIllustrationBoardProps) {
 
     // --------------------------------------------------------------------------
@@ -232,6 +236,7 @@ export function SharedIllustrationBoard({
                 onGenerateAllRemaining={onGenerateAllRemaining}
                 onCancelBatch={onCancelBatch}
                 batchState={batchState}
+                generationError={generationError}
             />
         )
     }
