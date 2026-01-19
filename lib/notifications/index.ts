@@ -525,11 +525,11 @@ export async function notifyIllustrationsUpdate(options: {
         <div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
           <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">First Illustration Revision${roundText}</h2>
           <p style="margin-bottom: 16px;">Hi ${authorFirstName},</p>
-          <p style="margin-bottom: 16px;">We've made the changes you requested – take a look at the updated illustration and let us know what you think.</p>
-          <p style="margin-bottom: 16px;">If it still needs some tweaking, no problem – just click <strong style="color: #d66700;">Request Edits</strong> and send over your notes. If everything looks good, click <strong style="color: #00a53d;">Approve Illustration</strong> and we'll move forward with the rest of the book.</p>
+          <p style="margin-bottom: 16px;">We've made the changes you requested – take a look at the updated sketches and let us know what you think.</p>
+          <p style="margin-bottom: 16px;">If it still needs some tweaking, no problem – just click <strong style="color: #d66700;">Request Edits</strong> and send over your notes. If everything looks good, click <strong style="color: #00a53d;">Approve Sketches</strong> and we'll move forward with the final coloring stage.</p>
           <p style="margin-bottom: 16px;">You can review it here:</p>
           <p style="margin: 24px 0;">
-            <a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Review Illustration</a>
+            <a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Review Sketches</a>
           </p>
           <p style="margin-bottom: 8px;">Talk soon,</p>
           <p style="font-weight: bold;">US Illustrations Team</p>
