@@ -490,18 +490,18 @@ export function SharedIllustrationBoard({
                             <DropdownMenu>
                                 <DropdownMenuTrigger className="flex items-center gap-2 outline-none group">
                                     <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase group-hover:text-purple-600 transition-colors">
-                                        {sketchViewMode === 'sketch' ? 'Draft Sketch' : 'Page Text'}
+                                        {sketchViewMode === 'sketch' ? 'Sketch' : 'Text'}
                                     </h4>
                                     <ChevronDown className="w-3 h-3 text-slate-400 group-hover:text-purple-600 transition-colors" />
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="center">
-                                    <DropdownMenuItem onClick={() => setSketchViewMode('sketch')} className="gap-2 cursor-pointer">
-                                        <Sparkles className="w-4 h-4 text-slate-500" />
-                                        <span>Draft Sketch</span>
+                                    <DropdownMenuItem onClick={() => setSketchViewMode('sketch')} className={`gap-2 cursor-pointer ${sketchViewMode === 'sketch' ? 'bg-purple-50 text-purple-700' : ''}`}>
+                                        {sketchViewMode === 'sketch' ? <Check className="w-4 h-4 text-purple-600" /> : <Sparkles className="w-4 h-4 text-slate-500" />}
+                                        <span>Sketch</span>
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => setSketchViewMode('text')} className="gap-2 cursor-pointer">
-                                        <AlignLeft className="w-4 h-4 text-slate-500" />
-                                        <span>Page Text</span>
+                                    <DropdownMenuItem onClick={() => setSketchViewMode('text')} className={`gap-2 cursor-pointer ${sketchViewMode === 'text' ? 'bg-purple-50 text-purple-700' : ''}`}>
+                                        {sketchViewMode === 'text' ? <Check className="w-4 h-4 text-purple-600" /> : <AlignLeft className="w-4 h-4 text-slate-500" />}
+                                        <span>Text</span>
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
@@ -573,13 +573,13 @@ export function SharedIllustrationBoard({
                                         <ChevronDown className="w-3 h-3 text-white/80" />
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="start">
-                                        <DropdownMenuItem onClick={() => setSketchViewMode('sketch')} className="gap-2 cursor-pointer">
-                                            <Sparkles className="w-4 h-4" />
-                                            <span>Draft Sketch</span>
+                                        <DropdownMenuItem onClick={() => setSketchViewMode('sketch')} className={`gap-2 cursor-pointer ${sketchViewMode === 'sketch' ? 'bg-purple-50 text-purple-700' : ''}`}>
+                                            {sketchViewMode === 'sketch' ? <Check className="w-4 h-4 text-purple-600" /> : <Sparkles className="w-4 h-4" />}
+                                            <span>Sketch</span>
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setSketchViewMode('text')} className="gap-2 cursor-pointer">
-                                            <AlignLeft className="w-4 h-4" />
-                                            <span>Page Text</span>
+                                        <DropdownMenuItem onClick={() => setSketchViewMode('text')} className={`gap-2 cursor-pointer ${sketchViewMode === 'text' ? 'bg-purple-50 text-purple-700' : ''}`}>
+                                            {sketchViewMode === 'text' ? <Check className="w-4 h-4 text-purple-600" /> : <AlignLeft className="w-4 h-4" />}
+                                            <span>Text</span>
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
