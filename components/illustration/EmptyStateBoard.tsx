@@ -64,7 +64,7 @@ export function EmptyStateBoard({
     const [isUploadingStyleRef, setIsUploadingStyleRef] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     
-    // Editable Illustration Notes state
+    // Editable Scene Description state
     const [editedNotes, setEditedNotes] = useState(page.scene_description || '')
     const [isSavingNotes, setIsSavingNotes] = useState(false)
     const [showTechnicalDetails, setShowTechnicalDetails] = useState(false)
@@ -530,7 +530,7 @@ export function EmptyStateBoard({
                         <div className={`p-6 rounded-xl border ${generationError ? 'bg-amber-50 border-amber-200' : 'bg-amber-50 border-amber-100'}`}>
                             <div className="flex items-center justify-between mb-3">
                                 <h5 className="flex items-center gap-2 text-xs font-bold text-amber-600 uppercase tracking-widest">
-                                    🎨 Illustration Notes
+                                    🎨 Scene Description
                                 </h5>
                                 {hasNotesChanged && (
                                     <Button

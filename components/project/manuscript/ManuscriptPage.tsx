@@ -97,7 +97,7 @@ export function ManuscriptPage({
       {/* Block B: Illustration Instructions */}
       <div className="px-8 py-6 bg-slate-50">
         <div className="mb-3">
-          <span className="text-xs font-medium text-gray-600">🎨 Illustration Notes</span>
+          <span className="text-xs font-medium text-gray-600">🎨 Scene Description</span>
         </div>
         {isEditMode ? (
           <RichTextEditor

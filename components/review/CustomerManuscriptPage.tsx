@@ -90,38 +90,7 @@ export function CustomerManuscriptPage({
         )}
       </div>
 
-      {/* Divider */}
-      <div className="border-t border-gray-100"></div>
-
-      {/* Block B: Illustration Instructions */}
-      <div className="px-8 py-6 bg-slate-50">
-        <div className="mb-3">
-          <span className="text-xs font-medium text-gray-600">🎨 Illustration Notes</span>
-        </div>
-        {isEditMode ? (
-          <RichTextEditor
-            initialContent={localSceneDescription}
-            onChange={handleSceneDescriptionChange}
-            role="customer"
-            placeholder="Describe the scene for the illustrator..."
-            className="font-sans text-base text-gray-600"
-          />
-        ) : (
-          <div className="font-sans text-base text-gray-600">
-            {localSceneDescription.trim() ? (
-              <RichTextEditor
-                initialContent={localSceneDescription}
-                onChange={() => { }}
-                role="customer"
-                readOnly={true}
-                className="font-sans text-base text-gray-600"
-              />
-            ) : (
-              <p className="text-gray-400">[No illustration instructions]</p>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Scene Description hidden from customer view */}
     </div>
   )
 }

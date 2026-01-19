@@ -120,7 +120,7 @@ export function SharedIllustrationBoard({
     // NEW: View Mode for Sketch Card
     const [sketchViewMode, setSketchViewMode] = useState<'sketch' | 'text'>('sketch')
     
-    // Admin: Editable Illustration Notes
+    // Admin: Editable Scene Description
     const [editedSceneNotes, setEditedSceneNotes] = useState(page.scene_description || '')
     const [isSavingSceneNotes, setIsSavingSceneNotes] = useState(false)
     const hasSceneNotesChanged = editedSceneNotes !== (page.scene_description || '')
@@ -527,10 +527,13 @@ export function SharedIllustrationBoard({
                             )}
                         </div>
 
-                        {/* ILLUSTRATION HEADER */}
+                        {/* ILLUSTRATION HEADER (or PAGE TEXT for customer pages 2+) */}
                         <div className="flex items-center justify-center gap-2 relative bg-slate-50/30">
-                            <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase">Final Illustration</h4>
-                            {isManualUpload(illustrationUrl) && (
+                            <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase">
+                                {isCustomer && page.page_number > 1 ? 'Page Text' : 'Final Illustration'}
+                            </h4>
+                            {/* Show UPLOADED badge only for admin or customer page 1 */}
+                            {!(isCustomer && page.page_number > 1) && isManualUpload(illustrationUrl) && (
                                 <span className="absolute top-1/2 -translate-y-1/2 right-12 lg:right-16 px-1.5 py-0.5 text-[9px] font-bold bg-rose-50 text-rose-600 rounded border border-rose-100 leading-none">
                                     UPLOADED
                                 </span>
@@ -544,7 +547,8 @@ export function SharedIllustrationBoard({
                                     <input type="file" ref={illustrationInputRef} className="hidden" accept="image/*" onChange={handleAdminUploadSelect('illustration')} />
                                 </>
                             )}
-                            {illustrationUrl && (
+                            {/* Download button only for admin or customer page 1 */}
+                            {!(isCustomer && page.page_number > 1) && illustrationUrl && (
                                 <button onClick={() => handleDownload(illustrationUrl!, `Page-${page.page_number}-Illustration.jpg`)} className="text-slate-400 hover:text-purple-600 transition-colors ml-2" title="Download Illustration">
                                     <Download className="w-4 h-4" />
                                 </button>
@@ -633,45 +637,37 @@ export function SharedIllustrationBoard({
                                                 {page.story_text || <span className="italic text-slate-300">No text content available.</span>}
                                             </p>
 
-                                            {/* 2. ILLUSTRATION NOTES */}
-                                            {(page.scene_description || isAdmin) && (
+                                            {/* 2. SCENE DESCRIPTION (Admin Only) */}
+                                            {isAdmin && (
                                                 <div className="bg-amber-50/50 p-5 rounded-lg border border-amber-100/60">
                                                     <span className="flex items-center gap-2 text-[10px] font-bold text-amber-600/80 uppercase tracking-widest mb-2">
-                                                        🎨 Illustration Notes
+                                                        🎨 Scene Description
                                                     </span>
-                                                    {isAdmin ? (
-                                                        /* Admin: Editable Textarea */
-                                                        <div className="space-y-3">
-                                                            <Textarea
-                                                                value={editedSceneNotes}
-                                                                onChange={(e) => setEditedSceneNotes(e.target.value)}
-                                                                placeholder="Describe the scene for the illustrator..."
-                                                                className="min-h-[120px] text-sm resize-none bg-white border-amber-200 focus-visible:ring-amber-500"
-                                                            />
-                                                            {hasSceneNotesChanged && (
-                                                                <div className="flex justify-end">
-                                                                    <Button
-                                                                        size="sm"
-                                                                        onClick={handleSaveSceneNotes}
-                                                                        disabled={isSavingSceneNotes}
-                                                                        className="bg-amber-600 hover:bg-amber-700 text-white"
-                                                                    >
-                                                                        {isSavingSceneNotes ? (
-                                                                            <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                                                                        ) : (
-                                                                            <CheckCircle2 className="w-4 h-4 mr-1" />
-                                                                        )}
-                                                                        Save Notes
-                                                                    </Button>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        /* Customer: Read-only */
-                                                        <p className="text-sm leading-relaxed text-slate-600">
-                                                            {page.scene_description}
-                                                        </p>
-                                                    )}
+                                                    <div className="space-y-3">
+                                                        <Textarea
+                                                            value={editedSceneNotes}
+                                                            onChange={(e) => setEditedSceneNotes(e.target.value)}
+                                                            placeholder="Describe the scene for the illustrator..."
+                                                            className="min-h-[120px] text-sm resize-none bg-white border-amber-200 focus-visible:ring-amber-500"
+                                                        />
+                                                        {hasSceneNotesChanged && (
+                                                            <div className="flex justify-end">
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={handleSaveSceneNotes}
+                                                                    disabled={isSavingSceneNotes}
+                                                                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                                                                >
+                                                                    {isSavingSceneNotes ? (
+                                                                        <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                                                                    ) : (
+                                                                        <CheckCircle2 className="w-4 h-4 mr-1" />
+                                                                    )}
+                                                                    Save Notes
+                                                                </Button>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -682,58 +678,79 @@ export function SharedIllustrationBoard({
 
 
 
-                        {/* 2. ILLUSTRATION BLOCK */}
+                        {/* 2. ILLUSTRATION BLOCK (or PAGE TEXT for customer pages 2+) */}
                         <div className="flex flex-col items-center md:space-y-0 bg-slate-50/10 relative min-h-[300px] md:min-h-0">
-                            {/* MOBILE HEADER FOR ILLUSTRATION (Overlay) */}
-                            <div className="absolute top-0 left-0 right-0 z-10 flex items-center gap-2 md:hidden p-3 bg-gradient-to-b from-black/40 to-transparent">
-                                <span className="text-xs font-bold tracking-wider text-white/90 uppercase shadow-sm">Colored</span>
+                            {/* MOBILE HEADER FOR ILLUSTRATION (Overlay) - Only for admin or customer page 1 */}
+                            {!(isCustomer && page.page_number > 1) && (
+                                <div className="absolute top-0 left-0 right-0 z-10 flex items-center gap-2 md:hidden p-3 bg-gradient-to-b from-black/40 to-transparent">
+                                    <span className="text-xs font-bold tracking-wider text-white/90 uppercase shadow-sm">Colored</span>
 
-                                {/* 1. REGENERATE (Admin) */}
-                                {isAdmin && onRegenerate && (
-                                    <button
-                                        className="h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm transition-colors ml-auto"
-                                        onClick={isGenerating ? undefined : () => setIsRegenerateDialogOpen(true)}
-                                        disabled={isGenerating}
-                                    >
-                                        <RefreshCw className={`h-4 w-4 ${isGenerating ? 'animate-spin' : ''}`} />
-                                    </button>
-                                )}
+                                    {/* 1. REGENERATE (Admin) */}
+                                    {isAdmin && onRegenerate && (
+                                        <button
+                                            className="h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm transition-colors ml-auto"
+                                            onClick={isGenerating ? undefined : () => setIsRegenerateDialogOpen(true)}
+                                            disabled={isGenerating}
+                                        >
+                                            <RefreshCw className={`h-4 w-4 ${isGenerating ? 'animate-spin' : ''}`} />
+                                        </button>
+                                    )}
 
-                                {/* 2. UPLOAD (Admin) */}
-                                {isAdmin && onUpload && (
-                                    <Button variant="ghost" size="icon" className={`h-8 w-8 rounded-full bg-black/40 text-red-500 hover:bg-black/60 backdrop-blur-sm ${isAdmin && onRegenerate ? 'ml-1' : 'ml-auto'}`} onClick={() => illustrationInputRef.current?.click()}>
-                                        <Upload className="w-4 h-4" />
-                                    </Button>
-                                )}
+                                    {/* 2. UPLOAD (Admin) */}
+                                    {isAdmin && onUpload && (
+                                        <Button variant="ghost" size="icon" className={`h-8 w-8 rounded-full bg-black/40 text-red-500 hover:bg-black/60 backdrop-blur-sm ${isAdmin && onRegenerate ? 'ml-1' : 'ml-auto'}`} onClick={() => illustrationInputRef.current?.click()}>
+                                            <Upload className="w-4 h-4" />
+                                        </Button>
+                                    )}
 
-                                {/* 3. DOWNLOAD */}
-                                {illustrationUrl && (
-                                    <button onClick={() => handleDownload(illustrationUrl!, `Page-${page.page_number}-Final.jpg`)} className={`h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm ${isAdmin && (onRegenerate || onUpload) ? 'ml-1' : 'ml-auto'}`}>
-                                        <Download className="w-4 h-4" />
-                                    </button>
-                                )}
-                            </div>
+                                    {/* 3. DOWNLOAD */}
+                                    {illustrationUrl && (
+                                        <button onClick={() => handleDownload(illustrationUrl!, `Page-${page.page_number}-Final.jpg`)} className={`h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm ${isAdmin && (onRegenerate || onUpload) ? 'ml-1' : 'ml-auto'}`}>
+                                            <Download className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
+                            )}
 
-                            <div className="relative w-full cursor-pointer hover:opacity-95 transition-opacity" onClick={() => setShowImage(illustrationUrl || null)}>
-                                {/* Show overlay if specific granular loading is active OR if generating and we already have an image (regeneration case) */}
-                                {(loadingState.illustration || (isGenerating && illustrationUrl)) && (
-                                    <AnimatedOverlay label="Painting Illustration..." />
-                                )}
+                            {/* MOBILE HEADER FOR PAGE TEXT (Customer pages 2+) */}
+                            {isCustomer && page.page_number > 1 && (
+                                <div className="absolute top-0 left-0 right-0 z-10 flex items-center gap-2 md:hidden p-3 bg-gradient-to-b from-black/40 to-transparent">
+                                    <span className="text-xs font-bold tracking-wider text-white/90 uppercase shadow-sm">Page Text</span>
+                                </div>
+                            )}
 
-                                {illustrationUrl ? (
-                                    <img
-                                        src={illustrationUrl}
-                                        alt="Final"
-                                        className={`w-full h-auto object-contain block ${isGenerating ? 'blur-sm scale-95 opacity-50' : ''} transition-all duration-700`}
-                                    />
-                                ) : (
-                                    <div className="flex items-center justify-center min-h-[300px]">
-                                        {!isGenerating && !loadingState.illustration && (
-                                            <span className="text-sm text-slate-300">No illustration available</span>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
+                            {/* CONTENT: Page Text for customer pages 2+, Illustration otherwise */}
+                            {isCustomer && page.page_number > 1 ? (
+                                /* PAGE TEXT VIEW for customer pages 2+ */
+                                <div className="w-full h-full p-8 bg-white text-slate-900 overflow-y-auto">
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">Page {page.page_number}</span>
+                                    <p className="text-lg md:text-xl font-serif leading-relaxed text-slate-800">
+                                        {page.story_text || <span className="italic text-slate-300">No text content available.</span>}
+                                    </p>
+                                </div>
+                            ) : (
+                                /* ILLUSTRATION VIEW for admin and customer page 1 */
+                                <div className="relative w-full cursor-pointer hover:opacity-95 transition-opacity" onClick={() => setShowImage(illustrationUrl || null)}>
+                                    {/* Show overlay if specific granular loading is active OR if generating and we already have an image (regeneration case) */}
+                                    {(loadingState.illustration || (isGenerating && illustrationUrl)) && (
+                                        <AnimatedOverlay label="Painting Illustration..." />
+                                    )}
+
+                                    {illustrationUrl ? (
+                                        <img
+                                            src={illustrationUrl}
+                                            alt="Final"
+                                            className={`w-full h-auto object-contain block ${isGenerating ? 'blur-sm scale-95 opacity-50' : ''} transition-all duration-700`}
+                                        />
+                                    ) : (
+                                        <div className="flex items-center justify-center min-h-[300px]">
+                                            {!isGenerating && !loadingState.illustration && (
+                                                <span className="text-sm text-slate-300">No illustration available</span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                     </div>
