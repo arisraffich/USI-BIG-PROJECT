@@ -64,45 +64,24 @@ export async function POST(
         .select('id, feedback_notes, is_resolved, feedback_history')
         .eq('project_id', project.id)
 
-      if (allPages) {
+      // Process any edits from the submit form (same pattern as characters)
+      if (allPages && illustrationEdits) {
         const editsMap = illustrationEdits || {}
 
         for (const p of allPages) {
           const edit = editsMap[p.id]
 
           if (edit !== undefined) {
-            // User explicitly edited this page
+            // User explicitly edited this page in the submit form
             const hasNotes = !!edit && edit.trim() !== ''
-
-            // If clearing notes (approving previously rejected page), strictly enable history move if needed?
-            // Actually, if customer clears text, we just clear it. We don't archive "empty" notes.
-            // But if they are replacing text, we overwrite.
 
             await supabase.from('pages').update({
               feedback_notes: hasNotes ? edit : null,
               is_resolved: !hasNotes
             }).eq('id', p.id)
-          } else {
-            // User did NOT edit this page. 
-            // If it has pending notes, assume they are now approved/accepted as-is (Implicit Approval).
-            if (p.feedback_notes && !p.is_resolved) {
-              // Move to history and clear
-              const newHistoryItem = {
-                note: p.feedback_notes,
-                date: new Date().toISOString(),
-                status: 'resolved_by_customer_approval',
-                source: 'customer'
-              }
-
-              const currentHistory = Array.isArray(p.feedback_history) ? p.feedback_history : []
-
-              await supabase.from('pages').update({
-                feedback_notes: null,
-                is_resolved: true,
-                feedback_history: [...currentHistory, newHistoryItem]
-              }).eq('id', p.id)
-            }
           }
+          // If user didn't edit in submit form, leave the page as-is
+          // (preserves feedback_notes saved via individual save buttons)
         }
       }
 
