@@ -166,7 +166,7 @@ export function CustomerProjectHeader({
                       1ST ILLUSTRATION APPROVED
                     </>
                   ) : (
-                    "APPROVE ILLUSTRATIONS"
+                    "APPROVE SKETCHES"
                   )}
                 </Button>
               )}
@@ -242,7 +242,7 @@ export function CustomerProjectHeader({
                         1ST ILLUSTRATION APPROVED
                       </>
                     ) : (
-                      "APPROVE ILLUSTRATIONS"
+                      "APPROVE SKETCHES"
                     )}
                   </Button>
                 </div>
