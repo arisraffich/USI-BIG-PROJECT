@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Page } from '@/types/page'
+import { Character } from '@/types/character'
 import { createClient } from '@/lib/supabase/client'
 import { UnifiedIllustrationFeed } from '@/components/illustration/UnifiedIllustrationFeed'
+import { SceneCharacter } from '@/components/illustration/SharedIllustrationBoard'
 import { uploadImageAction } from '@/app/actions/upload-image'
 import { toast } from 'sonner'
 
@@ -54,6 +56,7 @@ function mapErrorToUserMessage(error: string): { message: string; technicalDetai
 interface IllustrationsTabContentProps {
     projectId: string
     pages: Page[]
+    characters?: Character[] // All project characters for character control
     illustrationStatus: string
     isAnalyzing: boolean
     analysisProgress: { current: number, total: number }
@@ -70,6 +73,7 @@ interface IllustrationsTabContentProps {
 export function IllustrationsTabContent({
     projectId,
     pages,
+    characters = [],
     illustrationStatus,
     isAnalyzing,
     initialAspectRatio,
@@ -192,10 +196,19 @@ export function IllustrationsTabContent({
         }
     }
 
-    const handleRegenerate = async (page: Page, prompt: string, referenceImages?: string[]) => {
+    const handleRegenerate = async (
+        page: Page, 
+        prompt: string, 
+        referenceImages?: string[], 
+        referenceImageUrl?: string, 
+        sceneCharacters?: SceneCharacter[]
+    ) => {
         try {
             setGeneratingPageIds(prev => new Set(prev).add(page.id))
             setLoadingState(prev => ({ ...prev, [page.id]: { ...prev[page.id], illustration: true } }))
+
+            // Determine if this is Scene Recreation mode
+            const isSceneRecreation = !!referenceImageUrl
 
             const response = await fetch('/api/illustrations/generate', {
                 method: 'POST',
@@ -205,14 +218,17 @@ export function IllustrationsTabContent({
                     pageId: page.id,
                     customPrompt: prompt,
                     currentImageUrl: page.illustration_url,
-                    referenceImages // Array of base64 strings
+                    referenceImages, // Array of base64 strings (Mode 1/2 only)
+                    referenceImageUrl, // Scene Recreation mode (Mode 3/4)
+                    sceneCharacters: isSceneRecreation ? sceneCharacters : undefined // Character overrides (Mode 3/4)
                 })
             })
 
             if (!response.ok) throw new Error('Regeneration failed')
 
             const data = await response.json()
-            toast.success('Illustration Regenerated!', { description: 'Updating sketch...' })
+            const successMessage = isSceneRecreation ? 'Scene Recreated!' : 'Illustration Regenerated!'
+            toast.success(successMessage, { description: 'Updating sketch...' })
 
             // Unlock Illustration, Lock Sketch
             setLoadingState(prev => ({ ...prev, [page.id]: { illustration: false, sketch: true } }))
@@ -489,6 +505,7 @@ export function IllustrationsTabContent({
             illustrationStatus={illustrationStatus}
             isAnalyzing={isAnalyzing}
             projectId={projectId}
+            characters={characters}
 
             // Handlers
             onGenerate={handleGenerate}

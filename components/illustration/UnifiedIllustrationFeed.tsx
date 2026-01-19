@@ -2,7 +2,8 @@
 
 import { useRef, useEffect } from 'react'
 import { Page } from '@/types/page'
-import { SharedIllustrationBoard } from './SharedIllustrationBoard'
+import { Character } from '@/types/character'
+import { SharedIllustrationBoard, SceneCharacter } from './SharedIllustrationBoard'
 import { Loader2 } from 'lucide-react'
 
 // --------------------------------------------------------------------------
@@ -21,11 +22,12 @@ interface UnifiedIllustrationFeedProps {
     // ADMIN SPECIFIC
     isAnalyzing?: boolean
     projectId?: string
+    characters?: Character[] // All project characters for character control
 
     // ADMIN STATE/HANDLERS
     loadingState?: { sketch: boolean; illustration: boolean }
     onGenerate?: (page: Page, referenceImageUrl?: string) => void
-    onRegenerate?: (page: Page, prompt: string, referenceImages?: string[]) => void
+    onRegenerate?: (page: Page, prompt: string, referenceImages?: string[], referenceImageUrl?: string, sceneCharacters?: SceneCharacter[]) => void
     onUpload?: (page: Page, type: 'sketch' | 'illustration', file: File) => void
 
     // Wizard State (Admin)
@@ -63,6 +65,7 @@ export function UnifiedIllustrationFeed({
     onSaveFeedback,
     isAnalyzing = false,
     projectId,
+    characters = [],
     loadingState,
     onGenerate,
     onRegenerate,
@@ -250,14 +253,14 @@ export function UnifiedIllustrationFeed({
 
                             // Pass candidates
                             previousIllustratedPages={previousIllustratedPages}
+                            characters={characters}
 
-                            // Handlers
                             // Handlers
                             onSaveFeedback={async (notes) => {
                                 if (onSaveFeedback) await onSaveFeedback(page.id, notes)
                             }}
                             onGenerate={onGenerate ? ((refUrl?: string) => onGenerate(page, refUrl)) : undefined}
-                            onRegenerate={onRegenerate ? (prompt, referenceImages) => onRegenerate(page, prompt, referenceImages) : undefined}
+                            onRegenerate={onRegenerate ? (prompt, referenceImages, referenceImageUrl, sceneCharacters) => onRegenerate(page, prompt, referenceImages, referenceImageUrl, sceneCharacters) : undefined}
                             onUpload={async (type, file) => {
                                 if (onUpload) onUpload(page, type, file)
                             }}

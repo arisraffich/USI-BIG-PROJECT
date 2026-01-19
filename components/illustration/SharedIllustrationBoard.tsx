@@ -1,13 +1,16 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { Page } from '@/types/page'
+import { Character } from '@/types/character'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, AlignLeft } from 'lucide-react'
+import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, AlignLeft, Users, Plus, Minus, Pencil, Check } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 import Image from 'next/image'
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from '@/components/ui/dialog'
@@ -15,6 +18,17 @@ import { toast } from 'sonner'
 import { PageStatusBar } from '@/components/project/PageStatusBar'
 import { EmptyStateBoard } from '@/components/illustration/EmptyStateBoard'
 import { ReviewHistoryDialog } from '@/components/project/ReviewHistoryDialog'
+
+// Type for scene character with action/emotion
+export interface SceneCharacter {
+    id: string
+    name: string
+    imageUrl: string | null
+    action: string
+    emotion: string
+    isIncluded: boolean
+    isModified: boolean // Track if user modified from AI Director's original
+}
 
 // Helper for the beautiful animation
 const AnimatedOverlay = ({ label }: { label: string }) => (
@@ -47,9 +61,10 @@ export interface SharedIllustrationBoardProps {
     textIntegration?: string
     setTextIntegration?: (text: string) => void
     onGenerate?: () => void
-    onRegenerate?: (prompt: string, referenceImages?: string[]) => void
+    onRegenerate?: (prompt: string, referenceImages?: string[], referenceImageUrl?: string, sceneCharacters?: SceneCharacter[]) => void
     onUpload?: (type: 'sketch' | 'illustration', file: File) => Promise<void>
     previousIllustratedPages?: Page[]
+    characters?: Character[] // All project characters for character control
     
     // Batch Generation
     allPages?: Page[]
@@ -84,6 +99,7 @@ export function SharedIllustrationBoard({
     onRegenerate,
     onUpload,
     previousIllustratedPages = [],
+    characters = [],
     allPages,
     onGenerateAllRemaining,
     onCancelBatch,
@@ -107,6 +123,13 @@ export function SharedIllustrationBoard({
     const [isRegenerateDialogOpen, setIsRegenerateDialogOpen] = useState(false)
     const [regenerationPrompt, setRegenerationPrompt] = useState('')
     const [referenceImages, setReferenceImages] = useState<{ file: File; preview: string }[]>([])
+    
+    // NEW: Environment Reference & Character Control (Mode 3/4)
+    const [selectedEnvPageId, setSelectedEnvPageId] = useState<string | null>(null)
+    const [sceneCharacters, setSceneCharacters] = useState<SceneCharacter[]>([])
+    const [editingCharacterId, setEditingCharacterId] = useState<string | null>(null)
+    const [editAction, setEditAction] = useState('')
+    const [editEmotion, setEditEmotion] = useState('')
 
     // Refs for hidden inputs
     const sketchInputRef = useRef<HTMLInputElement>(null)
@@ -118,6 +141,43 @@ export function SharedIllustrationBoard({
 
     // Lock logic (matches Customer backup implicitly via read-only checks)
     const isLocked = !isAdmin && ['illustration_approved', 'illustration_production', 'completed'].includes(illustrationStatus)
+    
+    // Check if we're in Scene Recreation mode (dropdown selected)
+    const isSceneRecreationMode = selectedEnvPageId !== null
+    
+    // Get character actions from the page for initializing scene characters
+    const pageCharacterActions = useMemo(() => {
+        return (page.character_actions || {}) as Record<string, { action?: string; pose?: string; emotion?: string }>
+    }, [page.character_actions])
+    
+    // Initialize scene characters when dialog opens in Scene Recreation mode
+    useEffect(() => {
+        if (isRegenerateDialogOpen && isSceneRecreationMode && characters.length > 0) {
+            const initialSceneChars: SceneCharacter[] = characters.map(char => {
+                const charName = char.name || char.role || 'Character'
+                const existingAction = pageCharacterActions[charName]
+                const isInScene = !!existingAction
+                
+                return {
+                    id: char.id,
+                    name: charName,
+                    imageUrl: char.image_url || null,
+                    action: existingAction?.action || existingAction?.pose || '',
+                    emotion: existingAction?.emotion || '',
+                    isIncluded: isInScene,
+                    isModified: false
+                }
+            })
+            setSceneCharacters(initialSceneChars)
+        }
+    }, [isRegenerateDialogOpen, isSceneRecreationMode, characters, pageCharacterActions])
+    
+    // Reset scene characters when dropdown changes to None
+    useEffect(() => {
+        if (!isSceneRecreationMode) {
+            setSceneCharacters([])
+        }
+    }, [isSceneRecreationMode])
 
     // --------------------------------------------------------------------------
     // HANDLERS
@@ -655,93 +715,346 @@ export function SharedIllustrationBoard({
                     setIsRegenerateDialogOpen(open)
                     if (!open) {
                         setRegenerationPrompt('')
-                        setReferenceImages([]) // Reset on close
+                        setReferenceImages([])
+                        setSelectedEnvPageId(null)
+                        setSceneCharacters([])
+                        setEditingCharacterId(null)
                     }
                 }}>
-                    <DialogContent className="sm:max-w-[500px]">
+                    <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle>Regenerate Illustration</DialogTitle>
-                            <DialogDescription>Describe what you want to change.</DialogDescription>
+                            <DialogDescription>
+                                {isSceneRecreationMode 
+                                    ? 'Recreate scene with a different environment and customize characters.'
+                                    : 'Describe what you want to change.'}
+                            </DialogDescription>
                         </DialogHeader>
 
                         <div className="space-y-4 py-2">
+                            {/* ENVIRONMENT REFERENCE DROPDOWN (Mode 3/4) - Show for Page 2+ */}
+                            {page.page_number >= 2 && previousIllustratedPages.length >= 1 && (
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium flex items-center gap-2">
+                                        <Sparkles className="w-4 h-4 text-purple-500" />
+                                        Environment Reference
+                                    </Label>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="outline" className="w-full justify-between">
+                                                <span>
+                                                    {selectedEnvPageId
+                                                        ? `Page ${previousIllustratedPages.find(p => p.id === selectedEnvPageId)?.page_number} Environment`
+                                                        : 'None (Edit Current Image)'}
+                                                </span>
+                                                <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent className="w-[calc(550px-3rem)]" align="start">
+                                            <DropdownMenuItem 
+                                                onClick={() => setSelectedEnvPageId(null)} 
+                                                className="cursor-pointer"
+                                            >
+                                                <X className="w-4 h-4 mr-2 text-slate-400" />
+                                                None (Edit Current Image)
+                                            </DropdownMenuItem>
+                                            {previousIllustratedPages.map(prevPage => (
+                                                <DropdownMenuItem
+                                                    key={prevPage.id}
+                                                    onClick={() => setSelectedEnvPageId(prevPage.id)}
+                                                    className="cursor-pointer"
+                                                >
+                                                    <Bookmark className="w-4 h-4 mr-2 text-purple-500" />
+                                                    Page {prevPage.page_number} Environment
+                                                </DropdownMenuItem>
+                                            ))}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                    {isSceneRecreationMode && (
+                                        <p className="text-xs text-purple-600 bg-purple-50 p-2 rounded-md">
+                                            Scene Recreation Mode: The selected page's background will be preserved.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* INSTRUCTIONS */}
                             <div className="space-y-2">
-                                <Label>Instructions</Label>
+                                <Label>Instructions {isSceneRecreationMode && <span className="text-slate-400 font-normal">(Optional)</span>}</Label>
                                 <Textarea
                                     value={regenerationPrompt}
                                     onChange={(e) => setRegenerationPrompt(e.target.value)}
-                                    placeholder="e.g. Make the lighting warmer, add sunglasses..."
-                                    className="min-h-[100px]"
+                                    placeholder={isSceneRecreationMode 
+                                        ? "e.g. Make the lighting warmer, change the camera angle..."
+                                        : "e.g. Make the lighting warmer, add sunglasses..."}
+                                    className="min-h-[80px]"
                                 />
                             </div>
 
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <Label className="text-sm font-medium">Reference Images (Optional)</Label>
-                                    <span className="text-xs text-slate-400">{referenceImages.length}/5 • Max 10MB each</span>
+                            {/* MODE 1/2: REFERENCE IMAGES (Only when NOT in Scene Recreation mode) */}
+                            {!isSceneRecreationMode && (
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-sm font-medium">Reference Images (Optional)</Label>
+                                        <span className="text-xs text-slate-400">{referenceImages.length}/5 • Max 10MB each</span>
+                                    </div>
+
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        className="hidden"
+                                        accept="image/*"
+                                        multiple
+                                        onChange={handleReferenceSelect}
+                                    />
+
+                                    {referenceImages.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 mb-2">
+                                            {referenceImages.map((img, idx) => (
+                                                <div key={idx} className="relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 group">
+                                                    <img src={img.preview} alt="Ref" className="w-full h-full object-cover" />
+                                                    <button
+                                                        onClick={() => removeReference(idx)}
+                                                        className="absolute top-0.5 right-0.5 bg-black/50 hover:bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    >
+                                                        <X className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {referenceImages.length < 5 && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="w-full border-dashed border-slate-300 text-slate-500 hover:text-slate-700 hover:border-slate-400 hover:bg-slate-50 gap-2 h-16"
+                                            onClick={() => fileInputRef.current?.click()}
+                                        >
+                                            <Upload className="w-4 h-4" />
+                                            Add Reference Image
+                                        </Button>
+                                    )}
                                 </div>
+                            )}
 
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    className="hidden"
-                                    accept="image/*"
-                                    multiple
-                                    onChange={handleReferenceSelect}
-                                />
-
-                                {referenceImages.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 mb-2">
-                                        {referenceImages.map((img, idx) => (
-                                            <div key={idx} className="relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 group">
-                                                <img src={img.preview} alt="Ref" className="w-full h-full object-cover" />
-                                                <button
-                                                    onClick={() => removeReference(idx)}
-                                                    className="absolute top-0.5 right-0.5 bg-black/50 hover:bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                >
-                                                    <X className="w-3 h-3" />
-                                                </button>
-                                            </div>
+                            {/* MODE 3/4: CHARACTER CONTROL (Only in Scene Recreation mode) */}
+                            {isSceneRecreationMode && characters.length > 0 && (
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-sm font-medium flex items-center gap-2">
+                                            <Users className="w-4 h-4 text-blue-500" />
+                                            Characters in Scene
+                                        </Label>
+                                        <span className="text-xs text-slate-400">
+                                            {sceneCharacters.filter(c => c.isIncluded).length} selected
+                                        </span>
+                                    </div>
+                                    
+                                    <div className="flex flex-wrap gap-2">
+                                        {sceneCharacters.map(char => (
+                                            <Popover 
+                                                key={char.id} 
+                                                open={editingCharacterId === char.id}
+                                                onOpenChange={(open) => {
+                                                    if (open) {
+                                                        setEditingCharacterId(char.id)
+                                                        setEditAction(char.action)
+                                                        setEditEmotion(char.emotion)
+                                                    } else {
+                                                        setEditingCharacterId(null)
+                                                    }
+                                                }}
+                                            >
+                                                <PopoverTrigger asChild>
+                                                    <button
+                                                        className={`relative flex flex-col items-center gap-1 p-2 rounded-lg border-2 transition-all hover:shadow-md ${
+                                                            char.isIncluded 
+                                                                ? char.isModified 
+                                                                    ? 'border-blue-400 bg-blue-50' 
+                                                                    : 'border-green-400 bg-green-50'
+                                                                : 'border-slate-200 bg-slate-50 opacity-60'
+                                                        }`}
+                                                    >
+                                                        {/* Avatar */}
+                                                        <div className="relative w-12 h-12 rounded-full overflow-hidden bg-slate-200">
+                                                            {char.imageUrl ? (
+                                                                <img 
+                                                                    src={char.imageUrl} 
+                                                                    alt={char.name} 
+                                                                    className="w-full h-full object-cover"
+                                                                />
+                                                            ) : (
+                                                                <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                                                    <Users className="w-6 h-6" />
+                                                                </div>
+                                                            )}
+                                                            {/* Status indicator */}
+                                                            <div className={`absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full flex items-center justify-center ${
+                                                                char.isIncluded 
+                                                                    ? char.isModified 
+                                                                        ? 'bg-blue-500' 
+                                                                        : 'bg-green-500'
+                                                                    : 'bg-slate-300'
+                                                            }`}>
+                                                                {char.isIncluded ? (
+                                                                    char.isModified ? (
+                                                                        <Pencil className="w-2.5 h-2.5 text-white" />
+                                                                    ) : (
+                                                                        <Check className="w-3 h-3 text-white" />
+                                                                    )
+                                                                ) : (
+                                                                    <Plus className="w-3 h-3 text-white" />
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        {/* Name */}
+                                                        <span className={`text-xs font-medium max-w-[70px] truncate ${
+                                                            char.isIncluded ? 'text-slate-700' : 'text-slate-400'
+                                                        }`}>
+                                                            {char.name}
+                                                        </span>
+                                                    </button>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-72" align="center">
+                                                    <div className="space-y-3">
+                                                        <div className="flex items-center gap-2 pb-2 border-b">
+                                                            <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-200">
+                                                                {char.imageUrl ? (
+                                                                    <img src={char.imageUrl} alt={char.name} className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <Users className="w-4 h-4 text-slate-400 m-2" />
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-semibold text-sm">{char.isIncluded ? 'Edit' : 'Add'} {char.name}</p>
+                                                                <p className="text-xs text-slate-400">
+                                                                    {char.isIncluded ? 'Modify action & emotion' : 'Add to scene'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className="space-y-2">
+                                                            <Label className="text-xs">Action (what are they doing?)</Label>
+                                                            <Input
+                                                                value={editAction}
+                                                                onChange={(e) => setEditAction(e.target.value)}
+                                                                placeholder="e.g. sitting at desk, reading a book"
+                                                                className="text-sm"
+                                                            />
+                                                        </div>
+                                                        
+                                                        <div className="space-y-2">
+                                                            <Label className="text-xs">Emotion</Label>
+                                                            <Input
+                                                                value={editEmotion}
+                                                                onChange={(e) => setEditEmotion(e.target.value)}
+                                                                placeholder="e.g. curious, excited, thoughtful"
+                                                                className="text-sm"
+                                                            />
+                                                        </div>
+                                                        
+                                                        <div className="flex gap-2 pt-2">
+                                                            {char.isIncluded && (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                                    onClick={() => {
+                                                                        setSceneCharacters(prev => prev.map(c => 
+                                                                            c.id === char.id 
+                                                                                ? { ...c, isIncluded: false, isModified: true }
+                                                                                : c
+                                                                        ))
+                                                                        setEditingCharacterId(null)
+                                                                    }}
+                                                                >
+                                                                    <Minus className="w-3 h-3 mr-1" />
+                                                                    Remove
+                                                                </Button>
+                                                            )}
+                                                            <Button
+                                                                size="sm"
+                                                                className="flex-1"
+                                                                disabled={!editAction.trim()}
+                                                                onClick={() => {
+                                                                    setSceneCharacters(prev => prev.map(c => 
+                                                                        c.id === char.id 
+                                                                            ? { 
+                                                                                ...c, 
+                                                                                action: editAction, 
+                                                                                emotion: editEmotion,
+                                                                                isIncluded: true,
+                                                                                isModified: true
+                                                                            }
+                                                                            : c
+                                                                    ))
+                                                                    setEditingCharacterId(null)
+                                                                }}
+                                                            >
+                                                                <Check className="w-3 h-3 mr-1" />
+                                                                {char.isIncluded ? 'Save' : 'Add'}
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                </PopoverContent>
+                                            </Popover>
                                         ))}
                                     </div>
-                                )}
-
-                                {referenceImages.length < 5 && (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-full border-dashed border-slate-300 text-slate-500 hover:text-slate-700 hover:border-slate-400 hover:bg-slate-50 gap-2 h-16"
-                                        onClick={() => fileInputRef.current?.click()}
-                                    >
-                                        <Upload className="w-4 h-4" />
-                                        Add Reference Image
-                                    </Button>
-                                )}
-                            </div>
+                                    
+                                    {sceneCharacters.filter(c => c.isIncluded).length === 0 && (
+                                        <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded-md">
+                                            No characters selected. Click on a character to add them to the scene.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <DialogFooter>
                             <Button variant="ghost" onClick={() => setIsRegenerateDialogOpen(false)}>Cancel</Button>
                             <Button
                                 onClick={async () => {
-                                    const base64Images = await Promise.all(referenceImages.map(img =>
-                                        new Promise<string>((resolve, reject) => {
-                                            const reader = new FileReader()
-                                            reader.onload = () => resolve(reader.result as string)
-                                            reader.onerror = reject
-                                            reader.readAsDataURL(img.file)
-                                        })
-                                    ))
+                                    // Convert uploaded images to base64 (Mode 1/2 only)
+                                    const base64Images = !isSceneRecreationMode 
+                                        ? await Promise.all(referenceImages.map(img =>
+                                            new Promise<string>((resolve, reject) => {
+                                                const reader = new FileReader()
+                                                reader.onload = () => resolve(reader.result as string)
+                                                reader.onerror = reject
+                                                reader.readAsDataURL(img.file)
+                                            })
+                                        ))
+                                        : []
+                                    
+                                    // Get reference URL for Scene Recreation mode
+                                    const refUrl = selectedEnvPageId 
+                                        ? previousIllustratedPages.find(p => p.id === selectedEnvPageId)?.illustration_url || undefined
+                                        : undefined
+                                    
+                                    // Get included characters for Scene Recreation mode
+                                    const includedChars = isSceneRecreationMode 
+                                        ? sceneCharacters.filter(c => c.isIncluded)
+                                        : undefined
+                                    
                                     setIsRegenerateDialogOpen(false)
-                                    onRegenerate(regenerationPrompt, base64Images)
+                                    onRegenerate(regenerationPrompt, base64Images, refUrl, includedChars)
                                 }}
-                                // Enable if prompt OR images exist (Edit), OR if BOTH are empty (Reset)
-                                // Actually, always enable? Yes, because empty = reset.
-                                disabled={false}
-                                className={(!regenerationPrompt.trim() && referenceImages.length === 0) ? "bg-red-600 hover:bg-red-700 text-white" : ""}
+                                disabled={isSceneRecreationMode && sceneCharacters.filter(c => c.isIncluded).length === 0}
+                                className={
+                                    (!regenerationPrompt.trim() && referenceImages.length === 0 && !isSceneRecreationMode) 
+                                        ? "bg-red-600 hover:bg-red-700 text-white" 
+                                        : isSceneRecreationMode 
+                                            ? "bg-purple-600 hover:bg-purple-700 text-white"
+                                            : ""
+                                }
                             >
-                                {(!regenerationPrompt.trim() && referenceImages.length === 0) ? "Reset to Original" : "Regenerate"}
+                                {(!regenerationPrompt.trim() && referenceImages.length === 0 && !isSceneRecreationMode) 
+                                    ? "Reset to Original" 
+                                    : isSceneRecreationMode 
+                                        ? "Recreate Scene"
+                                        : "Regenerate"}
                             </Button>
                         </DialogFooter>
                     </DialogContent>

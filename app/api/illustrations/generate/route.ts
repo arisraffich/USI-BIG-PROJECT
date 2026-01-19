@@ -16,16 +16,49 @@ function mapAspectRatio(ratio: string | null | undefined): string {
     }
 }
 
+// Type for scene character passed from frontend
+interface SceneCharacterInput {
+    id: string
+    name: string
+    imageUrl: string | null
+    action: string
+    emotion: string
+    isIncluded: boolean
+    isModified: boolean
+}
+
 export async function POST(request: Request) {
     try {
         const body = await request.json()
-        const { projectId, pageId, customPrompt, currentImageUrl, referenceImages: uploadedReferenceImages, referenceImageUrl } = body
+        const { 
+            projectId, 
+            pageId, 
+            customPrompt, 
+            currentImageUrl, 
+            referenceImages: uploadedReferenceImages, 
+            referenceImageUrl,
+            sceneCharacters // New: Character overrides for Scene Recreation mode
+        } = body as {
+            projectId: string
+            pageId?: string
+            customPrompt?: string
+            currentImageUrl?: string
+            referenceImages?: string[]
+            referenceImageUrl?: string
+            sceneCharacters?: SceneCharacterInput[]
+        }
 
-        // Debug: Log if manual reference was selected
+        // Debug: Log mode detection
         if (referenceImageUrl) {
-            console.log('[Illustration Generate] 🎯 Manual reference image selected:', referenceImageUrl.substring(0, 80) + '...')
+            console.log('[Illustration Generate] 🎬 Scene Recreation Mode - manual reference image selected')
+            if (sceneCharacters?.length) {
+                const includedChars = sceneCharacters.filter(c => c.isIncluded)
+                console.log(`[Illustration Generate] 👥 Character overrides: ${includedChars.length} characters selected`)
+            }
+        } else if (customPrompt || uploadedReferenceImages?.length) {
+            console.log('[Illustration Generate] ✏️ Edit Mode - custom prompt/reference images provided')
         } else {
-            console.log('[Illustration Generate] 📄 Using default reference (Page 1 or main character)')
+            console.log('[Illustration Generate] 📄 Standard Mode - using default reference (Page 1 or main character)')
         }
 
         if (!projectId) {
@@ -64,11 +97,16 @@ export async function POST(request: Request) {
         let anchorImage: string | null = null
         let styleReferenceImages: string[] = []
         let hasCustomStyleRefs = false // Declared at outer scope, set in Standard Mode
+        
+        // --- MODE DETECTION (Priority Order) ---
+        // 1. Scene Recreation Mode: referenceImageUrl is present (dropdown selection)
+        // 2. Edit Mode: customPrompt OR uploadedReferenceImages with currentImageUrl
+        // 3. Standard Mode: Default generation
+        const hasReferences = (uploadedReferenceImages?.length ?? 0) > 0
+        const isSceneRecreationMode = !!referenceImageUrl
+        const isEditMode = !isSceneRecreationMode && (customPrompt || hasReferences) && currentImageUrl
 
-        // --- EDIT MODE vs STANDARD MODE ---
-        const hasReferences = uploadedReferenceImages?.length > 0
-
-        if ((customPrompt || hasReferences) && currentImageUrl) {
+        if (isEditMode) {
             // Edit Mode: Use User Prompt + Current Image as Anchor + Uploaded References
             fullPrompt = `MODE: IMAGE EDITING
 INSTRUCTIONS:
@@ -82,7 +120,7 @@ IMAGE CONTEXT:
             styleReferenceImages = uploadedReferenceImages || []
 
         } else {
-            // Standard Mode: Fetch Characters & Build AI Director Prompt
+            // Standard Mode OR Scene Recreation Mode: Fetch Characters & Build AI Director Prompt
             const { data: characters } = await supabase
                 .from('characters')
                 .select('id, name, role, image_url, is_main')
@@ -93,23 +131,40 @@ IMAGE CONTEXT:
 
             // Map to new structure for Interleaved Prompting
             let mainCharacterName = '';
+            
+            // Check if we have character overrides from Scene Recreation mode
+            const hasCharacterOverrides = sceneCharacters && sceneCharacters.length > 0
+            const includedCharacterIds = hasCharacterOverrides 
+                ? new Set(sceneCharacters.filter(c => c.isIncluded).map(c => c.id))
+                : null
 
             if (characters) {
-                characterReferences = characters.map((c, index) => {
-                    let safeName = c.name || `Character ${index + 1}`
+                characterReferences = characters
+                    // Filter to only included characters if we have overrides
+                    .filter(c => {
+                        if (!includedCharacterIds) return true // No overrides, include all
+                        return includedCharacterIds.has(c.id)
+                    })
+                    .map((c, index) => {
+                        let safeName = c.name || `Character ${index + 1}`
 
-                    if (c.is_main) {
-                        mainCharacterName = c.name || ''
-                        safeName = "THE MAIN CHARACTER"
-                    }
+                        if (c.is_main) {
+                            mainCharacterName = c.name || ''
+                            safeName = "THE MAIN CHARACTER"
+                        }
 
-                    return {
-                        name: safeName,
-                        imageUrl: c.image_url!,
-                        role: c.role || undefined,
-                        isMain: c.is_main
-                    }
-                })
+                        return {
+                            name: safeName,
+                            imageUrl: c.image_url!,
+                            role: c.role || undefined,
+                            isMain: c.is_main
+                        }
+                    })
+                
+                // Log character filtering
+                if (hasCharacterOverrides) {
+                    console.log(`[Illustration Generate] 👥 Character filter: ${characterReferences.length} of ${characters.length} characters included`)
+                }
             }
 
             // SCRUBBING LOGIC: Remove the Main Character's species name from the text
@@ -127,8 +182,7 @@ IMAGE CONTEXT:
             }
 
             // FETCH ANCHOR IMAGE
-            // Detect if this is Scene Recreation Mode (manual reference selection)
-            const isSceneRecreation = !!referenceImageUrl
+            // Use isSceneRecreationMode from outer scope
             
             // Check if project has custom style references (for sequels or style matching)
             const projectStyleRefs = project?.style_reference_urls || []
@@ -169,16 +223,28 @@ IMAGE CONTEXT:
                 }
             }
 
-            // Construct Prompt
-            const characterActions = pageData.character_actions || {}
+            // Construct Prompt - Character Actions
             let actionDescription = ''
-
-            if (characterActions) {
-                Object.values(characterActions).forEach((action: any) => {
-                    if (action.action) actionDescription += `Character Action: ${action.action}. `
-                    if (action.pose) actionDescription += `Pose: ${action.pose}. `
-                    if (action.emotion) actionDescription += `Emotion: ${action.emotion}. `
+            
+            // Use sceneCharacters overrides if provided (Scene Recreation with character control)
+            if (hasCharacterOverrides && sceneCharacters) {
+                const includedChars = sceneCharacters.filter(c => c.isIncluded)
+                includedChars.forEach((char) => {
+                    const charLabel = char.name || 'Character'
+                    if (char.action) actionDescription += `${charLabel} Action: ${char.action}. `
+                    if (char.emotion) actionDescription += `${charLabel} Emotion: ${char.emotion}. `
                 })
+                console.log(`[Illustration Generate] 📝 Using custom character actions from UI`)
+            } else {
+                // Use AI Director's character actions from the page
+                const characterActions = pageData.character_actions || {}
+                if (characterActions) {
+                    Object.entries(characterActions).forEach(([charName, action]: [string, any]) => {
+                        if (action.action) actionDescription += `${charName} Action: ${action.action}. `
+                        if (action.pose) actionDescription += `${charName} Pose: ${action.pose}. `
+                        if (action.emotion) actionDescription += `${charName} Emotion: ${action.emotion}. `
+                    })
+                }
             }
 
             // Scrub the descriptions
@@ -252,8 +318,13 @@ IMPORTANT: Do NOT render any text in the illustration. The story text will be pr
             // Check if using custom style references (for Page 1)
             const usingCustomStyleRefs = pageData.page_number === 1 && hasCustomStyleRefs
             
-            if (isSceneRecreation) {
+            if (isSceneRecreationMode) {
                 // SCENE RECREATION MODE: Edit the reference image, keep background, change characters
+                // Include optional user instructions if provided
+                const userInstructionsSection = customPrompt 
+                    ? `\n\nADDITIONAL USER INSTRUCTIONS (IMPORTANT):\n${customPrompt}`
+                    : ''
+                
                 styleInstructions = `TASK: SCENE RECREATION WITH NEW CHARACTER ACTIONS
 
 STORY CONTEXT:
@@ -299,6 +370,7 @@ SHOT TYPE (pick ONE):
 • WIDE SHOT: Full environment with characters smaller in frame
 • MEDIUM SHOT: Characters from waist up, balanced with environment
 • CLOSE-UP: Focus on character emotions, environment as backdrop
+${userInstructionsSection}
 
 OUTPUT REQUIREMENTS:
 - SAME environment/background (preserved from reference)
@@ -359,7 +431,7 @@ These images define the TARGET ARTISTIC STYLE for this illustration.
             }
 
             // Build BACKGROUND section conditionally
-            const backgroundSection = isSceneRecreation 
+            const backgroundSection = isSceneRecreationMode 
                 ? '' // Omit in scene recreation mode - reference image defines environment
                 : `BACKGROUND:
 ${pageData.background_elements || 'Appropriate background for the scene.'}
@@ -367,7 +439,7 @@ ${pageData.background_elements || 'Appropriate background for the scene.'}
 `
 
             // Build fullPrompt differently for scene recreation vs standard generation
-            if (isSceneRecreation) {
+            if (isSceneRecreationMode) {
                 // Scene Recreation: Use the streamlined prompt (styleInstructions has everything)
                 fullPrompt = `${styleInstructions}
 
@@ -402,7 +474,7 @@ ${textPromptSection}`
             anchorImage: anchorImage,
             styleReferenceImages: styleReferenceImages,
             aspectRatio: mappedAspectRatio,
-            isSceneRecreation: !!referenceImageUrl,
+            isSceneRecreation: isSceneRecreationMode,
             hasCustomStyleRefs: hasCustomStyleRefs
         })
 

@@ -631,6 +631,7 @@ export function ProjectTabsContent({
           <IllustrationsTabContent
             projectId={projectId}
             pages={localPages}
+            characters={localCharacters}
             illustrationStatus={illustrationStatus}
             isAnalyzing={isAnalyzing}
             analysisProgress={analysisProgress}
