@@ -4,7 +4,7 @@ import LoginForm from './login-form'
 
 export default async function AdminLoginPage() {
   const cookieStore = await cookies()
-  const isAuthenticated = cookieStore.get('admin_auth')?.value === 'true'
+  const isAuthenticated = cookieStore.get('admin_session_v2')?.value === 'true'
 
   if (isAuthenticated) {
     redirect('/admin/dashboard')

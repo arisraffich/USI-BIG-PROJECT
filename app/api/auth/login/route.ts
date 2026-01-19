@@ -10,7 +10,8 @@ export async function POST(request: Request) {
       password === process.env.ADMIN_PASSWORD
     ) {
       const cookieStore = await cookies()
-      cookieStore.set('admin_auth', 'true', {
+      // Using v2 cookie name - invalidates all old sessions
+      cookieStore.set('admin_session_v2', 'true', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',

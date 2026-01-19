@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 export default function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -28,7 +29,9 @@ export default function LoginForm() {
       })
 
       if (response.ok) {
-        router.push('/admin/dashboard')
+        // Redirect to the original requested URL or dashboard
+        const redirectUrl = searchParams?.get('redirect') || '/admin/dashboard'
+        router.push(redirectUrl)
         router.refresh()
       } else {
         setError('Invalid username or password')
