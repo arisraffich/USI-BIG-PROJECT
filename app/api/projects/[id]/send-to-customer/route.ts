@@ -49,7 +49,7 @@ export async function POST(
     }
 
     // DETERMINE MODE: Character Review vs Illustration Trial
-    const isIllustrationMode = ['characters_approved', 'illustration_review', 'illustration_revision_needed'].includes(project.status)
+    const isIllustrationMode = ['characters_approved', 'illustration_review', 'illustration_revision_needed', 'illustration_approved'].includes(project.status)
 
     if (isIllustrationMode) {
       // --- ILLUSTRATION REVIEW MODE ---
