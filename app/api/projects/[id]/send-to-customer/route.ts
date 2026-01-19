@@ -62,10 +62,6 @@ export async function POST(
         .order('page_number', { ascending: true })
 
       let hasImages = false
-      
-      // Determine if this is a TRIAL send (first time) or PRODUCTION send (after approval)
-      const currentSendCount = (project as any).illustration_send_count || 0
-      const isTrialSend = currentSendCount === 0
 
       if (pages && pages.length > 0) {
         // 2. Process Sync & Resolve Feedback for EACH page
@@ -88,15 +84,10 @@ export async function POST(
             updateData.is_resolved = true
           }
 
-          // Sync Images to customer fields
-          // TRIAL SEND: Only sync Page 1 (the trial illustration)
-          // PRODUCTION SEND: Sync all pages with illustrations
-          const shouldSyncImages = isTrialSend ? page.page_number === 1 : true
-          
-          if (shouldSyncImages) {
-            if (page.illustration_url) updateData.customer_illustration_url = page.illustration_url
-            if (page.sketch_url) updateData.customer_sketch_url = page.sketch_url
-          }
+          // Sync Images (Ensure customer sees latest generated versions)
+          // We only sync if there is a URL.
+          if (page.illustration_url) updateData.customer_illustration_url = page.illustration_url
+          if (page.sketch_url) updateData.customer_sketch_url = page.sketch_url
 
           if (Object.keys(updateData).length > 0) {
             await supabase.from('pages').update(updateData).eq('id', page.id)

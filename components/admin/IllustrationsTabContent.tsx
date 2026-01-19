@@ -85,9 +85,13 @@ export function IllustrationsTabContent({
 }: IllustrationsTabContentProps) {
     const router = useRouter()
 
-    // ADMIN always sees ALL pages - they need to generate and manage all illustrations
-    // The restriction to Page 1 only applies to CUSTOMER view (handled in CustomerProjectTabsContent)
-    const visiblePages = pages
+    // MEMOIZE VISIBLE PAGES to prevent unstable references passed to children
+    // Admin sees only Page 1 until illustration is approved, then sees all pages
+    const visiblePages = useMemo(() => {
+        return ['illustration_approved', 'completed'].includes(illustrationStatus)
+            ? pages
+            : pages.slice(0, 1)
+    }, [pages, illustrationStatus])
 
     // Local state for wizard settings (propagated to pages if needed via DB)
     const [aspectRatio, setAspectRatio] = useState(initialAspectRatio || '')
