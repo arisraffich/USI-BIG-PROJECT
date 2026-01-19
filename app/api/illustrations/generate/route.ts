@@ -468,6 +468,13 @@ ${textPromptSection}`
         // Pass isSceneRecreation flag for higher quality input/output in Scene Recreation mode
         // (referenceImageUrl indicates manual page selection = Scene Recreation mode)
         // Pass hasCustomStyleRefs to disable main character style anchoring when custom style refs exist
+        
+        // DEBUG: Log the full prompt being sent
+        console.log('\n========== FULL PROMPT TO GEMINI ==========')
+        console.log(fullPrompt)
+        console.log('============================================\n')
+        console.log('[Illustration Generate] Character references:', characterReferences.map(c => c.name))
+        
         const result = await generateIllustration({
             prompt: fullPrompt,
             characterReferences: characterReferences,

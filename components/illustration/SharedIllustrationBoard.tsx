@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import Image from 'next/image'
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
 import { PageStatusBar } from '@/components/project/PageStatusBar'
 import { EmptyStateBoard } from '@/components/illustration/EmptyStateBoard'
 import { ReviewHistoryDialog } from '@/components/project/ReviewHistoryDialog'
@@ -118,6 +119,11 @@ export function SharedIllustrationBoard({
 
     // NEW: View Mode for Sketch Card
     const [sketchViewMode, setSketchViewMode] = useState<'sketch' | 'text'>('sketch')
+    
+    // Admin: Editable Illustration Notes
+    const [editedSceneNotes, setEditedSceneNotes] = useState(page.scene_description || '')
+    const [isSavingSceneNotes, setIsSavingSceneNotes] = useState(false)
+    const hasSceneNotesChanged = editedSceneNotes !== (page.scene_description || '')
 
     // Admin: Regenerate Logic
     const [isRegenerateDialogOpen, setIsRegenerateDialogOpen] = useState(false)
@@ -178,6 +184,34 @@ export function SharedIllustrationBoard({
             setSceneCharacters([])
         }
     }, [isSceneRecreationMode])
+    
+    // Sync editedSceneNotes when page changes
+    useEffect(() => {
+        setEditedSceneNotes(page.scene_description || '')
+    }, [page.scene_description, page.id])
+    
+    // Save illustration notes handler (Admin only)
+    const handleSaveSceneNotes = useCallback(async () => {
+        if (!projectId) return
+        
+        setIsSavingSceneNotes(true)
+        try {
+            const supabase = createClient()
+            const { error } = await supabase
+                .from('pages')
+                .update({ scene_description: editedSceneNotes })
+                .eq('id', page.id)
+            
+            if (error) throw error
+            
+            toast.success('Illustration notes saved')
+        } catch (error: any) {
+            toast.error('Failed to save notes')
+            console.error(error)
+        } finally {
+            setIsSavingSceneNotes(false)
+        }
+    }, [projectId, page.id, editedSceneNotes])
 
     // --------------------------------------------------------------------------
     // HANDLERS
@@ -600,14 +634,44 @@ export function SharedIllustrationBoard({
                                             </p>
 
                                             {/* 2. ILLUSTRATION NOTES */}
-                                            {page.scene_description && (
+                                            {(page.scene_description || isAdmin) && (
                                                 <div className="bg-amber-50/50 p-5 rounded-lg border border-amber-100/60">
                                                     <span className="flex items-center gap-2 text-[10px] font-bold text-amber-600/80 uppercase tracking-widest mb-2">
                                                         🎨 Illustration Notes
                                                     </span>
-                                                    <p className="text-sm leading-relaxed text-slate-600">
-                                                        {page.scene_description}
-                                                    </p>
+                                                    {isAdmin ? (
+                                                        /* Admin: Editable Textarea */
+                                                        <div className="space-y-3">
+                                                            <Textarea
+                                                                value={editedSceneNotes}
+                                                                onChange={(e) => setEditedSceneNotes(e.target.value)}
+                                                                placeholder="Describe the scene for the illustrator..."
+                                                                className="min-h-[120px] text-sm resize-none bg-white border-amber-200 focus-visible:ring-amber-500"
+                                                            />
+                                                            {hasSceneNotesChanged && (
+                                                                <div className="flex justify-end">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        onClick={handleSaveSceneNotes}
+                                                                        disabled={isSavingSceneNotes}
+                                                                        className="bg-amber-600 hover:bg-amber-700 text-white"
+                                                                    >
+                                                                        {isSavingSceneNotes ? (
+                                                                            <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                                                                        ) : (
+                                                                            <CheckCircle2 className="w-4 h-4 mr-1" />
+                                                                        )}
+                                                                        Save Notes
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        /* Customer: Read-only */
+                                                        <p className="text-sm leading-relaxed text-slate-600">
+                                                            {page.scene_description}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -877,26 +941,29 @@ export function SharedIllustrationBoard({
                                                                 : 'border-slate-200 bg-slate-50 opacity-60'
                                                         }`}
                                                     >
-                                                        {/* Avatar */}
-                                                        <div className="relative w-12 h-12 rounded-full overflow-hidden bg-slate-200">
-                                                            {char.imageUrl ? (
-                                                                <img 
-                                                                    src={char.imageUrl} 
-                                                                    alt={char.name} 
-                                                                    className="w-full h-full object-cover"
-                                                                />
-                                                            ) : (
-                                                                <div className="w-full h-full flex items-center justify-center text-slate-400">
-                                                                    <Users className="w-6 h-6" />
-                                                                </div>
-                                                            )}
-                                                            {/* Status indicator */}
-                                                            <div className={`absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full flex items-center justify-center ${
+                                                        {/* Avatar Container - relative for badge positioning */}
+                                                        <div className="relative">
+                                                            {/* Avatar Circle */}
+                                                            <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-200">
+                                                                {char.imageUrl ? (
+                                                                    <img 
+                                                                        src={char.imageUrl} 
+                                                                        alt={char.name} 
+                                                                        className="w-full h-full object-cover"
+                                                                    />
+                                                                ) : (
+                                                                    <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                                                        <Users className="w-6 h-6" />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            {/* Status indicator - positioned outside the overflow-hidden div */}
+                                                            <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm ${
                                                                 char.isIncluded 
                                                                     ? char.isModified 
                                                                         ? 'bg-blue-500' 
                                                                         : 'bg-green-500'
-                                                                    : 'bg-slate-300'
+                                                                    : 'bg-slate-400'
                                                             }`}>
                                                                 {char.isIncluded ? (
                                                                     char.isModified ? (
