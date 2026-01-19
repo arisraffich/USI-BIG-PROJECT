@@ -27,7 +27,7 @@ interface EmptyStateBoardProps {
     textIntegration?: string
     setTextIntegration?: (val: string) => void
     onGenerate?: (refUrl?: string) => void
-    previousIllustratedPages?: Page[]
+    illustratedPages?: Page[] // All pages with illustrations (for environment reference)
     
     // Batch Generation
     allPages?: Page[]
@@ -49,7 +49,7 @@ export function EmptyStateBoard({
     textIntegration,
     setTextIntegration,
     onGenerate,
-    previousIllustratedPages = [],
+    illustratedPages = [],
     allPages = [],
     onGenerateAllRemaining,
     onCancelBatch,
@@ -387,14 +387,14 @@ export function EmptyStateBoard({
 
                 <div className="flex flex-col items-center gap-3 w-full max-w-md mt-6">
                     <div className="flex items-center justify-center gap-3 w-full">
-                        {/* MANUAL REFERENCE DROPDOWN */}
-                        {previousIllustratedPages.length >= 2 && (
+                        {/* MANUAL REFERENCE DROPDOWN - Show if there are illustrated pages to reference */}
+                        {illustratedPages.length >= 1 && (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="outline" className="min-w-[140px] justify-between border-slate-300 text-slate-700 hover:bg-slate-50">
                                         <span className="truncate max-w-[100px]">
                                             {selectedRefPageId
-                                                ? `Page ${previousIllustratedPages.find(p => p.id === selectedRefPageId)?.page_number}`
+                                                ? `Page ${illustratedPages.find(p => p.id === selectedRefPageId)?.page_number}`
                                                 : `Page 1 (Default)`
                                             }
                                         </span>
@@ -407,7 +407,7 @@ export function EmptyStateBoard({
                                         Page 1 (Default Style)
                                     </DropdownMenuItem>
 
-                                    {previousIllustratedPages.map(prevPage => (
+                                    {illustratedPages.map(prevPage => (
                                         <DropdownMenuItem
                                             key={prevPage.id}
                                             onClick={() => setSelectedRefPageId(prevPage.id)}
@@ -435,7 +435,7 @@ export function EmptyStateBoard({
                                 }
 
                                 const refUrl = selectedRefPageId
-                                    ? previousIllustratedPages.find(p => p.id === selectedRefPageId)?.illustration_url || undefined
+                                    ? illustratedPages.find(p => p.id === selectedRefPageId)?.illustration_url || undefined
                                     : undefined
 
                                 onGenerate(refUrl)

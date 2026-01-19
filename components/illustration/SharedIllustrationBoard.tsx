@@ -64,7 +64,7 @@ export interface SharedIllustrationBoardProps {
     onGenerate?: () => void
     onRegenerate?: (prompt: string, referenceImages?: string[], referenceImageUrl?: string, sceneCharacters?: SceneCharacter[]) => void
     onUpload?: (type: 'sketch' | 'illustration', file: File) => Promise<void>
-    previousIllustratedPages?: Page[]
+    illustratedPages?: Page[] // All pages with illustrations (for environment reference)
     characters?: Character[] // All project characters for character control
     
     // Batch Generation
@@ -99,7 +99,7 @@ export function SharedIllustrationBoard({
     onGenerate,
     onRegenerate,
     onUpload,
-    previousIllustratedPages = [],
+    illustratedPages = [],
     characters = [],
     allPages,
     onGenerateAllRemaining,
@@ -308,7 +308,7 @@ export function SharedIllustrationBoard({
                 textIntegration={textIntegration}
                 setTextIntegration={setTextIntegration}
                 onGenerate={onGenerate}
-                previousIllustratedPages={previousIllustratedPages}
+                illustratedPages={illustratedPages}
             />
         )
     }
@@ -325,7 +325,7 @@ export function SharedIllustrationBoard({
                 textIntegration={textIntegration}
                 setTextIntegration={setTextIntegration}
                 onGenerate={onGenerate}
-                previousIllustratedPages={previousIllustratedPages}
+                illustratedPages={illustratedPages}
                 allPages={allPages}
                 onGenerateAllRemaining={onGenerateAllRemaining}
                 onCancelBatch={onCancelBatch}
@@ -797,7 +797,7 @@ export function SharedIllustrationBoard({
 
                         <div className="space-y-4 py-2">
                             {/* ENVIRONMENT REFERENCE DROPDOWN (Mode 3/4) - Show for Page 2+ */}
-                            {page.page_number >= 2 && previousIllustratedPages.length >= 1 && (
+                            {page.page_number >= 2 && illustratedPages.length >= 1 && (
                                 <div className="space-y-2">
                                     <Label className="text-sm font-medium flex items-center gap-2">
                                         <Sparkles className="w-4 h-4 text-purple-500" />
@@ -808,7 +808,7 @@ export function SharedIllustrationBoard({
                                             <Button variant="outline" className="w-full justify-between">
                                                 <span>
                                                     {selectedEnvPageId
-                                                        ? `Page ${previousIllustratedPages.find(p => p.id === selectedEnvPageId)?.page_number} Environment`
+                                                        ? `Page ${illustratedPages.find(p => p.id === selectedEnvPageId)?.page_number} Environment`
                                                         : 'None (Edit Current Image)'}
                                                 </span>
                                                 <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
@@ -822,7 +822,7 @@ export function SharedIllustrationBoard({
                                                 <X className="w-4 h-4 mr-2 text-slate-400" />
                                                 None (Edit Current Image)
                                             </DropdownMenuItem>
-                                            {previousIllustratedPages.map(prevPage => (
+                                            {illustratedPages.map(prevPage => (
                                                 <DropdownMenuItem
                                                     key={prevPage.id}
                                                     onClick={() => setSelectedEnvPageId(prevPage.id)}
@@ -1097,7 +1097,7 @@ export function SharedIllustrationBoard({
                                     
                                     // Get reference URL for Scene Recreation mode
                                     const refUrl = selectedEnvPageId 
-                                        ? previousIllustratedPages.find(p => p.id === selectedEnvPageId)?.illustration_url || undefined
+                                        ? illustratedPages.find(p => p.id === selectedEnvPageId)?.illustration_url || undefined
                                         : undefined
                                     
                                     // Get included characters for Scene Recreation mode

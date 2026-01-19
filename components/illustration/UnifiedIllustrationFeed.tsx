@@ -226,11 +226,10 @@ export function UnifiedIllustrationFeed({
             className={`${heightClass} w-full overflow-y-auto md:snap-y md:snap-mandatory scroll-smooth pb-20`}
         >
             {visiblePages.map(page => {
-                // CALCULATE PREVIOUS ILLUSTRATED PAGES FOR THIS SPECIFIC PAGE
-                // Must be: Before current page AND have illustration_url
-                const previousIllustratedPages = pages.filter(p =>
-                    p.page_number < page.page_number &&
-                    // Only Admin has Manual Reference, so check admin url
+                // CALCULATE ILLUSTRATED PAGES FOR ENVIRONMENT REFERENCE
+                // Any page with an illustration EXCEPT the current page
+                const illustratedPages = pages.filter(p =>
+                    p.id !== page.id &&
                     (p.illustration_url)
                 ).sort((a, b) => a.page_number - b.page_number)
 
@@ -251,8 +250,8 @@ export function UnifiedIllustrationFeed({
                             projectId={projectId}
                             illustrationStatus={illustrationStatus as any}
 
-                            // Pass candidates
-                            previousIllustratedPages={previousIllustratedPages}
+                            // Pass candidates for environment reference
+                            illustratedPages={illustratedPages}
                             characters={characters}
 
                             // Handlers
