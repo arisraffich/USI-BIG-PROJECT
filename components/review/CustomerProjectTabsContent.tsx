@@ -425,8 +425,11 @@ export function CustomerProjectTabsContent({
 
   // Calculate submit disabled
   const isSubmitDisabled = useMemo(() => {
-    // If in Illustration Mode, we are always valid (empty feedback is allowed = approval)
-    if (showIllustrationsTab) return false
+    // If in Illustration Mode, disable Approve if ANY page has unresolved feedback
+    if (showIllustrationsTab) {
+      const hasUnresolvedFeedback = localPages.some(p => p.feedback_notes && !p.is_resolved)
+      return hasUnresolvedFeedback
+    }
 
     // Character checks
     if (!sortedCharacters.secondary.length) return false
@@ -434,7 +437,7 @@ export function CustomerProjectTabsContent({
       const formInfo = characterForms[char.id]
       return formInfo && formInfo.isValid
     })
-  }, [sortedCharacters.secondary, characterForms, showIllustrationsTab])
+  }, [sortedCharacters.secondary, characterForms, showIllustrationsTab, localPages])
 
   const handleCharacterAdded = useCallback(() => {
     // Character addition handled by realtime subscription
