@@ -6,7 +6,7 @@ import { useTransition, useState, useEffect } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Home, Loader2, Send, Menu, FileText, Sparkles, ArrowLeft } from 'lucide-react'
+import { Home, Loader2, Send, Menu, FileText, Sparkles, ArrowLeft, Download } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
@@ -57,6 +57,7 @@ interface StageConfig {
   showCount: boolean
   isResend: boolean
   buttonDisabled: boolean
+  isDownload?: boolean
 }
 
 export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations, generatedIllustrationCount = 0, centerContent, hasUnresolvedFeedback = false, hasResolvedFeedback = false }: ProjectHeaderProps) {
@@ -65,6 +66,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const pathname = usePathname()
   const [isPending, startTransition] = useTransition()
   const [isSendingToCustomer, setIsSendingToCustomer] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   // Hydration fix
@@ -119,16 +121,16 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
     }
 
-    // STAGE 8: Illustrations Stage (Trial Approved)
+    // STAGE 8: Illustrations Approved (Ready for Download)
     if (status === 'illustration_approved') {
-      const hasSecondIllustration = generatedIllustrationCount >= 2
       return {
-        tag: 'Illustrations Stage',
-        tagStyle: 'bg-teal-100 text-teal-800 border-teal-300',
-        buttonLabel: 'Send Illustrations',
-        showCount: true,
-        isResend: true,
-        buttonDisabled: !hasSecondIllustration
+        tag: 'Sketches Approved',
+        tagStyle: 'bg-green-100 text-green-800 border-green-300',
+        buttonLabel: 'Download Illustrations',
+        showCount: false,
+        isResend: false,
+        buttonDisabled: false,
+        isDownload: true
       }
     }
 
@@ -256,7 +258,11 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   }
 
   const stage = getStageConfig()
-  const buttonDisplayLabel = isSendingToCustomer ? 'Sending...' : stage.buttonLabel
+  const buttonDisplayLabel = isSendingToCustomer 
+    ? 'Sending...' 
+    : isDownloading 
+      ? 'Downloading...' 
+      : stage.buttonLabel
 
   // Realtime Subscription for Admin Status Updates
   useEffect(() => {
@@ -323,8 +329,60 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     })
   }
 
+  const handleDownloadIllustrations = async () => {
+    if (isDownloading) return
+
+    setIsDownloading(true)
+    try {
+      const response = await fetch(`/api/projects/${projectId}/download-illustrations`)
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to download illustrations')
+      }
+
+      // Get the blob from response
+      const blob = await response.blob()
+      
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('Content-Disposition')
+      let filename = 'illustrations.zip'
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/)
+        if (match) filename = match[1]
+      }
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      toast.success('Download started!', {
+        description: `Downloading ${filename}`,
+      })
+    } catch (error: any) {
+      console.error('Error downloading illustrations:', error)
+      toast.error('Failed to download illustrations', {
+        description: error.message || 'An error occurred',
+      })
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+
   const handleSendToCustomer = async () => {
     if (stage.buttonDisabled || isSendingToCustomer) return
+
+    // Handle download action separately
+    if (stage.isDownload) {
+      handleDownloadIllustrations()
+      return
+    }
 
     if (stage.buttonLabel === 'Create Illustrations') {
       if (onCreateIllustrations) {
@@ -446,13 +504,17 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       actions={
         <Button
           onClick={handleSendToCustomer}
-          disabled={isSendingToCustomer || stage.buttonDisabled}
+          disabled={isSendingToCustomer || isDownloading || stage.buttonDisabled}
           size="sm"
-          className={`flex px-3 md:px-4 ${stage.buttonDisabled ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none' : 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg'} font-semibold transition-all duration-75 rounded-md whitespace-nowrap items-center justify-center h-9`}
+          className={`flex px-3 md:px-4 ${stage.buttonDisabled ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none' : stage.isDownload ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg' : 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg'} font-semibold transition-all duration-75 rounded-md whitespace-nowrap items-center justify-center h-9`}
         >
-          <Send className="w-4 h-4 md:mr-2" />
+          {stage.isDownload ? (
+            <Download className="w-4 h-4 md:mr-2" />
+          ) : (
+            <Send className="w-4 h-4 md:mr-2" />
+          )}
           <span className="hidden md:inline">{buttonDisplayLabel}</span>
-          <span className="md:hidden">Send</span>
+          <span className="md:hidden">{stage.isDownload ? 'Download' : 'Send'}</span>
 
           {stage.showCount && !isSendingToCustomer && sendCount > 0 && (
             <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
