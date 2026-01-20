@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { notifyCustomerSubmission } from '@/lib/notifications'
+import { notifyCustomerSubmission, notifyIllustrationsApproved, notifyIllustrationFeedback } from '@/lib/notifications'
 
 import { buildCharacterPrompt } from '@/lib/utils/prompt-builder'
 import { removeMetadata, sanitizeFilename } from '@/lib/utils/metadata-cleaner'
@@ -103,13 +103,20 @@ export async function POST(
         illustration_status: newStatus
       }).eq('id', project.id)
 
-      // Notify (non-blocking)
-      notifyCustomerSubmission({
+      // Notify (non-blocking) - use appropriate notification based on outcome
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+      const notificationOptions = {
         projectId: project.id,
         projectTitle: project.book_title,
         authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim(),
-        projectUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/project/${project.id}`,
-      }).catch(e => console.error('Notification error:', e))
+        projectUrl: `${baseUrl}/admin/project/${project.id}`,
+      }
+
+      if (hasFeedback) {
+        notifyIllustrationFeedback(notificationOptions).catch(e => console.error('Notification error:', e))
+      } else {
+        notifyIllustrationsApproved(notificationOptions).catch(e => console.error('Notification error:', e))
+      }
 
       return NextResponse.json({
         success: true,

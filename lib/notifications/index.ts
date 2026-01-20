@@ -570,6 +570,80 @@ export async function notifyIllustrationsUpdate(options: {
   }
 }
 
+export async function notifyIllustrationsApproved(options: {
+  projectId: string
+  projectTitle: string
+  authorName: string
+  projectUrl: string
+}): Promise<void> {
+  const { projectTitle, authorName, projectUrl } = options
+
+  try {
+    await sendSlackNotification({
+      text: `✅ Sketches APPROVED for "${projectTitle}"`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Sketches Approved*\n${authorName} has approved all sketches for "${projectTitle}".\nReady for production!`,
+          },
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'View Project' },
+              url: projectUrl,
+              style: 'primary',
+            },
+          ],
+        },
+      ],
+    })
+  } catch (error: any) {
+    console.error('Failed to send illustration approval notification:', error)
+  }
+}
+
+export async function notifyIllustrationFeedback(options: {
+  projectId: string
+  projectTitle: string
+  authorName: string
+  projectUrl: string
+}): Promise<void> {
+  const { projectTitle, authorName, projectUrl } = options
+
+  try {
+    await sendSlackNotification({
+      text: `📝 Illustration feedback submitted for "${projectTitle}"`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Illustration Feedback*\n${authorName} has requested revisions for "${projectTitle}".`,
+          },
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'View Project' },
+              url: projectUrl,
+              style: 'primary',
+            },
+          ],
+        },
+      ],
+    })
+  } catch (error: any) {
+    console.error('Failed to send illustration feedback notification:', error)
+  }
+}
+
 export async function notifyCustomerReview(options: {
   projectTitle: string
   authorName: string
