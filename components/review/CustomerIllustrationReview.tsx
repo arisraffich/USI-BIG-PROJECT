@@ -19,12 +19,14 @@ interface CustomerIllustrationReviewProps {
     page: Page
     onChange: (id: string, notes: string) => void
     illustrationStatus?: string
+    projectStatus?: string
 }
 
 export const CustomerIllustrationReview = memo(function CustomerIllustrationReview({
     page,
     onChange,
-    illustrationStatus = 'draft'
+    illustrationStatus = 'draft',
+    projectStatus
 }: CustomerIllustrationReviewProps) {
 
     // Wrapper for Save Logic to pass to Shared Board
@@ -51,6 +53,7 @@ export const CustomerIllustrationReview = memo(function CustomerIllustrationRevi
                 mode="customer"
                 page={page}
                 illustrationStatus={illustrationStatus as any}
+                projectStatus={projectStatus}
                 onSaveFeedback={handleSaveFeedback}
             />
         </div>

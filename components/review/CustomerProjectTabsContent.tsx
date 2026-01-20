@@ -650,6 +650,7 @@ export function CustomerProjectTabsContent({
                   activePageId={activeIllustrationPageId || localPages.find(p => p.page_number === 1)?.id}
                   onPageChange={setActiveIllustrationPageId}
                   illustrationStatus={illustrationStatus}
+                  projectStatus={localProjectStatus}
                   onSaveFeedback={async (pageId, notes) => handleIllustrationFeedbackChange(pageId, notes)}
                 />
               </div>

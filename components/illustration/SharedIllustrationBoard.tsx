@@ -53,6 +53,7 @@ export interface SharedIllustrationBoardProps {
     mode: 'admin' | 'customer'
     projectId?: string
     illustrationStatus?: 'draft' | 'illustration_approved' | 'illustration_production' | 'completed'
+    projectStatus?: string // Main status field - used for lock logic
     onSaveFeedback: (notes: string) => Promise<void>
     isGenerating?: boolean
     isUploading?: boolean
@@ -88,6 +89,7 @@ export function SharedIllustrationBoard({
     mode,
     projectId,
     illustrationStatus = 'draft',
+    projectStatus,
     onSaveFeedback,
     isGenerating = false,
     isUploading = false,
@@ -145,8 +147,9 @@ export function SharedIllustrationBoard({
     const isAdmin = mode === 'admin'
     const isCustomer = mode === 'customer'
 
-    // Lock logic (matches Customer backup implicitly via read-only checks)
-    const isLocked = !isAdmin && ['illustration_approved', 'illustration_production', 'completed'].includes(illustrationStatus)
+    // Lock logic - uses main projectStatus field (more reliable than illustrationStatus)
+    const statusToCheck = projectStatus || illustrationStatus
+    const isLocked = !isAdmin && ['illustration_approved', 'illustration_production', 'completed'].includes(statusToCheck)
     
     // Check if we're in Scene Recreation mode (dropdown selected)
     const isSceneRecreationMode = selectedEnvPageId !== null

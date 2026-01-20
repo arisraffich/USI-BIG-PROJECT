@@ -17,6 +17,7 @@ interface UnifiedIllustrationFeedProps {
 
     // CUSTOMER SPECIFIC
     illustrationStatus?: string
+    projectStatus?: string // Main status field for lock logic
     onSaveFeedback?: (pageId: string, notes: string) => Promise<void>
 
     // ADMIN SPECIFIC
@@ -62,6 +63,7 @@ export function UnifiedIllustrationFeed({
     activePageId,
     onPageChange,
     illustrationStatus = 'draft',
+    projectStatus,
     onSaveFeedback,
     isAnalyzing = false,
     projectId,
@@ -249,6 +251,7 @@ export function UnifiedIllustrationFeed({
                             page={page}
                             projectId={projectId}
                             illustrationStatus={illustrationStatus as any}
+                            projectStatus={projectStatus}
 
                             // Pass candidates for environment reference
                             illustratedPages={illustratedPages}
