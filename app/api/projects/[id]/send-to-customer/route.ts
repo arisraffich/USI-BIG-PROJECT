@@ -119,7 +119,7 @@ export async function POST(
       if (project.author_email) {
         if (currentCount > 0) {
           const { notifyIllustrationsUpdate } = await import('@/lib/notifications')
-          await notifyIllustrationsUpdate({
+          notifyIllustrationsUpdate({
             projectTitle: project.book_title || 'Untitled Project',
             authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer',
             authorEmail: project.author_email,
@@ -130,7 +130,7 @@ export async function POST(
           }).catch(err => console.error('Notification error:', err))
         } else {
           const { notifyIllustrationTrialSent } = await import('@/lib/notifications')
-          await notifyIllustrationTrialSent({
+          notifyIllustrationTrialSent({
             projectTitle: project.book_title || 'Untitled Project',
             authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer',
             authorEmail: project.author_email,
@@ -278,18 +278,18 @@ export async function POST(
           const revisionRound = newCount - 1 // Round 1 = 2nd send, Round 2 = 3rd send, etc.
           console.log('[Send to Customer] ? Triggering Stage 3 email (Character Revisions Round', revisionRound, ')')
           const { notifyCharacterRevisions } = await import('@/lib/notifications')
-          await notifyCharacterRevisions({
+          notifyCharacterRevisions({
             projectTitle: project.book_title || 'Untitled Project',
             authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer',
             authorEmail: project.author_email,
             reviewUrl,
             projectUrl,
             revisionRound,
-          }).catch((error) => console.error('[Send to Customer] ? Error sending Stage 3 notifications:', error))
+          }).catch((error) => console.error('[Send to Customer] ❌ Error sending Stage 3 notifications:', error))
         } else if (newCount === 1) {
           // Stage 2: First-time characters ready
           const { notifySecondaryCharactersReady } = await import('@/lib/notifications')
-          await notifySecondaryCharactersReady({
+          notifySecondaryCharactersReady({
             projectTitle: project.book_title || 'Untitled Project',
             authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer',
             authorEmail: project.author_email,
@@ -298,7 +298,7 @@ export async function POST(
           }).catch((error) => console.error('[Send to Customer] ❌ Error sending Stage 2 notifications:', error))
         } else {
           // Stage 1: Initial Definition (Count remains 0)
-          await notifyProjectSentToCustomer({
+          notifyProjectSentToCustomer({
             projectTitle: project.book_title || 'Untitled Project',
             authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer',
             authorEmail: project.author_email,
