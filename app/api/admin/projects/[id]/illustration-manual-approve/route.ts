@@ -55,9 +55,14 @@ export async function POST(
 
         // 3. Update Status to Approved
         const newStatus = 'trial_approved' // Manual approve = trial approved
-        await supabase.from('projects').update({
+        const { error: updateError } = await supabase.from('projects').update({
             status: newStatus
         }).eq('id', project.id)
+
+        if (updateError) {
+            console.error('Failed to update project status:', updateError)
+            return NextResponse.json({ error: 'Failed to update project status' }, { status: 500 })
+        }
 
         // 4. Notify Team (Slack Only)
         await notifyCustomerSubmission({

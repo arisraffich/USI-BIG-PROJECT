@@ -316,7 +316,11 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const stage = getStageConfig()
   
   // For character phase, use character_send_count for display
-  const displayCount = isInIllustrationPhase(status) ? sendCount : (projectInfo.character_send_count || 0)
+  // For sketches phase (sendCount > 1), show revision round (sendCount - 1)
+  // For trial phase (sendCount <= 1), show sendCount
+  const displayCount = isInIllustrationPhase(status) 
+    ? (sendCount > 1 ? sendCount - 1 : sendCount) 
+    : (projectInfo.character_send_count || 0)
   
   const buttonDisplayLabel = isSendingToCustomer 
     ? 'Sending...' 

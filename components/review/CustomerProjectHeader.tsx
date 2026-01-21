@@ -103,6 +103,19 @@ export function CustomerProjectHeader({
   const isTrialPhase = illustrationSendCount <= 1
   const approveButtonText = isTrialPhase ? 'APPROVE ILLUSTRATION' : 'APPROVE SKETCHES'
   const approvedButtonText = isTrialPhase ? 'TRIAL APPROVED' : 'SKETCHES APPROVED'
+  
+  // Determine status badge text based on project status
+  const getStatusBadgeText = () => {
+    if (projectStatus === 'trial_review' || projectStatus === 'trial_revision') return 'Trial Review'
+    if (projectStatus === 'sketches_review' || projectStatus === 'sketches_revision') return 'Sketches Review'
+    if (projectStatus === 'illustration_approved') return 'Approved'
+    if (projectStatus === 'completed') return 'Completed'
+    // Legacy statuses
+    if (projectStatus === 'illustration_review' || projectStatus === 'illustration_revision_needed') {
+      return illustrationSendCount <= 1 ? 'Trial Review' : 'Sketches Review'
+    }
+    return 'Review'
+  }
 
   return (
     <>
@@ -182,7 +195,7 @@ export function CustomerProjectHeader({
           statusTag={
             showIllustrationsTab && isIllustrationsActive ? (
               <Badge variant="secondary" className="hidden lg:flex bg-blue-50 text-blue-700 border-blue-200">
-                Trial Stage
+                {getStatusBadgeText()}
               </Badge>
             ) : null
           }
