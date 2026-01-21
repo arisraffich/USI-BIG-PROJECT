@@ -91,7 +91,9 @@ export function IllustrationsTabContent({
         const allPagesStatuses = [
             'trial_approved', 'illustrations_generating',
             'sketches_review', 'sketches_revision',
-            'illustration_approved', 'completed'
+            'illustration_approved', 'completed',
+            // Legacy statuses (for migration period)
+            'illustration_review', 'illustration_revision_needed'
         ]
         return allPagesStatuses.includes(projectStatus)
             ? pages

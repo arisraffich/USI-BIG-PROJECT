@@ -257,7 +257,13 @@ export function SharedIllustrationBoard({
     }
 
     const handleDownload = useCallback((url: string, filename: string) => {
-        window.location.href = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
+        // Use anchor click instead of window.location.href to prevent scroll state corruption
+        const link = document.createElement('a')
+        link.href = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
     }, [])
 
     const handleCustomerSave = useCallback(async (textOverride?: string) => {
