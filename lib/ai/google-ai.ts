@@ -7,9 +7,9 @@ const ILLUSTRATION_MODEL = 'gemini-3-pro-image-preview' // Nano Banana Pro
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 
 // Retry configuration
-const MAX_RETRIES = 3
-const INITIAL_DELAY_MS = 2000 // 2 seconds
-const MAX_DELAY_MS = 30000 // 30 seconds
+const MAX_RETRIES = 4 // Extra retry for timeout resilience
+const INITIAL_DELAY_MS = 3000 // 3 seconds
+const MAX_DELAY_MS = 45000 // 45 seconds
 
 /**
  * Retry wrapper with exponential backoff for API calls
@@ -28,12 +28,18 @@ async function retryWithBackoff<T>(
     } catch (error: any) {
       lastError = error
       
-      // Check if error is retryable (503, 429, or network errors)
+      // Check if error is retryable (503, 429, network errors, or timeouts)
+      const errorMsg = error.message?.toLowerCase() || ''
+      const errorCode = error.cause?.code?.toLowerCase() || ''
       const isRetryable = 
-        error.message?.includes('503') || 
-        error.message?.includes('429') ||
-        error.message?.includes('overloaded') ||
-        error.message?.includes('UNAVAILABLE')
+        errorMsg.includes('503') || 
+        errorMsg.includes('429') ||
+        errorMsg.includes('overloaded') ||
+        errorMsg.includes('unavailable') ||
+        errorMsg.includes('fetch failed') ||
+        errorMsg.includes('timeout') ||
+        errorCode.includes('timeout') ||
+        errorCode.includes('headers_timeout')
       
       if (!isRetryable || attempt === maxRetries) {
         console.error(`[${context}] ❌ Non-retryable error or max retries reached:`, error.message)
