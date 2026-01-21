@@ -130,26 +130,42 @@ export async function POST(
       const projectUrl = `${baseUrl}/admin/project/${id}`
 
       if (project.author_email) {
-        if (currentCount > 0) {
-          const { notifyIllustrationsUpdate } = await import('@/lib/notifications')
-          notifyIllustrationsUpdate({
-            projectTitle: project.book_title || 'Untitled Project',
-            authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer',
-            authorEmail: project.author_email,
-            authorPhone: project.author_phone || undefined,
-            reviewUrl,
-            projectUrl,
-            revisionRound: currentCount, // Track revision rounds (1st revision = round 1, etc.)
-          }).catch(err => console.error('Notification error:', err))
-        } else {
+        const authorName = `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer'
+        const projectTitle = project.book_title || 'Untitled Project'
+        
+        if (currentCount === 0) {
+          // First send: Trial illustration (page 1 only)
           const { notifyIllustrationTrialSent } = await import('@/lib/notifications')
           notifyIllustrationTrialSent({
-            projectTitle: project.book_title || 'Untitled Project',
-            authorName: `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim() || 'Customer',
+            projectTitle,
+            authorName,
             authorEmail: project.author_email,
             authorPhone: project.author_phone || undefined,
             reviewUrl,
             projectUrl,
+          }).catch(err => console.error('Notification error:', err))
+        } else if (currentCount === 1) {
+          // Second send: All sketches ready (first time sending all pages)
+          const { notifyAllSketchesSent } = await import('@/lib/notifications')
+          notifyAllSketchesSent({
+            projectTitle,
+            authorName,
+            authorEmail: project.author_email,
+            authorPhone: project.author_phone || undefined,
+            reviewUrl,
+            projectUrl,
+          }).catch(err => console.error('Notification error:', err))
+        } else {
+          // Third+ send: Revisions
+          const { notifyIllustrationsUpdate } = await import('@/lib/notifications')
+          notifyIllustrationsUpdate({
+            projectTitle,
+            authorName,
+            authorEmail: project.author_email,
+            authorPhone: project.author_phone || undefined,
+            reviewUrl,
+            projectUrl,
+            revisionRound: currentCount - 1, // Revision round (currentCount=2 means 1st revision)
           }).catch(err => console.error('Notification error:', err))
         }
       }

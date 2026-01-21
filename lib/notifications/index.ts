@@ -502,6 +502,68 @@ export async function notifyIllustrationTrialSent(options: {
   }
 }
 
+// NEW: Called when ALL sketches are sent for the first time (after trial approved)
+export async function notifyAllSketchesSent(options: {
+  projectTitle: string
+  authorName: string
+  authorEmail: string
+  authorPhone?: string
+  reviewUrl: string
+  projectUrl: string
+}): Promise<void> {
+  const { projectTitle, authorName, authorEmail, reviewUrl, projectUrl } = options
+
+  const authorFirstName = authorName.trim().split(/\s+/)[0] || authorName
+
+  // Send email to customer
+  try {
+    await sendEmail({
+      to: authorEmail,
+      subject: `Stage 3: Your Sketches Are Ready for Review`,
+      html: `
+        <div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
+          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">All Sketches Ready</h2>
+          <p style="margin-bottom: 16px;">Hi ${authorFirstName},</p>
+          <p style="margin-bottom: 16px;">Great news – all your illustration sketches are ready for review!</p>
+          <p style="margin-bottom: 16px;">Please take your time going through each page. If anything needs adjusting, just click <strong style="color: #d66700;">Request Revisions</strong> and add your notes. Once everything looks good, click <strong style="color: #00a53d;">Approve Sketches</strong> and we'll move forward with the final coloring.</p>
+          <p style="margin-bottom: 16px;">Review them here:</p>
+          <p style="margin: 24px 0;">
+            <a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Review All Sketches</a>
+          </p>
+          <p style="margin-bottom: 16px;">Looking forward to hearing what you think!</p>
+          <p style="margin-bottom: 8px;">Best,</p>
+          <p style="font-weight: bold;">US Illustrations Team</p>
+        </div>
+      `,
+    })
+  } catch (emailError: any) {
+    console.error('[Notification] Failed to send all sketches email:', emailError)
+  }
+
+  // Send Slack notification
+  try {
+    await sendSlackNotification({
+      text: `📚 All Sketches sent to customer for "${projectTitle}"`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `📚 *All Sketches Sent*\nAll illustration sketches for "${projectTitle}" have been sent to ${authorName} for review.`,
+          },
+          accessory: {
+            type: 'button',
+            text: { type: 'plain_text', text: 'View Project', emoji: true },
+            url: projectUrl,
+          },
+        },
+      ],
+    })
+  } catch (slackError: any) {
+    console.error('Failed to send Slack notification:', slackError)
+  }
+}
+
 export async function notifyIllustrationsUpdate(options: {
   projectTitle: string
   authorName: string
