@@ -204,15 +204,15 @@ export function IllustrationsTabContent({
         referenceImageUrl?: string, 
         sceneCharacters?: SceneCharacter[]
     ) => {
-        console.log('[DEBUG 1] handleRegenerate CALLED', { pageId: page.id, prompt, hasRefImages: !!referenceImages?.length })
+        console.error('[DEBUG 1] handleRegenerate CALLED', { pageId: page.id, prompt, hasRefImages: !!referenceImages?.length })
         try {
-            console.log('[DEBUG 2] Setting loading state...')
+            console.error('[DEBUG 2] Setting loading state...')
             setGeneratingPageIds(prev => new Set(prev).add(page.id))
             setLoadingState(prev => ({ ...prev, [page.id]: { ...prev[page.id], illustration: true } }))
 
             // Determine if this is Scene Recreation mode
             const isSceneRecreation = !!referenceImageUrl
-            console.log('[DEBUG 3] About to build request body...')
+            console.error('[DEBUG 3] About to build request body...')
 
             const requestBody = {
                 projectId,
@@ -223,17 +223,17 @@ export function IllustrationsTabContent({
                 referenceImageUrl, // Scene Recreation mode (Mode 3/4)
                 sceneCharacters: isSceneRecreation ? sceneCharacters : undefined // Character overrides (Mode 3/4)
             }
-            console.log('[DEBUG 4] Request body built, stringifying...')
+            console.error('[DEBUG 4] Request body built, stringifying...')
             const bodyString = JSON.stringify(requestBody)
-            console.log('[DEBUG 5] Body stringified, size:', bodyString.length, 'bytes')
-            console.log('[DEBUG 6] About to fetch...')
+            console.error('[DEBUG 5] Body stringified, size:', bodyString.length, 'bytes')
+            console.error('[DEBUG 6] About to fetch...')
 
             const response = await fetch('/api/illustrations/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: bodyString
             })
-            console.log('[DEBUG 7] Fetch completed, status:', response.status)
+            console.error('[DEBUG 7] Fetch completed, status:', response.status)
 
             if (!response.ok) throw new Error('Regeneration failed')
 
