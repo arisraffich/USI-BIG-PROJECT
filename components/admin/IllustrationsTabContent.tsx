@@ -68,6 +68,9 @@ interface IllustrationsTabContentProps {
     // External error state (shared with sidebar)
     pageErrors?: { [pageId: string]: { message: string; technicalDetails: string } }
     onPageErrorsChange?: React.Dispatch<React.SetStateAction<{ [pageId: string]: { message: string; technicalDetails: string } }>>
+    
+    // Callback to sync generating state with parent (for sidebar)
+    onGeneratingPageIdsChange?: (pageIds: string[]) => void
 }
 
 export function IllustrationsTabContent({
@@ -81,7 +84,8 @@ export function IllustrationsTabContent({
     activePageId,
     onPageChange,
     pageErrors = {},
-    onPageErrorsChange
+    onPageErrorsChange,
+    onGeneratingPageIdsChange
 }: IllustrationsTabContentProps) {
     const router = useRouter()
 
@@ -116,6 +120,13 @@ export function IllustrationsTabContent({
     })
     const batchCancelledRef = useRef(false)
     const MAX_CONCURRENT = 3
+    
+    // Sync generatingPageIds to parent (for sidebar orange dots)
+    useEffect(() => {
+        if (onGeneratingPageIdsChange) {
+            onGeneratingPageIdsChange(Array.from(generatingPageIds))
+        }
+    }, [generatingPageIds, onGeneratingPageIdsChange])
     
     // Helper to update page errors (uses external state if provided)
     const setPageError = useCallback((pageId: string, error: GenerationError | null) => {

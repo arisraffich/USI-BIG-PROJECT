@@ -46,6 +46,9 @@ export function ProjectTabsContent({
   
   // Page errors state (shared between IllustrationsTabContent and sidebar)
   const [pageErrors, setPageErrors] = useState<{ [pageId: string]: { message: string; technicalDetails: string } }>({})
+  
+  // Generating page IDs state (shared between IllustrationsTabContent and sidebar for orange dots)
+  const [generatingPageIds, setGeneratingPageIds] = useState<string[]>([])
 
   // Sync local characters when server props update
   useEffect(() => {
@@ -483,6 +486,7 @@ export function ProjectTabsContent({
             projectStatus={localProjectStatus as any}
             illustrationSendCount={projectInfo?.illustration_send_count || 0}
             failedPageIds={Object.keys(pageErrors)}
+            generatingPageIds={generatingPageIds}
           />
         ) : null
       }
@@ -574,6 +578,7 @@ export function ProjectTabsContent({
             onPageChange={setActiveIllustrationPageId}
             pageErrors={pageErrors}
             onPageErrorsChange={setPageErrors}
+            onGeneratingPageIdsChange={setGeneratingPageIds}
           />
         </div >
       </div >

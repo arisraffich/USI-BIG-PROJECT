@@ -11,6 +11,7 @@ interface UnifiedIllustrationSidebarProps {
     mode: 'admin' | 'customer'
     disabled?: boolean
     failedPageIds?: string[]
+    generatingPageIds?: string[]
     illustrationSendCount?: number
 }
 
@@ -22,6 +23,7 @@ export function UnifiedIllustrationSidebar({
     mode,
     disabled = false,
     failedPageIds = [],
+    generatingPageIds = [],
     illustrationSendCount = 0
 }: UnifiedIllustrationSidebarProps) {
     // ============================================================
@@ -97,10 +99,12 @@ export function UnifiedIllustrationSidebar({
                                 <span className={`w-2 h-2 rounded-full ${
                                     failedPageIds.includes(page.id) 
                                         ? 'bg-red-500' 
-                                        : page.illustration_url 
-                                            ? 'bg-green-400' 
-                                            : 'bg-transparent'
-                                    }`} title={failedPageIds.includes(page.id) ? "Failed" : page.illustration_url ? "Completed" : "Pending"}></span>
+                                        : generatingPageIds.includes(page.id)
+                                            ? 'bg-orange-400 animate-pulse'
+                                            : page.illustration_url 
+                                                ? 'bg-green-400' 
+                                                : 'bg-gray-300'
+                                    }`} title={failedPageIds.includes(page.id) ? "Failed" : generatingPageIds.includes(page.id) ? "Generating..." : page.illustration_url ? "Completed" : "Pending"}></span>
                             </button>
                         )
                     })}
@@ -128,7 +132,9 @@ export function UnifiedIllustrationSidebar({
                                         ? 'bg-purple-600 text-white shadow-lg scale-110 border border-purple-500'
                                         : failedPageIds.includes(page.id)
                                             ? 'bg-red-100 border border-red-400 text-red-700'
-                                            : 'bg-white/30 backdrop-blur-md border border-white/20 text-slate-900 ring-1 ring-white/30 hover:bg-white/50'
+                                            : generatingPageIds.includes(page.id)
+                                                ? 'bg-orange-100 border border-orange-400 text-orange-700 animate-pulse'
+                                                : 'bg-white/30 backdrop-blur-md border border-white/20 text-slate-900 ring-1 ring-white/30 hover:bg-white/50'
                                         } ${(disabled || isLocked) ? 'opacity-40 cursor-not-allowed' : ''}`}
                                 >
                                     {page.page_number}

@@ -343,29 +343,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
           const newProject = payload.new as any
           const oldProject = payload.old as any
           
-          // Only show toast when status actually CHANGES (not on every project update)
-          if (oldProject?.status === newProject.status) {
-            return // Status didn't change, skip toast
-          }
-
-          if (newProject.status === 'characters_approved') {
-            toast.success('Characters Approved!', {
-              description: 'The customer has approved the characters. Illustrations unlocked.'
-            })
-            router.refresh()
-          }
-          
-          if (newProject.status === 'trial_approved') {
-            toast.success('Trial Approved!', {
-              description: 'The customer approved the trial illustration. You can now generate all pages.'
-            })
-            router.refresh()
-          }
-          
-          if (newProject.status === 'illustration_approved') {
-            toast.success('All Sketches Approved!', {
-              description: 'The customer has approved all sketches. Ready for download.'
-            })
+          // Only refresh when status actually changes
+          if (oldProject?.status !== newProject.status) {
             router.refresh()
           }
         }
