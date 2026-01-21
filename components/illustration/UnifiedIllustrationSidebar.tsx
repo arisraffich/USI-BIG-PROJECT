@@ -48,7 +48,7 @@ export function UnifiedIllustrationSidebar({
                         return p.page_number === 1 || !!p.customer_illustration_url || !!p.customer_sketch_url
                     }).map((page) => {
                         const isActive = activePageId === page.id
-                        const isLocked = !isProductionUnlocked && page.page_number > 1
+                        const isLocked = mode !== 'admin' && !isProductionUnlocked && page.page_number > 1
 
                         return (
                             <button
@@ -91,7 +91,7 @@ export function UnifiedIllustrationSidebar({
                         return p.page_number === 1 || !!p.customer_illustration_url || !!p.customer_sketch_url
                     }).map((page) => {
                         const isActive = activePageId === page.id
-                        const isLocked = !isProductionUnlocked && page.page_number > 1
+                        const isLocked = mode !== 'admin' && !isProductionUnlocked && page.page_number > 1
 
                         return (
                             <div key={page.id} className="relative flex-shrink-0">
