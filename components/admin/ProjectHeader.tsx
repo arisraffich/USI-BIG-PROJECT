@@ -33,8 +33,6 @@ interface ProjectInfo {
   send_count?: number
 }
 
-
-
 interface ProjectHeaderProps {
   projectId: string
   projectInfo: ProjectInfo
@@ -60,6 +58,19 @@ interface StageConfig {
   isDownload?: boolean
 }
 
+// Helper to check if in illustration workflow phase
+function isInIllustrationPhase(status: ProjectStatus): boolean {
+  return [
+    'characters_approved',
+    'trial_review', 'trial_revision', 'trial_approved',
+    'illustrations_generating',
+    'sketches_review', 'sketches_revision',
+    'illustration_approved',
+    // Legacy statuses (will be migrated)
+    'illustration_review', 'illustration_revision_needed'
+  ].includes(status)
+}
+
 export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations, generatedIllustrationCount = 0, centerContent, hasUnresolvedFeedback = false, hasResolvedFeedback = false }: ProjectHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -74,18 +85,18 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     setMounted(true)
   }, [])
 
-  const isIllustrationMode = ['illustration_review', 'illustration_revision_needed'].includes(projectInfo.status)
-  const sendCount = isIllustrationMode
-    ? (projectInfo.illustration_send_count || 0)
-    : (projectInfo.character_send_count || 0)
+  const status = projectInfo.status
+  const sendCount = projectInfo.illustration_send_count || 0
 
   // ------------------------------------------------------------------
-  // STAGE CONFIGURATION LOGIC
+  // STAGE CONFIGURATION LOGIC - ILLUSTRATION WORKFLOW
   // ------------------------------------------------------------------
   const getStageConfig = (): StageConfig => {
-    const status = projectInfo.status
+    // ============================================================
+    // ILLUSTRATION PHASE STAGES
+    // ============================================================
 
-    // STAGE 5: Characters Approved (Ready for Trial)
+    // STAGE: Characters Approved → Ready to send trial (page 1)
     if (status === 'characters_approved') {
       return {
         tag: '1st Illustration',
@@ -97,31 +108,78 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
     }
 
-    // STAGE 6: Illustration Review (Sent)
-    if (status === 'illustration_review') {
+    // STAGE: Trial sent, waiting for customer review
+    // (Legacy: illustration_review with sendCount = 1)
+    if (status === 'trial_review' || (status === 'illustration_review' && sendCount === 1)) {
       return {
-        tag: hasUnresolvedFeedback ? 'Customer Feedback Received' : (hasResolvedFeedback ? 'Ready to Resend' : 'Waiting for Review'),
-        tagStyle: hasUnresolvedFeedback ? 'bg-yellow-100 text-yellow-800 border-yellow-300' : (hasResolvedFeedback ? 'bg-green-100 text-green-800 border-green-300' : 'bg-blue-100 text-blue-800 border-blue-300'),
+        tag: hasUnresolvedFeedback ? 'Trial Feedback' : 'Wait: Trial Review',
+        tagStyle: hasUnresolvedFeedback 
+          ? 'bg-yellow-100 text-yellow-800 border-yellow-300' 
+          : 'bg-blue-100 text-blue-800 border-blue-300',
         buttonLabel: 'Resend Trial',
         showCount: true,
         isResend: true,
-        buttonDisabled: !hasResolvedFeedback // Enable ONLY when admin has resolved the feedback
+        buttonDisabled: !hasResolvedFeedback
       }
     }
 
-    // STAGE 7: Revision Needed
-    if (status === 'illustration_revision_needed') {
+    // STAGE: Customer requested trial revision
+    // (Legacy: illustration_revision_needed with sendCount = 1)
+    if (status === 'trial_revision' || (status === 'illustration_revision_needed' && sendCount <= 1)) {
       return {
-        tag: 'Action Required',
+        tag: 'Trial Feedback',
         tagStyle: 'bg-orange-100 text-orange-800 border-orange-300',
         buttonLabel: 'Resend Trial',
-        showCount: false,
+        showCount: true,
         isResend: true,
-        buttonDisabled: false
+        buttonDisabled: !hasResolvedFeedback
       }
     }
 
-    // STAGE 8: Illustrations Approved (Ready for Download)
+    // STAGE: Trial approved, admin generating remaining pages
+    if (status === 'trial_approved' || status === 'illustrations_generating') {
+      const allPagesGenerated = generatedIllustrationCount >= pageCount
+      return {
+        tag: allPagesGenerated ? 'Ready to Send' : 'Generating...',
+        tagStyle: allPagesGenerated 
+          ? 'bg-green-100 text-green-800 border-green-300'
+          : 'bg-purple-100 text-purple-800 border-purple-300',
+        buttonLabel: 'Send Sketches',
+        showCount: false,
+        isResend: false,
+        buttonDisabled: !allPagesGenerated
+      }
+    }
+
+    // STAGE: All sketches sent, waiting for customer review
+    // (Legacy: illustration_review with sendCount > 1)
+    if (status === 'sketches_review' || (status === 'illustration_review' && sendCount > 1)) {
+      return {
+        tag: hasUnresolvedFeedback ? 'Sketches Feedback' : 'Wait: Sketches Review',
+        tagStyle: hasUnresolvedFeedback 
+          ? 'bg-yellow-100 text-yellow-800 border-yellow-300' 
+          : 'bg-blue-100 text-blue-800 border-blue-300',
+        buttonLabel: 'Resend Sketches',
+        showCount: true,
+        isResend: true,
+        buttonDisabled: !hasResolvedFeedback
+      }
+    }
+
+    // STAGE: Customer requested sketches revision
+    // (Legacy: illustration_revision_needed with sendCount > 1)
+    if (status === 'sketches_revision' || (status === 'illustration_revision_needed' && sendCount > 1)) {
+      return {
+        tag: 'Sketches Feedback',
+        tagStyle: 'bg-orange-100 text-orange-800 border-orange-300',
+        buttonLabel: 'Resend Sketches',
+        showCount: true,
+        isResend: true,
+        buttonDisabled: !hasResolvedFeedback
+      }
+    }
+
+    // STAGE: All sketches approved - FINAL
     if (status === 'illustration_approved') {
       return {
         tag: 'Sketches Approved',
@@ -134,8 +192,13 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
     }
 
-    // STAGE 5.5: Waiting for Review (Sent to Customer)
-    if (status === 'character_review' && sendCount > 0) {
+    // ============================================================
+    // CHARACTER PHASE STAGES
+    // ============================================================
+    const charSendCount = projectInfo.character_send_count || 0
+
+    // Waiting for customer character review
+    if (status === 'character_review' && charSendCount > 0) {
       return {
         tag: hasUnresolvedFeedback ? 'Customer Feedback Received' : 'Waiting for Review',
         tagStyle: hasUnresolvedFeedback ? 'bg-yellow-100 text-yellow-800 border-yellow-300' : 'bg-blue-100 text-blue-800 border-blue-300',
@@ -146,9 +209,9 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
     }
 
-    // STAGE 4: Characters Regenerated (Ready to Resend)
+    // Characters regenerated, ready to resend
     if (status === 'characters_regenerated') {
-      if (sendCount === 0) {
+      if (charSendCount === 0) {
         return {
           tag: 'Characters Generated',
           tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
@@ -169,8 +232,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
     }
 
-    // STAGE 3: Revision Needed
-    // (Customer requested changes, or we are in revision loop)
+    // Customer requested character revision
     if (status === 'character_revision_needed') {
       return {
         tag: 'Regenerate Characters',
@@ -178,27 +240,25 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         buttonLabel: 'Resend Characters',
         showCount: true,
         isResend: true,
-        buttonDisabled: true // Disabled until regenerated
-      }
-    }
-
-    // STAGE 2.3: Generating Characters (Show button but disabled)
-    if (status === 'character_generation') {
-      return {
-        tag: 'Generating Characters',
-        tagStyle: 'bg-blue-100 text-blue-800 border-blue-300',
-        buttonLabel: sendCount > 0 ? 'Resend Characters' : 'Send Characters',
-        showCount: sendCount > 0,
-        isResend: sendCount > 0,
         buttonDisabled: true
       }
     }
 
-    // STAGE 2.5: Characters Generated (Explicit Status)
-    // This handles cases where status is explicitly set (e.g. after customer submission or regeneration)
+    // Generating characters
+    if (status === 'character_generation') {
+      return {
+        tag: 'Generating Characters',
+        tagStyle: 'bg-blue-100 text-blue-800 border-blue-300',
+        buttonLabel: charSendCount > 0 ? 'Resend Characters' : 'Send Characters',
+        showCount: charSendCount > 0,
+        isResend: charSendCount > 0,
+        buttonDisabled: true
+      }
+    }
+
+    // Characters generation complete
     if (status === 'character_generation_complete') {
-      // If already sent before (count > 0), this is a resend scenario
-      if (sendCount > 0) {
+      if (charSendCount > 0) {
         return {
           tag: 'Characters Regenerated',
           tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
@@ -208,7 +268,6 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
           buttonDisabled: false
         }
       }
-      // First time send
       return {
         tag: 'Characters Generated',
         tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
@@ -219,9 +278,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
     }
 
-    // STAGE 2: Images Ready (First Time Implicit)
-    // Condition: Has images, but never sent (count 0) and status isn't explicit
-    if (hasImages && sendCount === 0) {
+    // Has images but never sent
+    if (hasImages && charSendCount === 0) {
       return {
         tag: 'Characters Generated',
         tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
@@ -232,9 +290,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
     }
     
-    // STAGE 2.1: Images Ready (Resend Implicit)
-    // Condition: Has images and already sent before (count > 0)
-    if (hasImages && sendCount > 0) {
+    // Has images and already sent
+    if (hasImages && charSendCount > 0) {
       return {
         tag: 'Characters Ready',
         tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
@@ -245,8 +302,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
     }
 
-    // STAGE 1: Project Creation / Setup (Default)
-    // Condition: No images yet
+    // Default: Project setup
     return {
       tag: 'Project Setup',
       tagStyle: 'bg-gray-100 text-gray-800 border-gray-300',
@@ -258,6 +314,10 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   }
 
   const stage = getStageConfig()
+  
+  // For character phase, use character_send_count for display
+  const displayCount = isInIllustrationPhase(status) ? sendCount : (projectInfo.character_send_count || 0)
+  
   const buttonDisplayLabel = isSendingToCustomer 
     ? 'Sending...' 
     : isDownloading 
@@ -288,6 +348,20 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
             })
             router.refresh()
           }
+          
+          if (newProject.status === 'trial_approved') {
+            toast.success('Trial Approved!', {
+              description: 'The customer approved the trial illustration. You can now generate all pages.'
+            })
+            router.refresh()
+          }
+          
+          if (newProject.status === 'illustration_approved') {
+            toast.success('All Sketches Approved!', {
+              description: 'The customer has approved all sketches. Ready for download.'
+            })
+            router.refresh()
+          }
         }
       )
       .subscribe()
@@ -303,20 +377,11 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     projectInfo.status
   )
 
-  // Read active tab from search params - synchronous, instant
+  // Read active tab from search params
   const activeTab = searchParams?.get('tab') || 'pages'
-  const isPagesActive = activeTab === 'pages'
-  const isCharactersActive = activeTab === 'characters'
-  const isIllustrationsActive = activeTab === 'illustrations'
 
-  // Check if Illustrations are unlocked
-  const isIllustrationsUnlocked = projectInfo.status === 'characters_approved' ||
-    projectInfo.status === 'sketch_generation' ||
-    projectInfo.status === 'sketch_ready' ||
-    projectInfo.status === 'illustration_review' ||
-    projectInfo.status === 'illustration_revision_needed' ||
-    projectInfo.status === 'illustration_approved' ||
-    projectInfo.status === 'completed'
+  // Check if Illustrations tab is unlocked
+  const isIllustrationsUnlocked = isInIllustrationPhase(status)
 
   const handleTabClick = (tab: 'pages' | 'characters' | 'illustrations', e?: React.MouseEvent) => {
     if (e) e.preventDefault()
@@ -341,10 +406,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         throw new Error(error.error || 'Failed to download illustrations')
       }
 
-      // Get the blob from response
       const blob = await response.blob()
       
-      // Get filename from Content-Disposition header or use default
       const contentDisposition = response.headers.get('Content-Disposition')
       let filename = 'illustrations.zip'
       if (contentDisposition) {
@@ -352,7 +415,6 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         if (match) filename = match[1]
       }
 
-      // Create download link
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
@@ -366,7 +428,6 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         description: `Downloading ${filename}`,
       })
     } catch (error: any) {
-      console.error('Error downloading illustrations:', error)
       toast.error('Failed to download illustrations', {
         description: error.message || 'An error occurred',
       })
@@ -378,7 +439,6 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const handleSendToCustomer = async () => {
     if (stage.buttonDisabled || isSendingToCustomer) return
 
-    // Handle download action separately
     if (stage.isDownload) {
       handleDownloadIllustrations()
       return
@@ -410,10 +470,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         description: `Review URL: ${data.reviewUrl}`,
       })
       
-      // Force immediate refresh to show updated count and resolved feedback
       router.refresh()
     } catch (error: any) {
-      console.error('Error sending to customer:', error)
       toast.error('Failed to send project to customer', {
         description: error.message || 'An error occurred',
       })
@@ -422,37 +480,10 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     }
   }
 
-  const setActiveTab = (tabId: string) => handleTabClick(tabId as any)
-
-  // --- Unified Header Content ---
-  const statusColor = 'bg-blue-100 text-blue-800 border-blue-200'
-  const statusLabel = projectInfo.status.replace(/_/g, ' ')
-
-  // Determine default tab logic
-  // If no tab param, and illustrations unlocked, default to illustrations?
-  // User said "In illustration stage illustraiton page is by default open."
-  // We can do this by checking if we are in illustration mode and tab is missing.
-
-  useEffect(() => {
-    if (!searchParams?.get('tab') && isIllustrationsUnlocked) {
-      // We can't easily "redirect" here without causing a loop if not careful, 
-      // but simply handling the *default* rendering or active state is safer.
-      // However, the `activeTab` variable is derived from searchParams.
-      // Let's force a replace if needed, or just treat 'undefined' as 'illustrations' in that case.
-      // Better: treat it in render logic, but user might want URL update.
-      // For now, let's update the `currentTab` derivation.
-    }
-  }, [isIllustrationsUnlocked, searchParams])
-
-  // Improved derivation of current tab for display
-  const currentTab = activeTab || (isIllustrationsUnlocked ? 'illustrations' :
-    (projectInfo.status === 'character_review' || projectInfo.status === 'character_generation' || projectInfo.status === 'draft' ? 'characters' : 'pages')
-  )
-  const sectionTitle = currentTab.charAt(0).toUpperCase() + currentTab.slice(1)
-
-  // ... (previous logic for stages, hooks, etc. remains same) ...
-
   const handleDashboardClick = () => router.push('/admin/dashboard')
+
+  // Determine current tab for display
+  const currentTab = activeTab || (isIllustrationsUnlocked ? 'illustrations' : 'pages')
 
   // Construct Tabs
   const tabs = [
@@ -516,9 +547,9 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
           <span className="hidden md:inline">{buttonDisplayLabel}</span>
           <span className="md:hidden">{stage.isDownload ? 'Download' : 'Send'}</span>
 
-          {stage.showCount && !isSendingToCustomer && sendCount > 0 && (
+          {stage.showCount && !isSendingToCustomer && displayCount > 0 && (
             <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
-              {sendCount}
+              {displayCount}
             </span>
           )}
         </Button>
@@ -526,12 +557,3 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     />
   )
 }
-
-// -------------------------------------------------------------
-// IMPORTS NEED TO BE UPDATED
-// -------------------------------------------------------------
-// I need shorter replacement chunks or replace full file.
-// I will replace full file content basically, or key parts.
-// Actually, `ProjectHeader` is huge (400 lines). I should define `tabs` inside component and just replace the `return (...)`.
-// But I need to import `SharedProjectHeader`.
-

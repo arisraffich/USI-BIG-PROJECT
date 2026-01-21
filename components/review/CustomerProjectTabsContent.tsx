@@ -37,7 +37,7 @@ interface CustomerProjectTabsContentProps {
   projectTitle: string
   authorName: string
   characterSendCount: number
-  illustrationStatus: string
+  illustrationSendCount: number
 }
 
 export function CustomerProjectTabsContent({
@@ -49,7 +49,7 @@ export function CustomerProjectTabsContent({
   projectTitle,
   authorName,
   characterSendCount,
-  illustrationStatus
+  illustrationSendCount
 }: CustomerProjectTabsContentProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -335,7 +335,16 @@ export function CustomerProjectTabsContent({
 
   // Check modes (use localProjectStatus for realtime updates)
   const isCharacterMode = ['character_generation', 'character_review', 'character_revision_needed', 'characters_approved'].includes(localProjectStatus)
-  const isIllustrationMode = ['illustration_review', 'illustration_revision_needed', 'illustration_approved', 'illustration_production', 'completed'].includes(localProjectStatus)
+  const isIllustrationMode = [
+    // New statuses
+    'trial_review', 'trial_revision', 'trial_approved',
+    'illustrations_generating',
+    'sketches_review', 'sketches_revision',
+    'illustration_approved',
+    // Legacy statuses
+    'illustration_review', 'illustration_revision_needed',
+    'illustration_production', 'completed'
+  ].includes(localProjectStatus)
   const showGallery = useMemo(() => {
     // ONLY show gallery if characters have customer_image_url
     // This ensures forms are shown when "Request Input" is clicked (no images yet)
@@ -421,7 +430,14 @@ export function CustomerProjectTabsContent({
     }
   }, [])
 
-  const isLocked = !['character_review', 'character_revision_needed', 'illustration_review', 'illustration_revision_needed'].includes(localProjectStatus)
+  const isLocked = ![
+    'character_review', 'character_revision_needed',
+    // New statuses
+    'trial_review', 'trial_revision',
+    'sketches_review', 'sketches_revision',
+    // Legacy statuses
+    'illustration_review', 'illustration_revision_needed'
+  ].includes(localProjectStatus)
 
   // Calculate submit disabled
   const isSubmitDisabled = useMemo(() => {
@@ -574,6 +590,7 @@ export function CustomerProjectTabsContent({
             isApproveDisabled={isApproveDisabled}
             showIllustrationsTab={showIllustrationsTab}
             projectStatus={projectStatus}
+            illustrationSendCount={illustrationSendCount}
           />
         }
         sidebar={
@@ -582,7 +599,8 @@ export function CustomerProjectTabsContent({
               mode="customer"
               pages={localPages as any}
               activePageId={activeIllustrationPageId || localPages.find(p => p.page_number === 1)?.id || null}
-              illustrationStatus={illustrationStatus}
+              projectStatus={localProjectStatus as any}
+              illustrationSendCount={illustrationSendCount}
               onPageClick={setActiveIllustrationPageId}
             />
           ) : null
@@ -649,8 +667,8 @@ export function CustomerProjectTabsContent({
                   pages={localPages}
                   activePageId={activeIllustrationPageId || localPages.find(p => p.page_number === 1)?.id}
                   onPageChange={setActiveIllustrationPageId}
-                  illustrationStatus={illustrationStatus}
                   projectStatus={localProjectStatus}
+                  illustrationSendCount={illustrationSendCount}
                   onSaveFeedback={async (pageId, notes) => handleIllustrationFeedbackChange(pageId, notes)}
                 />
               </div>

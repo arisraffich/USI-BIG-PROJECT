@@ -20,8 +20,7 @@ export async function POST(request: Request) {
             .from('projects')
             .update({
                 illustration_aspect_ratio: aspect_ratio,
-                illustration_text_integration: text_integration,
-                illustration_status: 'analyzing' // Start AI Director analysis
+                illustration_text_integration: text_integration
             })
             .eq('id', projectId)
             .select()

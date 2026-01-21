@@ -15,9 +15,10 @@ interface UnifiedIllustrationFeedProps {
     activePageId?: string | null
     onPageChange?: (pageId: string) => void
 
-    // CUSTOMER SPECIFIC
+    // STATUS & LOCKING
     illustrationStatus?: string
     projectStatus?: string // Main status field for lock logic
+    illustrationSendCount?: number // For determining if all sketches have been sent
     onSaveFeedback?: (pageId: string, notes: string) => Promise<void>
 
     // ADMIN SPECIFIC
@@ -64,6 +65,7 @@ export function UnifiedIllustrationFeed({
     onPageChange,
     illustrationStatus = 'draft',
     projectStatus,
+    illustrationSendCount = 0,
     onSaveFeedback,
     isAnalyzing = false,
     projectId,
@@ -217,9 +219,25 @@ export function UnifiedIllustrationFeed({
     // Both views now use full-screen layout for illustrations.
     const heightClass = 'h-[calc(100vh-70px)]'
 
+    // Locking logic matching UnifiedIllustrationSidebar
+    const isCustomerUnlocked = [
+        'sketches_review',
+        'sketches_revision', 
+        'illustration_approved',
+        'completed',
+        // Legacy: when sendCount > 1, customer received all sketches
+        ...(illustrationSendCount > 1 ? ['illustration_review', 'illustration_revision_needed'] : [])
+    ].includes(projectStatus || '')
+
     const visiblePages = pages.filter(p => {
+        // Admin always sees all pages
         if (mode === 'admin') return true
-        return p.page_number === 1 || !!p.customer_illustration_url || !!p.customer_sketch_url
+        // Customer: Page 1 always visible
+        if (p.page_number === 1) return true
+        // Customer: All pages visible after unlocked
+        if (isCustomerUnlocked) return true
+        // Customer: Show pages that have been explicitly sent
+        return !!p.customer_illustration_url || !!p.customer_sketch_url
     })
 
     return (

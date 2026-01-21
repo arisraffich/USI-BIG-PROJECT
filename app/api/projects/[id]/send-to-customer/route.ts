@@ -49,7 +49,15 @@ export async function POST(
     }
 
     // DETERMINE MODE: Character Review vs Illustration Trial
-    const isIllustrationMode = ['characters_approved', 'illustration_review', 'illustration_revision_needed', 'illustration_approved'].includes(project.status)
+    const isIllustrationMode = [
+      'characters_approved',
+      'trial_review', 'trial_revision', 'trial_approved',
+      'illustrations_generating',
+      'sketches_review', 'sketches_revision',
+      'illustration_approved',
+      // Legacy statuses
+      'illustration_review', 'illustration_revision_needed'
+    ].includes(project.status)
 
     if (isIllustrationMode) {
       // --- ILLUSTRATION REVIEW MODE ---
@@ -98,14 +106,19 @@ export async function POST(
 
       // 3. Update Project Status & Count
       const currentCount = (project as any).illustration_send_count || 0
+      const newCount = hasImages ? currentCount + 1 : currentCount
+      
+      // Determine new status based on send count
+      // First send (trial): trial_review
+      // Subsequent sends (all sketches): sketches_review
+      const newStatus = newCount === 1 ? 'trial_review' : 'sketches_review'
 
       const { error: updateError } = await supabase
         .from('projects')
         .update({
-          status: 'illustration_review', // Set to waiting for review
-          illustration_status: 'illustration_review', // Sync illustration status
+          status: newStatus,
           review_token: reviewToken,
-          illustration_send_count: hasImages ? currentCount + 1 : currentCount
+          illustration_send_count: newCount
         })
         .eq('id', id)
 

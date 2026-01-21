@@ -24,6 +24,7 @@ interface CustomerProjectHeaderProps {
   isApproveDisabled?: boolean
   showIllustrationsTab?: boolean
   projectStatus?: string
+  illustrationSendCount?: number
 }
 
 export function CustomerProjectHeader({
@@ -41,7 +42,8 @@ export function CustomerProjectHeader({
   showApproveButton = false,
   isApproveDisabled = false,
   showIllustrationsTab = false,
-  projectStatus
+  projectStatus,
+  illustrationSendCount = 0
 }: CustomerProjectHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -95,7 +97,12 @@ export function CustomerProjectHeader({
   }
 
   const currentTabId = isIllustrationsActive ? 'illustrations' : (isCharactersActive ? 'characters' : 'pages')
-  const isApprovedStage = projectStatus === 'illustration_approved' || projectStatus === 'illustration_production' || projectStatus === 'completed'
+  const isApprovedStage = projectStatus === 'illustration_approved' || projectStatus === 'trial_approved' || projectStatus === 'completed'
+  
+  // Determine button text based on phase
+  const isTrialPhase = illustrationSendCount <= 1
+  const approveButtonText = isTrialPhase ? 'APPROVE ILLUSTRATION' : 'APPROVE SKETCHES'
+  const approvedButtonText = isTrialPhase ? 'TRIAL APPROVED' : 'SKETCHES APPROVED'
 
   return (
     <>
@@ -163,10 +170,10 @@ export function CustomerProjectHeader({
                   ) : isApprovedStage ? (
                     <>
                       <Check className="w-4 h-4 mr-2" />
-                      1ST ILLUSTRATION APPROVED
+                      {approvedButtonText}
                     </>
                   ) : (
-                    "APPROVE SKETCHES"
+                    approveButtonText
                   )}
                 </Button>
               )}
@@ -239,10 +246,10 @@ export function CustomerProjectHeader({
                     ) : isApprovedStage ? (
                       <>
                         <Check className="w-4 h-4 mr-2" />
-                        1ST ILLUSTRATION APPROVED
+                        {approvedButtonText}
                       </>
                     ) : (
-                      "APPROVE SKETCHES"
+                      approveButtonText
                     )}
                   </Button>
                 </div>

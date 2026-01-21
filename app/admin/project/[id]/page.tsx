@@ -16,7 +16,6 @@ export default async function ProjectDetailPage({
   let pages = null
   let characters = null
   let projectStatus: string = 'draft'
-  let illustrationStatus: string = 'not_started'
   let projectInfo: any = null
 
   try {
@@ -55,11 +54,7 @@ export default async function ProjectDetailPage({
 
     characters = charactersResult.data || null
     projectStatus = projectResult.data?.status || 'draft'
-    projectStatus = projectResult.data?.status || 'draft'
     projectInfo = projectResult.data
-
-    // Extract illustration status
-    illustrationStatus = projectResult.data?.illustration_status || 'not_started'
 
   } catch (error: any) {
     console.error('Error in ProjectDetailPage:', error)
@@ -74,7 +69,6 @@ export default async function ProjectDetailPage({
         characters={characters}
         projectStatus={projectStatus}
         projectInfo={projectInfo}
-        illustrationStatus={illustrationStatus}
       />
       <ProjectDevTools projectId={id} />
     </Suspense>

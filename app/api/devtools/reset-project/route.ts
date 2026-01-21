@@ -25,7 +25,6 @@ export async function POST(request: Request) {
                 status: 'characters_approved', // Go back to "Ready for Illustration" stage
                 illustration_send_count: 0,
                 review_token: crypto.randomUUID().replace(/-/g, ''), // Invalidate existing customer URL by rotating it
-                illustration_status: 'not_started',
                 illustration_aspect_ratio: null,
                 illustration_text_integration: null,
             })

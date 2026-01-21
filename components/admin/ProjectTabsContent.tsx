@@ -25,7 +25,6 @@ interface ProjectTabsContentProps {
   characters: Character[] | null
   projectStatus?: string
   projectInfo?: any
-  illustrationStatus?: string
 }
 
 export function ProjectTabsContent({
@@ -33,8 +32,7 @@ export function ProjectTabsContent({
   pages,
   characters,
   projectStatus,
-  projectInfo,
-  illustrationStatus = 'not_started'
+  projectInfo
 }: ProjectTabsContentProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -69,19 +67,7 @@ export function ProjectTabsContent({
     localProjectStatus === 'sketch_ready' ||
     localProjectStatus === 'completed'
 
-  // Auto-heal status mismatch
-  useEffect(() => {
-    if (localProjectStatus === 'illustration_approved' && illustrationStatus !== 'illustration_approved') {
-      const supabase = createClient()
-      supabase.from('projects')
-        .update({ illustration_status: 'illustration_approved' })
-        .eq('id', projectId)
-        .then(() => {
-          toast.success('Project status synchronized')
-          // Project status update will be reflected via props on next server render
-        })
-    }
-  }, [localProjectStatus, illustrationStatus, projectId, router])
+  // Auto-heal status mismatch - REMOVED: illustration_status field no longer used
 
   // Automatic Switch to Illustrations Tab on Approval
   const prevStatusRef = useRef(localProjectStatus)
@@ -136,7 +122,8 @@ export function ProjectTabsContent({
 
   const isGenerating = localProjectStatus === 'character_generation'
   const isCharactersLoading = isGenerating
-  const isAnalyzing = illustrationStatus === 'analyzing'
+  // NOTE: isAnalyzing removed - illustration_status field no longer used
+  const isAnalyzing = false
 
   const pageCount = pages?.length || 0
   const characterCount = localCharacters?.length || 0
@@ -300,63 +287,8 @@ export function ProjectTabsContent({
     }
   }, [pages])
 
-  // Analysis Loop
-  useEffect(() => {
-    if (isAnalyzing && pages && pages.length > 0) {
-      const p1 = pages.find(p => p.page_number === 1)
-      if (p1?.character_actions && Object.keys(p1.character_actions).length > 0) {
-        if (!hasStartedAnalysisRef.current) {
-          hasStartedAnalysisRef.current = true
-          const supabase = createClient()
-          supabase.from('projects').update({ illustration_status: 'generating' }).eq('id', projectId).then(() => {
-            router.refresh()
-          })
-        }
-        return
-      }
-    }
-
-    if (isAnalyzing && pages && pages.length > 0 && !hasStartedAnalysisRef.current) {
-      hasStartedAnalysisRef.current = true
-      setAnalysisProgress({ current: 0, total: pages.length })
-
-      const runAnalysis = async () => {
-        const supabase = createClient()
-        let completedCount = 0
-        const pagesToAnalyze = [pages[0]] // Only analyze Page 1
-
-        for (const page of pagesToAnalyze) {
-          if (page.character_actions && Object.keys(page.character_actions).length > 0) {
-            completedCount++
-            continue
-          }
-
-          try {
-            const response = await fetch('/api/ai/extract-character-actions', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                projectId,
-                pageId: page.id,
-                storyText: page.story_text,
-                sceneDescription: page.scene_description,
-                characters
-              })
-            })
-            if (!response.ok) throw new Error('Failed to analyze page')
-            completedCount++
-          } catch (error) {
-            console.error(`Error analyzing page ${page.page_number}:`, error)
-          }
-        }
-
-        await supabase.from('projects').update({ illustration_status: 'generating' }).eq('id', projectId)
-        router.refresh()
-      }
-
-      runAnalysis()
-    }
-  }, [isAnalyzing, pages, projectId, characters, router])
+  // NOTE: Analysis Loop removed - illustration_status field no longer used
+  // Character actions are now extracted on-demand during illustration generation
 
   const handleTabClick = (tab: 'pages' | 'characters' | 'illustrations', e: React.MouseEvent) => {
     e.preventDefault()
@@ -527,7 +459,7 @@ export function ProjectTabsContent({
               </div>
             )) ||
             // 2. Illustration Trial Manual Approve
-            (activeTab === 'illustrations' && isTrialReady && illustrationStatus !== 'illustration_approved' && (
+            (activeTab === 'illustrations' && isTrialReady && !['illustration_approved', 'trial_approved'].includes(localProjectStatus) && (
               <Button
                 variant="destructive"
                 size="sm"
@@ -548,7 +480,8 @@ export function ProjectTabsContent({
             pages={localPages}
             activePageId={activeIllustrationPageId}
             onPageClick={(id) => setActiveIllustrationPageId(id)}
-            illustrationStatus={illustrationStatus}
+            projectStatus={localProjectStatus as any}
+            illustrationSendCount={projectInfo?.illustration_send_count || 0}
             failedPageIds={Object.keys(pageErrors)}
           />
         ) : null
@@ -632,7 +565,7 @@ export function ProjectTabsContent({
             projectId={projectId}
             pages={localPages}
             characters={localCharacters}
-            illustrationStatus={illustrationStatus}
+            projectStatus={localProjectStatus}
             isAnalyzing={isAnalyzing}
             analysisProgress={analysisProgress}
             initialAspectRatio={projectInfo?.illustration_aspect_ratio}

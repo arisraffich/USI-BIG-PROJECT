@@ -54,10 +54,9 @@ export async function POST(
         }
 
         // 3. Update Status to Approved
-        const newStatus = 'illustration_approved'
+        const newStatus = 'trial_approved' // Manual approve = trial approved
         await supabase.from('projects').update({
-            status: newStatus,
-            illustration_status: newStatus
+            status: newStatus
         }).eq('id', project.id)
 
         // 4. Notify Team (Slack Only)

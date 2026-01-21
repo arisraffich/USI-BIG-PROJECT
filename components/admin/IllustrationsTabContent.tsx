@@ -57,7 +57,7 @@ interface IllustrationsTabContentProps {
     projectId: string
     pages: Page[]
     characters?: Character[] // All project characters for character control
-    illustrationStatus: string
+    projectStatus: string // Main status field
     isAnalyzing: boolean
     analysisProgress: { current: number, total: number }
     initialAspectRatio?: string
@@ -74,7 +74,7 @@ export function IllustrationsTabContent({
     projectId,
     pages,
     characters = [],
-    illustrationStatus,
+    projectStatus,
     isAnalyzing,
     initialAspectRatio,
     initialTextIntegration,
@@ -86,12 +86,17 @@ export function IllustrationsTabContent({
     const router = useRouter()
 
     // MEMOIZE VISIBLE PAGES to prevent unstable references passed to children
-    // Admin sees only Page 1 until illustration is approved, then sees all pages
+    // Admin sees only Page 1 during trial phase, then all pages after trial approved
     const visiblePages = useMemo(() => {
-        return ['illustration_approved', 'completed'].includes(illustrationStatus)
+        const allPagesStatuses = [
+            'trial_approved', 'illustrations_generating',
+            'sketches_review', 'sketches_revision',
+            'illustration_approved', 'completed'
+        ]
+        return allPagesStatuses.includes(projectStatus)
             ? pages
             : pages.slice(0, 1)
-    }, [pages, illustrationStatus])
+    }, [pages, projectStatus])
 
     // Local state for wizard settings (propagated to pages if needed via DB)
     const [aspectRatio, setAspectRatio] = useState(initialAspectRatio || '')
@@ -503,7 +508,7 @@ export function IllustrationsTabContent({
             pages={visiblePages}
             activePageId={activePageId}
             onPageChange={onPageChange}
-            illustrationStatus={illustrationStatus}
+            projectStatus={projectStatus}
             isAnalyzing={isAnalyzing}
             projectId={projectId}
             characters={characters}
