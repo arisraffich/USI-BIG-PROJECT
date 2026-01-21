@@ -341,6 +341,12 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         },
         (payload) => {
           const newProject = payload.new as any
+          const oldProject = payload.old as any
+          
+          // Only show toast when status actually CHANGES (not on every project update)
+          if (oldProject?.status === newProject.status) {
+            return // Status didn't change, skip toast
+          }
 
           if (newProject.status === 'characters_approved') {
             toast.success('Characters Approved!', {
