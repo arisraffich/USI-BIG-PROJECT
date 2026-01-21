@@ -106,13 +106,13 @@ export function CustomerProjectHeader({
   
   // Determine status badge text based on project status
   const getStatusBadgeText = () => {
-    if (projectStatus === 'trial_review' || projectStatus === 'trial_revision') return 'Trial Review'
+    if (projectStatus === 'trial_review' || projectStatus === 'trial_revision') return 'Illustration Review'
     if (projectStatus === 'sketches_review' || projectStatus === 'sketches_revision') return 'Sketches Review'
-    if (projectStatus === 'illustration_approved') return 'Approved'
+    if (projectStatus === 'illustration_approved') return 'Sketches Approved'
     if (projectStatus === 'completed') return 'Completed'
     // Legacy statuses
     if (projectStatus === 'illustration_review' || projectStatus === 'illustration_revision_needed') {
-      return illustrationSendCount <= 1 ? 'Trial Review' : 'Sketches Review'
+      return illustrationSendCount <= 1 ? 'Illustration Review' : 'Sketches Review'
     }
     return 'Review'
   }

@@ -112,7 +112,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     // (Legacy: illustration_review with sendCount = 1)
     if (status === 'trial_review' || (status === 'illustration_review' && sendCount === 1)) {
       return {
-        tag: hasUnresolvedFeedback ? 'Trial Feedback' : 'Wait: Trial Review',
+        tag: hasUnresolvedFeedback ? 'Illustration Feedback' : 'Wait: Illustration Review',
         tagStyle: hasUnresolvedFeedback 
           ? 'bg-yellow-100 text-yellow-800 border-yellow-300' 
           : 'bg-blue-100 text-blue-800 border-blue-300',
@@ -127,7 +127,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     // (Legacy: illustration_revision_needed with sendCount = 1)
     if (status === 'trial_revision' || (status === 'illustration_revision_needed' && sendCount <= 1)) {
       return {
-        tag: 'Trial Feedback',
+        tag: 'Illustration Feedback',
         tagStyle: 'bg-orange-100 text-orange-800 border-orange-300',
         buttonLabel: 'Resend Trial',
         showCount: true,
