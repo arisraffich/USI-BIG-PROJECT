@@ -5,6 +5,7 @@ import { Page } from '@/types/page'
 import { Character } from '@/types/character'
 import { SharedIllustrationBoard, SceneCharacter } from './SharedIllustrationBoard'
 import { Loader2 } from 'lucide-react'
+import { useIllustrationLock } from '@/hooks/use-illustration-lock'
 
 // --------------------------------------------------------------------------
 // UNIFIED FEED PROPS (Hybrid of Admin + Customer needs)
@@ -219,26 +220,14 @@ export function UnifiedIllustrationFeed({
     // Both views now use full-screen layout for illustrations.
     const heightClass = 'h-[calc(100vh-70px)]'
 
-    // Locking logic matching UnifiedIllustrationSidebar
-    const isCustomerUnlocked = [
-        'sketches_review',
-        'sketches_revision', 
-        'illustration_approved',
-        'completed',
-        // Legacy: when sendCount > 1, customer received all sketches
-        ...(illustrationSendCount > 1 ? ['illustration_review', 'illustration_revision_needed'] : [])
-    ].includes(projectStatus || '')
-
-    const visiblePages = pages.filter(p => {
-        // Admin always sees all pages
-        if (mode === 'admin') return true
-        // Customer: Page 1 always visible
-        if (p.page_number === 1) return true
-        // Customer: All pages visible after unlocked
-        if (isCustomerUnlocked) return true
-        // Customer: Show pages that have been explicitly sent
-        return !!p.customer_illustration_url || !!p.customer_sketch_url
+    // Centralized lock logic from useIllustrationLock hook
+    const { filterVisiblePages, isCustomerLocked } = useIllustrationLock({
+        projectStatus,
+        mode,
+        pages,
     })
+
+    const visiblePages = filterVisiblePages(pages)
 
     return (
         <div

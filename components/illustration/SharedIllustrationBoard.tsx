@@ -19,6 +19,7 @@ import { createClient } from '@/lib/supabase/client'
 import { PageStatusBar } from '@/components/project/PageStatusBar'
 import { EmptyStateBoard } from '@/components/illustration/EmptyStateBoard'
 import { ReviewHistoryDialog } from '@/components/project/ReviewHistoryDialog'
+import { useIllustrationLock } from '@/hooks/use-illustration-lock'
 
 // Type for scene character with action/emotion
 export interface SceneCharacter {
@@ -147,9 +148,12 @@ export function SharedIllustrationBoard({
     const isAdmin = mode === 'admin'
     const isCustomer = mode === 'customer'
 
-    // Lock logic - uses main projectStatus field (more reliable than illustrationStatus)
-    const statusToCheck = projectStatus || illustrationStatus
-    const isLocked = !isAdmin && ['illustration_approved', 'illustration_production', 'completed'].includes(statusToCheck)
+    // Centralized lock logic from useIllustrationLock hook
+    const { isCustomerLocked } = useIllustrationLock({
+        projectStatus,
+        mode,
+    })
+    const isLocked = isCustomerLocked
     
     // Check if we're in Scene Recreation mode (dropdown selected)
     const isSceneRecreationMode = selectedEnvPageId !== null

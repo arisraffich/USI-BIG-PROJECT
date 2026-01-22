@@ -2,6 +2,7 @@
 
 import { Page } from '@/types/page'
 import { ProjectStatus } from '@/types/project'
+import { useIllustrationLock } from '@/hooks/use-illustration-lock'
 
 interface UnifiedIllustrationSidebarProps {
     pages: Page[]
@@ -26,63 +27,21 @@ export function UnifiedIllustrationSidebar({
     generatingPageIds = [],
     illustrationSendCount = 0
 }: UnifiedIllustrationSidebarProps) {
-    // ============================================================
-    // LOCKING LOGIC (Pages 2+ visibility/access)
-    // ============================================================
-    // ADMIN: 
-    //   - Page 1 always visible
-    //   - Pages 2+ unlock once page 1 is generated (has illustration_url)
-    //
-    // CUSTOMER:
-    //   - Page 1 always visible (once sketches sent)
-    //   - Pages 2+ visible after admin sends sketches (sketches_review status)
-    // ============================================================
-    
-    // Check if page 1 has been generated
-    const page1 = pages.find(p => p.page_number === 1)
-    const page1Generated = !!page1?.illustration_url
-    
-    // Admin: unlock pages 2+ once page 1 is generated OR in review/approved phases
-    const isAdminUnlocked = page1Generated || [
-        'sketches_review', 
-        'sketches_revision',
-        'illustration_approved',
-        'completed',
-        // Legacy statuses
-        'trial_approved', 'illustrations_generating',
-        'illustration_review', 'illustration_revision_needed'
-    ].includes(projectStatus)
-    
-    // Customer: unlock pages 2+ once sketches are sent
-    const isCustomerUnlocked = [
-        'sketches_review',
-        'sketches_revision', 
-        'illustration_approved',
-        'completed',
-        // Legacy statuses
-        'illustration_review', 'illustration_revision_needed'
-    ].includes(projectStatus)
-    
-    // Determine if pages 2+ are locked based on mode
-    const isPagesUnlocked = mode === 'admin' ? isAdminUnlocked : isCustomerUnlocked
+    // Centralized lock logic from useIllustrationLock hook
+    const { isPagesUnlocked, isPageLocked, filterVisiblePages } = useIllustrationLock({
+        projectStatus,
+        mode,
+        pages,
+    })
 
     return (
         <>
             {/* Desktop Sidebar */}
             <div className="hidden lg:block fixed left-0 top-[70px] h-[calc(100vh-70px)] w-[250px] bg-white border-r border-gray-200 overflow-y-auto z-40 pb-20">
                 <div className="p-2 space-y-1">
-                    {pages.filter(p => {
-                        // Admin always sees all pages in sidebar
-                        if (mode === 'admin') return true
-                        // Customer: Only show pages that have been sent to them
-                        if (p.page_number === 1) return true
-                        if (isCustomerUnlocked) return true
-                        return !!p.customer_illustration_url || !!p.customer_sketch_url
-                    }).map((page) => {
+                    {filterVisiblePages(pages).map((page) => {
                         const isActive = activePageId === page.id
-                        // Page 1 is never locked
-                        // Pages 2+ are locked until unlocked condition is met
-                        const isLocked = page.page_number > 1 && !isPagesUnlocked
+                        const isLocked = isPageLocked(page.page_number)
 
                         return (
                             <button
@@ -119,14 +78,9 @@ export function UnifiedIllustrationSidebar({
             {/* Mobile Bottom Navigation */}
             <div className="block lg:hidden fixed bottom-6 left-0 right-0 z-50 pointer-events-none">
                 <div className="flex items-center gap-2 overflow-x-auto pointer-events-auto px-4 py-2 [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-400/30 [&::-webkit-scrollbar-thumb]:rounded-full">
-                    {pages.filter(p => {
-                        if (mode === 'admin') return true
-                        if (p.page_number === 1) return true
-                        if (isCustomerUnlocked) return true
-                        return !!p.customer_illustration_url || !!p.customer_sketch_url
-                    }).map((page) => {
+                    {filterVisiblePages(pages).map((page) => {
                         const isActive = activePageId === page.id
-                        const isLocked = page.page_number > 1 && !isPagesUnlocked
+                        const isLocked = isPageLocked(page.page_number)
 
                         return (
                             <div key={page.id} className="relative flex-shrink-0">
