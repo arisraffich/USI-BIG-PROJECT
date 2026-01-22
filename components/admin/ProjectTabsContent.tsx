@@ -11,13 +11,24 @@ import { ManuscriptEditor } from '@/components/project/manuscript/ManuscriptEdit
 import { ProjectHeader } from '@/components/admin/ProjectHeader'
 import { UnifiedIllustrationSidebar } from '@/components/illustration/UnifiedIllustrationSidebar'
 import { UnifiedProjectLayout } from '@/components/layout/UnifiedProjectLayout'
-import { Loader2, Sparkles } from 'lucide-react'
+import { Loader2, Sparkles, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IllustrationsTabContent } from '@/components/admin/IllustrationsTabContent'
 import { Page } from '@/types/page'
 import { Character } from '@/types/character'
 import { ProjectStatus } from '@/types/project'
 import { CharacterFormData } from '@/components/shared/UniversalCharacterCard'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 
 interface ProjectTabsContentProps {
   projectId: string
@@ -151,6 +162,10 @@ export function ProjectTabsContent({
   const [isManualMode, setIsManualMode] = useState(false)
   const [characterForms, setCharacterForms] = useState<{ [id: string]: { data: any; isValid: boolean } }>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // Push to Customer State
+  const [isPushDialogOpen, setIsPushDialogOpen] = useState(false)
+  const [isPushing, setIsPushing] = useState(false)
 
   // Initialize forms when entering manual mode (or when characters load)
   useEffect(() => {
@@ -224,6 +239,30 @@ export function ProjectTabsContent({
       toast.error('Failed to approve')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  // Push to Customer (Silent Update)
+  const handlePushToCustomer = async () => {
+    setIsPushing(true)
+    try {
+      const response = await fetch(`/api/projects/${projectId}/push-to-customer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Push failed')
+      }
+      
+      const result = await response.json()
+      toast.success(result.message || 'Changes pushed to customer')
+      setIsPushDialogOpen(false)
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to push changes')
+    } finally {
+      setIsPushing(false)
     }
   }
 
@@ -400,49 +439,92 @@ export function ProjectTabsContent({
             router.replace(`${pathname}?${params.toString()}`, { scroll: false })
           }}
           centerContent={
-            // Characters Manual Mode (only)
-            (activeTab === 'characters' && localCharacters && localCharacters.length > 1 && (
-              <div className="flex items-center gap-2">
-                {!isManualMode ? (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => setIsManualMode(true)}
-                    className="bg-red-600 hover:bg-red-700 text-white h-8 text-xs px-3 shadow-sm"
-                  >
-                    Manual
-                  </Button>
-                ) : (
-                  <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
-                    <Button variant="ghost" size="sm" onClick={() => setIsManualMode(false)} className="h-7 text-xs px-2 text-slate-500 hover:text-slate-700">
-                      Cancel
+            <>
+              {/* Characters Manual Mode */}
+              {activeTab === 'characters' && localCharacters && localCharacters.length > 1 && (
+                <div className="flex items-center gap-2">
+                  {!isManualMode ? (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setIsManualMode(true)}
+                      className="bg-red-600 hover:bg-red-700 text-white h-8 text-xs px-3 shadow-sm"
+                    >
+                      Manual
                     </Button>
-
-                    <div className="h-4 w-px bg-slate-200" />
-
-                    {sortedCharacters.secondary.every(c => c.image_url) ? (
-                      <Button
-                        size="sm"
-                        className="bg-orange-500 hover:bg-orange-600 text-white h-7 text-xs px-3"
-                        onClick={handleManualApprove}
-                        disabled={isSubmitting}
-                      >
-                        {isSubmitting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Approve'}
+                  ) : (
+                    <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
+                      <Button variant="ghost" size="sm" onClick={() => setIsManualMode(false)} className="h-7 text-xs px-2 text-slate-500 hover:text-slate-700">
+                        Cancel
                       </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        className="bg-orange-500 hover:bg-orange-600 text-white h-7 text-xs px-3"
-                        onClick={handleManualSubmit}
-                        disabled={!isManualSubmitValid || isSubmitting}
+
+                      <div className="h-4 w-px bg-slate-200" />
+
+                      {sortedCharacters.secondary.every(c => c.image_url) ? (
+                        <Button
+                          size="sm"
+                          className="bg-orange-500 hover:bg-orange-600 text-white h-7 text-xs px-3"
+                          onClick={handleManualApprove}
+                          disabled={isSubmitting}
+                        >
+                          {isSubmitting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Approve'}
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="bg-orange-500 hover:bg-orange-600 text-white h-7 text-xs px-3"
+                          onClick={handleManualSubmit}
+                          disabled={!isManualSubmitValid || isSubmitting}
+                        >
+                          {isSubmitting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Submit'}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Illustrations Push Button */}
+              {activeTab === 'illustrations' && (projectInfo?.illustration_send_count || 0) > 0 && (
+                <AlertDialog open={isPushDialogOpen} onOpenChange={setIsPushDialogOpen}>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs px-3 border-blue-300 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                    >
+                      <Upload className="w-3 h-3 mr-1.5" />
+                      Push
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Push Changes to Customer?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will silently update all illustrations on the customer&apos;s side without sending any notifications. The customer will see the latest versions when they refresh or revisit the page.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={isPushing}>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handlePushToCustomer}
+                        disabled={isPushing}
+                        className="bg-blue-600 hover:bg-blue-700"
                       >
-                        {isSubmitting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Submit'}
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))
+                        {isPushing ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Pushing...
+                          </>
+                        ) : (
+                          'Push Changes'
+                        )}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </>
           }
         />
       }

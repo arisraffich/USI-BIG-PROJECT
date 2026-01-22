@@ -298,6 +298,8 @@ export function SharedIllustrationBoard({
         if (e.target.files && e.target.files[0] && onUpload) {
             onUpload(type, e.target.files[0])
         }
+        // Reset input so same file can be selected again
+        e.target.value = ''
     }, [onUpload])
 
     const isManualUpload = (url: string | null | undefined) => {
