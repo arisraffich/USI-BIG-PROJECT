@@ -34,6 +34,36 @@ interface ProjectCardProps {
   pageCount?: number
 }
 
+// Determine which tab to open based on project status
+function getDefaultTabForStatus(status: string): string {
+  // Illustration stages
+  const illustrationStatuses = [
+    'characters_approved',
+    'sketches_review',
+    'sketches_revision',
+    'illustration_approved',
+    'completed',
+  ]
+  if (illustrationStatuses.includes(status)) {
+    return 'illustrations'
+  }
+  
+  // Character stages
+  const characterStatuses = [
+    'character_review',
+    'character_generation',
+    'character_approval',
+    'character_approval_pending',
+    'character_revision_needed',
+  ]
+  if (characterStatuses.includes(status)) {
+    return 'characters'
+  }
+  
+  // Default to pages (draft, or any unknown status)
+  return 'pages'
+}
+
 export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }: ProjectCardProps) {
   const router = useRouter()
   const [isDeleting, setIsDeleting] = useState(false)
@@ -102,7 +132,7 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }:
     <Card className="hover:shadow-lg transition-shadow">
       <CardContent className="pt-0 pb-0">
         <div className="flex justify-between items-start">
-          <Link href={`/admin/project/${project.id}`} className="flex-1 block cursor-pointer">
+          <Link href={`/admin/project/${project.id}?tab=${getDefaultTabForStatus(project.status)}`} className="flex-1 block cursor-pointer">
             <h2 className="text-xl font-semibold mb-0">{project.book_title}</h2>
             <p className="text-sm text-gray-600">
               By {project.author_firstname} {project.author_lastname} | {pageCount} {pageCount === 1 ? 'Page' : 'Pages'} | Created: {formatDate(project.created_at)}
