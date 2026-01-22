@@ -83,8 +83,9 @@ export async function uploadImageAction(formData: FormData): Promise<UploadResul
         // 3. Update Database with versioned URL
         const versionedUrl = `${publicUrl}?t=${timestamp}`
 
+        // Both sketch and illustration uploads should auto-resolve any pending feedback
         const updateData = type === 'sketch'
-            ? { sketch_url: versionedUrl, sketch_generated_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+            ? { sketch_url: versionedUrl, sketch_generated_at: new Date().toISOString(), updated_at: new Date().toISOString(), is_resolved: true }
             : { illustration_url: versionedUrl, illustration_generated_at: new Date().toISOString(), updated_at: new Date().toISOString(), is_resolved: true }
 
         const { error: dbError } = await supabase

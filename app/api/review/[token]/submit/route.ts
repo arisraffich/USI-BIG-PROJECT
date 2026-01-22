@@ -122,9 +122,14 @@ export async function POST(
           : 'All sketches approved!'
       }
 
-      await supabase.from('projects').update({
+      const { error: statusUpdateError } = await supabase.from('projects').update({
         status: newStatus
       }).eq('id', project.id)
+
+      if (statusUpdateError) {
+        console.error('Failed to update project status:', statusUpdateError)
+        return NextResponse.json({ error: 'Failed to update project status' }, { status: 500 })
+      }
 
       // Notify (non-blocking) - use appropriate notification based on outcome
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
