@@ -152,24 +152,6 @@ export function ProjectTabsContent({
   const [characterForms, setCharacterForms] = useState<{ [id: string]: { data: any; isValid: boolean } }>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleManualTrialApprove = async () => {
-    if (!confirm("Are you sure you want to manually approve the 1st illustration? This will unlock all pages for generation.")) return
-
-    setIsSubmitting(true)
-    try {
-      const response = await fetch(`/api/admin/projects/${projectId}/illustration-manual-approve`, {
-        method: 'POST',
-      })
-      if (!response.ok) throw new Error('Approval failed')
-      toast.success('Illustration trial manually approved')
-      router.refresh()
-    } catch (e) {
-      toast.error('Failed to approve trial')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
   // Initialize forms when entering manual mode (or when characters load)
   useEffect(() => {
     if (localCharacters && localCharacters.length > 0) {
@@ -418,7 +400,7 @@ export function ProjectTabsContent({
             router.replace(`${pathname}?${params.toString()}`, { scroll: false })
           }}
           centerContent={
-            // 1. Characters Manual Mode
+            // Characters Manual Mode (only)
             (activeTab === 'characters' && localCharacters && localCharacters.length > 1 && (
               <div className="flex items-center gap-2">
                 {!isManualMode ? (
@@ -460,18 +442,6 @@ export function ProjectTabsContent({
                   </div>
                 )}
               </div>
-            )) ||
-            // 2. Illustration Trial Manual Approve
-            (activeTab === 'illustrations' && isTrialReady && !['illustration_approved', 'trial_approved'].includes(localProjectStatus) && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleManualTrialApprove}
-                className="bg-red-600 hover:bg-red-700 text-white h-8 text-xs px-3 shadow-sm"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Manual Approve Trial'}
-              </Button>
             ))
           }
         />

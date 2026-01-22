@@ -62,11 +62,11 @@ interface StageConfig {
 function isInIllustrationPhase(status: ProjectStatus): boolean {
   return [
     'characters_approved',
-    'trial_review', 'trial_revision', 'trial_approved',
-    'illustrations_generating',
     'sketches_review', 'sketches_revision',
     'illustration_approved',
-    // Legacy statuses (will be migrated)
+    // Legacy statuses (for migration compatibility)
+    'trial_review', 'trial_revision', 'trial_approved',
+    'illustrations_generating',
     'illustration_review', 'illustration_revision_needed'
   ].includes(status)
 }
@@ -93,57 +93,33 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   // ------------------------------------------------------------------
   const getStageConfig = (): StageConfig => {
     // ============================================================
-    // ILLUSTRATION PHASE STAGES
+    // ILLUSTRATION PHASE STAGES (Simplified - No Trial)
     // ============================================================
+    // Flow: characters_approved → [generate all] → sketches_review → illustration_approved
 
-    // STAGE: Characters Approved → Ready to send trial (page 1)
-    if (status === 'characters_approved') {
-      return {
-        tag: '1st Illustration',
-        tagStyle: 'bg-green-100 text-green-800 border-green-300',
-        buttonLabel: 'Send Trial',
-        showCount: false,
-        isResend: false,
-        buttonDisabled: !isTrialReady
-      }
-    }
-
-    // STAGE: Trial sent, waiting for customer review
-    // (Legacy: illustration_review with sendCount = 1)
-    if (status === 'trial_review' || (status === 'illustration_review' && sendCount === 1)) {
-      return {
-        tag: hasUnresolvedFeedback ? 'Illustration Feedback' : 'Wait: Illustration Review',
-        tagStyle: hasUnresolvedFeedback 
-          ? 'bg-yellow-100 text-yellow-800 border-yellow-300' 
-          : 'bg-blue-100 text-blue-800 border-blue-300',
-        buttonLabel: 'Resend Trial',
-        showCount: true,
-        isResend: true,
-        buttonDisabled: !hasResolvedFeedback
-      }
-    }
-
-    // STAGE: Customer requested trial revision
-    // (Legacy: illustration_revision_needed with sendCount = 1)
-    if (status === 'trial_revision' || (status === 'illustration_revision_needed' && sendCount <= 1)) {
-      return {
-        tag: 'Illustration Feedback',
-        tagStyle: 'bg-orange-100 text-orange-800 border-orange-300',
-        buttonLabel: 'Resend Trial',
-        showCount: true,
-        isResend: true,
-        buttonDisabled: !hasResolvedFeedback
-      }
-    }
-
-    // STAGE: Trial approved, admin generating remaining pages
-    if (status === 'trial_approved' || status === 'illustrations_generating') {
+    // STAGE: Characters Approved → Ready to generate all pages
+    // Admin generates page 1 first, then rest. Button disabled until ALL generated.
+    if (status === 'characters_approved' || 
+        // Legacy statuses: treat as "generating" phase
+        status === 'trial_review' || status === 'trial_revision' || 
+        status === 'trial_approved' || status === 'illustrations_generating') {
       const allPagesGenerated = generatedIllustrationCount >= pageCount
+      const page1Generated = generatedIllustrationCount >= 1
+      
+      let tag = 'Ready to Generate'
+      let tagStyle = 'bg-green-100 text-green-800 border-green-300'
+      
+      if (page1Generated && !allPagesGenerated) {
+        tag = 'Generating...'
+        tagStyle = 'bg-purple-100 text-purple-800 border-purple-300'
+      } else if (allPagesGenerated) {
+        tag = 'Sketches Ready'
+        tagStyle = 'bg-green-100 text-green-800 border-green-300'
+      }
+      
       return {
-        tag: allPagesGenerated ? 'Ready to Send' : 'Generating...',
-        tagStyle: allPagesGenerated 
-          ? 'bg-green-100 text-green-800 border-green-300'
-          : 'bg-purple-100 text-purple-800 border-purple-300',
+        tag,
+        tagStyle,
         buttonLabel: 'Send Sketches',
         showCount: false,
         isResend: false,
@@ -152,8 +128,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     }
 
     // STAGE: All sketches sent, waiting for customer review
-    // (Legacy: illustration_review with sendCount > 1)
-    if (status === 'sketches_review' || (status === 'illustration_review' && sendCount > 1)) {
+    // (Legacy: illustration_review)
+    if (status === 'sketches_review' || status === 'illustration_review') {
       return {
         tag: hasUnresolvedFeedback ? 'Sketches Feedback' : 'Wait: Sketches Review',
         tagStyle: hasUnresolvedFeedback 
@@ -167,8 +143,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     }
 
     // STAGE: Customer requested sketches revision
-    // (Legacy: illustration_revision_needed with sendCount > 1)
-    if (status === 'sketches_revision' || (status === 'illustration_revision_needed' && sendCount > 1)) {
+    // (Legacy: illustration_revision_needed)
+    if (status === 'sketches_revision' || status === 'illustration_revision_needed') {
       return {
         tag: 'Sketches Feedback',
         tagStyle: 'bg-orange-100 text-orange-800 border-orange-300',
@@ -316,10 +292,9 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const stage = getStageConfig()
   
   // For character phase, use character_send_count for display
-  // For sketches phase (sendCount > 1), show revision round (sendCount - 1)
-  // For trial phase (sendCount <= 1), show sendCount
+  // For illustration phase, show revision round (sendCount - 1 for resends, since first send = round 0)
   const displayCount = isInIllustrationPhase(status) 
-    ? (sendCount > 1 ? sendCount - 1 : sendCount) 
+    ? Math.max(0, sendCount - 1) // Revision rounds start from 0
     : (projectInfo.character_send_count || 0)
   
   const buttonDisplayLabel = isSendingToCustomer 

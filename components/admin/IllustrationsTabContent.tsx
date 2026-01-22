@@ -90,18 +90,30 @@ export function IllustrationsTabContent({
     const router = useRouter()
 
     // MEMOIZE VISIBLE PAGES to prevent unstable references passed to children
-    // Admin sees only Page 1 during trial phase, then all pages after trial approved
+    // Admin sees only Page 1 until it's generated, then all pages unlock
     const visiblePages = useMemo(() => {
+        // Check if page 1 has been generated
+        const page1 = pages.find(p => p.page_number === 1)
+        const page1Generated = !!page1?.illustration_url
+        
+        // Status-based logic (for review/revision/approved phases, always show all)
         const allPagesStatuses = [
-            'trial_approved', 'illustrations_generating',
             'sketches_review', 'sketches_revision',
             'illustration_approved', 'completed',
             // Legacy statuses (for migration period)
+            'trial_approved', 'illustrations_generating',
             'illustration_review', 'illustration_revision_needed'
         ]
-        return allPagesStatuses.includes(projectStatus)
-            ? pages
-            : pages.slice(0, 1)
+        
+        // Show all pages if:
+        // 1. Status is in a phase where all pages should be visible, OR
+        // 2. Page 1 has been generated (admin can now generate rest)
+        if (allPagesStatuses.includes(projectStatus) || page1Generated) {
+            return pages
+        }
+        
+        // Otherwise, show only page 1 (admin must generate page 1 first)
+        return pages.slice(0, 1)
     }, [pages, projectStatus])
 
     // Local state for wizard settings (propagated to pages if needed via DB)

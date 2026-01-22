@@ -30,32 +30,37 @@ export function UnifiedIllustrationSidebar({
     // LOCKING LOGIC (Pages 2+ visibility/access)
     // ============================================================
     // ADMIN: 
-    //   - Before trial_approved: Locked (only page 1, generating trial)
-    //   - After trial_approved: Unlocked (can generate all pages)
+    //   - Page 1 always visible
+    //   - Pages 2+ unlock once page 1 is generated (has illustration_url)
     //
     // CUSTOMER:
-    //   - Before first sketches send: Locked (only sees page 1 trial)
-    //   - After sketches_review (sendCount > 1): Unlocked (sees all pages)
+    //   - Page 1 always visible (once sketches sent)
+    //   - Pages 2+ visible after admin sends sketches (sketches_review status)
     // ============================================================
     
-    const isAdminUnlocked = [
-        'trial_approved',
-        'illustrations_generating', 
+    // Check if page 1 has been generated
+    const page1 = pages.find(p => p.page_number === 1)
+    const page1Generated = !!page1?.illustration_url
+    
+    // Admin: unlock pages 2+ once page 1 is generated OR in review/approved phases
+    const isAdminUnlocked = page1Generated || [
         'sketches_review', 
         'sketches_revision',
         'illustration_approved',
         'completed',
-        // Legacy: when sendCount > 1, admin already sent all pages
-        ...(illustrationSendCount > 1 ? ['illustration_review', 'illustration_revision_needed'] : [])
+        // Legacy statuses
+        'trial_approved', 'illustrations_generating',
+        'illustration_review', 'illustration_revision_needed'
     ].includes(projectStatus)
     
+    // Customer: unlock pages 2+ once sketches are sent
     const isCustomerUnlocked = [
         'sketches_review',
         'sketches_revision', 
         'illustration_approved',
         'completed',
-        // Legacy: when sendCount > 1, customer received all sketches
-        ...(illustrationSendCount > 1 ? ['illustration_review', 'illustration_revision_needed'] : [])
+        // Legacy statuses
+        'illustration_review', 'illustration_revision_needed'
     ].includes(projectStatus)
     
     // Determine if pages 2+ are locked based on mode

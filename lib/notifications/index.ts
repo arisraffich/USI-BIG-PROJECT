@@ -430,79 +430,10 @@ export async function notifyCharactersApproved(options: {
   }
 }
 
-export async function notifyIllustrationTrialSent(options: {
-  projectTitle: string
-  authorName: string
-  authorEmail: string
-  authorPhone?: string
-  reviewUrl: string
-  projectUrl: string
-}): Promise<void> {
-  const { projectTitle, authorName, authorEmail, authorPhone, reviewUrl, projectUrl } = options
+// notifyIllustrationTrialSent REMOVED - trial phase no longer exists
+// All sketches are now sent at once using notifyAllSketchesSent
 
-  const authorFirstName = authorName.trim().split(/\s+/)[0] || authorName
-
-  // Send email to customer
-  try {
-    await sendEmail({
-      to: authorEmail,
-      subject: `Stage 3: Your First Illustration is Ready`,
-      html: `
-        <div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
-          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">First Illustration Preview</h2>
-          <p style="margin-bottom: 16px;">Hi ${authorFirstName},</p>
-          <p style="margin-bottom: 16px;">Great news – your first illustration is ready!</p>
-          <p style="margin-bottom: 16px;">This one sets the tone for the rest of the book, so take your time looking it over. If anything feels off or you'd like tweaks to the style, colors, or details, just let me know. If it looks good to you, give me the green light and I'll get started on the remaining illustrations.</p>
-          <p style="margin-bottom: 16px;">Take a look here:</p>
-          <p style="margin: 24px 0;">
-            <a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Review Illustration</a>
-          </p>
-          <p style="margin-bottom: 16px;">Looking forward to hearing what you think!</p>
-          <p style="margin-bottom: 8px;">Best,</p>
-          <p style="font-weight: bold;">US Illustrations Team</p>
-        </div>
-      `,
-    })
-  } catch (emailError: any) {
-    console.error('[Notification] Failed to send illustration trial email:', emailError)
-  }
-
-  // Send SMS (DISABLED temporarily per user request condition)
-  if (false && authorPhone) {
-    // ...
-  }
-
-  // Send Slack notification to PM
-  try {
-    await sendSlackNotification({
-      text: `🎨 Illustration Trial sent to customer for "${projectTitle}"`,
-      blocks: [
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `*Illustration Trial Sent*\nTrial illustration for "${projectTitle}" by ${authorName} has been sent for review.`,
-          },
-        },
-        {
-          type: 'actions',
-          elements: [
-            {
-              type: 'button',
-              text: { type: 'plain_text', text: 'View Project' },
-              url: projectUrl,
-              style: 'primary',
-            },
-          ],
-        },
-      ],
-    })
-  } catch (slackError: any) {
-    console.error('Failed to send Slack notification:', slackError)
-  }
-}
-
-// NEW: Called when ALL sketches are sent for the first time (after trial approved)
+// Called when ALL sketches are sent for the first time
 export async function notifyAllSketchesSent(options: {
   projectTitle: string
   authorName: string
@@ -573,7 +504,7 @@ export async function notifyIllustrationsUpdate(options: {
   projectUrl: string
   revisionRound?: number
 }): Promise<void> {
-  const { projectTitle, authorName, authorEmail, authorPhone, reviewUrl, projectUrl, revisionRound } = options
+  const { projectTitle, authorName, authorEmail, reviewUrl, projectUrl, revisionRound } = options
 
   const authorFirstName = authorName.trim().split(/\s+/)[0] || authorName
   const roundText = revisionRound ? ` | Round ${revisionRound}` : ''
@@ -582,14 +513,14 @@ export async function notifyIllustrationsUpdate(options: {
   try {
     await sendEmail({
       to: authorEmail,
-      subject: `Stage 3: First Illustration Revision${roundText}`,
+      subject: `Stage 3: Sketches Revised${roundText}`,
       html: `
         <div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
-          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">First Illustration Revision${roundText}</h2>
+          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">Sketches Revised${roundText}</h2>
           <p style="margin-bottom: 16px;">Hi ${authorFirstName},</p>
           <p style="margin-bottom: 16px;">We've made the changes you requested – take a look at the updated sketches and let us know what you think.</p>
           <p style="margin-bottom: 16px;">If it still needs some tweaking, no problem – just click <strong style="color: #d66700;">Request Revisions</strong> and send over your notes. If everything looks good, click <strong style="color: #00a53d;">Approve Sketches</strong> and we'll move forward with the final coloring stage.</p>
-          <p style="margin-bottom: 16px;">You can review it here:</p>
+          <p style="margin-bottom: 16px;">You can review them here:</p>
           <p style="margin: 24px 0;">
             <a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Review Sketches</a>
           </p>
@@ -599,19 +530,19 @@ export async function notifyIllustrationsUpdate(options: {
       `,
     })
   } catch (emailError: any) {
-    console.error('[Notification] Failed to send illustration update email:', emailError)
+    console.error('[Notification] Failed to send sketches revision email:', emailError)
   }
 
   // Send Slack notification to PM
   try {
     await sendSlackNotification({
-      text: `🎨 First Illustration Revision${roundText} sent to customer for "${projectTitle}"`,
+      text: `🔄 Sketches Revised${roundText} - sent to customer for "${projectTitle}"`,
       blocks: [
         {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `*First Illustration Revision${roundText}*\nRevision for "${projectTitle}" by ${authorName} has been sent for review.`,
+            text: `*Sketches Revised${roundText}*\nRevisions for "${projectTitle}" by ${authorName} have been sent for review.`,
           },
         },
         {

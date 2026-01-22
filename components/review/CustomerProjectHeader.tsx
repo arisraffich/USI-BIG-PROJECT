@@ -97,23 +97,21 @@ export function CustomerProjectHeader({
   }
 
   const currentTabId = isIllustrationsActive ? 'illustrations' : (isCharactersActive ? 'characters' : 'pages')
-  const isApprovedStage = projectStatus === 'illustration_approved' || projectStatus === 'trial_approved' || projectStatus === 'completed'
+  const isApprovedStage = projectStatus === 'illustration_approved' || projectStatus === 'completed'
   
-  // Determine button text based on phase
-  const isTrialPhase = illustrationSendCount <= 1
-  const approveButtonText = isTrialPhase ? 'APPROVE ILLUSTRATION' : 'APPROVE SKETCHES'
-  const approvedButtonText = isTrialPhase ? 'TRIAL APPROVED' : 'SKETCHES APPROVED'
+  // Simplified: Always show "APPROVE SKETCHES" (no trial phase)
+  const approveButtonText = 'APPROVE SKETCHES'
+  const approvedButtonText = 'SKETCHES APPROVED'
   
   // Determine status badge text based on project status
   const getStatusBadgeText = () => {
-    if (projectStatus === 'trial_review' || projectStatus === 'trial_revision') return 'Illustration Review'
     if (projectStatus === 'sketches_review' || projectStatus === 'sketches_revision') return 'Sketches Review'
     if (projectStatus === 'illustration_approved') return 'Sketches Approved'
     if (projectStatus === 'completed') return 'Completed'
-    // Legacy statuses
-    if (projectStatus === 'illustration_review' || projectStatus === 'illustration_revision_needed') {
-      return illustrationSendCount <= 1 ? 'Illustration Review' : 'Sketches Review'
-    }
+    // Legacy statuses (for migration compatibility)
+    if (projectStatus === 'trial_review' || projectStatus === 'trial_revision') return 'Sketches Review'
+    if (projectStatus === 'trial_approved' || projectStatus === 'illustrations_generating') return 'Sketches Review'
+    if (projectStatus === 'illustration_review' || projectStatus === 'illustration_revision_needed') return 'Sketches Review'
     return 'Review'
   }
   

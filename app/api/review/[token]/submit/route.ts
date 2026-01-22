@@ -38,16 +38,13 @@ export async function POST(
     }
 
     // Check if project is in correct status
-    // Allow submission if in review or if revision needed (re-submitting?)
-    // Strictly speaking, should be 'character_review'.
-    // Check if project is in correct status
     // Allow submission if in ANY review status
     const allowedStatuses = [
       'character_review', 'character_revision_needed',
-      // New illustration statuses
-      'trial_review', 'trial_revision',
+      // Illustration statuses
       'sketches_review', 'sketches_revision',
-      // Legacy illustration statuses (for migration)
+      // Legacy statuses (for migration compatibility)
+      'trial_review', 'trial_revision',
       'illustration_review', 'illustration_revision_needed'
     ]
 
@@ -58,12 +55,12 @@ export async function POST(
       )
     }
 
-    // BRANCH 1: ILLUSTRATION REVIEW SUBMISSION
-    // Check if in any illustration-related status
+    // BRANCH 1: ILLUSTRATION/SKETCHES REVIEW SUBMISSION
     const isIllustrationStatus = [
-      'trial_review', 'trial_revision',
       'sketches_review', 'sketches_revision',
-      'illustration_review', 'illustration_revision_needed' // Legacy
+      // Legacy statuses (for migration compatibility)
+      'trial_review', 'trial_revision',
+      'illustration_review', 'illustration_revision_needed'
     ].includes(project.status)
     
     if (isIllustrationStatus) {
@@ -100,26 +97,18 @@ export async function POST(
       // Check if ANY page has feedback notes (unresolved)
       const { data: pages } = await supabase.from('pages').select('feedback_notes, is_resolved').eq('project_id', project.id)
       const hasFeedback = pages?.some(p => !!p.feedback_notes && !p.is_resolved)
-      
-      // Determine phase based on send count
-      const sendCount = (project as any).illustration_send_count || 0
-      const isTrialPhase = sendCount <= 1
 
       let newStatus: string
       let message: string
 
       if (hasFeedback) {
         // Feedback = Revision needed
-        newStatus = isTrialPhase ? 'trial_revision' : 'sketches_revision'
-        message = isTrialPhase 
-          ? 'Feedback submitted. We will revise the trial illustration.'
-          : 'Feedback submitted. We will revise the sketches.'
+        newStatus = 'sketches_revision'
+        message = 'Feedback submitted. We will revise the sketches.'
       } else {
         // No feedback = Approved
-        newStatus = isTrialPhase ? 'trial_approved' : 'illustration_approved'
-        message = isTrialPhase 
-          ? 'Trial illustration approved! Full production can begin.'
-          : 'All sketches approved!'
+        newStatus = 'illustration_approved'
+        message = 'All sketches approved!'
       }
 
       const { error: statusUpdateError } = await supabase.from('projects').update({

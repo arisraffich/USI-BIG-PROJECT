@@ -48,14 +48,14 @@ export async function POST(
       reviewToken = uuidv4().replace(/-/g, '').substring(0, 32)
     }
 
-    // DETERMINE MODE: Character Review vs Illustration Trial
+    // DETERMINE MODE: Character Review vs Illustration (Sketches)
     const isIllustrationMode = [
       'characters_approved',
-      'trial_review', 'trial_revision', 'trial_approved',
-      'illustrations_generating',
       'sketches_review', 'sketches_revision',
       'illustration_approved',
-      // Legacy statuses
+      // Legacy statuses (for migration compatibility)
+      'trial_review', 'trial_revision', 'trial_approved',
+      'illustrations_generating',
       'illustration_review', 'illustration_revision_needed'
     ].includes(project.status)
 
@@ -108,10 +108,8 @@ export async function POST(
       const currentCount = (project as any).illustration_send_count || 0
       const newCount = hasImages ? currentCount + 1 : currentCount
       
-      // Determine new status based on send count
-      // First send (trial): trial_review
-      // Subsequent sends (all sketches): sketches_review
-      const newStatus = newCount === 1 ? 'trial_review' : 'sketches_review'
+      // Simplified: Always set to sketches_review (no trial phase)
+      const newStatus = 'sketches_review'
 
       const { error: updateError } = await supabase
         .from('projects')
@@ -134,18 +132,7 @@ export async function POST(
         const projectTitle = project.book_title || 'Untitled Project'
         
         if (currentCount === 0) {
-          // First send: Trial illustration (page 1 only)
-          const { notifyIllustrationTrialSent } = await import('@/lib/notifications')
-          notifyIllustrationTrialSent({
-            projectTitle,
-            authorName,
-            authorEmail: project.author_email,
-            authorPhone: project.author_phone || undefined,
-            reviewUrl,
-            projectUrl,
-          }).catch(err => console.error('Notification error:', err))
-        } else if (currentCount === 1) {
-          // Second send: All sketches ready (first time sending all pages)
+          // First send: All sketches ready
           const { notifyAllSketchesSent } = await import('@/lib/notifications')
           notifyAllSketchesSent({
             projectTitle,
@@ -156,7 +143,7 @@ export async function POST(
             projectUrl,
           }).catch(err => console.error('Notification error:', err))
         } else {
-          // Third+ send: Revisions
+          // Subsequent sends: Revisions
           const { notifyIllustrationsUpdate } = await import('@/lib/notifications')
           notifyIllustrationsUpdate({
             projectTitle,
@@ -165,7 +152,7 @@ export async function POST(
             authorPhone: project.author_phone || undefined,
             reviewUrl,
             projectUrl,
-            revisionRound: currentCount - 1, // Revision round (currentCount=2 means 1st revision)
+            revisionRound: currentCount, // Revision round (currentCount=1 means 1st revision)
           }).catch(err => console.error('Notification error:', err))
         }
       }

@@ -1,6 +1,6 @@
 export type ProjectStatus =
   | 'draft'
-  // Character Phase
+  // Character Phase (unchanged)
   | 'character_review'
   | 'character_generation'
   | 'character_approval'
@@ -10,18 +10,17 @@ export type ProjectStatus =
   | 'character_generation_complete'
   | 'character_revision_needed'
   | 'characters_regenerated'
-  // Illustration Phase - Trial (Page 1)
-  | 'trial_review'           // Waiting for customer to review trial (page 1)
-  | 'trial_revision'         // Customer requested changes to trial
-  | 'trial_approved'         // Customer approved trial, admin can generate rest
-  // Illustration Phase - Full Sketches
-  | 'illustrations_generating' // Admin generating pages 2-N
+  // Illustration Phase (simplified - no trial)
   | 'sketches_review'        // All sketches sent, waiting for customer review
   | 'sketches_revision'      // Customer requested changes to sketches
   | 'illustration_approved'  // Customer approved all sketches - FINAL
-  // Legacy (will be migrated)
-  | 'illustration_review'    // → trial_review
-  | 'illustration_revision_needed' // → trial_revision or sketches_revision
+  // Legacy (for migration compatibility)
+  | 'trial_review'
+  | 'trial_revision'
+  | 'trial_approved'
+  | 'illustrations_generating'
+  | 'illustration_review'
+  | 'illustration_revision_needed'
   // Other
   | 'completed'
 
