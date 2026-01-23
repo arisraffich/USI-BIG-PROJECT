@@ -55,6 +55,7 @@ export interface SharedIllustrationBoardProps {
     projectId?: string
     illustrationStatus?: 'draft' | 'illustration_approved' | 'illustration_production' | 'completed'
     projectStatus?: string // Main status field - used for lock logic
+    illustrationSendCount?: number // For round-based history display
     onSaveFeedback: (notes: string) => Promise<void>
     isGenerating?: boolean
     isUploading?: boolean
@@ -91,6 +92,7 @@ export function SharedIllustrationBoard({
     projectId,
     illustrationStatus = 'draft',
     projectStatus,
+    illustrationSendCount = 0,
     onSaveFeedback,
     isGenerating = false,
     isUploading = false,
@@ -452,30 +454,65 @@ export function SharedIllustrationBoard({
                             )}
                         </div>
 
-                        {/* HISTORY - Smart Collapsible */}
+                        {/* HISTORY - Round-Based Collapsible */}
                         {page.feedback_history && page.feedback_history.length > 0 && (() => {
-                            const reversedHistory = page.feedback_history.slice().reverse()
-                            const latestItem = reversedHistory[0]
-                            const olderItems = reversedHistory.slice(1)
                             const hasCurrentFeedback = !!page.feedback_notes
                             
-                            // If current feedback exists: collapse ALL history
-                            // If no current feedback: show latest outside, collapse older ones
-                            const itemsToCollapse = hasCurrentFeedback ? reversedHistory : olderItems
-                            const showLatestOutside = !hasCurrentFeedback
+                            // Check if ANY item has a revision_round (new system)
+                            const hasAnyRounds = page.feedback_history.some((item: any) => item.revision_round != null)
+                            
+                            // Badge component: shows round number if available, checkmark for legacy
+                            const RevisionBadge = ({ round }: { round?: number }) => (
+                                round != null ? (
+                                    <span className="w-5 h-5 rounded-full bg-green-600 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                                        {round}
+                                    </span>
+                                ) : (
+                                    <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+                                )
+                            )
+                            
+                            let itemsOutside: any[] = []
+                            let itemsToCollapse: any[] = []
+                            
+                            if (!hasAnyRounds) {
+                                // LEGACY MODE: No rounds tracked yet - use old logic (latest by array order)
+                                const reversedHistory = page.feedback_history.slice().reverse()
+                                if (!hasCurrentFeedback) {
+                                    itemsOutside = [reversedHistory[0]]
+                                    itemsToCollapse = reversedHistory.slice(1)
+                                } else {
+                                    itemsToCollapse = reversedHistory
+                                }
+                            } else {
+                                // ROUND-BASED MODE: Group by revision_round
+                                // Current round items show outside, older rounds go in dropdown
+                                const currentRound = illustrationSendCount
+                                
+                                if (!hasCurrentFeedback) {
+                                    itemsOutside = page.feedback_history.filter((item: any) => item.revision_round === currentRound)
+                                    itemsToCollapse = page.feedback_history.filter((item: any) => item.revision_round !== currentRound)
+                                } else {
+                                    // Customer is writing feedback - collapse all history
+                                    itemsToCollapse = page.feedback_history.slice()
+                                }
+                                
+                                // Sort collapsed items by round (newest first)
+                                itemsToCollapse.sort((a: any, b: any) => (b.revision_round || 0) - (a.revision_round || 0))
+                            }
                             
                             return (
                                 <div className="mt-3 space-y-2">
-                                    {/* Latest resolved - show outside dropdown when no current feedback */}
-                                    {showLatestOutside && latestItem && (
-                                        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm flex items-start gap-2">
-                                            <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+                                    {/* Current round items - show outside dropdown */}
+                                    {itemsOutside.map((item: any, idx: number) => (
+                                        <div key={`outside-${idx}`} className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm flex items-start gap-2">
+                                            <RevisionBadge round={item.revision_round} />
                                             <p className="leading-relaxed text-green-900">
                                                 <span className="font-bold text-green-700 uppercase text-xs mr-2">Resolved:</span>
-                                                {(latestItem as any).note}
+                                                {item.note}
                                             </p>
                                         </div>
-                                    )}
+                                    ))}
                                     
                                     {/* Collapsible section for older items */}
                                     {itemsToCollapse.length > 0 && (
@@ -496,10 +533,9 @@ export function SharedIllustrationBoard({
                                             
                                             {inlineHistoryExpanded && (
                                                 <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
-                                                    {/* @ts-ignore */}
                                                     {itemsToCollapse.map((item: any, i: number) => (
                                                         <div key={`hist-${i}`} className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm flex items-start gap-2">
-                                                            <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+                                                            <RevisionBadge round={item.revision_round} />
                                                             <p className="leading-relaxed text-slate-700">
                                                                 <span className="font-bold text-slate-500 uppercase text-xs mr-2">Resolved:</span>
                                                                 {item.note}

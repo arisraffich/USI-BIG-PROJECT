@@ -259,6 +259,7 @@ export function UnifiedIllustrationFeed({
                             projectId={projectId}
                             illustrationStatus={illustrationStatus as any}
                             projectStatus={projectStatus}
+                            illustrationSendCount={illustrationSendCount}
 
                             // Pass candidates for environment reference
                             illustratedPages={illustratedPages}

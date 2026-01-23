@@ -61,6 +61,9 @@ export async function POST(
 
     if (isIllustrationMode) {
       // --- ILLUSTRATION REVIEW MODE ---
+      
+      // Get current send count FIRST (needed for revision_round tracking)
+      const currentCount = (project as any).illustration_send_count || 0
 
       // 1. Get ALL Pages
       const { data: pages } = await supabase
@@ -81,11 +84,15 @@ export async function POST(
           const updateData: any = {}
           if (page.feedback_notes) {
             const currentHistory = Array.isArray(page.feedback_history) ? page.feedback_history : []
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // Store revision_round: the NEW count (after this send completes)
+            // This marks which "resend cycle" this feedback was resolved in
             const newHistory = [
               ...currentHistory,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              { note: page.feedback_notes, created_at: new Date().toISOString() } as any
+              { 
+                note: page.feedback_notes, 
+                created_at: new Date().toISOString(),
+                revision_round: currentCount + 1  // The round being completed now
+              }
             ]
             updateData.feedback_history = newHistory
             updateData.feedback_notes = null
@@ -105,7 +112,6 @@ export async function POST(
       }
 
       // 3. Update Project Status & Count
-      const currentCount = (project as any).illustration_send_count || 0
       const newCount = hasImages ? currentCount + 1 : currentCount
       
       // Simplified: Always set to sketches_review (no trial phase)
