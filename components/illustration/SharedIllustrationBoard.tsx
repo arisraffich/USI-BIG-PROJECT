@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, AlignLeft, Users, Plus, Minus, Pencil, Check } from 'lucide-react'
+import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, ChevronUp, AlignLeft, Users, Plus, Minus, Pencil, Check } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
@@ -436,17 +436,39 @@ export function SharedIllustrationBoard({
                             )}
                         </div>
 
-                        {/* HISTORY */}
-                        {/* @ts-ignore */}
-                        {page.feedback_history?.slice().reverse().map((item: any, i: number) => (
-                            <div key={`hist-${i}`} className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm flex items-start gap-2">
-                                <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
-                                <p className="leading-relaxed text-slate-700">
-                                    <span className="font-bold text-slate-500 uppercase text-xs mr-2">Resolved:</span>
-                                    {item.note}
-                                </p>
+                        {/* HISTORY - Collapsible */}
+                        {page.feedback_history && page.feedback_history.length > 0 && (
+                            <div className="mt-3">
+                                <button
+                                    onClick={() => setHistoryOpen(!historyOpen)}
+                                    className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors w-full py-1"
+                                >
+                                    {historyOpen ? (
+                                        <ChevronUp className="w-4 h-4" />
+                                    ) : (
+                                        <ChevronDown className="w-4 h-4" />
+                                    )}
+                                    <span>
+                                        {historyOpen ? 'Hide' : 'Show'} {page.feedback_history.length} previous revision{page.feedback_history.length !== 1 ? 's' : ''}
+                                    </span>
+                                </button>
+                                
+                                {historyOpen && (
+                                    <div className="mt-2 space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                                        {/* @ts-ignore */}
+                                        {page.feedback_history.slice().reverse().map((item: any, i: number) => (
+                                            <div key={`hist-${i}`} className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm flex items-start gap-2">
+                                                <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+                                                <p className="leading-relaxed text-slate-700">
+                                                    <span className="font-bold text-slate-500 uppercase text-xs mr-2">Resolved:</span>
+                                                    {item.note}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        ))}
+                        )}
 
                         {!page.feedback_notes && (!page.feedback_history || page.feedback_history.length === 0) && (
                             <div className="text-sm text-slate-400 italic text-center py-8">

@@ -3,6 +3,7 @@
 import { Page } from '@/types/page'
 import { ProjectStatus } from '@/types/project'
 import { useIllustrationLock } from '@/hooks/use-illustration-lock'
+import { MessageSquare, CheckCircle2 } from 'lucide-react'
 
 interface UnifiedIllustrationSidebarProps {
     pages: Page[]
@@ -54,6 +55,13 @@ export function UnifiedIllustrationSidebar({
                                     } ${(disabled || isLocked) ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
                             >
                                 <span className="flex items-center gap-2">
+                                    {/* Feedback indicator - Admin only */}
+                                    {mode === 'admin' && page.feedback_notes && !page.is_resolved && (
+                                        <MessageSquare className="w-4 h-4 text-amber-500" title="Has unresolved feedback" />
+                                    )}
+                                    {mode === 'admin' && page.feedback_notes && page.is_resolved && (
+                                        <CheckCircle2 className="w-4 h-4 text-green-500" title="Feedback resolved" />
+                                    )}
                                     Page {page.page_number}
                                     {failedPageIds.includes(page.id) && (
                                         <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" title="Generation failed" />
@@ -100,6 +108,17 @@ export function UnifiedIllustrationSidebar({
                                 </button>
                                 {failedPageIds.includes(page.id) && (
                                     <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 border border-white animate-pulse" />
+                                )}
+                                {/* Feedback indicator - Admin only (mobile) */}
+                                {mode === 'admin' && page.feedback_notes && !page.is_resolved && (
+                                    <span className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full bg-amber-400 border border-white flex items-center justify-center">
+                                        <MessageSquare className="w-2 h-2 text-white" />
+                                    </span>
+                                )}
+                                {mode === 'admin' && page.feedback_notes && page.is_resolved && (
+                                    <span className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full bg-green-500 border border-white flex items-center justify-center">
+                                        <CheckCircle2 className="w-2 h-2 text-white" />
+                                    </span>
                                 )}
                             </div>
                         )
