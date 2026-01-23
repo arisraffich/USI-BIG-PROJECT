@@ -687,7 +687,7 @@ export function CustomerProjectTabsContent({
                         />
                       </div>
                       {completedCount < totalForms && (
-                        <p className="text-xs text-gray-500 mt-2">
+                        <p className="text-xs text-gray-500 mt-2 hidden md:block">
                           Please complete form {activeFormIndex + 1} to continue
                         </p>
                       )}
