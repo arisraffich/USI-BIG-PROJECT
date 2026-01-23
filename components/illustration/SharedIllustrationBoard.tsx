@@ -120,7 +120,6 @@ export function SharedIllustrationBoard({
     const [showImage, setShowImage] = useState<string | null>(null)
     const [historyOpen, setHistoryOpen] = useState(false) // For mobile popup
     const [inlineHistoryExpanded, setInlineHistoryExpanded] = useState(false) // For desktop inline collapsible
-    const historyDropdownRef = useRef<HTMLDivElement>(null) // For click-outside collapse
 
     // NEW: View Mode for Sketch Card
     const [sketchViewMode, setSketchViewMode] = useState<'sketch' | 'text'>('sketch')
@@ -193,20 +192,6 @@ export function SharedIllustrationBoard({
             setSceneCharacters([])
         }
     }, [isSceneRecreationMode])
-    
-    // Click-outside handler to collapse history dropdown
-    useEffect(() => {
-        if (!inlineHistoryExpanded) return
-        
-        const handleClickOutside = (event: MouseEvent) => {
-            if (historyDropdownRef.current && !historyDropdownRef.current.contains(event.target as Node)) {
-                setInlineHistoryExpanded(false)
-            }
-        }
-        
-        document.addEventListener('mousedown', handleClickOutside)
-        return () => document.removeEventListener('mousedown', handleClickOutside)
-    }, [inlineHistoryExpanded])
     
     // Sync editedSceneNotes when page changes
     useEffect(() => {
@@ -452,52 +437,34 @@ export function SharedIllustrationBoard({
                             )}
                         </div>
 
-                        {/* HISTORY - Organized by Revision Round */}
+                        {/* HISTORY - Smart Collapsible */}
                         {page.feedback_history && page.feedback_history.length > 0 && (() => {
+                            const reversedHistory = page.feedback_history.slice().reverse()
+                            const latestItem = reversedHistory[0]
+                            const olderItems = reversedHistory.slice(1)
                             const hasCurrentFeedback = !!page.feedback_notes
                             
-                            // Get all history items with their revision rounds
-                            const historyItems = page.feedback_history.map((item: any) => ({
-                                note: item.note,
-                                created_at: item.created_at,
-                                revision_round: item.revision_round || null // Legacy items won't have this
-                            }))
-                            
-                            // Find the latest (max) revision round
-                            const latestRound = Math.max(...historyItems.map(item => item.revision_round || 0))
-                            
-                            // Separate items by round
-                            const latestRoundItems = historyItems.filter(item => item.revision_round === latestRound)
-                            const olderRoundItems = historyItems.filter(item => item.revision_round !== latestRound)
-                            
-                            // If customer has current feedback: collapse ALL history
-                            // If no current feedback: show latest round items outside, collapse older rounds
-                            const showOutside = !hasCurrentFeedback && latestRoundItems.length > 0
-                            const itemsToCollapse = hasCurrentFeedback ? historyItems : olderRoundItems
-                            
-                            // Helper to render round number badge
-                            const RoundBadge = ({ round }: { round: number | null }) => (
-                                <span className="w-5 h-5 rounded-full bg-green-600 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                                    {round || '?'}
-                                </span>
-                            )
+                            // If current feedback exists: collapse ALL history
+                            // If no current feedback: show latest outside, collapse older ones
+                            const itemsToCollapse = hasCurrentFeedback ? reversedHistory : olderItems
+                            const showLatestOutside = !hasCurrentFeedback
                             
                             return (
                                 <div className="mt-3 space-y-2">
-                                    {/* Latest round items - show outside dropdown when no current feedback */}
-                                    {showOutside && latestRoundItems.map((item, idx) => (
-                                        <div key={`latest-${idx}`} className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm flex items-start gap-2">
-                                            <RoundBadge round={item.revision_round} />
+                                    {/* Latest resolved - show outside dropdown when no current feedback */}
+                                    {showLatestOutside && latestItem && (
+                                        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm flex items-start gap-2">
+                                            <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
                                             <p className="leading-relaxed text-green-900">
                                                 <span className="font-bold text-green-700 uppercase text-xs mr-2">Resolved:</span>
-                                                {item.note}
+                                                {(latestItem as any).note}
                                             </p>
                                         </div>
-                                    ))}
+                                    )}
                                     
-                                    {/* Collapsible section for older rounds */}
+                                    {/* Collapsible section for older items */}
                                     {itemsToCollapse.length > 0 && (
-                                        <div ref={historyDropdownRef}>
+                                        <>
                                             <button
                                                 onClick={() => setInlineHistoryExpanded(!inlineHistoryExpanded)}
                                                 className="flex items-center gap-2 text-sm text-slate-900 hover:text-slate-700 transition-colors w-full py-1"
@@ -513,10 +480,11 @@ export function SharedIllustrationBoard({
                                             </button>
                                             
                                             {inlineHistoryExpanded && (
-                                                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1 mt-2">
-                                                    {itemsToCollapse.map((item, i) => (
+                                                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                                                    {/* @ts-ignore */}
+                                                    {itemsToCollapse.map((item: any, i: number) => (
                                                         <div key={`hist-${i}`} className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm flex items-start gap-2">
-                                                            <RoundBadge round={item.revision_round} />
+                                                            <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
                                                             <p className="leading-relaxed text-slate-700">
                                                                 <span className="font-bold text-slate-500 uppercase text-xs mr-2">Resolved:</span>
                                                                 {item.note}
@@ -525,7 +493,7 @@ export function SharedIllustrationBoard({
                                                     ))}
                                                 </div>
                                             )}
-                                        </div>
+                                        </>
                                     )}
                                 </div>
                             )
