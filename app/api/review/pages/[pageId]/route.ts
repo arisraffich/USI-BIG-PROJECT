@@ -95,8 +95,8 @@ export async function PATCH(
                 }
 
                 if (projectDetails) {
-                    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-                    const projectUrl = `${appUrl}/admin/projects/${page.project_id}?tab=illustrations`
+                    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+                    const projectUrl = `${baseUrl}/admin/project/${page.project_id}?tab=illustrations`
 
                     const { notifyCustomerReview } = await import('@/lib/notifications')
 
