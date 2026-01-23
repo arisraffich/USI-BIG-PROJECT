@@ -81,11 +81,15 @@ export async function POST(
           const updateData: any = {}
           if (page.feedback_notes) {
             const currentHistory = Array.isArray(page.feedback_history) ? page.feedback_history : []
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // Store revision_round: which send cycle this feedback was from
+            // currentCount=1 means customer was reviewing send #1, so this is round 1 feedback
             const newHistory = [
               ...currentHistory,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              { note: page.feedback_notes, created_at: new Date().toISOString() } as any
+              { 
+                note: page.feedback_notes, 
+                created_at: new Date().toISOString(),
+                revision_round: currentCount // 1-indexed round number
+              }
             ]
             updateData.feedback_history = newHistory
             updateData.feedback_notes = null
