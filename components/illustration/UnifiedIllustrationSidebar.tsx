@@ -57,10 +57,14 @@ export function UnifiedIllustrationSidebar({
                                 <span className="flex items-center gap-2">
                                     {/* Feedback indicator - Admin only */}
                                     {mode === 'admin' && page.feedback_notes && !page.is_resolved && (
-                                        <MessageSquare className="w-4 h-4 text-amber-500" title="Has unresolved feedback" />
+                                        <span title="Has unresolved feedback">
+                                            <MessageSquare className="w-4 h-4 text-amber-500" />
+                                        </span>
                                     )}
                                     {mode === 'admin' && page.feedback_notes && page.is_resolved && (
-                                        <CheckCircle2 className="w-4 h-4 text-green-500" title="Feedback resolved" />
+                                        <span title="Feedback resolved">
+                                            <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                        </span>
                                     )}
                                     Page {page.page_number}
                                     {failedPageIds.includes(page.id) && (
