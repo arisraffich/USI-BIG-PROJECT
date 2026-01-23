@@ -311,6 +311,19 @@ export function CustomerProjectTabsContent({
     return tab === 'characters' ? 'characters' : (tab === 'illustrations' ? 'illustrations' : 'pages')
   }, [searchParams])
 
+  // Helper to check if a character's form is complete (based on saved database data)
+  const isCharacterFormComplete = useCallback((char: Character): boolean => {
+    return !!(
+      char.age?.trim() &&
+      char.gender?.trim() &&
+      char.skin_color?.trim() &&
+      char.hair_color?.trim() &&
+      char.hair_style?.trim() &&
+      char.eye_color?.trim() &&
+      (char.clothing?.trim() || char.accessories?.trim() || char.special_features?.trim())
+    )
+  }, [])
+
   // Sort characters: main character first, then secondary by creation date
   const sortedCharacters = useMemo(() => {
     if (!localCharacters) return { main: null, secondary: [] }
@@ -332,6 +345,30 @@ export function CustomerProjectTabsContent({
       secondary: sorted.filter(c => !c.is_main)
     }
   }, [localCharacters])
+  
+  // Sequential form logic: find first incomplete form index
+  const { activeFormIndex, completedCount, totalForms } = useMemo(() => {
+    const secondary = sortedCharacters.secondary
+    const total = secondary.length
+    
+    // Find first incomplete form
+    let firstIncomplete = -1
+    let completed = 0
+    
+    for (let i = 0; i < secondary.length; i++) {
+      if (isCharacterFormComplete(secondary[i])) {
+        completed++
+      } else if (firstIncomplete === -1) {
+        firstIncomplete = i
+      }
+    }
+    
+    return {
+      activeFormIndex: firstIncomplete === -1 ? total : firstIncomplete, // -1 means all complete
+      completedCount: completed,
+      totalForms: total
+    }
+  }, [sortedCharacters.secondary, isCharacterFormComplete])
 
   // Check modes (use localProjectStatus for realtime updates)
   const isCharacterMode = ['character_generation', 'character_review', 'character_revision_needed', 'characters_approved'].includes(localProjectStatus)
@@ -633,22 +670,49 @@ export function CustomerProjectTabsContent({
                 />
               ) : (
                 // Character Forms - only show secondary characters (main character has no form data)
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {/* Main character form is no longer shown - main character data comes from uploaded image and story extraction */}
-                  {sortedCharacters.secondary.map((character) => (
-                    <CustomerCharacterCard
-                      key={character.id}
-                      character={character}
-                      onChange={handleCharacterChange}
-                    />
-                  ))}
-                  <div className="h-full">
-                    <CustomerAddCharacterButton
-                      mode="card"
-                      projectId={projectId}
-                      mainCharacterName={sortedCharacters.main?.name || sortedCharacters.main?.role || null}
-                      onCharacterAdded={handleCharacterAdded}
-                    />
+                <div className="space-y-6">
+                  {/* Progress Bar */}
+                  {totalForms > 0 && (
+                    <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-semibold text-gray-700">Character Details</h3>
+                        <span className="text-sm font-medium text-gray-500">
+                          {completedCount} of {totalForms} completed
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                        <div 
+                          className="bg-gradient-to-r from-green-500 to-emerald-500 h-2.5 rounded-full transition-all duration-500 ease-out"
+                          style={{ width: `${totalForms > 0 ? (completedCount / totalForms) * 100 : 0}%` }}
+                        />
+                      </div>
+                      {completedCount < totalForms && (
+                        <p className="text-xs text-gray-500 mt-2">
+                          Please complete form {activeFormIndex + 1} to continue
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Character Forms Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {/* Main character form is no longer shown - main character data comes from uploaded image and story extraction */}
+                    {sortedCharacters.secondary.map((character, index) => (
+                      <CustomerCharacterCard
+                        key={character.id}
+                        character={character}
+                        onChange={handleCharacterChange}
+                        isLocked={index > activeFormIndex}
+                      />
+                    ))}
+                    <div className="h-full">
+                      <CustomerAddCharacterButton
+                        mode="card"
+                        projectId={projectId}
+                        mainCharacterName={sortedCharacters.main?.name || sortedCharacters.main?.role || null}
+                        onCharacterAdded={handleCharacterAdded}
+                      />
+                    </div>
                   </div>
                 </div>
               )}

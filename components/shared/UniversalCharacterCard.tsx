@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Save, Edit, Trash2, Loader2, User, Check } from 'lucide-react'
+import { Save, Edit, Trash2, Loader2, User, Check, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Character } from '@/types/character'
 import {
@@ -68,6 +68,7 @@ export interface UniversalCharacterCardProps {
     alwaysEditing?: boolean
     hideSaveButton?: boolean
     onChange?: (data: CharacterFormData, isValid: boolean) => void
+    isLocked?: boolean // Sequential form flow - prevents editing until previous forms are complete
 }
 
 export const UniversalCharacterCard = memo(function UniversalCharacterCard({
@@ -79,7 +80,8 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
     readOnly = false,
     alwaysEditing = false,
     hideSaveButton = false,
-    onChange
+    onChange,
+    isLocked = false
 }: UniversalCharacterCardProps) {
     const [isEditing, setIsEditing] = useState(alwaysEditing)
     const [saving, setSaving] = useState(false)
@@ -280,18 +282,30 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
         <Card id={`character-${character.id}`} className={cn(
             "w-full transition-all duration-300 relative overflow-hidden group",
             // Conditional Glow Logic
-            !isFormValid
-                ? "border-amber-200 shadow-[0_0_15px_-3px_rgba(251,191,36,0.15)] bg-amber-50/10" // Pending Glow
-                : !editMode
-                    ? "border-green-200 shadow-[0_0_15px_-3px_rgba(34,197,94,0.15)] bg-green-50/10" // Ready & Saved Glow
-                    : "border-gray-200 shadow-sm hover:shadow-md", // Default/Editing Valid
+            isLocked
+                ? "border-gray-200 bg-gray-50/50 opacity-75" // Locked State - muted
+                : !isFormValid
+                    ? "border-amber-200 shadow-[0_0_15px_-3px_rgba(251,191,36,0.15)] bg-amber-50/10" // Pending Glow
+                    : !editMode
+                        ? "border-green-200 shadow-[0_0_15px_-3px_rgba(34,197,94,0.15)] bg-green-50/10" // Ready & Saved Glow
+                        : "border-gray-200 shadow-sm hover:shadow-md", // Default/Editing Valid
             className
         )}>
             {/* Status Strip for Quick Scanning */}
             <div className={cn(
                 "absolute left-0 top-0 right-0 h-1 transition-colors duration-300",
-                !isFormValid ? "bg-amber-400" : (!editMode ? "bg-green-500" : "bg-transparent")
+                isLocked ? "bg-gray-300" : (!isFormValid ? "bg-amber-400" : (!editMode ? "bg-green-500" : "bg-transparent"))
             )} />
+            
+            {/* Locked Overlay */}
+            {isLocked && (
+                <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-30 flex items-center justify-center">
+                    <div className="bg-white/90 rounded-lg px-4 py-3 shadow-sm border border-gray-200 flex items-center gap-2">
+                        <Lock className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm font-medium text-gray-500">Complete the previous form first</span>
+                    </div>
+                </div>
+            )}
             <CardContent className="p-6">
                 {/* Delete button (Top Right, absolute) - only if onDelete is provided */}
                 {!isMainCharacter && onDelete && (

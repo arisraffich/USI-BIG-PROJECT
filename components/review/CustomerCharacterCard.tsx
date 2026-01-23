@@ -9,12 +9,14 @@ interface CustomerCharacterCardProps {
   character: Character
   isGenerating?: boolean
   onChange?: (id: string, data: any, isValid: boolean) => void
+  isLocked?: boolean
 }
 
 export const CustomerCharacterCard = memo(function CustomerCharacterCard({
   character,
   isGenerating = false,
-  onChange
+  onChange,
+  isLocked = false
 }: CustomerCharacterCardProps) {
 
   const handleSave = async (data: CharacterFormData) => {
@@ -57,6 +59,7 @@ export const CustomerCharacterCard = memo(function CustomerCharacterCard({
       alwaysEditing={false} // Enable Lock-on-Save behavior
       hideSaveButton={false}
       onChange={handleChange}
+      isLocked={isLocked}
     />
   )
 })
