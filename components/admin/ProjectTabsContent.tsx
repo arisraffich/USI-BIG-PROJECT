@@ -163,9 +163,13 @@ export function ProjectTabsContent({
   const [characterForms, setCharacterForms] = useState<{ [id: string]: { data: any; isValid: boolean } }>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   
-  // Push to Customer State
+  // Push to Customer State (Illustrations)
   const [isPushDialogOpen, setIsPushDialogOpen] = useState(false)
   const [isPushing, setIsPushing] = useState(false)
+  
+  // Push Characters to Customer State
+  const [isCharPushDialogOpen, setIsCharPushDialogOpen] = useState(false)
+  const [isCharPushing, setIsCharPushing] = useState(false)
 
   // Initialize forms when entering manual mode (or when characters load)
   useEffect(() => {
@@ -242,7 +246,7 @@ export function ProjectTabsContent({
     }
   }
 
-  // Push to Customer (Silent Update)
+  // Push to Customer (Silent Update) - Illustrations
   const handlePushToCustomer = async () => {
     setIsPushing(true)
     try {
@@ -263,6 +267,30 @@ export function ProjectTabsContent({
       toast.error(e.message || 'Failed to push changes')
     } finally {
       setIsPushing(false)
+    }
+  }
+
+  // Push Characters to Customer (Silent Update)
+  const handlePushCharactersToCustomer = async () => {
+    setIsCharPushing(true)
+    try {
+      const response = await fetch(`/api/projects/${projectId}/push-characters-to-customer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Push failed')
+      }
+      
+      const result = await response.json()
+      toast.success(result.message || 'Characters pushed to customer')
+      setIsCharPushDialogOpen(false)
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to push characters')
+    } finally {
+      setIsCharPushing(false)
     }
   }
 
@@ -440,18 +468,61 @@ export function ProjectTabsContent({
           }}
           centerContent={
             <>
-              {/* Characters Manual Mode */}
+              {/* Characters Manual Mode + Push Button */}
               {activeTab === 'characters' && localCharacters && localCharacters.length > 1 && (
                 <div className="flex items-center gap-2">
                   {!isManualMode ? (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => setIsManualMode(true)}
-                      className="bg-red-600 hover:bg-red-700 text-white h-8 text-xs px-3 shadow-sm"
-                    >
-                      Manual
-                    </Button>
+                    <>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setIsManualMode(true)}
+                        className="bg-red-600 hover:bg-red-700 text-white h-8 text-xs px-3 shadow-sm"
+                      >
+                        Manual
+                      </Button>
+                      
+                      {/* Push Characters Button - only show after characters sent */}
+                      {(projectInfo?.character_send_count || 0) > 0 && (
+                        <AlertDialog open={isCharPushDialogOpen} onOpenChange={setIsCharPushDialogOpen}>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs px-3 border-blue-300 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                            >
+                              <Upload className="w-3 h-3 mr-1.5" />
+                              Push
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Push Characters to Customer?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will silently update all character images on the customer&apos;s side without sending any notifications. The customer will see the latest versions when they refresh or revisit the page.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel disabled={isCharPushing}>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={handlePushCharactersToCustomer}
+                                disabled={isCharPushing}
+                                className="bg-blue-600 hover:bg-blue-700"
+                              >
+                                {isCharPushing ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Pushing...
+                                  </>
+                                ) : (
+                                  'Push Characters'
+                                )}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </>
                   ) : (
                     <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
                       <Button variant="ghost" size="sm" onClick={() => setIsManualMode(false)} className="h-7 text-xs px-2 text-slate-500 hover:text-slate-700">
