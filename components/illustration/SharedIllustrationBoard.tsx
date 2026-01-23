@@ -118,7 +118,8 @@ export function SharedIllustrationBoard({
     const [isEditing, setIsEditing] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [showImage, setShowImage] = useState<string | null>(null)
-    const [historyOpen, setHistoryOpen] = useState(false)
+    const [historyOpen, setHistoryOpen] = useState(false) // For mobile popup
+    const [inlineHistoryExpanded, setInlineHistoryExpanded] = useState(false) // For desktop inline collapsible
 
     // NEW: View Mode for Sketch Card
     const [sketchViewMode, setSketchViewMode] = useState<'sketch' | 'text'>('sketch')
@@ -436,39 +437,67 @@ export function SharedIllustrationBoard({
                             )}
                         </div>
 
-                        {/* HISTORY - Collapsible */}
-                        {page.feedback_history && page.feedback_history.length > 0 && (
-                            <div className="mt-3">
-                                <button
-                                    onClick={() => setHistoryOpen(!historyOpen)}
-                                    className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors w-full py-1"
-                                >
-                                    {historyOpen ? (
-                                        <ChevronUp className="w-4 h-4" />
-                                    ) : (
-                                        <ChevronDown className="w-4 h-4" />
+                        {/* HISTORY - Smart Collapsible */}
+                        {page.feedback_history && page.feedback_history.length > 0 && (() => {
+                            const reversedHistory = page.feedback_history.slice().reverse()
+                            const latestItem = reversedHistory[0]
+                            const olderItems = reversedHistory.slice(1)
+                            const hasCurrentFeedback = !!page.feedback_notes
+                            
+                            // If current feedback exists: collapse ALL history
+                            // If no current feedback: show latest outside, collapse older ones
+                            const itemsToCollapse = hasCurrentFeedback ? reversedHistory : olderItems
+                            const showLatestOutside = !hasCurrentFeedback
+                            
+                            return (
+                                <div className="mt-3 space-y-2">
+                                    {/* Latest resolved - show outside dropdown when no current feedback */}
+                                    {showLatestOutside && latestItem && (
+                                        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm flex items-start gap-2">
+                                            <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+                                            <p className="leading-relaxed text-green-900">
+                                                <span className="font-bold text-green-700 uppercase text-xs mr-2">Resolved:</span>
+                                                {(latestItem as any).note}
+                                            </p>
+                                        </div>
                                     )}
-                                    <span>
-                                        {historyOpen ? 'Hide' : 'Show'} {page.feedback_history.length} previous revision{page.feedback_history.length !== 1 ? 's' : ''}
-                                    </span>
-                                </button>
-                                
-                                {historyOpen && (
-                                    <div className="mt-2 space-y-2 max-h-[200px] overflow-y-auto pr-1">
-                                        {/* @ts-ignore */}
-                                        {page.feedback_history.slice().reverse().map((item: any, i: number) => (
-                                            <div key={`hist-${i}`} className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm flex items-start gap-2">
-                                                <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
-                                                <p className="leading-relaxed text-slate-700">
-                                                    <span className="font-bold text-slate-500 uppercase text-xs mr-2">Resolved:</span>
-                                                    {item.note}
-                                                </p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                                    
+                                    {/* Collapsible section for older items */}
+                                    {itemsToCollapse.length > 0 && (
+                                        <>
+                                            <button
+                                                onClick={() => setInlineHistoryExpanded(!inlineHistoryExpanded)}
+                                                className="flex items-center gap-2 text-sm text-slate-900 hover:text-slate-700 transition-colors w-full py-1"
+                                            >
+                                                {inlineHistoryExpanded ? (
+                                                    <ChevronUp className="w-4 h-4" />
+                                                ) : (
+                                                    <ChevronDown className="w-4 h-4" />
+                                                )}
+                                                <span>
+                                                    {inlineHistoryExpanded ? 'Hide' : 'Show'} {itemsToCollapse.length} previous revision{itemsToCollapse.length !== 1 ? 's' : ''}
+                                                </span>
+                                            </button>
+                                            
+                                            {inlineHistoryExpanded && (
+                                                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                                                    {/* @ts-ignore */}
+                                                    {itemsToCollapse.map((item: any, i: number) => (
+                                                        <div key={`hist-${i}`} className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm flex items-start gap-2">
+                                                            <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+                                                            <p className="leading-relaxed text-slate-700">
+                                                                <span className="font-bold text-slate-500 uppercase text-xs mr-2">Resolved:</span>
+                                                                {item.note}
+                                                            </p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            )
+                        })()}
 
                         {!page.feedback_notes && (!page.feedback_history || page.feedback_history.length === 0) && (
                             <div className="text-sm text-slate-400 italic text-center py-8">
