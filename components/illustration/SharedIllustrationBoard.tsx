@@ -120,6 +120,7 @@ export function SharedIllustrationBoard({
     const [showImage, setShowImage] = useState<string | null>(null)
     const [historyOpen, setHistoryOpen] = useState(false) // For mobile popup
     const [inlineHistoryExpanded, setInlineHistoryExpanded] = useState(false) // For desktop inline collapsible
+    const historyDropdownRef = useRef<HTMLDivElement>(null) // For click-outside collapse
 
     // NEW: View Mode for Sketch Card
     const [sketchViewMode, setSketchViewMode] = useState<'sketch' | 'text'>('sketch')
@@ -192,6 +193,20 @@ export function SharedIllustrationBoard({
             setSceneCharacters([])
         }
     }, [isSceneRecreationMode])
+    
+    // Click-outside handler to collapse history dropdown
+    useEffect(() => {
+        if (!inlineHistoryExpanded) return
+        
+        const handleClickOutside = (event: MouseEvent) => {
+            if (historyDropdownRef.current && !historyDropdownRef.current.contains(event.target as Node)) {
+                setInlineHistoryExpanded(false)
+            }
+        }
+        
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [inlineHistoryExpanded])
     
     // Sync editedSceneNotes when page changes
     useEffect(() => {
@@ -464,7 +479,7 @@ export function SharedIllustrationBoard({
                                     
                                     {/* Collapsible section for older items */}
                                     {itemsToCollapse.length > 0 && (
-                                        <>
+                                        <div ref={historyDropdownRef}>
                                             <button
                                                 onClick={() => setInlineHistoryExpanded(!inlineHistoryExpanded)}
                                                 className="flex items-center gap-2 text-sm text-slate-900 hover:text-slate-700 transition-colors w-full py-1"
@@ -493,7 +508,7 @@ export function SharedIllustrationBoard({
                                                     ))}
                                                 </div>
                                             )}
-                                        </>
+                                        </div>
                                     )}
                                 </div>
                             )
