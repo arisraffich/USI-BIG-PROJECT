@@ -37,7 +37,8 @@ export async function POST(request: Request) {
             currentImageUrl, 
             referenceImages: uploadedReferenceImages, 
             referenceImageUrl,
-            sceneCharacters // New: Character overrides for Scene Recreation mode
+            sceneCharacters, // New: Character overrides for Scene Recreation mode
+            skipDbUpdate // New: For comparison mode - upload but don't save to DB
         } = body as {
             projectId: string
             pageId?: string
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
             referenceImages?: string[]
             referenceImageUrl?: string
             sceneCharacters?: SceneCharacterInput[]
+            skipDbUpdate?: boolean
         }
 
         // Debug: Log mode detection
@@ -505,37 +507,40 @@ ${textPromptSection}`
         const { data: urlData } = supabase.storage.from('illustrations').getPublicUrl(filename)
         const publicUrl = urlData.publicUrl
 
-        // 7. Update Page Record
+        // 7. Update Page Record (skip if in comparison mode)
         // Update illustration URL and mark any feedback as resolved (same pattern as character regeneration)
 
-        await supabase.from('pages')
-            .update({
-                illustration_url: publicUrl,
-                is_resolved: true, // Mark feedback as resolved after regeneration
-            })
-            .eq('id', pageData.id)
-
-        // 8. Update Project Status (Enable Resend Flow)
-        // Only update status to 'illustration_revision_needed' if we have already sent the trial at least once.
-        // AND if we are NOT in the 'illustration_approved' (Production) phase.
-        // In Production, we want to stay 'illustration_approved' so the "Send Illustrations" button remains active.
-
-        const sendCount = project?.illustration_send_count || 0
-        const currentStatus = project?.status
-
-        if (sendCount > 0 && currentStatus !== 'illustration_approved') {
-            await supabase.from('projects')
+        if (!skipDbUpdate) {
+            await supabase.from('pages')
                 .update({
-                    status: 'illustration_revision_needed',
+                    illustration_url: publicUrl,
+                    is_resolved: true, // Mark feedback as resolved after regeneration
                 })
-                .eq('id', projectId)
+                .eq('id', pageData.id)
+
+            // 8. Update Project Status (Enable Resend Flow)
+            // Only update status to 'illustration_revision_needed' if we have already sent the trial at least once.
+            // AND if we are NOT in the 'illustration_approved' (Production) phase.
+            // In Production, we want to stay 'illustration_approved' so the "Send Illustrations" button remains active.
+
+            const sendCount = project?.illustration_send_count || 0
+            const currentStatus = project?.status
+
+            if (sendCount > 0 && currentStatus !== 'illustration_approved') {
+                await supabase.from('projects')
+                    .update({
+                        status: 'illustration_revision_needed',
+                    })
+                    .eq('id', projectId)
+            }
         }
 
         return NextResponse.json({
             success: true,
             illustrationUrl: publicUrl,
             pageId: pageData.id,
-            aspectRatioUsed: mappedAspectRatio
+            aspectRatioUsed: mappedAspectRatio,
+            isPreview: !!skipDbUpdate // Indicate this is a preview (not saved to DB)
         })
 
     } catch (error: any) {

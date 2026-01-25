@@ -84,6 +84,14 @@ export interface SharedIllustrationBoardProps {
     
     // Error State
     generationError?: { message: string; technicalDetails: string }
+    
+    // Comparison Mode (Regeneration Preview)
+    comparisonState?: {
+        pageId: string
+        oldUrl: string
+        newUrl: string
+    }
+    onComparisonDecision?: (decision: 'keep_new' | 'revert_old') => void
 }
 
 export function SharedIllustrationBoard({
@@ -110,7 +118,9 @@ export function SharedIllustrationBoard({
     onGenerateAllRemaining,
     onCancelBatch,
     batchState,
-    generationError
+    generationError,
+    comparisonState,
+    onComparisonDecision
 }: SharedIllustrationBoardProps) {
 
     // --------------------------------------------------------------------------
@@ -674,6 +684,55 @@ export function SharedIllustrationBoard({
                     </div>
 
                     {/* IMAGES GRID (The Core Layout) */}
+                    {/* COMPARISON MODE: Show OLD vs NEW side by side */}
+                    {comparisonState && onComparisonDecision ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 flex-1 divide-y md:divide-y-0 md:divide-x divide-slate-100 h-full overflow-y-auto md:overflow-hidden">
+                            {/* OLD ILLUSTRATION (Left) */}
+                            <div className="flex flex-col items-center bg-white relative min-h-[300px] md:min-h-0">
+                                <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-3 bg-gradient-to-b from-black/60 to-transparent">
+                                    <span className="text-sm font-bold tracking-wider text-white uppercase px-3 py-1 bg-slate-700/80 rounded">OLD</span>
+                                </div>
+                                <div className="relative w-full h-full cursor-pointer hover:opacity-95 transition-opacity" onClick={() => setShowImage(comparisonState.oldUrl)}>
+                                    <img
+                                        src={comparisonState.oldUrl}
+                                        alt="Previous Illustration"
+                                        className="w-full h-full object-contain block"
+                                    />
+                                </div>
+                                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+                                    <Button
+                                        onClick={() => onComparisonDecision('revert_old')}
+                                        variant="outline"
+                                        className="w-full bg-white/90 hover:bg-white text-slate-800 border-slate-300"
+                                    >
+                                        Revert Old
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* NEW ILLUSTRATION (Right) */}
+                            <div className="flex flex-col items-center bg-slate-50/10 relative min-h-[300px] md:min-h-0">
+                                <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-3 bg-gradient-to-b from-black/60 to-transparent">
+                                    <span className="text-sm font-bold tracking-wider text-white uppercase px-3 py-1 bg-green-600/90 rounded">NEW</span>
+                                </div>
+                                <div className="relative w-full h-full cursor-pointer hover:opacity-95 transition-opacity" onClick={() => setShowImage(comparisonState.newUrl)}>
+                                    <img
+                                        src={comparisonState.newUrl}
+                                        alt="New Illustration"
+                                        className="w-full h-full object-contain block"
+                                    />
+                                </div>
+                                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+                                    <Button
+                                        onClick={() => onComparisonDecision('keep_new')}
+                                        className="w-full bg-green-600 hover:bg-green-700 text-white"
+                                    >
+                                        Keep New
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 flex-1 divide-y md:divide-y-0 md:divide-x divide-slate-100 h-full overflow-y-auto md:overflow-hidden">
 
                         {/* 1. SKETCH BLOCK */}
@@ -871,6 +930,7 @@ export function SharedIllustrationBoard({
                         </div>
 
                     </div>
+                    )}
                 </div>
             </div>
 

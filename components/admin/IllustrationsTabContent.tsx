@@ -133,6 +133,13 @@ export function IllustrationsTabContent({
     const batchCancelledRef = useRef(false)
     const MAX_CONCURRENT = 3
     
+    // Comparison mode state (for regeneration preview)
+    const [comparisonState, setComparisonState] = useState<{
+        pageId: string
+        oldUrl: string
+        newUrl: string
+    } | null>(null)
+    
     // Sync generatingPageIds to parent (for sidebar orange dots)
     useEffect(() => {
         if (onGeneratingPageIdsChange) {
@@ -227,6 +234,24 @@ export function IllustrationsTabContent({
         }
     }
 
+    // Helper to download image as backup
+    const downloadImageBackup = async (url: string, pageNumber: number) => {
+        try {
+            const response = await fetch(url)
+            const blob = await response.blob()
+            const downloadUrl = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = downloadUrl
+            link.download = `Page-${pageNumber}-backup-${new Date().toISOString().split('T')[0]}.png`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            URL.revokeObjectURL(downloadUrl)
+        } catch (e) {
+            console.warn('Failed to download backup:', e)
+        }
+    }
+
     const handleRegenerate = async (
         page: Page, 
         prompt: string, 
@@ -234,9 +259,16 @@ export function IllustrationsTabContent({
         referenceImageUrl?: string, 
         sceneCharacters?: SceneCharacter[]
     ) => {
+        const hasExistingIllustration = !!page.illustration_url
+        
         try {
             setGeneratingPageIds(prev => new Set(prev).add(page.id))
             setLoadingState(prev => ({ ...prev, [page.id]: { ...prev[page.id], illustration: true } }))
+
+            // Auto-download backup if there's an existing illustration
+            if (hasExistingIllustration && page.illustration_url) {
+                downloadImageBackup(page.illustration_url, page.page_number)
+            }
 
             // Determine if this is Scene Recreation mode
             const isSceneRecreation = !!referenceImageUrl
@@ -251,14 +283,34 @@ export function IllustrationsTabContent({
                     currentImageUrl: page.illustration_url,
                     referenceImages, // Array of base64 strings (Mode 1/2 only)
                     referenceImageUrl, // Scene Recreation mode (Mode 3/4)
-                    sceneCharacters: isSceneRecreation ? sceneCharacters : undefined // Character overrides (Mode 3/4)
+                    sceneCharacters: isSceneRecreation ? sceneCharacters : undefined, // Character overrides (Mode 3/4)
+                    skipDbUpdate: hasExistingIllustration // Don't save to DB if regenerating (comparison mode)
                 })
             })
 
             if (!response.ok) throw new Error('Regeneration failed')
 
             const data = await response.json()
-            const successMessage = isSceneRecreation ? 'Scene Recreated!' : 'Illustration Regenerated!'
+
+            // If regenerating (has existing), enter comparison mode
+            if (hasExistingIllustration && data.isPreview) {
+                setComparisonState({
+                    pageId: page.id,
+                    oldUrl: page.illustration_url!,
+                    newUrl: data.illustrationUrl
+                })
+                toast.success('Compare and choose', { description: 'Select which version to keep' })
+                setLoadingState(prev => ({ ...prev, [page.id]: { illustration: false, sketch: false } }))
+                setGeneratingPageIds(prev => {
+                    const next = new Set(prev)
+                    next.delete(page.id)
+                    return next
+                })
+                return // Exit here - don't proceed to sketch generation yet
+            }
+
+            // First generation (no existing) - proceed normally
+            const successMessage = isSceneRecreation ? 'Scene Recreated!' : 'Illustration Generated!'
             toast.success(successMessage, { description: 'Updating sketch...' })
 
             // Unlock Illustration, Lock Sketch
@@ -296,6 +348,59 @@ export function IllustrationsTabContent({
                 return next
             })
             setLoadingState(prev => ({ ...prev, [page.id]: { illustration: false, sketch: false } }))
+        }
+    }
+
+    // Handle comparison decision (Keep New or Revert Old)
+    const handleComparisonDecision = async (decision: 'keep_new' | 'revert_old') => {
+        if (!comparisonState) return
+        
+        const { pageId, oldUrl, newUrl } = comparisonState
+        const page = pages.find(p => p.id === pageId)
+        
+        try {
+            if (decision === 'keep_new') {
+                setLoadingState(prev => ({ ...prev, [pageId]: { illustration: false, sketch: true } }))
+            }
+            
+            const response = await fetch('/api/illustrations/confirm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ decision, pageId, projectId, oldUrl, newUrl })
+            })
+            
+            if (!response.ok) throw new Error('Failed to confirm')
+            
+            const data = await response.json()
+            
+            if (decision === 'keep_new') {
+                toast.success('New illustration confirmed', { description: 'Generating sketch...' })
+                
+                // Generate sketch for new illustration
+                try {
+                    const sketchRes = await fetch('/api/illustrations/generate-sketch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ projectId, pageId, illustrationUrl: newUrl })
+                    })
+                    if (sketchRes.ok) {
+                        toast.success('Sketch Updated')
+                    } else {
+                        toast.error('Sketch update failed')
+                    }
+                } catch (e) {
+                    toast.error('Sketch update failed')
+                }
+            } else {
+                toast.success('Reverted to previous illustration')
+            }
+            
+            setComparisonState(null)
+            router.refresh()
+        } catch (error) {
+            toast.error('Failed to confirm decision')
+        } finally {
+            setLoadingState(prev => ({ ...prev, [pageId]: { illustration: false, sketch: false } }))
         }
     }
 
@@ -559,6 +664,10 @@ export function IllustrationsTabContent({
             
             // Error State
             pageErrors={pageErrors}
+            
+            // Comparison Mode (Regeneration Preview)
+            comparisonState={comparisonState}
+            onComparisonDecision={handleComparisonDecision}
         />
     )
 }
