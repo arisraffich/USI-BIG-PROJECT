@@ -358,11 +358,15 @@ export function IllustrationsTabContent({
         const { pageId, oldUrl, newUrl } = comparisonState
         const page = pages.find(p => p.id === pageId)
         
+        // Exit comparison mode IMMEDIATELY so UI switches back to normal view
+        setComparisonState(null)
+        
+        // Set loading state for sketch if keeping new (user sees animation right away)
+        if (decision === 'keep_new') {
+            setLoadingState(prev => ({ ...prev, [pageId]: { illustration: false, sketch: true } }))
+        }
+        
         try {
-            if (decision === 'keep_new') {
-                setLoadingState(prev => ({ ...prev, [pageId]: { illustration: false, sketch: true } }))
-            }
-            
             const response = await fetch('/api/illustrations/confirm', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -395,7 +399,6 @@ export function IllustrationsTabContent({
                 toast.success('Reverted to previous illustration')
             }
             
-            setComparisonState(null)
             router.refresh()
         } catch (error) {
             toast.error('Failed to confirm decision')
