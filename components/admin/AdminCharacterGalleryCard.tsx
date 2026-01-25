@@ -24,10 +24,10 @@ export function AdminCharacterGalleryCard({ character, projectId, isGenerating =
     const [optimisticImage, setOptimisticImage] = useState<string | null>(null)
 
     const handleOpenRegenerate = () => {
-        let prompt = character.generation_prompt || ''
-        if (character.feedback_notes && !character.is_resolved) {
-            prompt = `CUSTOMER REQUEST: ${character.feedback_notes}\n\n${prompt}`
-        }
+        // Pre-populate with customer feedback if unresolved, otherwise empty
+        const prompt = (character.feedback_notes && !character.is_resolved) 
+            ? character.feedback_notes 
+            : ''
         setCustomPrompt(prompt)
         setIsDialogOpen(true)
     }

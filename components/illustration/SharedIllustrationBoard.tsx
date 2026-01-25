@@ -154,6 +154,16 @@ export function SharedIllustrationBoard({
     const [editAction, setEditAction] = useState('')
     const [editEmotion, setEditEmotion] = useState('')
 
+    // Handler to open regenerate dialog with customer feedback pre-populated
+    const handleOpenRegenerateDialog = () => {
+        // Pre-populate with customer feedback if unresolved, otherwise empty
+        const prompt = (page.feedback_notes && !page.is_resolved) 
+            ? page.feedback_notes 
+            : ''
+        setRegenerationPrompt(prompt)
+        setIsRegenerateDialogOpen(true)
+    }
+
     // Refs for hidden inputs
     const sketchInputRef = useRef<HTMLInputElement>(null)
     const illustrationInputRef = useRef<HTMLInputElement>(null)
@@ -397,7 +407,7 @@ export function SharedIllustrationBoard({
                         <h4 className="font-semibold text-slate-800">Reviews</h4>
                         {/* ADMIN ONLY: REGEN BUTTON (Strictly from Admin Backup) */}
                         {isAdmin && onRegenerate && (
-                            <Button variant="outline" size="sm" onClick={() => setIsRegenerateDialogOpen(true)} disabled={isGenerating} title="Regenerate with Instructions">
+                            <Button variant="outline" size="sm" onClick={handleOpenRegenerateDialog} disabled={isGenerating} title="Regenerate with Instructions">
                                 <RefreshCw className="w-3.5 h-3.5 mr-2" />
                                 Regenerate
                             </Button>
@@ -764,7 +774,7 @@ export function SharedIllustrationBoard({
                                 {isAdmin && onRegenerate && sketchViewMode === 'sketch' && (
                                     <button
                                         className="h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm transition-colors ml-auto"
-                                        onClick={isGenerating ? undefined : () => setIsRegenerateDialogOpen(true)}
+                                        onClick={isGenerating ? undefined : handleOpenRegenerateDialog}
                                         disabled={isGenerating}
                                     >
                                         <RefreshCw className={`h-4 w-4 ${isGenerating ? 'animate-spin' : ''}`} />
@@ -865,7 +875,7 @@ export function SharedIllustrationBoard({
                                     {isAdmin && onRegenerate && (
                                         <button
                                             className="h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm transition-colors ml-auto"
-                                            onClick={isGenerating ? undefined : () => setIsRegenerateDialogOpen(true)}
+                                            onClick={isGenerating ? undefined : handleOpenRegenerateDialog}
                                             disabled={isGenerating}
                                         >
                                             <RefreshCw className={`h-4 w-4 ${isGenerating ? 'animate-spin' : ''}`} />
