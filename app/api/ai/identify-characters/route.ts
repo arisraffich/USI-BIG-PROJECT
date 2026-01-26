@@ -2,104 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { openai } from '@/lib/ai/openai'
 
-// Hybrid filtering function to remove plural characters programmatically
-function isPluralCharacter(nameOrRole: string | null): boolean {
-  if (!nameOrRole) return false
-
-  const text = nameOrRole.toLowerCase().trim()
-
-  // Common plural endings
-  const pluralEndings = ['s', 'es', 'ies']
-
-  // Check if it ends with plural indicators
-  if (pluralEndings.some(ending => text.endsWith(ending))) {
-    // But exclude common singular words that end in 's'
-    const singularExceptions = ['mom', 'dad', 'grandma', 'grandpa', 'class', 'glass', 'grass']
-    if (singularExceptions.includes(text)) {
-      return false
-    }
-
-    // Check for plural indicators in the text
-    const pluralIndicators = [
-      'many', 'several', 'group of', 'groups of', 'crowd of', 'crowds of',
-      'people', 'children', 'kids', 'adults', 'teachers', 'doctors', 'nurses',
-      'animals', 'dogs', 'cats', 'birds', 'friends', 'neighbors', 'family members'
-    ]
-
-    if (pluralIndicators.some(indicator => text.includes(indicator))) {
-      return true
-    }
-
-    // If it's a role and ends in 's', likely plural (e.g., "Teachers", "Doctors")
-    // But "Mom" or "Dad" are singular even though they could be plural contextually
-    if (text.endsWith('s') && text.length > 3) {
-      // Check if it's a known singular role
-      const singularRoles = ['mom', 'dad', 'grandma', 'grandpa', 'teacher', 'doctor', 'nurse']
-      if (!singularRoles.some(role => text.startsWith(role))) {
-        return true // Likely plural
-      }
-    }
-  }
-
-  return false
-}
-
-// Safety Net: Fuzzy matching to detect if a character is likely the main character
-function isLikelyMainCharacter(
-  identifiedChar: any,
-  mainCharacter: any
-): boolean {
-  if (!mainCharacter) return false
-
-  const mainName = mainCharacter.name?.toLowerCase().trim() || ''
-  const mainRole = mainCharacter.story_role?.toLowerCase().trim() ||
-    mainCharacter.biography?.toLowerCase().trim() || ''
-
-  const charName = identifiedChar.name?.toLowerCase().trim() || ''
-  const charRole = identifiedChar.role?.toLowerCase().trim() || ''
-  const charStoryRole = identifiedChar.story_role?.toLowerCase().trim() || ''
-
-  // 1. Exact name match
-  if (mainName && charName && charName === mainName) {
-    return true
-  }
-
-  // 2. Name contains main name (e.g., "Zara" in "Zara the Explorer")
-  if (mainName && charName && charName.includes(mainName) && mainName.length > 2) {
-    return true
-  }
-
-  // 3. Main name contains character name (e.g., main is "Zara the Explorer", char is "Zara")
-  if (mainName && charName && mainName.includes(charName) && charName.length > 2) {
-    return true
-  }
-
-  // 4. Role matches main character description
-  if (mainRole && (charRole.includes(mainRole) || mainRole.includes(charRole)) && mainRole.length > 3) {
-    return true
-  }
-
-  // 5. Story role matches main character description
-  if (mainRole && (charStoryRole.includes(mainRole) || mainRole.includes(charStoryRole)) && mainRole.length > 3) {
-    return true
-  }
-
-  // 6. Check if character appears on many pages (main character trait)
-  // Main characters typically appear on 50%+ of pages
-  const appearsOnManyPages = identifiedChar.appears_in?.length > 0 &&
-    identifiedChar.appears_in.length >= 3 // At least 3 pages
-
-  // If unnamed character appears frequently, might be main character
-  if (appearsOnManyPages && !charName && mainName) {
-    // Be conservative - only flag if we have strong role match
-    if (charRole && mainRole && (charRole.includes(mainRole) || mainRole.includes(charRole))) {
-      return true
-    }
-  }
-
-  return false
-}
-
 // Exported function for direct calls (e.g., from project creation)
 export async function identifyCharactersForProject(project_id: string) {
   const supabase = await createAdminClient()
@@ -201,6 +103,19 @@ CRITICAL RULES:
    - INCLUDE: recurring characters, characters with physical descriptions
    - EXCLUDE: background mentions, generic placeholders
 
+CHARACTER IDENTITY REASONING:
+- Multiple references may point to the SAME person 
+  (use context: "Mom", "Mother", "the woman" might all be one character)
+- Return each unique individual ONCE with their most descriptive name
+- The main character may appear under different names/descriptions - exclude ALL of them
+- Two characters can be RELATED but still DIFFERENT people 
+  (a character's mother is a separate person from that character)
+- Background crowds or unnamed groups are not individual characters
+
+VISUAL PRESENCE CHECK:
+- Only include characters who APPEAR VISUALLY in scenes and need to be illustrated
+- Exclude characters who are only mentioned, remembered, or talked about but never shown
+
 RESPONSE FORMAT:
 Return a JSON object:
 {
@@ -274,60 +189,9 @@ ${mainCharName ? `- DO NOT include "${mainCharName}" - they are the main charact
       throw new Error('Invalid response format from AI - missing characters array')
     }
 
-    // STEP 6: Get main character name for filtering
-    const mainCharNameForFiltering = mainCharacter?.name || null
-    console.log(`[Character ID] Main character name for filtering: "${mainCharNameForFiltering || 'NULL'}"`)
+    console.log(`[Character ID] AI identified ${identified.characters.length} characters`)
 
-    // STEP 7: SAFETY NET - Remove main character if AI accidentally included them
-    let filteredCharacters = identified.characters
-    const removedDuplicates: string[] = []
-
-    // Filter using existing main character data (fuzzy matching)
-    if (mainCharacter) {
-      filteredCharacters = identified.characters.filter((char: any) => {
-        if (isLikelyMainCharacter(char, mainCharacter)) {
-          const identifier = char.name || char.role || 'unnamed'
-          removedDuplicates.push(identifier)
-          console.warn(`[Safety Net] Removed main character from list (DB match): ${identifier}`)
-          return false
-        }
-        return true
-      })
-    }
-
-    // ADDITIONAL SAFETY NET: Filter by main character name
-    if (mainCharNameForFiltering) {
-      const mainNameLower = mainCharNameForFiltering.toLowerCase().trim()
-      filteredCharacters = filteredCharacters.filter((char: any) => {
-        const charName = char.name?.toLowerCase().trim() || ''
-        const charRole = char.role?.toLowerCase().trim() || ''
-        
-        // Exact match on name
-        if (charName && charName === mainNameLower) {
-          removedDuplicates.push(char.name || char.role || 'unnamed')
-          console.warn(`[Safety Net] Removed main character (exact name match): ${char.name}`)
-          return false
-        }
-        
-        // Name contains main name
-        if (charName && (charName.includes(mainNameLower) || mainNameLower.includes(charName)) && charName.length > 2) {
-          removedDuplicates.push(char.name || char.role || 'unnamed')
-          console.warn(`[Safety Net] Removed main character (partial name match): ${char.name}`)
-          return false
-        }
-        
-        // Role matches main name
-        if (charRole && charRole === mainNameLower) {
-          removedDuplicates.push(char.name || char.role || 'unnamed')
-          console.warn(`[Safety Net] Removed main character (role match): ${char.role}`)
-          return false
-        }
-        
-        return true
-      })
-    }
-
-    // STEP 8: Update main character's appears_in (assume they appear on all pages)
+    // STEP 6: Update main character's appears_in (assume they appear on all pages)
     let mainCharAppearances: string[] = []
     let mainCharUpdated = false
     
@@ -345,7 +209,7 @@ ${mainCharName ? `- DO NOT include "${mainCharName}" - they are the main charact
       console.log(`[Character ID] Updated main character "${mainCharacter.name}" - appears on all ${allPageNumbers.length} pages`)
     }
 
-    // STEP 9: Filter characters (plural check + existing character check)
+    // STEP 7: Filter characters (DB deduplication only - trust AI for character identification)
     const { data: existingCharacters } = await supabase
       .from('characters')
       .select('name, role, is_main')
@@ -361,9 +225,8 @@ ${mainCharName ? `- DO NOT include "${mainCharName}" - they are the main charact
       if (roleKey) existingRoles.add(roleKey)
     })
 
-    // Filter characters
-    const beforeFilterCount = filteredCharacters.length
-    const newCharacters = filteredCharacters.filter((char: any) => {
+    // Filter characters - only remove DB duplicates (trust AI reasoning for everything else)
+    const newCharacters = identified.characters.filter((char: any) => {
       const charName = char.name?.toLowerCase().trim() || null
       const charRole = char.role?.toLowerCase().trim() || null
 
@@ -372,37 +235,30 @@ ${mainCharName ? `- DO NOT include "${mainCharName}" - they are the main charact
         return false
       }
 
-      // Skip if name already exists
+      // Skip if name already exists in DB
       if (charName && existingNames.has(charName)) {
         return false
       }
 
-      // Skip if role already exists (but allow generic roles like "Mom", "Dad")
+      // Skip if role already exists in DB (but allow generic roles like "Mom", "Dad")
       if (charRole && existingRoles.has(charRole) && charRole !== 'mom' && charRole !== 'dad') {
-        return false
-      }
-
-      // Filter out plural characters
-      if (isPluralCharacter(char.name || char.role)) {
         return false
       }
 
       return true
     })
 
-    // STEP 10: LOGGING - Comprehensive logging for monitoring
+    // STEP 8: LOGGING - Comprehensive logging for monitoring
     console.log('[Character ID] ===== CHARACTER IDENTIFICATION SUMMARY =====')
     console.log(`[Character ID] Project ID: ${project_id}`)
     console.log(`[Character ID] Total Pages: ${maxPageNumber}`)
     console.log(`[Character ID] Main Character: ${mainCharacter?.name || 'Not set'}`)
-    console.log(`[Character ID] AI Response - Characters Identified: ${identified.characters.length}`)
-    console.log(`[Character ID] Safety Net - Main Character Removed: ${removedDuplicates.length} (${removedDuplicates.join(', ') || 'none'})`)
-    console.log(`[Character ID] After Safety Net: ${beforeFilterCount} characters`)
-    console.log(`[Character ID] After Filtering - New Characters to Create: ${newCharacters.length}`)
-    console.log(`[Character ID] Filtered Out: ${beforeFilterCount - newCharacters.length} characters`)
+    console.log(`[Character ID] AI Identified: ${identified.characters.length} characters`)
+    console.log(`[Character ID] New Characters to Create: ${newCharacters.length}`)
+    console.log(`[Character ID] DB Duplicates Filtered: ${identified.characters.length - newCharacters.length}`)
     console.log('[Character ID] ============================================')
 
-    // STEP 11: Create secondary character records
+    // STEP 9: Create secondary character records
     let charactersCreated = 0
     if (newCharacters.length > 0) {
       const charactersToCreate = newCharacters.map((char: any) => {
@@ -438,7 +294,7 @@ ${mainCharName ? `- DO NOT include "${mainCharName}" - they are the main charact
       charactersCreated = charactersToCreate.length
     }
 
-    // STEP 12: Update pages with character_ids
+    // STEP 10: Update pages with character_ids
     // Get all characters (including newly created ones) WITH appears_in
     const { data: allCharacters } = await supabase
       .from('characters')
@@ -499,7 +355,7 @@ ${mainCharName ? `- DO NOT include "${mainCharName}" - they are the main charact
         .eq('id', update.id)
     }
 
-    // STEP 13: Update project status
+    // STEP 11: Update project status
     await supabase
       .from('projects')
       .update({ status: 'character_review' })
@@ -510,11 +366,8 @@ ${mainCharName ? `- DO NOT include "${mainCharName}" - they are the main charact
       main_character: mainCharacter?.name || null,
       main_character_updated: mainCharUpdated,
       characters_identified: identified.characters.length,
-      safety_net_removed: removedDuplicates.length,
-      safety_net_removed_list: removedDuplicates,
-      characters_after_safety_net: beforeFilterCount,
       characters_created: charactersCreated,
-      filtered_out: beforeFilterCount - newCharacters.length,
+      db_duplicates_filtered: identified.characters.length - newCharacters.length,
       characters: newCharacters,
     }
 }
