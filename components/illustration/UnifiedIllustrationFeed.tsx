@@ -58,13 +58,12 @@ interface UnifiedIllustrationFeedProps {
     // Error State
     pageErrors?: { [pageId: string]: { message: string; technicalDetails: string } }
     
-    // Comparison Mode (Regeneration Preview)
-    comparisonState?: {
-        pageId: string
+    // Comparison Mode (Regeneration Preview) - Map supports parallel comparisons
+    comparisonStates?: Record<string, {
         oldUrl: string
         newUrl: string
-    } | null
-    onComparisonDecision?: (decision: 'keep_new' | 'revert_old') => void
+    }>
+    onComparisonDecision?: (pageId: string, decision: 'keep_new' | 'revert_old') => void
 }
 
 export function UnifiedIllustrationFeed({
@@ -94,7 +93,7 @@ export function UnifiedIllustrationFeed({
     onCancelBatch,
     batchState,
     pageErrors,
-    comparisonState,
+    comparisonStates = {},
     onComparisonDecision
 }: UnifiedIllustrationFeedProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -305,8 +304,8 @@ export function UnifiedIllustrationFeed({
                             generationError={pageErrors?.[page.id]}
                             
                             // Comparison Mode (Regeneration Preview)
-                            comparisonState={comparisonState?.pageId === page.id ? comparisonState : undefined}
-                            onComparisonDecision={onComparisonDecision}
+                            comparisonState={comparisonStates[page.id] ? { pageId: page.id, ...comparisonStates[page.id] } : undefined}
+                            onComparisonDecision={onComparisonDecision ? (decision) => onComparisonDecision(page.id, decision) : undefined}
                         />
                     </div>
                 )

@@ -133,12 +133,11 @@ export function IllustrationsTabContent({
     const batchCancelledRef = useRef(false)
     const MAX_CONCURRENT = 3
     
-    // Comparison mode state (for regeneration preview)
-    const [comparisonState, setComparisonState] = useState<{
-        pageId: string
+    // Comparison mode state (for regeneration preview) - Map supports parallel comparisons
+    const [comparisonStates, setComparisonStates] = useState<Record<string, {
         oldUrl: string
         newUrl: string
-    } | null>(null)
+    }>>({})
     
     // Sync generatingPageIds to parent (for sidebar orange dots)
     useEffect(() => {
@@ -294,11 +293,13 @@ export function IllustrationsTabContent({
 
             // If regenerating (has existing), enter comparison mode
             if (hasExistingIllustration && data.isPreview) {
-                setComparisonState({
-                    pageId: page.id,
-                    oldUrl: page.illustration_url!,
-                    newUrl: data.illustrationUrl
-                })
+                setComparisonStates(prev => ({
+                    ...prev,
+                    [page.id]: {
+                        oldUrl: page.illustration_url!,
+                        newUrl: data.illustrationUrl
+                    }
+                }))
                 toast.success('Compare and choose', { description: 'Select which version to keep' })
                 setLoadingState(prev => ({ ...prev, [page.id]: { illustration: false, sketch: false } }))
                 setGeneratingPageIds(prev => {
@@ -352,14 +353,19 @@ export function IllustrationsTabContent({
     }
 
     // Handle comparison decision (Keep New or Revert Old)
-    const handleComparisonDecision = async (decision: 'keep_new' | 'revert_old') => {
-        if (!comparisonState) return
+    const handleComparisonDecision = async (pageId: string, decision: 'keep_new' | 'revert_old') => {
+        const comparison = comparisonStates[pageId]
+        if (!comparison) return
         
-        const { pageId, oldUrl, newUrl } = comparisonState
+        const { oldUrl, newUrl } = comparison
         const page = pages.find(p => p.id === pageId)
         
         // Exit comparison mode IMMEDIATELY so UI switches back to normal view
-        setComparisonState(null)
+        setComparisonStates(prev => {
+            const next = { ...prev }
+            delete next[pageId]
+            return next
+        })
         
         // Set loading state for sketch if keeping new (user sees animation right away)
         if (decision === 'keep_new') {
@@ -669,7 +675,7 @@ export function IllustrationsTabContent({
             pageErrors={pageErrors}
             
             // Comparison Mode (Regeneration Preview)
-            comparisonState={comparisonState}
+            comparisonStates={comparisonStates}
             onComparisonDecision={handleComparisonDecision}
         />
     )
