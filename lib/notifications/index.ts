@@ -569,8 +569,9 @@ export async function notifyIllustrationsApproved(options: {
   authorName: string
   projectUrl: string
 }): Promise<void> {
-  const { projectTitle, authorName, projectUrl } = options
+  const { projectId, projectTitle, authorName, projectUrl } = options
 
+  // Send Slack notification
   try {
     await sendSlackNotification({
       text: `✅ Sketches APPROVED for "${projectTitle}"`,
@@ -597,6 +598,34 @@ export async function notifyIllustrationsApproved(options: {
     })
   } catch (error: any) {
     console.error('Failed to send illustration approval notification:', error)
+  }
+
+  // Send email with download link to info@usillustrations.com
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const downloadUrl = `${baseUrl}/api/projects/${projectId}/download-illustrations`
+
+    await sendEmail({
+      to: 'info@usillustrations.com',
+      subject: `Download ${authorName} Sketches`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <p style="font-size: 16px; color: #333; margin-bottom: 20px;">
+            ${authorName} approved all sketches for "${projectTitle}".
+          </p>
+          <p style="font-size: 16px; color: #333; margin-bottom: 20px;">
+            Download below
+          </p>
+          <a href="${downloadUrl}" 
+             style="display: inline-block; background-color: #7c3aed; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+            Download Sketches
+          </a>
+        </div>
+      `,
+    })
+    console.log(`[Email] Sketches approval email sent for project ${projectId}`)
+  } catch (emailError: any) {
+    console.error('Failed to send sketches approval email:', emailError)
   }
 }
 
