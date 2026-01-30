@@ -7,7 +7,18 @@ import { sanitizeFilename } from '@/lib/utils/metadata-cleaner'
 export const maxDuration = 60
 
 // Helper to map UI aspect ratios to Gemini-supported values
-function mapAspectRatio(ratio: string | null | undefined): string {
+// When isSpread is true, returns wider aspect ratios for double-page spreads
+function mapAspectRatio(ratio: string | null | undefined, isSpread: boolean = false): string {
+    if (isSpread) {
+        // Spread (double-page) aspect ratios
+        switch (ratio) {
+            case '8:10': return '21:9';      // Portrait spread
+            case '8.5:8.5': return '16:9';   // Square spread
+            case '8.5:11': return '21:9';    // Letter spread
+            default: return '16:9';
+        }
+    }
+    // Single page aspect ratios
     switch (ratio) {
         case '8:10': return '4:5';
         case '8.5:8.5': return '1:1';
@@ -93,7 +104,13 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Page not found' }, { status: 404 })
         }
 
-        const mappedAspectRatio = mapAspectRatio(project?.illustration_aspect_ratio || undefined)
+        // Check if this page is a spread (double-page)
+        const isSpread = pageData.is_spread === true
+        const mappedAspectRatio = mapAspectRatio(project?.illustration_aspect_ratio || undefined, isSpread)
+        
+        if (isSpread) {
+            console.log(`[Illustration Generate] 📖 SPREAD MODE - Page ${pageData.page_number} using ${mappedAspectRatio} aspect ratio`)
+        }
         let fullPrompt = ''
         let characterReferences: any[] = []
         let anchorImage: string | null = null
@@ -253,11 +270,36 @@ IMAGE CONTEXT:
             const cleanSceneDescription = scrubText(pageData.scene_description || 'A scene from the story.')
             const cleanActionDescription = scrubText(actionDescription || 'No specific character actions.')
 
-            const isIntegrated = project?.illustration_text_integration === 'integrated'
+            // Determine text integration: per-page setting takes priority, then fall back to project default
+            const pageTextIntegration = pageData.text_integration
+            const projectTextIntegration = project?.illustration_text_integration
+            const isIntegrated = pageTextIntegration 
+                ? pageTextIntegration === 'integrated'
+                : projectTextIntegration === 'integrated'
+            
             const storyText = pageData.story_text || ''
             let textPromptSection = ''
 
             if (isIntegrated) {
+                // Base text integration rules
+                let textPlacementRules: string
+                
+                if (isSpread) {
+                    // SPREAD-SPECIFIC text placement: RIGHT side, avoid center gutter
+                    textPlacementRules = `TEXT PLACEMENT FOR SPREAD (CRITICAL):
+- This is a double-page spread. The center 10% is the gutter/binding zone where the book folds.
+- Position text-safe areas on the RIGHT SIDE of the spread, away from the center.
+- NEVER place text-safe areas in the center 10% of the image (the gutter zone).
+- For short text, reserve one calm text area on the right portion.
+- For long text, you may use areas on the right side at different vertical positions.`
+                } else {
+                    // Single page text placement: TOP and/or BOTTOM
+                    textPlacementRules = `TEXT PLACEMENT FOR SINGLE PAGE:
+- For short text, reserve one calm text area.
+- For long or multi-paragraph text, reserve larger areas, typically at the TOP and/or BOTTOM of the illustration.
+- If the text contains multiple paragraphs, you may split the layout into multiple text-safe areas.`
+                }
+                
                 textPromptSection = `TEXT INTEGRATION & LAYOUT INSTRUCTIONS:
 
 The following story text is provided ONLY to determine layout and spacing.
@@ -280,9 +322,7 @@ Your task is to CREATE appropriate text-safe areas or text containers that will 
 TEXT PLANNING RULES:
 - Analyze the length, structure, and paragraph count of the provided story text.
 - Based on the text length, intentionally reserve sufficient visual space for the text.
-- For short text, reserve one calm text area.
-- For long or multi-paragraph text, reserve larger areas, typically at the TOP and/or BOTTOM of the illustration.
-- If the text contains multiple paragraphs, you may split the layout into multiple text-safe areas.
+${textPlacementRules}
 
 TEXT AREA DESIGN:
 - Use harmonious visual solutions appropriate to the illustration style (soft background washes, framed negative space, sky, walls, floor, or other calm zones).
@@ -440,16 +480,30 @@ ${pageData.background_elements || 'Appropriate background for the scene.'}
 
 `
 
+            // Build spread composition rules (applies to all spreads)
+            let spreadCompositionRules = ''
+            if (isSpread) {
+                spreadCompositionRules = `
+SPREAD COMPOSITION RULES (CRITICAL):
+This is a double-page spread that will be bound in the center.
+- NEVER place important characters, faces, or key focal elements in the center 10% of the image.
+- The center 10% is the gutter/binding zone where the book folds - content here will be hidden or distorted.
+- Distribute characters and key visual elements on the LEFT third or RIGHT third of the composition.
+- Design the scene to read well as a panoramic, wide-format illustration.
+
+`
+            }
+
             // Build fullPrompt differently for scene recreation vs standard generation
             if (isSceneRecreationMode) {
                 // Scene Recreation: Use the streamlined prompt (styleInstructions has everything)
-                fullPrompt = `${styleInstructions}
+                fullPrompt = `${spreadCompositionRules}${styleInstructions}
 
 ${textPromptSection}`
             } else {
                 // Standard Generation: Full detailed prompt
                 fullPrompt = `TASK: ILLUSTRATION GENERATION
-
+${spreadCompositionRules}
 SCENE Context:
 ${cleanSceneDescription}
 
@@ -540,6 +594,7 @@ ${textPromptSection}`
             illustrationUrl: publicUrl,
             pageId: pageData.id,
             aspectRatioUsed: mappedAspectRatio,
+            isSpread: isSpread,
             isPreview: !!skipDbUpdate // Indicate this is a preview (not saved to DB)
         })
 

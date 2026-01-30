@@ -64,6 +64,8 @@ export interface SharedIllustrationBoardProps {
     setAspectRatio?: (ratio: string) => void
     textIntegration?: string
     setTextIntegration?: (text: string) => void
+    isSpread?: boolean
+    setIsSpread?: (isSpread: boolean) => void
     onGenerate?: () => void
     onRegenerate?: (prompt: string, referenceImages?: string[], referenceImageUrl?: string, sceneCharacters?: SceneCharacter[]) => void
     onUpload?: (type: 'sketch' | 'illustration', file: File) => Promise<void>
@@ -109,6 +111,8 @@ export function SharedIllustrationBoard({
     setAspectRatio,
     textIntegration,
     setTextIntegration,
+    isSpread = false,
+    setIsSpread,
     onGenerate,
     onRegenerate,
     onUpload,
@@ -362,6 +366,8 @@ export function SharedIllustrationBoard({
                 setAspectRatio={setAspectRatio}
                 textIntegration={textIntegration}
                 setTextIntegration={setTextIntegration}
+                isSpread={isSpread}
+                setIsSpread={setIsSpread}
                 onGenerate={onGenerate}
                 illustratedPages={illustratedPages}
             />
@@ -379,6 +385,8 @@ export function SharedIllustrationBoard({
                 setAspectRatio={setAspectRatio}
                 textIntegration={textIntegration}
                 setTextIntegration={setTextIntegration}
+                isSpread={isSpread}
+                setIsSpread={setIsSpread}
                 onGenerate={onGenerate}
                 illustratedPages={illustratedPages}
                 allPages={allPages}

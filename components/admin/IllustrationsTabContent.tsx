@@ -118,7 +118,27 @@ export function IllustrationsTabContent({
 
     // Local state for wizard settings (propagated to pages if needed via DB)
     const [aspectRatio, setAspectRatio] = useState(initialAspectRatio || '')
-    const [textIntegration, setTextIntegration] = useState(initialTextIntegration || '')
+    
+    // Per-page text integration state (keyed by page id)
+    // Initialize from pages data or use project default
+    const [pageTextIntegration, setPageTextIntegration] = useState<Record<string, string>>(() => {
+        const initial: Record<string, string> = {}
+        pages.forEach(p => {
+            // Use page's saved value, or fall back to project default
+            initial[p.id] = p.text_integration || initialTextIntegration || ''
+        })
+        return initial
+    })
+    
+    // Per-page spread state (keyed by page id)
+    const [pageSpread, setPageSpread] = useState<Record<string, boolean>>(() => {
+        const initial: Record<string, boolean> = {}
+        pages.forEach(p => {
+            initial[p.id] = p.is_spread || false
+        })
+        return initial
+    })
+    
     const [generatingPageIds, setGeneratingPageIds] = useState<Set<string>>(new Set())
     const [loadingState, setLoadingState] = useState<{ [key: string]: { sketch: boolean; illustration: boolean } }>({})
     
@@ -146,6 +166,43 @@ export function IllustrationsTabContent({
         }
     }, [generatingPageIds, onGeneratingPageIdsChange])
     
+    // Sync per-page state when pages prop changes (e.g., new pages added)
+    useEffect(() => {
+        setPageTextIntegration(prev => {
+            const updated = { ...prev }
+            pages.forEach(p => {
+                if (!(p.id in updated)) {
+                    updated[p.id] = p.text_integration || initialTextIntegration || ''
+                }
+            })
+            return updated
+        })
+        setPageSpread(prev => {
+            const updated = { ...prev }
+            pages.forEach(p => {
+                if (!(p.id in updated)) {
+                    updated[p.id] = p.is_spread || false
+                }
+            })
+            return updated
+        })
+    }, [pages, initialTextIntegration])
+    
+    // Handler for setting text integration per page
+    const handleSetPageTextIntegration = useCallback((pageId: string, value: string) => {
+        setPageTextIntegration(prev => ({ ...prev, [pageId]: value }))
+    }, [])
+    
+    // Handler for setting spread per page (also auto-selects integrated text)
+    const handleSetPageSpread = useCallback((pageId: string, isSpread: boolean) => {
+        setPageSpread(prev => ({ ...prev, [pageId]: isSpread }))
+        
+        // Auto-select 'integrated' text when spread is enabled
+        if (isSpread) {
+            setPageTextIntegration(prev => ({ ...prev, [pageId]: 'integrated' }))
+        }
+    }, [])
+    
     // Helper to update page errors (uses external state if provided)
     const setPageError = useCallback((pageId: string, error: GenerationError | null) => {
         if (onPageErrorsChange) {
@@ -170,13 +227,26 @@ export function IllustrationsTabContent({
             setLoadingState(prev => ({ ...prev, [page.id]: { ...prev[page.id], illustration: true, sketch: false } }))
 
             const supabase = createClient()
-            // 1. Save preferences to Project
+            
+            // 1. Save project-level aspect ratio (locked by Page 1)
             await supabase.from('projects').update({
                 illustration_aspect_ratio: aspectRatio,
-                illustration_text_integration: textIntegration
+                illustration_text_integration: pageTextIntegration[page.id] || '' // Also update project default
             }).eq('id', projectId)
+            
+            // 2. Save per-page settings (text_integration and is_spread)
+            const pageSettings: { text_integration?: string; is_spread?: boolean } = {}
+            if (pageTextIntegration[page.id]) {
+                pageSettings.text_integration = pageTextIntegration[page.id]
+            }
+            if (pageSpread[page.id] !== undefined) {
+                pageSettings.is_spread = pageSpread[page.id]
+            }
+            if (Object.keys(pageSettings).length > 0) {
+                await supabase.from('pages').update(pageSettings).eq('id', page.id)
+            }
 
-            // 2. Trigger Generation (API)
+            // 3. Trigger Generation (API)
             const response = await fetch('/api/illustrations/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -660,10 +730,14 @@ export function IllustrationsTabContent({
             // Wizard State
             aspectRatio={aspectRatio}
             setAspectRatio={setAspectRatio}
-            textIntegration={textIntegration}
-            setTextIntegration={setTextIntegration}
             generatingPageIds={generatingPageIds}
             loadingStateMap={loadingState}
+            
+            // Per-page settings
+            pageTextIntegration={pageTextIntegration}
+            setPageTextIntegration={handleSetPageTextIntegration}
+            pageSpread={pageSpread}
+            setPageSpread={handleSetPageSpread}
             
             // Batch Generation
             allPages={pages}

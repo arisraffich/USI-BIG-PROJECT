@@ -26,6 +26,8 @@ interface EmptyStateBoardProps {
     setAspectRatio?: (val: string) => void
     textIntegration?: string
     setTextIntegration?: (val: string) => void
+    isSpread?: boolean
+    setIsSpread?: (val: boolean) => void
     onGenerate?: (refUrl?: string) => void
     illustratedPages?: Page[] // All pages with illustrations (for environment reference)
     
@@ -48,6 +50,8 @@ export function EmptyStateBoard({
     setAspectRatio,
     textIntegration,
     setTextIntegration,
+    isSpread = false,
+    setIsSpread,
     onGenerate,
     illustratedPages = [],
     allPages = [],
@@ -303,6 +307,37 @@ export function EmptyStateBoard({
                                 ))}
                             </div>
                         </div>
+
+                        {/* Spread Checkbox (Hidden for Page 1) */}
+                        {page.page_number > 1 && setIsSpread && (
+                            <>
+                                <div className="h-px bg-slate-200"></div>
+                                <div className="space-y-2">
+                                    <div 
+                                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${isSpread ? 'bg-purple-50 border-2 border-purple-300' : 'hover:bg-slate-100 border-2 border-transparent bg-white'}`}
+                                        onClick={() => {
+                                            setIsSpread(!isSpread)
+                                            // Auto-select integrated text when enabling spread
+                                            if (!isSpread && setTextIntegration) {
+                                                setTextIntegration('integrated')
+                                            }
+                                        }}
+                                    >
+                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSpread ? 'border-purple-600 bg-purple-600' : 'border-slate-300'}`}>
+                                            {isSpread && (
+                                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            )}
+                                        </div>
+                                        <div className="flex-1">
+                                            <span className={`font-medium text-sm ${isSpread ? 'text-purple-900' : 'text-slate-700'}`}>Double-Page Spread</span>
+                                            <p className="text-xs text-slate-400">Uses wider aspect ratio (21:9 or 16:9)</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        )}
 
                         {/* Style Reference Upload (Page 1 Admin Only) */}
                         {page.page_number === 1 && !isCustomer && projectId && (

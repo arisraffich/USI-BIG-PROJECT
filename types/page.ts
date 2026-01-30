@@ -32,6 +32,9 @@ export interface Page {
   feedback_history?: Array<{ note: string; created_at: string }> | null
   is_approved?: boolean
   is_resolved?: boolean
+  // Spread and Text Integration (per-page settings)
+  is_spread?: boolean
+  text_integration?: 'integrated' | 'separated' | null
 }
 
 

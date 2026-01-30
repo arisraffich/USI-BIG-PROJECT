@@ -67,6 +67,12 @@ export function UnifiedIllustrationSidebar({
                                         </span>
                                     )}
                                     Page {page.page_number}
+                                    {/* Spread indicator */}
+                                    {page.is_spread && (
+                                        <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-purple-100 text-purple-700 rounded" title="Double-page spread">
+                                            Spread
+                                        </span>
+                                    )}
                                     {failedPageIds.includes(page.id) && (
                                         <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" title="Generation failed" />
                                     )}
@@ -112,6 +118,12 @@ export function UnifiedIllustrationSidebar({
                                 </button>
                                 {failedPageIds.includes(page.id) && (
                                     <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 border border-white animate-pulse" />
+                                )}
+                                {/* Spread indicator - mobile (bottom-right corner) */}
+                                {page.is_spread && !failedPageIds.includes(page.id) && (
+                                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-purple-500 border border-white text-[6px] font-bold text-white flex items-center justify-center" title="Spread">
+                                        2
+                                    </span>
                                 )}
                                 {/* Feedback indicator - Admin only (mobile) */}
                                 {mode === 'admin' && page.feedback_notes && !page.is_resolved && (
