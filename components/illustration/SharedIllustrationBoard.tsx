@@ -53,7 +53,7 @@ export interface SharedIllustrationBoardProps {
     page: Page
     mode: 'admin' | 'customer'
     projectId?: string
-    illustrationStatus?: 'draft' | 'illustration_approved' | 'illustration_production' | 'completed'
+    illustrationStatus?: 'draft' | 'illustration_approved' | 'completed'
     projectStatus?: string // Main status field - used for lock logic
     illustrationSendCount?: number // For round-based history display
     onSaveFeedback: (notes: string) => Promise<void>

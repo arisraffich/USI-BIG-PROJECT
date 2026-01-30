@@ -1,16 +1,13 @@
 export type ProjectStatus =
   | 'draft'
-  // Character Phase (unchanged)
+  // Character Phase
   | 'character_review'
   | 'character_generation'
-  | 'character_approval'
-  | 'character_approval_pending'
-  | 'characters_approved'
-  | 'character_form_pending'
   | 'character_generation_complete'
   | 'character_revision_needed'
+  | 'characters_approved'
   | 'characters_regenerated'
-  // Illustration Phase (simplified - no trial)
+  // Illustration Phase
   | 'sketches_review'        // All sketches sent, waiting for customer review
   | 'sketches_revision'      // Customer requested changes to sketches
   | 'illustration_approved'  // Customer approved all sketches - FINAL

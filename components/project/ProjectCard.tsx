@@ -36,13 +36,20 @@ interface ProjectCardProps {
 
 // Determine which tab to open based on project status
 function getDefaultTabForStatus(status: string): string {
-  // Illustration stages
+  // Illustration stages (including legacy statuses for backward compatibility)
   const illustrationStatuses = [
     'characters_approved',
     'sketches_review',
     'sketches_revision',
     'illustration_approved',
     'completed',
+    // Legacy statuses (for backward compatibility)
+    'trial_review',
+    'trial_revision',
+    'trial_approved',
+    'illustrations_generating',
+    'illustration_review',
+    'illustration_revision_needed',
   ]
   if (illustrationStatuses.includes(status)) {
     return 'illustrations'
@@ -52,9 +59,9 @@ function getDefaultTabForStatus(status: string): string {
   const characterStatuses = [
     'character_review',
     'character_generation',
-    'character_approval',
-    'character_approval_pending',
+    'character_generation_complete',
     'character_revision_needed',
+    'characters_regenerated',
   ]
   if (characterStatuses.includes(status)) {
     return 'characters'
