@@ -154,12 +154,14 @@ export function SharedIllustrationBoard({
     const [editAction, setEditAction] = useState('')
     const [editEmotion, setEditEmotion] = useState('')
 
-    // Handler to open regenerate dialog with customer feedback pre-populated
+    // Handler to open regenerate dialog with saved prompt or customer feedback pre-populated
     const handleOpenRegenerateDialog = () => {
-        // Pre-populate with customer feedback if unresolved, otherwise empty
-        const prompt = (page.feedback_notes && !page.is_resolved) 
-            ? page.feedback_notes 
-            : ''
+        // Priority: 1) Saved prompt from localStorage, 2) Customer feedback if unresolved, 3) Empty
+        const savedPrompt = typeof window !== 'undefined' 
+            ? localStorage.getItem(`regen-prompt-${page.id}`) 
+            : null
+        const prompt = savedPrompt 
+            || (page.feedback_notes && !page.is_resolved ? page.feedback_notes : '')
         setRegenerationPrompt(prompt)
         setIsRegenerateDialogOpen(true)
     }
@@ -1308,6 +1310,11 @@ export function SharedIllustrationBoard({
                                     const includedChars = isSceneRecreationMode 
                                         ? sceneCharacters.filter(c => c.isIncluded)
                                         : undefined
+                                    
+                                    // Save prompt to localStorage for next regeneration
+                                    if (regenerationPrompt.trim()) {
+                                        localStorage.setItem(`regen-prompt-${page.id}`, regenerationPrompt)
+                                    }
                                     
                                     setIsRegenerateDialogOpen(false)
                                     onRegenerate(regenerationPrompt, base64Images, refUrl, includedChars)
