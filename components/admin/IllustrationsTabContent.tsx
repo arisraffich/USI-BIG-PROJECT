@@ -46,6 +46,12 @@ function mapErrorToUserMessage(error: string): { message: string; technicalDetai
             technicalDetails: error
         }
     }
+    if (lowerError.includes('billing') || lowerError.includes('payment') || lowerError.includes('disabled') || lowerError.includes('402')) {
+        return {
+            message: 'API billing issue - please check your Google Cloud account has sufficient funds',
+            technicalDetails: error
+        }
+    }
     
     return {
         message: 'Generation failed - please try editing the scene description',
