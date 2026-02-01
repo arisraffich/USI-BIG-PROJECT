@@ -112,18 +112,23 @@ export function ProjectTabsContent({
     return () => clearInterval(interval)
   }, [localProjectStatus, router])
 
+  // Check if there are secondary characters (more than just main character)
+  const hasSecondaryCharacters = localCharacters && localCharacters.length > 1
+
   // 1. Determine Active Tab (Hoist to top)
   const activeTab = useMemo(() => {
     const tab = searchParams?.get('tab')
     if (tab === 'illustrations') return 'illustrations'
-    if (tab === 'characters') return 'characters'
+    // Only allow characters tab if there are secondary characters
+    if (tab === 'characters' && hasSecondaryCharacters) return 'characters'
     if (tab === 'pages') return 'pages'
 
     // Default tab logic based on status
     if (isIllustrationsUnlocked) return 'illustrations'
-    if (localProjectStatus === 'character_review' || localProjectStatus === 'character_generation' || localProjectStatus === 'draft') return 'characters'
+    // Only default to characters if there are secondary characters
+    if (hasSecondaryCharacters && (localProjectStatus === 'character_review' || localProjectStatus === 'character_generation' || localProjectStatus === 'draft')) return 'characters'
     return 'pages'
-  }, [searchParams, isIllustrationsUnlocked, localProjectStatus])
+  }, [searchParams, isIllustrationsUnlocked, localProjectStatus, hasSecondaryCharacters])
 
   const isPagesActive = activeTab === 'pages'
   const isCharactersActive = activeTab === 'characters'

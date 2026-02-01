@@ -457,16 +457,20 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       icon: <FileText className="w-4 h-4" />,
       onClick: () => handleTabClick('pages'),
       count: pageCount
-    },
-    {
+    }
+  ]
+
+  // Only show Characters tab if there are secondary characters (count > 1 means main + secondary)
+  if (characterCount > 1) {
+    tabs.push({
       id: 'characters',
       label: 'Characters',
       icon: <Loader2 className="w-4 h-4" />,
       onClick: () => handleTabClick('characters'),
       count: characterCount,
       disabled: isCharactersLoading
-    }
-  ]
+    })
+  }
 
   if (isIllustrationsUnlocked) {
     tabs.push({
