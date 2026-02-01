@@ -335,57 +335,48 @@ export function EmptyStateBoard({
                             </div>
                         </div>
 
-                        {/* Illustration Type Checkboxes (Spot + Spread) */}
+                        {/* Illustration Type Checkboxes (Spot + Spread) - Side by side */}
                         {setIllustrationType && (
                             <>
                                 <div className="h-px bg-slate-200"></div>
-                                <div className="space-y-2">
-                                    {/* Spot Illustration Checkbox - Available on all pages */}
+                                <div className={`grid gap-2 ${page.page_number > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                    {/* Spot Image Checkbox - Available on all pages */}
                                     <div 
-                                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${illustrationType === 'spot' ? 'bg-pink-50 border-2 border-pink-300' : 'hover:bg-slate-100 border-2 border-transparent bg-white'}`}
+                                        className={`flex items-center gap-2 p-2.5 rounded-lg cursor-pointer transition-colors ${illustrationType === 'spot' ? 'bg-pink-50 border-2 border-pink-300' : 'hover:bg-slate-100 border-2 border-transparent bg-white'}`}
                                         onClick={() => {
-                                            // Toggle spot: if already spot, set to null (normal), otherwise set to spot
                                             setIllustrationType(illustrationType === 'spot' ? null : 'spot')
                                         }}
                                     >
-                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${illustrationType === 'spot' ? 'border-pink-600 bg-pink-600' : 'border-slate-300'}`}>
+                                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${illustrationType === 'spot' ? 'border-pink-600 bg-pink-600' : 'border-slate-300'}`}>
                                             {illustrationType === 'spot' && (
-                                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                                 </svg>
                                             )}
                                         </div>
-                                        <div className="flex-1">
-                                            <span className={`font-medium text-sm ${illustrationType === 'spot' ? 'text-pink-900' : 'text-slate-700'}`}>Spot Illustration</span>
-                                            <p className="text-xs text-slate-400">Small floating image on white background</p>
-                                        </div>
+                                        <span className={`font-medium text-sm ${illustrationType === 'spot' ? 'text-pink-900' : 'text-slate-700'}`}>Spot Image</span>
                                     </div>
 
-                                    {/* Double-Page Spread Checkbox - Hidden for Page 1 */}
+                                    {/* Spread Image Checkbox - Hidden for Page 1 */}
                                     {page.page_number > 1 && (
                                         <div 
-                                            className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${illustrationType === 'spread' ? 'bg-purple-50 border-2 border-purple-300' : 'hover:bg-slate-100 border-2 border-transparent bg-white'}`}
+                                            className={`flex items-center gap-2 p-2.5 rounded-lg cursor-pointer transition-colors ${illustrationType === 'spread' ? 'bg-purple-50 border-2 border-purple-300' : 'hover:bg-slate-100 border-2 border-transparent bg-white'}`}
                                             onClick={() => {
-                                                // Toggle spread: if already spread, set to null (normal), otherwise set to spread
                                                 const newType = illustrationType === 'spread' ? null : 'spread'
                                                 setIllustrationType(newType)
-                                                // Auto-select integrated text when enabling spread
                                                 if (newType === 'spread' && setTextIntegration) {
                                                     setTextIntegration('integrated')
                                                 }
                                             }}
                                         >
-                                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${illustrationType === 'spread' ? 'border-purple-600 bg-purple-600' : 'border-slate-300'}`}>
+                                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${illustrationType === 'spread' ? 'border-purple-600 bg-purple-600' : 'border-slate-300'}`}>
                                                 {illustrationType === 'spread' && (
-                                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                                     </svg>
                                                 )}
                                             </div>
-                                            <div className="flex-1">
-                                                <span className={`font-medium text-sm ${illustrationType === 'spread' ? 'text-purple-900' : 'text-slate-700'}`}>Double-Page Spread</span>
-                                                <p className="text-xs text-slate-400">Uses wider aspect ratio (21:9 or 16:9)</p>
-                                            </div>
+                                            <span className={`font-medium text-sm ${illustrationType === 'spread' ? 'text-purple-900' : 'text-slate-700'}`}>Spread Image</span>
                                         </div>
                                     )}
                                 </div>
