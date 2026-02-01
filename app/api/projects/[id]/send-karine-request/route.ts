@@ -65,12 +65,22 @@ export async function POST(
       .filter(Boolean)
       .join(' ') || 'Unknown Customer'
 
+    // Build project URL for upload button
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const projectUrl = `${baseUrl}/admin/project/${id}?tab=illustrations`
+
     // Build email
     const subject = '1st Illustration Coloring Request'
     const html = `
-      <p>Hi Karine,</p>
-      <p>Please colorize the 1st illustration attached for <strong>${customerName}'s</strong> project.</p>
-      <p>Thank you!</p>
+      <div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
+        <p style="margin-bottom: 16px;">Hi Karine,</p>
+        <p style="margin-bottom: 16px;">Please colorize the 1st illustration attached for <strong>${customerName}'s</strong> project.</p>
+        <p style="margin-bottom: 16px;">Once the image is ready, please upload it here:</p>
+        <p style="margin: 24px 0;">
+          <a href="${projectUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Upload Image</a>
+        </p>
+        <p style="margin-bottom: 8px;">Thank you!</p>
+      </div>
     `
 
     // Build attachments
