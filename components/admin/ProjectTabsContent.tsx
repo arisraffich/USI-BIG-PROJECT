@@ -246,6 +246,31 @@ export function ProjectTabsContent({
     }
   }
 
+  // Skip to Illustrations (when no secondary characters found)
+  const handleSkipToIllustrations = async () => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('projects')
+        .update({ status: 'characters_approved' })
+        .eq('id', projectId)
+
+      if (error) throw error
+
+      toast.success('Skipped to illustrations stage')
+      setLocalProjectStatus('characters_approved')
+      
+      // Switch to illustrations tab
+      startTransition(() => {
+        router.replace(`${pathname}?tab=illustrations`)
+      })
+      router.refresh()
+    } catch (e) {
+      console.error('Failed to skip to illustrations:', e)
+      toast.error('Failed to skip to illustrations')
+    }
+  }
+
   // Push to Customer (Silent Update) - Illustrations
   const handlePushToCustomer = async () => {
     setIsPushing(true)
@@ -642,7 +667,8 @@ export function ProjectTabsContent({
                 <div className="w-full">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
                     {/* Main character form is no longer shown - main character data comes from uploaded image and story extraction */}
-                    {localCharacters.length <= 1 && (
+                    {/* Show different UI based on whether analysis is complete or still running */}
+                    {localCharacters.length <= 1 && localProjectStatus === 'draft' && (
                       <div className="bg-[#f65952]/5 border border-[#f65952]/20 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-4 text-center min-h-[300px] animate-pulse">
                         <div className="relative">
                           <div className="absolute inset-0 bg-[#f65952] rounded-full animate-ping opacity-20"></div>
@@ -655,6 +681,34 @@ export function ProjectTabsContent({
                           <p className="text-sm text-[#f65952]/80 max-w-[200px]">
                             AI is reading your manuscript to identify more characters.
                           </p>
+                        </div>
+                      </div>
+                    )}
+                    {/* No secondary characters found - show skip option */}
+                    {localCharacters.length <= 1 && localProjectStatus === 'character_review' && sortedCharacters.secondary.length === 0 && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 flex flex-col items-center justify-center gap-4 text-center min-h-[300px]">
+                        <div className="relative">
+                          <div className="relative bg-white rounded-full p-3 shadow-sm border border-blue-200">
+                            <Sparkles className="w-6 h-6 text-blue-500" />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <h3 className="font-semibold text-blue-900">No Secondary Characters Found</h3>
+                          <p className="text-sm text-blue-700/80 max-w-[280px]">
+                            The AI did not identify any secondary characters in this story. You can proceed directly to illustrations or manually add characters.
+                          </p>
+                        </div>
+                        <div className="flex gap-3 mt-2">
+                          <AddCharacterButton
+                            mode="button"
+                            mainCharacterName={sortedCharacters.main?.name || sortedCharacters.main?.role || null}
+                          />
+                          <Button 
+                            onClick={handleSkipToIllustrations}
+                            className="bg-blue-600 hover:bg-blue-700"
+                          >
+                            Proceed to Illustrations
+                          </Button>
                         </div>
                       </div>
                     )}
