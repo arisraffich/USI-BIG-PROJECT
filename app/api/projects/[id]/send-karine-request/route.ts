@@ -24,10 +24,10 @@ export async function POST(
 
     const supabase = await createAdminClient()
 
-    // Get project info (customer name)
+    // Get project info (customer name + review token)
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id, author_firstname, author_lastname, book_title')
+      .select('id, author_firstname, author_lastname, book_title, review_token')
       .eq('id', id)
       .single()
 
@@ -65,9 +65,12 @@ export async function POST(
       .filter(Boolean)
       .join(' ') || 'Unknown Customer'
 
-    // Build project URL for upload button
+    // Build URLs
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
     const projectUrl = `${baseUrl}/admin/project/${id}?tab=illustrations`
+    const customerUrl = project.review_token 
+      ? `${baseUrl}/review/${project.review_token}?tab=illustrations`
+      : null
 
     // Build email
     const subject = '1st Illustration Coloring Request'
@@ -79,6 +82,12 @@ export async function POST(
         <p style="margin: 24px 0;">
           <a href="${projectUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Upload Image</a>
         </p>
+        ${customerUrl ? `
+        <p style="margin-top: 24px; margin-bottom: 16px;">See customer view below:</p>
+        <p style="margin: 24px 0;">
+          <a href="${customerUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Customer View</a>
+        </p>
+        ` : ''}
         <p style="margin-bottom: 8px;">Thank you!</p>
       </div>
     `
