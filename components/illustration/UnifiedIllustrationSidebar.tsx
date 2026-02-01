@@ -67,8 +67,13 @@ export function UnifiedIllustrationSidebar({
                                         </span>
                                     )}
                                     Page {page.page_number}
-                                    {/* Spread indicator */}
-                                    {page.is_spread && (
+                                    {/* Illustration type indicators */}
+                                    {page.illustration_type === 'spot' && (
+                                        <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-pink-100 text-pink-700 rounded" title="Spot illustration">
+                                            Spot
+                                        </span>
+                                    )}
+                                    {(page.illustration_type === 'spread' || (!page.illustration_type && page.is_spread)) && (
                                         <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-purple-100 text-purple-700 rounded" title="Double-page spread">
                                             Spread
                                         </span>
@@ -119,8 +124,13 @@ export function UnifiedIllustrationSidebar({
                                 {failedPageIds.includes(page.id) && (
                                     <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 border border-white animate-pulse" />
                                 )}
-                                {/* Spread indicator - mobile (bottom-right corner) */}
-                                {page.is_spread && !failedPageIds.includes(page.id) && (
+                                {/* Illustration type indicator - mobile (bottom-right corner) */}
+                                {page.illustration_type === 'spot' && !failedPageIds.includes(page.id) && (
+                                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-pink-500 border border-white text-[6px] font-bold text-white flex items-center justify-center" title="Spot">
+                                        S
+                                    </span>
+                                )}
+                                {(page.illustration_type === 'spread' || (!page.illustration_type && page.is_spread)) && !failedPageIds.includes(page.id) && (
                                     <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-purple-500 border border-white text-[6px] font-bold text-white flex items-center justify-center" title="Spread">
                                         2
                                     </span>

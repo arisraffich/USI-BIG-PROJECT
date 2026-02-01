@@ -33,8 +33,9 @@ export interface Page {
   is_approved?: boolean
   is_resolved?: boolean
   // Spread and Text Integration (per-page settings)
-  is_spread?: boolean
+  is_spread?: boolean // Deprecated: use illustration_type instead
   text_integration?: 'integrated' | 'separated' | null
+  illustration_type?: 'spread' | 'spot' | null // null = normal full-page illustration
 }
 
 

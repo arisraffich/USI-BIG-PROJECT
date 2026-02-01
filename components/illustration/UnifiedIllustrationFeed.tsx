@@ -40,8 +40,8 @@ interface UnifiedIllustrationFeedProps {
     // Per-page settings (Admin)
     pageTextIntegration?: Record<string, string>
     setPageTextIntegration?: (pageId: string, value: string) => void
-    pageSpread?: Record<string, boolean>
-    setPageSpread?: (pageId: string, isSpread: boolean) => void
+    pageIllustrationType?: Record<string, 'spread' | 'spot' | null>
+    setPageIllustrationType?: (pageId: string, type: 'spread' | 'spot' | null) => void
 
     // UI Feedback
     generatingPageIds?: Set<string>
@@ -90,8 +90,8 @@ export function UnifiedIllustrationFeed({
     setAspectRatio,
     pageTextIntegration = {},
     setPageTextIntegration,
-    pageSpread = {},
-    setPageSpread,
+    pageIllustrationType = {},
+    setPageIllustrationType,
     generatingPageIds = new Set(),
     loadingStateMap,
     allPages,
@@ -301,8 +301,8 @@ export function UnifiedIllustrationFeed({
                             // Per-page settings
                             textIntegration={pageTextIntegration[page.id] || ''}
                             setTextIntegration={setPageTextIntegration ? (val: string) => setPageTextIntegration(page.id, val) : undefined}
-                            isSpread={pageSpread[page.id] || false}
-                            setIsSpread={setPageSpread ? (val: boolean) => setPageSpread(page.id, val) : undefined}
+                            illustrationType={pageIllustrationType[page.id] || null}
+                            setIllustrationType={setPageIllustrationType ? (val: 'spread' | 'spot' | null) => setPageIllustrationType(page.id, val) : undefined}
                             
                             // Batch Generation
                             allPages={allPages}

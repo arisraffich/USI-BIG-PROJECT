@@ -26,8 +26,8 @@ interface EmptyStateBoardProps {
     setAspectRatio?: (val: string) => void
     textIntegration?: string
     setTextIntegration?: (val: string) => void
-    isSpread?: boolean
-    setIsSpread?: (val: boolean) => void
+    illustrationType?: 'spread' | 'spot' | null
+    setIllustrationType?: (type: 'spread' | 'spot' | null) => void
     onGenerate?: (refUrl?: string) => void
     illustratedPages?: Page[] // All pages with illustrations (for environment reference)
     
@@ -50,8 +50,8 @@ export function EmptyStateBoard({
     setAspectRatio,
     textIntegration,
     setTextIntegration,
-    isSpread = false,
-    setIsSpread,
+    illustrationType = null,
+    setIllustrationType,
     onGenerate,
     illustratedPages = [],
     allPages = [],
@@ -285,9 +285,14 @@ export function EmptyStateBoard({
 
                         <div className="h-px bg-slate-200"></div>
 
-                        {/* Text Placement Selection */}
-                        <div className="space-y-3">
-                            <Label className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Text Placement</Label>
+                        {/* Text Placement Selection - Disabled for Spot illustrations */}
+                        <div className={`space-y-3 ${illustrationType === 'spot' ? 'opacity-50' : ''}`}>
+                            <div className="flex items-center justify-between">
+                                <Label className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Text Placement</Label>
+                                {illustrationType === 'spot' && (
+                                    <span className="text-xs text-pink-600 font-medium">Not available for spot</span>
+                                )}
+                            </div>
                             <div className="grid grid-cols-2 gap-2">
                                 {[
                                     { value: 'integrated', label: 'Integrated', desc: 'Text inside illustration' },
@@ -295,46 +300,94 @@ export function EmptyStateBoard({
                                 ].map((option) => (
                                     <div
                                         key={option.value}
-                                        className={`flex flex-col items-center p-3 rounded-lg cursor-pointer transition-colors text-center ${textIntegration === option.value ? 'bg-purple-50 border-2 border-purple-300' : 'hover:bg-slate-100 border-2 border-transparent bg-white'}`}
-                                        onClick={() => setTextIntegration && setTextIntegration(option.value)}
+                                        className={`flex flex-col items-center p-3 rounded-lg transition-colors text-center ${
+                                            illustrationType === 'spot' 
+                                                ? 'cursor-not-allowed bg-slate-50 border-2 border-transparent' 
+                                                : textIntegration === option.value 
+                                                    ? 'cursor-pointer bg-purple-50 border-2 border-purple-300' 
+                                                    : 'cursor-pointer hover:bg-slate-100 border-2 border-transparent bg-white'
+                                        }`}
+                                        onClick={() => {
+                                            if (illustrationType !== 'spot' && setTextIntegration) {
+                                                setTextIntegration(option.value)
+                                            }
+                                        }}
                                     >
-                                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mb-2 ${textIntegration === option.value ? 'border-purple-600' : 'border-slate-300'}`}>
-                                            {textIntegration === option.value && <div className="w-2 h-2 rounded-full bg-purple-600" />}
+                                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mb-2 ${
+                                            illustrationType === 'spot'
+                                                ? 'border-slate-300'
+                                                : textIntegration === option.value 
+                                                    ? 'border-purple-600' 
+                                                    : 'border-slate-300'
+                                        }`}>
+                                            {illustrationType !== 'spot' && textIntegration === option.value && <div className="w-2 h-2 rounded-full bg-purple-600" />}
                                         </div>
-                                        <span className={`font-medium text-sm ${textIntegration === option.value ? 'text-purple-900' : 'text-slate-700'}`}>{option.label}</span>
+                                        <span className={`font-medium text-sm ${
+                                            illustrationType === 'spot'
+                                                ? 'text-slate-400'
+                                                : textIntegration === option.value 
+                                                    ? 'text-purple-900' 
+                                                    : 'text-slate-700'
+                                        }`}>{option.label}</span>
                                         <p className="text-xs text-slate-400 mt-0.5">{option.desc}</p>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Spread Checkbox (Hidden for Page 1) */}
-                        {page.page_number > 1 && setIsSpread && (
+                        {/* Illustration Type Checkboxes (Spot + Spread) */}
+                        {setIllustrationType && (
                             <>
                                 <div className="h-px bg-slate-200"></div>
                                 <div className="space-y-2">
+                                    {/* Spot Illustration Checkbox - Available on all pages */}
                                     <div 
-                                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${isSpread ? 'bg-purple-50 border-2 border-purple-300' : 'hover:bg-slate-100 border-2 border-transparent bg-white'}`}
+                                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${illustrationType === 'spot' ? 'bg-pink-50 border-2 border-pink-300' : 'hover:bg-slate-100 border-2 border-transparent bg-white'}`}
                                         onClick={() => {
-                                            setIsSpread(!isSpread)
-                                            // Auto-select integrated text when enabling spread
-                                            if (!isSpread && setTextIntegration) {
-                                                setTextIntegration('integrated')
-                                            }
+                                            // Toggle spot: if already spot, set to null (normal), otherwise set to spot
+                                            setIllustrationType(illustrationType === 'spot' ? null : 'spot')
                                         }}
                                     >
-                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSpread ? 'border-purple-600 bg-purple-600' : 'border-slate-300'}`}>
-                                            {isSpread && (
+                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${illustrationType === 'spot' ? 'border-pink-600 bg-pink-600' : 'border-slate-300'}`}>
+                                            {illustrationType === 'spot' && (
                                                 <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                                 </svg>
                                             )}
                                         </div>
                                         <div className="flex-1">
-                                            <span className={`font-medium text-sm ${isSpread ? 'text-purple-900' : 'text-slate-700'}`}>Double-Page Spread</span>
-                                            <p className="text-xs text-slate-400">Uses wider aspect ratio (21:9 or 16:9)</p>
+                                            <span className={`font-medium text-sm ${illustrationType === 'spot' ? 'text-pink-900' : 'text-slate-700'}`}>Spot Illustration</span>
+                                            <p className="text-xs text-slate-400">Small floating image on white background</p>
                                         </div>
                                     </div>
+
+                                    {/* Double-Page Spread Checkbox - Hidden for Page 1 */}
+                                    {page.page_number > 1 && (
+                                        <div 
+                                            className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${illustrationType === 'spread' ? 'bg-purple-50 border-2 border-purple-300' : 'hover:bg-slate-100 border-2 border-transparent bg-white'}`}
+                                            onClick={() => {
+                                                // Toggle spread: if already spread, set to null (normal), otherwise set to spread
+                                                const newType = illustrationType === 'spread' ? null : 'spread'
+                                                setIllustrationType(newType)
+                                                // Auto-select integrated text when enabling spread
+                                                if (newType === 'spread' && setTextIntegration) {
+                                                    setTextIntegration('integrated')
+                                                }
+                                            }}
+                                        >
+                                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${illustrationType === 'spread' ? 'border-purple-600 bg-purple-600' : 'border-slate-300'}`}>
+                                                {illustrationType === 'spread' && (
+                                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                )}
+                                            </div>
+                                            <div className="flex-1">
+                                                <span className={`font-medium text-sm ${illustrationType === 'spread' ? 'text-purple-900' : 'text-slate-700'}`}>Double-Page Spread</span>
+                                                <p className="text-xs text-slate-400">Uses wider aspect ratio (21:9 or 16:9)</p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </>
                         )}

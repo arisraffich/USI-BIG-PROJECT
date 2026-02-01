@@ -136,11 +136,12 @@ export function IllustrationsTabContent({
         return initial
     })
     
-    // Per-page spread state (keyed by page id)
-    const [pageSpread, setPageSpread] = useState<Record<string, boolean>>(() => {
-        const initial: Record<string, boolean> = {}
+    // Per-page illustration type state (keyed by page id): 'spread' | 'spot' | null (normal)
+    const [pageIllustrationType, setPageIllustrationType] = useState<Record<string, 'spread' | 'spot' | null>>(() => {
+        const initial: Record<string, 'spread' | 'spot' | null> = {}
         pages.forEach(p => {
-            initial[p.id] = p.is_spread || false
+            // Support both new illustration_type and legacy is_spread
+            initial[p.id] = p.illustration_type || (p.is_spread ? 'spread' : null)
         })
         return initial
     })
@@ -183,11 +184,12 @@ export function IllustrationsTabContent({
             })
             return updated
         })
-        setPageSpread(prev => {
+        setPageIllustrationType(prev => {
             const updated = { ...prev }
             pages.forEach(p => {
                 if (!(p.id in updated)) {
-                    updated[p.id] = p.is_spread || false
+                    // Support both new illustration_type and legacy is_spread
+                    updated[p.id] = p.illustration_type || (p.is_spread ? 'spread' : null)
                 }
             })
             return updated
@@ -199,14 +201,16 @@ export function IllustrationsTabContent({
         setPageTextIntegration(prev => ({ ...prev, [pageId]: value }))
     }, [])
     
-    // Handler for setting spread per page (also auto-selects integrated text)
-    const handleSetPageSpread = useCallback((pageId: string, isSpread: boolean) => {
-        setPageSpread(prev => ({ ...prev, [pageId]: isSpread }))
+    // Handler for setting illustration type per page (spread, spot, or null for normal)
+    // Handles mutual exclusivity and auto text integration behavior
+    const handleSetPageIllustrationType = useCallback((pageId: string, type: 'spread' | 'spot' | null) => {
+        setPageIllustrationType(prev => ({ ...prev, [pageId]: type }))
         
         // Auto-select 'integrated' text when spread is enabled
-        if (isSpread) {
+        if (type === 'spread') {
             setPageTextIntegration(prev => ({ ...prev, [pageId]: 'integrated' }))
         }
+        // Note: Spot disables text integration (handled in UI by graying out the option)
     }, [])
     
     // Helper to update page errors (uses external state if provided)
@@ -240,14 +244,13 @@ export function IllustrationsTabContent({
                 illustration_text_integration: pageTextIntegration[page.id] || '' // Also update project default
             }).eq('id', projectId)
             
-            // 2. Save per-page settings (text_integration and is_spread)
-            const pageSettings: { text_integration?: string; is_spread?: boolean } = {}
+            // 2. Save per-page settings (text_integration and illustration_type)
+            const pageSettings: { text_integration?: string; illustration_type?: string | null } = {}
             if (pageTextIntegration[page.id]) {
                 pageSettings.text_integration = pageTextIntegration[page.id]
             }
-            if (pageSpread[page.id] !== undefined) {
-                pageSettings.is_spread = pageSpread[page.id]
-            }
+            // Save illustration_type (null for normal, 'spread' for spread, 'spot' for spot)
+            pageSettings.illustration_type = pageIllustrationType[page.id] || null
             if (Object.keys(pageSettings).length > 0) {
                 await supabase.from('pages').update(pageSettings).eq('id', page.id)
             }
@@ -742,8 +745,8 @@ export function IllustrationsTabContent({
             // Per-page settings
             pageTextIntegration={pageTextIntegration}
             setPageTextIntegration={handleSetPageTextIntegration}
-            pageSpread={pageSpread}
-            setPageSpread={handleSetPageSpread}
+            pageIllustrationType={pageIllustrationType}
+            setPageIllustrationType={handleSetPageIllustrationType}
             
             // Batch Generation
             allPages={pages}

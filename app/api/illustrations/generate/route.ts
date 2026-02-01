@@ -104,12 +104,18 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Page not found' }, { status: 404 })
         }
 
-        // Check if this page is a spread (double-page)
-        const isSpread = pageData.is_spread === true
+        // Check illustration type (spread, spot, or normal)
+        // Support both new illustration_type field and legacy is_spread for backward compatibility
+        const illustrationType = pageData.illustration_type || (pageData.is_spread ? 'spread' : null)
+        const isSpread = illustrationType === 'spread'
+        const isSpot = illustrationType === 'spot'
         const mappedAspectRatio = mapAspectRatio(project?.illustration_aspect_ratio || undefined, isSpread)
         
         if (isSpread) {
             console.log(`[Illustration Generate] 📖 SPREAD MODE - Page ${pageData.page_number} using ${mappedAspectRatio} aspect ratio`)
+        }
+        if (isSpot) {
+            console.log(`[Illustration Generate] 🔵 SPOT MODE - Page ${pageData.page_number} (children's book spot illustration)`)
         }
         let fullPrompt = ''
         let characterReferences: any[] = []
@@ -480,10 +486,10 @@ ${pageData.background_elements || 'Appropriate background for the scene.'}
 
 `
 
-            // Build spread composition rules (applies to all spreads)
-            let spreadCompositionRules = ''
+            // Build illustration type composition rules (spread or spot)
+            let illustrationTypeRules = ''
             if (isSpread) {
-                spreadCompositionRules = `
+                illustrationTypeRules = `
 SPREAD COMPOSITION RULES (CRITICAL):
 This is a double-page spread that will be bound in the center.
 - NEVER place important characters, faces, or key focal elements in the center 10% of the image.
@@ -492,18 +498,34 @@ This is a double-page spread that will be bound in the center.
 - Design the scene to read well as a panoramic, wide-format illustration.
 
 `
+            } else if (isSpot) {
+                illustrationTypeRules = `
+SPOT ILLUSTRATION (CRITICAL - CHILDREN'S BOOK):
+This is a children's book spot illustration, NOT a full-page illustration.
+
+COMPOSITION RULES:
+- VIGNETTE/FLOATING: The illustration must NOT fill the entire canvas. Leave white space.
+- NO HARD BORDERS: The image should fade, bleed, or soften at the edges naturally.
+- The illustration should "float" on a WHITE BACKGROUND - do NOT render a full rectangular scene.
+
+SUBJECT RULES:
+- SINGLE FOCAL POINT: Focus on ONE clear subject (character or object). No complex scenes.
+- MINIMAL/NO BACKGROUND: Background is either absent, abstractly suggested, or fades to white.
+- COMPACT SCALE: Design to work at smaller sizes. Keep it simple and readable.
+
+`
             }
 
             // Build fullPrompt differently for scene recreation vs standard generation
             if (isSceneRecreationMode) {
                 // Scene Recreation: Use the streamlined prompt (styleInstructions has everything)
-                fullPrompt = `${spreadCompositionRules}${styleInstructions}
+                fullPrompt = `${illustrationTypeRules}${styleInstructions}
 
 ${textPromptSection}`
             } else {
                 // Standard Generation: Full detailed prompt
                 fullPrompt = `TASK: ILLUSTRATION GENERATION
-${spreadCompositionRules}
+${illustrationTypeRules}
 SCENE Context:
 ${cleanSceneDescription}
 
@@ -594,7 +616,8 @@ ${textPromptSection}`
             illustrationUrl: publicUrl,
             pageId: pageData.id,
             aspectRatioUsed: mappedAspectRatio,
-            isSpread: isSpread,
+            isSpread: isSpread, // Deprecated: use illustrationType
+            illustrationType: illustrationType,
             isPreview: !!skipDbUpdate // Indicate this is a preview (not saved to DB)
         })
 
