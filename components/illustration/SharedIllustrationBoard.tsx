@@ -95,6 +95,11 @@ export interface SharedIllustrationBoardProps {
         newUrl: string
     }
     onComparisonDecision?: (decision: 'keep_new' | 'revert_old') => void
+    
+    // Admin Reply Feature
+    onSaveAdminReply?: (reply: string) => Promise<void>
+    onAcceptAdminReply?: () => Promise<void>
+    onCustomerFollowUp?: (notes: string) => Promise<void>
 }
 
 export function SharedIllustrationBoard({
@@ -126,7 +131,11 @@ export function SharedIllustrationBoard({
     batchState,
     generationError,
     comparisonState,
-    onComparisonDecision
+    onComparisonDecision,
+    // Admin Reply Feature
+    onSaveAdminReply,
+    onAcceptAdminReply,
+    onCustomerFollowUp
 }: SharedIllustrationBoardProps) {
 
     // --------------------------------------------------------------------------
@@ -138,6 +147,16 @@ export function SharedIllustrationBoard({
     const [showImage, setShowImage] = useState<string | null>(null)
     const [historyOpen, setHistoryOpen] = useState(false) // For mobile popup
     const [inlineHistoryExpanded, setInlineHistoryExpanded] = useState(false) // For desktop inline collapsible
+    
+    // Admin Reply State
+    const [isAdminReplying, setIsAdminReplying] = useState(false)
+    const [adminReplyText, setAdminReplyText] = useState('')
+    const [isSavingAdminReply, setIsSavingAdminReply] = useState(false)
+    // Customer Follow-up State
+    const [isCustomerFollowingUp, setIsCustomerFollowingUp] = useState(false)
+    const [followUpText, setFollowUpText] = useState('')
+    const [isSavingFollowUp, setIsSavingFollowUp] = useState(false)
+    const [isAccepting, setIsAccepting] = useState(false)
     const historyDropdownRef = useRef<HTMLDivElement>(null) // For click-outside collapse
 
     // NEW: View Mode for Sketch Card
@@ -355,6 +374,61 @@ export function SharedIllustrationBoard({
         }
     }, [onSaveFeedback, notes])
 
+    // Handle Admin Reply Save
+    const handleSaveAdminReply = useCallback(async () => {
+        if (!onSaveAdminReply || !adminReplyText.trim()) {
+            setIsAdminReplying(false)
+            return
+        }
+        setIsSavingAdminReply(true)
+        try {
+            await onSaveAdminReply(adminReplyText.trim())
+            setAdminReplyText('')
+            setIsAdminReplying(false)
+            toast.success('Reply saved')
+        } catch (e) {
+            console.error(e)
+            toast.error('Failed to save reply')
+        } finally {
+            setIsSavingAdminReply(false)
+        }
+    }, [onSaveAdminReply, adminReplyText])
+
+    // Handle Customer Accept Admin Reply
+    const handleAcceptReply = useCallback(async () => {
+        if (!onAcceptAdminReply) return
+        setIsAccepting(true)
+        try {
+            await onAcceptAdminReply()
+            toast.success('Response accepted')
+        } catch (e) {
+            console.error(e)
+            toast.error('Failed to accept response')
+        } finally {
+            setIsAccepting(false)
+        }
+    }, [onAcceptAdminReply])
+
+    // Handle Customer Follow-up
+    const handleCustomerFollowUp = useCallback(async () => {
+        if (!onCustomerFollowUp || !followUpText.trim()) {
+            setIsCustomerFollowingUp(false)
+            return
+        }
+        setIsSavingFollowUp(true)
+        try {
+            await onCustomerFollowUp(followUpText.trim())
+            setFollowUpText('')
+            setIsCustomerFollowingUp(false)
+            toast.success('Follow-up saved')
+        } catch (e) {
+            console.error(e)
+            toast.error('Failed to save follow-up')
+        } finally {
+            setIsSavingFollowUp(false)
+        }
+    }, [onCustomerFollowUp, followUpText])
+
     const handleAdminUploadSelect = useCallback((type: 'sketch' | 'illustration') => (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0] && onUpload) {
             onUpload(type, e.target.files[0])
@@ -464,9 +538,9 @@ export function SharedIllustrationBoard({
                         )}
 
                         {/* FEEDBACK SECTION */}
-                        <div className="mt-2">
-                            {/* READ ONLY FEEDBACK */}
-                            {!isEditing && page.feedback_notes && (
+                        <div className="mt-2 space-y-3">
+                            {/* READ ONLY FEEDBACK (Customer's Request) */}
+                            {!isEditing && !isCustomerFollowingUp && page.feedback_notes && (
                                 <div className={`${page.is_resolved ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-100'} border rounded-md p-3 text-sm relative group animate-in fade-in zoom-in-95 duration-200`}>
                                     <div className="flex items-center justify-between mb-1">
                                         <p className={`font-semibold text-xs uppercase ${page.is_resolved ? 'text-green-700' : 'text-amber-700'}`}>
@@ -479,7 +553,8 @@ export function SharedIllustrationBoard({
                                         )}
                                     </div>
                                     <p className={`whitespace-pre-wrap ${page.is_resolved ? 'text-green-900' : 'text-amber-900'}`}>{page.feedback_notes}</p>
-                                    {isCustomer && !page.is_resolved && !isLocked && (
+                                    {/* Customer Edit Button - only if no admin reply yet */}
+                                    {isCustomer && !page.is_resolved && !isLocked && !page.admin_reply && (
                                         <Button
                                             variant="ghost"
                                             size="sm"
@@ -492,7 +567,104 @@ export function SharedIllustrationBoard({
                                 </div>
                             )}
 
-                            {/* EDIT MODE (Customer Only) */}
+                            {/* ADMIN REPLY DISPLAY (Illustrator Note) - Customer sees this */}
+                            {page.admin_reply && !page.is_resolved && !isCustomerFollowingUp && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm animate-in fade-in zoom-in-95 duration-200">
+                                    <p className="font-semibold text-xs uppercase text-blue-700 mb-1">Illustrator Note:</p>
+                                    <p className="whitespace-pre-wrap text-blue-900">{page.admin_reply}</p>
+                                    
+                                    {/* Customer Actions: Accept or Reply */}
+                                    {isCustomer && !isLocked && (
+                                        <div className="flex gap-3 mt-3">
+                                            <Button
+                                                size="sm"
+                                                onClick={handleAcceptReply}
+                                                disabled={isAccepting}
+                                                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold"
+                                            >
+                                                {isAccepting ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
+                                                Accept
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                onClick={() => setIsCustomerFollowingUp(true)}
+                                                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold"
+                                            >
+                                                <MessageSquarePlus className="w-4 h-4 mr-1.5" />
+                                                Reply
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* ADMIN REPLY BUTTON (Admin sees this when there's unresolved feedback) */}
+                            {isAdmin && page.feedback_notes && !page.is_resolved && !page.admin_reply && !isAdminReplying && onSaveAdminReply && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setIsAdminReplying(true)}
+                                    className="w-full h-9 gap-2 text-blue-600 border-blue-300 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400 bg-white font-medium"
+                                >
+                                    <MessageSquarePlus className="w-4 h-4" />
+                                    Reply to Customer
+                                </Button>
+                            )}
+
+                            {/* ADMIN REPLY EDIT MODE */}
+                            {isAdmin && isAdminReplying && (
+                                <div className="space-y-3 animate-in fade-in zoom-in-95 duration-200 bg-white rounded-lg p-3 border border-blue-200 shadow-sm ring-1 ring-blue-50">
+                                    <Label className="text-xs font-semibold text-blue-700 uppercase">Illustrator Note:</Label>
+                                    <Textarea
+                                        value={adminReplyText}
+                                        onChange={(e) => setAdminReplyText(e.target.value)}
+                                        placeholder="Explain why you cannot make this change..."
+                                        className="min-h-[100px] text-sm resize-none focus-visible:ring-blue-500 border-blue-200 bg-white"
+                                        autoFocus
+                                    />
+                                    <div className="flex gap-3 justify-end mt-2">
+                                        <Button variant="ghost" size="sm" onClick={() => { setAdminReplyText(''); setIsAdminReplying(false) }} className="text-slate-600 hover:bg-slate-50">Cancel</Button>
+                                        <Button
+                                            size="sm"
+                                            onClick={handleSaveAdminReply}
+                                            disabled={isSavingAdminReply || !adminReplyText.trim()}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                                        >
+                                            {isSavingAdminReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
+                                            Send Reply
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* CUSTOMER FOLLOW-UP EDIT MODE */}
+                            {isCustomer && isCustomerFollowingUp && (
+                                <div className="space-y-3 animate-in fade-in zoom-in-95 duration-200 bg-white rounded-lg p-3 border border-amber-100 shadow-sm ring-1 ring-amber-50">
+                                    <Label className="text-xs font-semibold text-amber-800 uppercase">Your Reply:</Label>
+                                    <Textarea
+                                        value={followUpText}
+                                        onChange={(e) => setFollowUpText(e.target.value)}
+                                        placeholder="Add your response or request..."
+                                        className="min-h-[100px] text-sm resize-none focus-visible:ring-amber-500 border-amber-200 bg-white"
+                                        autoFocus
+                                    />
+                                    <div className="flex gap-3 justify-end mt-2">
+                                        <Button variant="ghost" size="sm" onClick={() => { setFollowUpText(''); setIsCustomerFollowingUp(false) }} className="text-slate-600 hover:bg-slate-50">Cancel</Button>
+                                        <Button
+                                            size="sm"
+                                            onClick={handleCustomerFollowUp}
+                                            disabled={isSavingFollowUp || !followUpText.trim()}
+                                            className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+                                            style={{ backgroundColor: '#d97706', color: '#ffffff' }}
+                                        >
+                                            {isSavingFollowUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
+                                            Send Reply
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* EDIT MODE (Customer Only - initial feedback) */}
                             {isEditing && isCustomer ? (
                                 <div className="space-y-3 animate-in fade-in zoom-in-95 duration-200 bg-white rounded-lg p-3 border border-amber-100 shadow-sm ring-1 ring-amber-50">
                                     <Label className="text-xs font-semibold text-amber-800 uppercase">Your Request:</Label>
@@ -506,8 +678,8 @@ export function SharedIllustrationBoard({
                                     </div>
                                 </div>
                             ) : (
-                                // CREATE BUTTON (Customer Only)
-                                isCustomer && !page.feedback_notes && !isLocked && (
+                                // CREATE BUTTON (Customer Only) - Only show if no feedback yet and not following up
+                                isCustomer && !page.feedback_notes && !isLocked && !isCustomerFollowingUp && (
                                     <Button variant="outline" size="sm" className="w-full h-11 gap-2 text-amber-600 border-amber-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-700 shadow-sm bg-white font-medium" onClick={() => setIsEditing(true)}>
                                         <MessageSquarePlus className="w-4 h-4" />
                                         Request Revision

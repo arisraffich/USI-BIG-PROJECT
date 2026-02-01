@@ -461,6 +461,13 @@ export function IllustrationsTabContent({
             // Update local state for illustration type
             setPageIllustrationType(prev => ({ ...prev, [page.id]: newType }))
 
+            // Clear admin reply since we're regenerating (addressing feedback with action)
+            try {
+                await fetch(`/api/pages/${page.id}/admin-reply`, { method: 'DELETE' })
+            } catch (e) {
+                // Non-critical, continue
+            }
+
             // 2. Trigger regeneration (no comparison mode - direct replacement)
             const response = await fetch('/api/illustrations/generate', {
                 method: 'POST',
@@ -554,6 +561,13 @@ export function IllustrationsTabContent({
             
             if (decision === 'keep_new') {
                 toast.success('New illustration confirmed', { description: 'Generating sketch...' })
+                
+                // Clear admin reply since we're regenerating (addressing feedback with action)
+                try {
+                    await fetch(`/api/pages/${pageId}/admin-reply`, { method: 'DELETE' })
+                } catch (e) {
+                    // Non-critical, continue
+                }
                 
                 // Generate sketch for new illustration
                 try {
@@ -810,6 +824,23 @@ export function IllustrationsTabContent({
         toast.info('Cancelling batch generation...')
     }, [])
 
+    // Handle admin reply to customer feedback
+    const handleSaveAdminReply = useCallback(async (pageId: string, reply: string) => {
+        const response = await fetch(`/api/pages/${pageId}/admin-reply`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ admin_reply: reply }),
+        })
+
+        if (!response.ok) {
+            const data = await response.json()
+            throw new Error(data.error || 'Failed to save reply')
+        }
+
+        // Refresh to show updated page with admin_reply
+        router.refresh()
+    }, [router])
+
     return (
         <UnifiedIllustrationFeed
             mode="admin"
@@ -851,6 +882,9 @@ export function IllustrationsTabContent({
             // Comparison Mode (Regeneration Preview)
             comparisonStates={comparisonStates}
             onComparisonDecision={handleComparisonDecision}
+            
+            // Admin Reply Feature
+            onSaveAdminReply={handleSaveAdminReply}
         />
     )
 }

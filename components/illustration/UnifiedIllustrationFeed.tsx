@@ -69,6 +69,11 @@ interface UnifiedIllustrationFeedProps {
         newUrl: string
     }>
     onComparisonDecision?: (pageId: string, decision: 'keep_new' | 'revert_old') => void
+    
+    // Admin Reply Feature
+    onSaveAdminReply?: (pageId: string, reply: string) => Promise<void>
+    onAcceptAdminReply?: (pageId: string) => Promise<void>
+    onCustomerFollowUp?: (pageId: string, notes: string) => Promise<void>
 }
 
 export function UnifiedIllustrationFeed({
@@ -102,7 +107,11 @@ export function UnifiedIllustrationFeed({
     batchState,
     pageErrors,
     comparisonStates = {},
-    onComparisonDecision
+    onComparisonDecision,
+    // Admin Reply Feature
+    onSaveAdminReply,
+    onAcceptAdminReply,
+    onCustomerFollowUp
 }: UnifiedIllustrationFeedProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const isScrollingRef = useRef(false)
@@ -319,6 +328,11 @@ export function UnifiedIllustrationFeed({
                             // Comparison Mode (Regeneration Preview)
                             comparisonState={comparisonStates[page.id] ? { pageId: page.id, ...comparisonStates[page.id] } : undefined}
                             onComparisonDecision={onComparisonDecision ? (decision) => onComparisonDecision(page.id, decision) : undefined}
+                            
+                            // Admin Reply Feature
+                            onSaveAdminReply={onSaveAdminReply ? (reply) => onSaveAdminReply(page.id, reply) : undefined}
+                            onAcceptAdminReply={onAcceptAdminReply ? () => onAcceptAdminReply(page.id) : undefined}
+                            onCustomerFollowUp={onCustomerFollowUp ? (notes) => onCustomerFollowUp(page.id, notes) : undefined}
                         />
                     </div>
                 )

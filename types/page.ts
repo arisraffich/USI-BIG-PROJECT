@@ -29,9 +29,12 @@ export interface Page {
   sketch_generated_at?: string | null
   // Feedback Module
   feedback_notes?: string | null
-  feedback_history?: Array<{ note: string; created_at: string }> | null
+  feedback_history?: Array<{ note: string; created_at: string; revision_round?: number }> | null
   is_approved?: boolean
   is_resolved?: boolean
+  // Admin Reply (Illustrator Note)
+  admin_reply?: string | null
+  admin_reply_at?: string | null
   // Spread and Text Integration (per-page settings)
   is_spread?: boolean // Deprecated: use illustration_type instead
   text_integration?: 'integrated' | 'separated' | null
