@@ -431,6 +431,96 @@ export function IllustrationsTabContent({
         }
     }
 
+    // Handle layout change (triggers direct regeneration, no comparison mode)
+    const handleLayoutChange = async (page: Page, newType: 'spread' | 'spot' | null) => {
+        try {
+            setGeneratingPageIds(prev => new Set(prev).add(page.id))
+            setLoadingState(prev => ({ ...prev, [page.id]: { illustration: true, sketch: false } }))
+
+            // Auto-download backup if there's an existing illustration
+            if (page.illustration_url) {
+                downloadImageBackup(page.illustration_url, page.page_number)
+            }
+
+            const supabase = createClient()
+            
+            // 1. Save new layout type to database
+            const pageSettings: { illustration_type: string | null; text_integration?: string } = {
+                illustration_type: newType
+            }
+            
+            // Auto-set text_integration to 'integrated' when switching to spread
+            if (newType === 'spread') {
+                pageSettings.text_integration = 'integrated'
+                // Also update local state
+                setPageTextIntegration(prev => ({ ...prev, [page.id]: 'integrated' }))
+            }
+            
+            await supabase.from('pages').update(pageSettings).eq('id', page.id)
+            
+            // Update local state for illustration type
+            setPageIllustrationType(prev => ({ ...prev, [page.id]: newType }))
+
+            // 2. Trigger regeneration (no comparison mode - direct replacement)
+            const response = await fetch('/api/illustrations/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    projectId,
+                    pageId: page.id,
+                    skipDbUpdate: false // Save to DB directly (no comparison mode)
+                })
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.error || 'Layout change failed')
+            }
+
+            const data = await response.json()
+            
+            const layoutLabel = newType === 'spread' ? 'Spread' : newType === 'spot' ? 'Spot' : 'Single Page'
+            toast.success(`Layout changed to ${layoutLabel}`, { description: 'Generating sketch...' })
+
+            // Unlock Illustration, Lock Sketch
+            setLoadingState(prev => ({ ...prev, [page.id]: { illustration: false, sketch: true } }))
+
+            // 3. Chain: Generate Sketch
+            if (data.illustrationUrl) {
+                try {
+                    const sketchRes = await fetch('/api/illustrations/generate-sketch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ projectId, pageId: page.id, illustrationUrl: data.illustrationUrl })
+                    })
+                    if (sketchRes.ok) {
+                        toast.success('Sketch Updated')
+                    } else {
+                        const errData = await sketchRes.json().catch(() => ({}))
+                        console.error("Sketch generation failed:", errData)
+                        toast.error('Sketch update failed')
+                    }
+                } catch (e) {
+                    console.error("Sketch trigger failed", e)
+                    toast.error('Sketch update failed')
+                }
+            }
+            
+            router.refresh()
+        } catch (error: any) {
+            const errorMessage = error?.message || 'Layout change failed'
+            toast.error('Layout change failed', { description: errorMessage })
+            console.error(error)
+        } finally {
+            setGeneratingPageIds(prev => {
+                const next = new Set(prev)
+                next.delete(page.id)
+                return next
+            })
+            setLoadingState(prev => ({ ...prev, [page.id]: { illustration: false, sketch: false } }))
+        }
+    }
+
     // Handle comparison decision (Keep New or Revert Old)
     const handleComparisonDecision = async (pageId: string, decision: 'keep_new' | 'revert_old') => {
         const comparison = comparisonStates[pageId]
@@ -734,6 +824,7 @@ export function IllustrationsTabContent({
             // Handlers
             onGenerate={handleGenerate}
             onRegenerate={handleRegenerate}
+            onLayoutChange={handleLayoutChange}
             onUpload={handleUpload}
 
             // Wizard State

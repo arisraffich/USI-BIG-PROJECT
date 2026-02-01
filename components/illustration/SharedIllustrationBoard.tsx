@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, ChevronUp, AlignLeft, Users, Plus, Minus, Pencil, Check } from 'lucide-react'
+import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, ChevronUp, AlignLeft, Users, Plus, Minus, Pencil, Check, Layers } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
@@ -68,6 +68,7 @@ export interface SharedIllustrationBoardProps {
     setIllustrationType?: (type: 'spread' | 'spot' | null) => void
     onGenerate?: () => void
     onRegenerate?: (prompt: string, referenceImages?: string[], referenceImageUrl?: string, sceneCharacters?: SceneCharacter[]) => void
+    onLayoutChange?: (newType: 'spread' | 'spot' | null) => void // For changing layout type (triggers regeneration)
     onUpload?: (type: 'sketch' | 'illustration', file: File) => Promise<void>
     illustratedPages?: Page[] // All pages with illustrations (for environment reference)
     characters?: Character[] // All project characters for character control
@@ -115,6 +116,7 @@ export function SharedIllustrationBoard({
     setIllustrationType,
     onGenerate,
     onRegenerate,
+    onLayoutChange,
     onUpload,
     illustratedPages = [],
     characters = [],
@@ -151,6 +153,10 @@ export function SharedIllustrationBoard({
     const [regenerationPrompt, setRegenerationPrompt] = useState('')
     const [referenceImages, setReferenceImages] = useState<{ file: File; preview: string }[]>([])
     
+    // Admin: Layout Change Dialog
+    const [isLayoutDialogOpen, setIsLayoutDialogOpen] = useState(false)
+    const [selectedLayoutType, setSelectedLayoutType] = useState<'spread' | 'spot' | null>(null)
+    
     // NEW: Environment Reference & Character Control (Mode 3/4)
     const [selectedEnvPageId, setSelectedEnvPageId] = useState<string | null>(null)
     const [sceneCharacters, setSceneCharacters] = useState<SceneCharacter[]>([])
@@ -169,6 +175,17 @@ export function SharedIllustrationBoard({
         setRegenerationPrompt(prompt)
         setIsRegenerateDialogOpen(true)
     }
+
+    // Handler to open layout dialog with current type pre-selected
+    const handleOpenLayoutDialog = () => {
+        // Get current illustration type from page data
+        const currentType = page.illustration_type || (page.is_spread ? 'spread' : null)
+        setSelectedLayoutType(currentType)
+        setIsLayoutDialogOpen(true)
+    }
+
+    // Get current illustration type for display
+    const currentIllustrationType = page.illustration_type || (page.is_spread ? 'spread' : null)
 
     // Refs for hidden inputs
     const sketchInputRef = useRef<HTMLInputElement>(null)
@@ -415,12 +432,27 @@ export function SharedIllustrationBoard({
                     {/* Header 73px - Matches Backup */}
                     <div className="p-4 border-b border-slate-100 h-[73px] flex items-center justify-between shrink-0">
                         <h4 className="font-semibold text-slate-800">Reviews</h4>
-                        {/* ADMIN ONLY: REGEN BUTTON (Strictly from Admin Backup) */}
+                        {/* ADMIN ONLY: LAYOUT + REGEN BUTTONS */}
                         {isAdmin && onRegenerate && (
-                            <Button variant="outline" size="sm" onClick={handleOpenRegenerateDialog} disabled={isGenerating} title="Regenerate with Instructions">
-                                <RefreshCw className="w-3.5 h-3.5 mr-2" />
-                                Regenerate
-                            </Button>
+                            <div className="flex items-center gap-1.5">
+                                {/* Layout Button - Icon only with tooltip */}
+                                {onLayoutChange && page.illustration_url && (
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        onClick={handleOpenLayoutDialog} 
+                                        disabled={isGenerating}
+                                        className="h-8 w-8 text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                                        title="Change Layout"
+                                    >
+                                        <Layers className="w-4 h-4" />
+                                    </Button>
+                                )}
+                                <Button variant="outline" size="sm" onClick={handleOpenRegenerateDialog} disabled={isGenerating} title="Regenerate with Instructions">
+                                    <RefreshCw className="w-3.5 h-3.5 mr-2" />
+                                    Regenerate
+                                </Button>
+                            </div>
                         )}
                     </div>
 
@@ -605,6 +637,20 @@ export function SharedIllustrationBoard({
                                 Page {page.page_number}
                             </span>
                         </div>
+
+                        {/* Center: Layout Button (Admin only, when illustration exists) */}
+                        {isAdmin && onLayoutChange && page.illustration_url && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleOpenLayoutDialog}
+                                disabled={isGenerating}
+                                className="bg-white/20 hover:bg-white/30 text-white border-transparent font-medium px-3 h-8 gap-1.5 rounded-full z-10 transition-colors"
+                            >
+                                <Layers className="w-4 h-4" />
+                                Layout
+                            </Button>
+                        )}
 
                         {/* Right: Action Button */}
                         <Button
@@ -1341,6 +1387,101 @@ export function SharedIllustrationBoard({
                                     : isSceneRecreationMode 
                                         ? "Recreate Scene"
                                         : "Regenerate"}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {/* ADMIN LAYOUT CHANGE DIALOG */}
+            {isAdmin && onLayoutChange && (
+                <Dialog open={isLayoutDialogOpen} onOpenChange={(open) => {
+                    setIsLayoutDialogOpen(open)
+                    if (!open) {
+                        setSelectedLayoutType(currentIllustrationType)
+                    }
+                }}>
+                    <DialogContent className="sm:max-w-[380px]">
+                        <DialogHeader>
+                            <DialogTitle>Change Layout</DialogTitle>
+                            <DialogDescription>
+                                Select a new layout type for this illustration.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="py-4">
+                            <RadioGroup 
+                                value={selectedLayoutType || 'normal'} 
+                                onValueChange={(value) => setSelectedLayoutType(value === 'normal' ? null : value as 'spread' | 'spot')}
+                                className="space-y-3"
+                            >
+                                {/* Single Page (Normal) */}
+                                <div className={`flex items-center space-x-3 p-3 rounded-lg border-2 transition-colors cursor-pointer ${
+                                    selectedLayoutType === null 
+                                        ? 'border-blue-500 bg-blue-50' 
+                                        : 'border-slate-200 hover:border-slate-300'
+                                }`} onClick={() => setSelectedLayoutType(null)}>
+                                    <RadioGroupItem value="normal" id="layout-normal" className="text-blue-600" />
+                                    <Label htmlFor="layout-normal" className="flex-1 cursor-pointer">
+                                        <span className="font-medium">Single Page</span>
+                                        {currentIllustrationType === null && (
+                                            <span className="ml-2 text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">current</span>
+                                        )}
+                                    </Label>
+                                </div>
+
+                                {/* Spot Image */}
+                                <div className={`flex items-center space-x-3 p-3 rounded-lg border-2 transition-colors cursor-pointer ${
+                                    selectedLayoutType === 'spot' 
+                                        ? 'border-pink-500 bg-pink-50' 
+                                        : 'border-slate-200 hover:border-slate-300'
+                                }`} onClick={() => setSelectedLayoutType('spot')}>
+                                    <RadioGroupItem value="spot" id="layout-spot" className="text-pink-600" />
+                                    <Label htmlFor="layout-spot" className="flex-1 cursor-pointer">
+                                        <span className="font-medium">Spot Image</span>
+                                        {currentIllustrationType === 'spot' && (
+                                            <span className="ml-2 text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">current</span>
+                                        )}
+                                    </Label>
+                                </div>
+
+                                {/* Spread Image - Hidden for Page 1 */}
+                                {page.page_number > 1 && (
+                                    <div className={`flex items-center space-x-3 p-3 rounded-lg border-2 transition-colors cursor-pointer ${
+                                        selectedLayoutType === 'spread' 
+                                            ? 'border-purple-500 bg-purple-50' 
+                                            : 'border-slate-200 hover:border-slate-300'
+                                    }`} onClick={() => setSelectedLayoutType('spread')}>
+                                        <RadioGroupItem value="spread" id="layout-spread" className="text-purple-600" />
+                                        <Label htmlFor="layout-spread" className="flex-1 cursor-pointer">
+                                            <span className="font-medium">Spread Image</span>
+                                            {currentIllustrationType === 'spread' && (
+                                                <span className="ml-2 text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">current</span>
+                                            )}
+                                        </Label>
+                                    </div>
+                                )}
+                            </RadioGroup>
+
+                            {/* Warning */}
+                            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                <p className="text-sm text-amber-800">
+                                    <strong>Note:</strong> This will regenerate the illustration immediately with the new layout.
+                                </p>
+                            </div>
+                        </div>
+
+                        <DialogFooter>
+                            <Button variant="ghost" onClick={() => setIsLayoutDialogOpen(false)}>Cancel</Button>
+                            <Button
+                                onClick={() => {
+                                    setIsLayoutDialogOpen(false)
+                                    onLayoutChange(selectedLayoutType)
+                                }}
+                                disabled={selectedLayoutType === currentIllustrationType}
+                                className="bg-violet-600 hover:bg-violet-700 text-white"
+                            >
+                                Change Layout
                             </Button>
                         </DialogFooter>
                     </DialogContent>

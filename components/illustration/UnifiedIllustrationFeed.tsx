@@ -31,6 +31,7 @@ interface UnifiedIllustrationFeedProps {
     loadingState?: { sketch: boolean; illustration: boolean }
     onGenerate?: (page: Page, referenceImageUrl?: string) => void
     onRegenerate?: (page: Page, prompt: string, referenceImages?: string[], referenceImageUrl?: string, sceneCharacters?: SceneCharacter[]) => void
+    onLayoutChange?: (page: Page, newType: 'spread' | 'spot' | null) => void // For changing layout type (triggers regeneration)
     onUpload?: (page: Page, type: 'sketch' | 'illustration', file: File) => void
 
     // Wizard State (Admin)
@@ -85,6 +86,7 @@ export function UnifiedIllustrationFeed({
     loadingState,
     onGenerate,
     onRegenerate,
+    onLayoutChange,
     onUpload,
     aspectRatio,
     setAspectRatio,
@@ -286,6 +288,7 @@ export function UnifiedIllustrationFeed({
                             }}
                             onGenerate={onGenerate ? ((refUrl?: string) => onGenerate(page, refUrl)) : undefined}
                             onRegenerate={onRegenerate ? (prompt, referenceImages, referenceImageUrl, sceneCharacters) => onRegenerate(page, prompt, referenceImages, referenceImageUrl, sceneCharacters) : undefined}
+                            onLayoutChange={onLayoutChange ? (newType) => onLayoutChange(page, newType) : undefined}
                             onUpload={async (type, file) => {
                                 if (onUpload) onUpload(page, type, file)
                             }}
