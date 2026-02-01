@@ -172,6 +172,9 @@ export function ProjectTabsContent({
   const [isPushDialogOpen, setIsPushDialogOpen] = useState(false)
   const [isPushing, setIsPushing] = useState(false)
   
+  // Karine Request State
+  const [isSendingKarineRequest, setIsSendingKarineRequest] = useState(false)
+  
   // Push Characters to Customer State
   const [isCharPushDialogOpen, setIsCharPushDialogOpen] = useState(false)
   const [isCharPushing, setIsCharPushing] = useState(false)
@@ -297,6 +300,28 @@ export function ProjectTabsContent({
       toast.error(e.message || 'Failed to push changes')
     } finally {
       setIsPushing(false)
+    }
+  }
+
+  // Send Karine Request (1st Illustration Coloring)
+  const handleSendKarineRequest = async () => {
+    setIsSendingKarineRequest(true)
+    try {
+      const response = await fetch(`/api/projects/${projectId}/send-karine-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to send email')
+      }
+      
+      toast.success('Email sent to Karine')
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to send email')
+    } finally {
+      setIsSendingKarineRequest(false)
     }
   }
 
@@ -624,6 +649,22 @@ export function ProjectTabsContent({
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
+              )}
+              
+              {/* Karine Request Button - Only show when Page 1 has illustration */}
+              {activeTab === 'illustrations' && localPages?.find(p => p.page_number === 1)?.illustration_url && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs px-3 border-blue-300 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                  onClick={handleSendKarineRequest}
+                  disabled={isSendingKarineRequest}
+                >
+                  {isSendingKarineRequest ? (
+                    <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                  ) : null}
+                  Karine
+                </Button>
               )}
             </>
           }
