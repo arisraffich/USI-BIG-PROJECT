@@ -20,9 +20,11 @@ import { useState, useEffect } from 'react'
 interface AddCharacterButtonProps {
   mainCharacterName: string | null
   mode?: 'button' | 'card'
+  className?: string
+  triggerRef?: React.RefObject<HTMLButtonElement>
 }
 
-export function AddCharacterButton({ mainCharacterName, mode = 'button' }: AddCharacterButtonProps) {
+export function AddCharacterButton({ mainCharacterName, mode = 'button', className, triggerRef }: AddCharacterButtonProps) {
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -185,8 +187,9 @@ export function AddCharacterButton({ mainCharacterName, mode = 'button' }: AddCh
   return (
     <>
       <Button
+        ref={triggerRef}
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 m-[15px] h-[47px] px-[calc(1rem+15px)]"
+        className={className || "flex items-center gap-2 m-[15px] h-[47px] px-[calc(1rem+15px)]"}
       >
         <Plus className="w-4 h-4" />
         Add Character

@@ -686,26 +686,27 @@ export function ProjectTabsContent({
                     )}
                     {/* No secondary characters found - show skip option */}
                     {localCharacters.length <= 1 && localProjectStatus === 'character_review' && sortedCharacters.secondary.length === 0 && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 flex flex-col items-center justify-center gap-4 text-center min-h-[300px]">
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 sm:p-8 flex flex-col items-center justify-center gap-4 text-center min-h-[300px] col-span-full">
                         <div className="relative">
                           <div className="relative bg-white rounded-full p-3 shadow-sm border border-blue-200">
                             <Sparkles className="w-6 h-6 text-blue-500" />
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <h3 className="font-semibold text-blue-900">No Secondary Characters Found</h3>
-                          <p className="text-sm text-blue-700/80 max-w-[280px]">
+                          <h3 className="font-semibold text-blue-900 text-lg">No Secondary Characters Found</h3>
+                          <p className="text-sm text-blue-700/80 max-w-[320px]">
                             The AI did not identify any secondary characters in this story. You can proceed directly to illustrations or manually add characters.
                           </p>
                         </div>
-                        <div className="flex gap-3 mt-2">
+                        <div className="flex flex-col sm:flex-row items-center gap-3 mt-2 w-full sm:w-auto px-4 sm:px-0">
                           <AddCharacterButton
                             mode="button"
                             mainCharacterName={sortedCharacters.main?.name || sortedCharacters.main?.role || null}
+                            className="w-full sm:w-auto h-11 px-5 flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-sm font-medium"
                           />
                           <Button 
                             onClick={handleSkipToIllustrations}
-                            className="bg-blue-600 hover:bg-blue-700"
+                            className="w-full sm:w-auto h-11 px-5 bg-blue-600 hover:bg-blue-700"
                           >
                             Proceed to Illustrations
                           </Button>
