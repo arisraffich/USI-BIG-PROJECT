@@ -157,8 +157,7 @@ export function ReviewHistoryDialog({ open, onOpenChange, page, reviews = [], on
                     )}
 
                     {/* 3. History */}
-                    {/* @ts-ignore */}
-                    {page.feedback_history?.slice().reverse().map((item: any, index: number) => (
+                    {page.feedback_history?.slice().reverse().map((item, index) => (
                         <div key={`hist-${index}`} className="bg-slate-50 border border-slate-200 rounded-md p-3 text-sm flex items-start gap-2 opacity-90 hover:opacity-100 transition-opacity">
                             <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
                             <p className="leading-relaxed text-slate-700">

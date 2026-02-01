@@ -101,10 +101,7 @@ export async function PATCH(
                     const { notifyCustomerReview } = await import('@/lib/notifications')
 
                     const safeTitle = projectDetails.book_title || 'Untitled Project'
-                    // @ts-ignore
-                    const safeAuthor = projectDetails.author_name ||
-                        `${projectDetails.author_firstname || ''} ${projectDetails.author_lastname || ''}`.trim() ||
-                        'Customer'
+                    const safeAuthor = `${projectDetails.author_firstname || ''} ${projectDetails.author_lastname || ''}`.trim() || 'Customer'
 
                     // Non-blocking call
                     notifyCustomerReview({

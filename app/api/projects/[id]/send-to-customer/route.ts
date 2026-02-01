@@ -208,8 +208,7 @@ export async function POST(
             const currentHistory = Array.isArray(char.feedback_history) ? char.feedback_history : []
             const newHistory = [
               ...currentHistory,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              { note: char.feedback_notes, created_at: new Date().toISOString() } as any
+              { note: char.feedback_notes, created_at: new Date().toISOString() }
             ]
             updateData.feedback_history = newHistory
             updateData.feedback_notes = null
