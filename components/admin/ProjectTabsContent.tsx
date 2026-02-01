@@ -610,61 +610,66 @@ export function ProjectTabsContent({
                 </div>
               )}
               
-              {/* Illustrations Push Button */}
-              {activeTab === 'illustrations' && (projectInfo?.illustration_send_count || 0) > 0 && (
-                <AlertDialog open={isPushDialogOpen} onOpenChange={setIsPushDialogOpen}>
-                  <AlertDialogTrigger asChild>
+              {/* Illustrations Push + Karine Buttons */}
+              {activeTab === 'illustrations' && (
+                <div className="flex items-center gap-2">
+                  {/* Push Button - Only show after illustrations sent */}
+                  {(projectInfo?.illustration_send_count || 0) > 0 && (
+                    <AlertDialog open={isPushDialogOpen} onOpenChange={setIsPushDialogOpen}>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs px-3 border-blue-300 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                        >
+                          <Upload className="w-3 h-3 mr-1.5" />
+                          Push
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Push Changes to Customer?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will silently update all illustrations on the customer&apos;s side without sending any notifications. The customer will see the latest versions when they refresh or revisit the page.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel disabled={isPushing}>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={handlePushToCustomer}
+                            disabled={isPushing}
+                            className="bg-blue-600 hover:bg-blue-700"
+                          >
+                            {isPushing ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Pushing...
+                              </>
+                            ) : (
+                              'Push Changes'
+                            )}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+                  
+                  {/* Karine Request Button - Only show when Page 1 has illustration */}
+                  {localPages?.find(p => p.page_number === 1)?.illustration_url && (
                     <Button
                       variant="outline"
                       size="sm"
                       className="h-8 text-xs px-3 border-blue-300 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                      onClick={handleSendKarineRequest}
+                      disabled={isSendingKarineRequest}
                     >
-                      <Upload className="w-3 h-3 mr-1.5" />
-                      Push
+                      {isSendingKarineRequest ? (
+                        <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                      ) : null}
+                      Karine
                     </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Push Changes to Customer?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will silently update all illustrations on the customer&apos;s side without sending any notifications. The customer will see the latest versions when they refresh or revisit the page.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel disabled={isPushing}>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handlePushToCustomer}
-                        disabled={isPushing}
-                        className="bg-blue-600 hover:bg-blue-700"
-                      >
-                        {isPushing ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Pushing...
-                          </>
-                        ) : (
-                          'Push Changes'
-                        )}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
-              
-              {/* Karine Request Button - Only show when Page 1 has illustration */}
-              {activeTab === 'illustrations' && localPages?.find(p => p.page_number === 1)?.illustration_url && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs px-3 border-blue-300 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                  onClick={handleSendKarineRequest}
-                  disabled={isSendingKarineRequest}
-                >
-                  {isSendingKarineRequest ? (
-                    <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
-                  ) : null}
-                  Karine
-                </Button>
+                  )}
+                </div>
               )}
             </>
           }
