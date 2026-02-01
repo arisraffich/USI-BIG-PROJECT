@@ -450,7 +450,14 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const currentTab = activeTab || (isIllustrationsUnlocked ? 'illustrations' : 'pages')
 
   // Construct Tabs
-  const tabs = [
+  const tabs: Array<{
+    id: string
+    label: string
+    icon: React.ReactNode
+    onClick: () => void
+    count: number
+    disabled?: boolean
+  }> = [
     {
       id: 'pages',
       label: 'Pages',
