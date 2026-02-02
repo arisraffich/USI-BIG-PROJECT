@@ -7,7 +7,7 @@ const ILLUSTRATION_MODEL = 'gemini-3-pro-image-preview' // Nano Banana Pro
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 
 // Retry configuration
-const MAX_RETRIES = 3
+const MAX_RETRIES = 1 // 2 total attempts (1 initial + 1 retry)
 const INITIAL_DELAY_MS = 2000 // 2 seconds
 const MAX_DELAY_MS = 30000 // 30 seconds
 

@@ -25,9 +25,24 @@ interface GenerationError {
 }
 
 // Map API errors to user-friendly messages
+// Extracts Google's actual error message when available for relevance
 function mapErrorToUserMessage(error: string): { message: string; technicalDetails: string } {
     const lowerError = error.toLowerCase()
     
+    // Try to extract Google's actual error message from JSON response
+    // Format: "Google API Error: 503 - {"error":{"message":"The model is overloaded..."}}"
+    const jsonMatch = error.match(/\{[\s\S]*"message"\s*:\s*"([^"]+)"[\s\S]*\}/)
+    const googleMessage = jsonMatch ? jsonMatch[1] : null
+    
+    // If we have a clear Google message, use it directly (they're usually user-friendly)
+    if (googleMessage) {
+        return {
+            message: googleMessage,
+            technicalDetails: error
+        }
+    }
+    
+    // Fallback mappings for errors without clear Google messages
     if (lowerError.includes('rate') || lowerError.includes('quota') || lowerError.includes('limit')) {
         return {
             message: 'Too many requests - please wait a moment and try again',
@@ -42,19 +57,32 @@ function mapErrorToUserMessage(error: string): { message: string; technicalDetai
     }
     if (lowerError.includes('no image generated')) {
         return {
-            message: 'Generation failed - try editing the Illustration Notes and regenerating',
+            message: 'No image was generated - try editing the scene description',
             technicalDetails: error
         }
     }
     if (lowerError.includes('billing') || lowerError.includes('payment') || lowerError.includes('disabled') || lowerError.includes('402')) {
         return {
-            message: 'API billing issue - please check your Google Cloud account has sufficient funds',
+            message: 'API billing issue - please check your Google Cloud account',
+            technicalDetails: error
+        }
+    }
+    if (lowerError.includes('timeout') || lowerError.includes('timed out')) {
+        return {
+            message: 'Request timed out - please try again',
+            technicalDetails: error
+        }
+    }
+    if (lowerError.includes('network') || lowerError.includes('connection')) {
+        return {
+            message: 'Network error - please check your connection and try again',
             technicalDetails: error
         }
     }
     
+    // Generic fallback - don't assume scene description is the problem
     return {
-        message: 'Generation failed - please try editing the scene description',
+        message: 'Generation failed - please try again',
         technicalDetails: error
     }
 }
