@@ -64,6 +64,21 @@ export default async function DashboardPage() {
         ...project,
         pageCount: pageCountsMap[project.id] || 0,
       }))
+
+      // Sort: Active projects first, then approved projects at bottom
+      // Both groups sorted by created_at descending (newest first)
+      projectsWithCounts.sort((a, b) => {
+        const aApproved = a.status === 'illustration_approved'
+        const bApproved = b.status === 'illustration_approved'
+        
+        // If one is approved and other is not, non-approved comes first
+        if (aApproved !== bApproved) {
+          return aApproved ? 1 : -1
+        }
+        
+        // Within same group, sort by created_at descending (newest first)
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      })
     } catch (countError) {
       console.error('Error fetching page counts:', countError)
       projectsWithCounts = (projects || []).map((project) => ({
