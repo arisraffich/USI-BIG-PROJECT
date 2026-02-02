@@ -87,12 +87,19 @@ The result must look like a faithful pencil-line tracing of the original image â
         const publicUrl = urlData.publicUrl
 
         // 4. Update Page Record
-        await supabase.from('pages')
+        const { error: updateError } = await supabase.from('pages')
             .update({
                 sketch_url: publicUrl,
                 // sketch_generated_at is missing from DB schema
             })
             .eq('id', pageId)
+
+        if (updateError) {
+            console.error('Failed to update page with sketch URL:', updateError)
+            throw new Error(`Database update failed: ${updateError.message}`)
+        }
+
+        console.log(`Sketch saved for Page ${page?.page_number}: ${publicUrl}`)
 
         return NextResponse.json({
             success: true,
