@@ -934,7 +934,8 @@ export function SharedIllustrationBoard({
                                 </DropdownMenuContent>
                             </DropdownMenu>
 
-                            {isManualUpload(sketchUrl) && sketchViewMode === 'sketch' && (
+                            {/* UPLOADED badge - Admin only */}
+                            {isAdmin && isManualUpload(sketchUrl) && sketchViewMode === 'sketch' && (
                                 <span className="absolute top-1/2 -translate-y-1/2 right-12 lg:right-16 px-1.5 py-0.5 text-[9px] font-bold bg-rose-50 text-rose-600 rounded border border-rose-100 leading-none">
                                     UPLOADED
                                 </span>
@@ -960,8 +961,8 @@ export function SharedIllustrationBoard({
                             <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase">
                                 {isCustomer && page.page_number > 1 ? 'Page Text' : 'Final Illustration'}
                             </h4>
-                            {/* Show UPLOADED badge only for admin or customer page 1 */}
-                            {!(isCustomer && page.page_number > 1) && isManualUpload(illustrationUrl) && (
+                            {/* UPLOADED badge - Admin only */}
+                            {isAdmin && isManualUpload(illustrationUrl) && (
                                 <span className="absolute top-1/2 -translate-y-1/2 right-12 lg:right-16 px-1.5 py-0.5 text-[9px] font-bold bg-rose-50 text-rose-600 rounded border border-rose-100 leading-none">
                                     UPLOADED
                                 </span>
