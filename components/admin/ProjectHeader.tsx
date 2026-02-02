@@ -20,6 +20,7 @@ import { useProjectStatus } from '@/hooks/use-project-status'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { MobilePageNavigator } from '@/components/ui/mobile-page-navigator'
+import { BADGE_COLORS } from '@/lib/constants/statusBadgeConfig'
 
 interface ProjectInfo {
   id: string
@@ -107,14 +108,14 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       const page1Generated = generatedIllustrationCount >= 1
       
       let tag = 'Ready to Generate'
-      let tagStyle = 'bg-green-100 text-green-800 border-green-300'
+      let tagStyle = BADGE_COLORS.BLUE
       
       if (page1Generated && !allPagesGenerated) {
         tag = 'Generating...'
-        tagStyle = 'bg-purple-100 text-purple-800 border-purple-300'
+        tagStyle = BADGE_COLORS.PURPLE
       } else if (allPagesGenerated) {
         tag = 'Sketches Ready'
-        tagStyle = 'bg-green-100 text-green-800 border-green-300'
+        tagStyle = BADGE_COLORS.PURPLE
       }
       
       return {
@@ -133,8 +134,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       return {
         tag: hasUnresolvedFeedback ? 'Sketches Feedback' : 'Wait: Sketches Review',
         tagStyle: hasUnresolvedFeedback 
-          ? 'bg-yellow-100 text-yellow-800 border-yellow-300' 
-          : 'bg-blue-100 text-blue-800 border-blue-300',
+          ? BADGE_COLORS.AMBER 
+          : BADGE_COLORS.PURPLE,
         buttonLabel: 'Resend Sketches',
         showCount: true,
         isResend: true,
@@ -147,7 +148,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     if (status === 'sketches_revision' || status === 'illustration_revision_needed') {
       return {
         tag: 'Sketches Feedback',
-        tagStyle: 'bg-orange-100 text-orange-800 border-orange-300',
+        tagStyle: BADGE_COLORS.ORANGE,
         buttonLabel: 'Resend Sketches',
         showCount: true,
         isResend: true,
@@ -159,7 +160,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     if (status === 'illustration_approved') {
       return {
         tag: 'Sketches Approved',
-        tagStyle: 'bg-green-100 text-green-800 border-green-300',
+        tagStyle: BADGE_COLORS.GREEN,
         buttonLabel: 'Download Illustrations',
         showCount: false,
         isResend: false,
@@ -177,7 +178,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     if (status === 'character_review' && charSendCount > 0) {
       return {
         tag: hasUnresolvedFeedback ? 'Customer Feedback Received' : 'Waiting for Review',
-        tagStyle: hasUnresolvedFeedback ? 'bg-yellow-100 text-yellow-800 border-yellow-300' : 'bg-blue-100 text-blue-800 border-blue-300',
+        tagStyle: hasUnresolvedFeedback ? BADGE_COLORS.CYAN_80 : BADGE_COLORS.CYAN_60,
         buttonLabel: 'Resend Characters',
         showCount: true,
         isResend: true,
@@ -190,7 +191,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       if (charSendCount === 0) {
         return {
           tag: 'Characters Generated',
-          tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+          tagStyle: BADGE_COLORS.CYAN_40,
           buttonLabel: 'Send Characters',
           showCount: false,
           isResend: false,
@@ -199,7 +200,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       } else {
         return {
           tag: 'Characters Regenerated',
-          tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+          tagStyle: BADGE_COLORS.CYAN_60,
           buttonLabel: 'Resend Characters',
           showCount: true,
           isResend: true,
@@ -212,7 +213,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     if (status === 'character_revision_needed') {
       return {
         tag: 'Regenerate Characters',
-        tagStyle: 'bg-red-100 text-red-800 border-red-300',
+        tagStyle: BADGE_COLORS.CYAN_80,
         buttonLabel: 'Resend Characters',
         showCount: true,
         isResend: true,
@@ -224,7 +225,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     if (status === 'character_generation') {
       return {
         tag: 'Generating Characters',
-        tagStyle: 'bg-blue-100 text-blue-800 border-blue-300',
+        tagStyle: BADGE_COLORS.CYAN_40,
         buttonLabel: charSendCount > 0 ? 'Resend Characters' : 'Send Characters',
         showCount: charSendCount > 0,
         isResend: charSendCount > 0,
@@ -237,7 +238,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       if (charSendCount > 0) {
         return {
           tag: 'Characters Regenerated',
-          tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+          tagStyle: BADGE_COLORS.CYAN_60,
           buttonLabel: 'Resend Characters',
           showCount: true,
           isResend: true,
@@ -246,7 +247,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
       return {
         tag: 'Characters Generated',
-        tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        tagStyle: BADGE_COLORS.CYAN_40,
         buttonLabel: 'Send Characters',
         showCount: false,
         isResend: false,
@@ -258,7 +259,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     if (hasImages && charSendCount === 0) {
       return {
         tag: 'Characters Generated',
-        tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        tagStyle: BADGE_COLORS.CYAN_40,
         buttonLabel: 'Send Characters',
         showCount: false,
         isResend: false,
@@ -270,7 +271,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     if (hasImages && charSendCount > 0) {
       return {
         tag: 'Characters Ready',
-        tagStyle: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        tagStyle: BADGE_COLORS.CYAN_60,
         buttonLabel: 'Resend Characters',
         showCount: true,
         isResend: true,
@@ -281,7 +282,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     // Default: Project setup
     return {
       tag: 'Project Setup',
-      tagStyle: 'bg-gray-100 text-gray-800 border-gray-300',
+      tagStyle: BADGE_COLORS.OUTLINE,
       buttonLabel: 'Request Input',
       showCount: false,
       isResend: false,

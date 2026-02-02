@@ -93,8 +93,38 @@ export async function POST(
         }
       }
 
+      // Auto-resolve pages with admin_reply (customer is implicitly accepting by approving)
+      const { data: pagesWithAdminReply } = await supabase
+        .from('pages')
+        .select('id, feedback_notes, feedback_history, admin_reply, is_resolved')
+        .eq('project_id', project.id)
+        .not('admin_reply', 'is', null)
+        .eq('is_resolved', false)
+
+      if (pagesWithAdminReply && pagesWithAdminReply.length > 0) {
+        for (const page of pagesWithAdminReply) {
+          // Move feedback to history (same as normal resolution)
+          const currentHistory = Array.isArray(page.feedback_history) ? page.feedback_history : []
+          const newHistory = page.feedback_notes ? [
+            ...currentHistory,
+            {
+              note: page.feedback_notes,
+              created_at: new Date().toISOString()
+            }
+          ] : currentHistory
+
+          await supabase.from('pages').update({
+            feedback_history: newHistory,
+            feedback_notes: null,
+            admin_reply: null,
+            admin_reply_at: null,
+            is_resolved: true
+          }).eq('id', page.id)
+        }
+      }
+
       // Determine Outcome: Revision vs Approval
-      // Check if ANY page has feedback notes (unresolved)
+      // Check if ANY page has feedback notes (unresolved) - after auto-resolving admin replies
       const { data: pages } = await supabase.from('pages').select('feedback_notes, is_resolved').eq('project_id', project.id)
       const hasFeedback = pages?.some(p => !!p.feedback_notes && !p.is_resolved)
 

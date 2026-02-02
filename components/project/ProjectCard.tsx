@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { getStatusBadgeConfig, getRoundNumber } from '@/lib/constants/statusBadgeConfig'
 
 interface Project {
   id: string
@@ -27,6 +28,8 @@ interface Project {
   author_email: string
   created_at: string
   status: string
+  character_send_count?: number
+  illustration_send_count?: number
 }
 
 interface ProjectCardProps {
@@ -75,6 +78,16 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }:
   const router = useRouter()
   const [isDeleting, setIsDeleting] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+  // Get badge configuration
+  const badgeConfig = getStatusBadgeConfig(
+    project.status,
+    project.character_send_count || 0,
+    project.illustration_send_count || 0
+  )
+  const roundNumber = badgeConfig.showRound
+    ? getRoundNumber(project.status, project.character_send_count || 0, project.illustration_send_count || 0)
+    : null
 
   async function handleDelete(e?: React.MouseEvent) {
     if (e) {
@@ -144,6 +157,17 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }:
             <p className="text-sm text-gray-600">
               By {project.author_firstname} {project.author_lastname} | {pageCount} {pageCount === 1 ? 'Page' : 'Pages'} | Created: {formatDate(project.created_at)}
             </p>
+            {/* Status Badge - Line 3 */}
+            <div className="mt-1.5">
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${badgeConfig.style}`}>
+                {badgeConfig.text}
+                {roundNumber && (
+                  <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-white/50 text-[10px] font-bold">
+                    {roundNumber}
+                  </span>
+                )}
+              </span>
+            </div>
           </Link>
           <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
             <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

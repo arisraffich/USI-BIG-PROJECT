@@ -58,6 +58,7 @@ export function CustomerProjectTabsContent({
   const [isApproving, setIsApproving] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'loading' | 'success'>('idle')
+  const [showApproveWarningDialog, setShowApproveWarningDialog] = useState(false)
   // Lifted state for Edit Mode to coordinate Header and Editor
   const [isEditMode, setIsEditMode] = useState(false)
   
@@ -477,12 +478,18 @@ export function CustomerProjectTabsContent({
     'illustration_review', 'illustration_revision_needed'
   ].includes(localProjectStatus)
 
+  // Find pages with pending admin replies (unresolved feedback WITH admin reply)
+  const pagesWithPendingAdminReply = useMemo(() => {
+    return localPages.filter(p => p.feedback_notes && !p.is_resolved && p.admin_reply)
+  }, [localPages])
+
   // Calculate submit disabled
   const isSubmitDisabled = useMemo(() => {
-    // If in Illustration Mode, disable Approve if ANY page has unresolved feedback
+    // If in Illustration Mode, disable Approve only if there's unresolved feedback WITHOUT admin reply
+    // (Pages with admin reply can be auto-resolved on approval)
     if (showIllustrationsTab) {
-      const hasUnresolvedFeedback = localPages.some(p => p.feedback_notes && !p.is_resolved)
-      return hasUnresolvedFeedback
+      const hasUnresolvedFeedbackWithoutReply = localPages.some(p => p.feedback_notes && !p.is_resolved && !p.admin_reply)
+      return hasUnresolvedFeedbackWithoutReply
     }
 
     // Character checks
@@ -516,6 +523,16 @@ export function CustomerProjectTabsContent({
       return
     }
 
+    // If in illustrations mode and there are pages with pending admin replies, show warning first
+    if (showIllustrationsTab && pagesWithPendingAdminReply.length > 0) {
+      setShowApproveWarningDialog(true)
+      return
+    }
+
+    await executeSubmit()
+  }
+
+  const executeSubmit = async () => {
     setIsSubmitting(true)
     setSubmissionStatus('loading')
 
@@ -550,6 +567,11 @@ export function CustomerProjectTabsContent({
       setSubmissionStatus('idle')
       setIsSubmitting(false)
     }
+  }
+
+  const handleApproveWarningConfirm = async () => {
+    setShowApproveWarningDialog(false)
+    await executeSubmit()
   }
 
   const handleApproveCharacters = async () => {
@@ -782,6 +804,41 @@ export function CustomerProjectTabsContent({
               ) : (
                 "SUBMIT FORMS"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Approval Warning Dialog for Pending Admin Replies */}
+      <Dialog open={showApproveWarningDialog} onOpenChange={setShowApproveWarningDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">
+              Pending Illustrator Notes
+            </DialogTitle>
+            <DialogDescription className="text-base pt-2">
+              {pagesWithPendingAdminReply.length === 1 ? (
+                <>Page {pagesWithPendingAdminReply[0].page_number} has an illustrator note you haven&apos;t responded to.</>
+              ) : (
+                <>Pages {pagesWithPendingAdminReply.map(p => p.page_number).join(', ')} have illustrator notes you haven&apos;t responded to.</>
+              )}
+              {' '}Approving will mark {pagesWithPendingAdminReply.length === 1 ? 'this' : 'these'} as resolved.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end mt-4">
+            <Button
+              onClick={() => setShowApproveWarningDialog(false)}
+              variant="outline"
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleApproveWarningConfirm}
+              disabled={isSubmitting}
+              className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-semibold"
+            >
+              Approve Sketches
             </Button>
           </DialogFooter>
         </DialogContent>
