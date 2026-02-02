@@ -108,7 +108,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       const page1Generated = generatedIllustrationCount >= 1
       
       let tag = 'Ready to Generate'
-      let tagStyle = BADGE_COLORS.BLUE
+      let tagStyle: string = BADGE_COLORS.BLUE
       
       if (page1Generated && !allPagesGenerated) {
         tag = 'Generating...'
