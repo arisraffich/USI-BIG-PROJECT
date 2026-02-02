@@ -368,7 +368,7 @@ export async function generateSketch(
                     // but Gemini might default to 1:1 if not specified. 
                     // Ideally we pass the same AR as illustration.
                     // For now let's try not sending AR and see if it respects input, or we might need to pass it.
-                    imageSize: "1K" // Sketch can be smaller? Or same. Let's do 1K for speed.
+                    imageSize: "2K" // Higher quality sketches
                 }
             }
         }
