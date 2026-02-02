@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, ChevronUp, AlignLeft, Users, Plus, Minus, Pencil, Check, Layers } from 'lucide-react'
+import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, ChevronUp, AlignLeft, Users, Plus, Minus, Pencil, Check, Layers, CornerDownRight } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
@@ -539,9 +539,9 @@ export function SharedIllustrationBoard({
 
                         {/* FEEDBACK SECTION */}
                         <div className="mt-2 space-y-3">
-                            {/* READ ONLY FEEDBACK (Customer's Request) */}
+                            {/* READ ONLY FEEDBACK (Customer's Request) - aligned left when admin reply exists */}
                             {!isEditing && !isCustomerFollowingUp && page.feedback_notes && (
-                                <div className={`${page.is_resolved ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-100'} border rounded-md p-3 text-sm relative group animate-in fade-in zoom-in-95 duration-200`}>
+                                <div className={`${page.is_resolved ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-100'} border rounded-md p-3 text-sm relative group animate-in fade-in zoom-in-95 duration-200 ${page.admin_reply && !page.is_resolved ? 'mr-6' : ''}`}>
                                     <div className="flex items-center justify-between mb-1">
                                         <p className={`font-semibold text-xs uppercase ${page.is_resolved ? 'text-green-700' : 'text-amber-700'}`}>
                                             {page.is_resolved ? 'Resolved:' : 'Your Request:'}
@@ -567,34 +567,39 @@ export function SharedIllustrationBoard({
                                 </div>
                             )}
 
-                            {/* ADMIN REPLY DISPLAY (Illustrator Note) - Customer sees this */}
+                            {/* ADMIN REPLY DISPLAY (Illustrator Note) - aligned right */}
                             {page.admin_reply && !page.is_resolved && !isCustomerFollowingUp && (
-                                <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm animate-in fade-in zoom-in-95 duration-200">
-                                    <p className="font-semibold text-xs uppercase text-blue-700 mb-1">Illustrator Note:</p>
-                                    <p className="whitespace-pre-wrap text-blue-900">{page.admin_reply}</p>
-                                    
-                                    {/* Customer Actions: Accept or Reply */}
-                                    {isCustomer && !isLocked && (
-                                        <div className="flex gap-3 mt-3">
-                                            <Button
-                                                size="sm"
-                                                onClick={handleAcceptReply}
-                                                disabled={isAccepting}
-                                                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold"
-                                            >
-                                                {isAccepting ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
-                                                Accept
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                onClick={() => setIsCustomerFollowingUp(true)}
-                                                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold"
-                                            >
-                                                <MessageSquarePlus className="w-4 h-4 mr-1.5" />
-                                                Reply
-                                            </Button>
+                                <div className="ml-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm">
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <CornerDownRight className="w-3.5 h-3.5 text-blue-500" />
+                                            <p className="font-semibold text-xs uppercase text-blue-700">Illustrator Note:</p>
                                         </div>
-                                    )}
+                                        <p className="whitespace-pre-wrap text-blue-900">{page.admin_reply}</p>
+                                        
+                                        {/* Customer Actions: Accept or Reply */}
+                                        {isCustomer && !isLocked && (
+                                            <div className="flex gap-3 mt-3">
+                                                <Button
+                                                    size="sm"
+                                                    onClick={handleAcceptReply}
+                                                    disabled={isAccepting}
+                                                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold"
+                                                >
+                                                    {isAccepting ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
+                                                    Accept
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => setIsCustomerFollowingUp(true)}
+                                                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold"
+                                                >
+                                                    <MessageSquarePlus className="w-4 h-4 mr-1.5" />
+                                                    Reply
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
 
@@ -611,28 +616,33 @@ export function SharedIllustrationBoard({
                                 </Button>
                             )}
 
-                            {/* ADMIN REPLY EDIT MODE */}
+                            {/* ADMIN REPLY EDIT MODE - aligned right */}
                             {isAdmin && isAdminReplying && (
-                                <div className="space-y-3 animate-in fade-in zoom-in-95 duration-200 bg-white rounded-lg p-3 border border-blue-200 shadow-sm ring-1 ring-blue-50">
-                                    <Label className="text-xs font-semibold text-blue-700 uppercase">Illustrator Note:</Label>
-                                    <Textarea
-                                        value={adminReplyText}
-                                        onChange={(e) => setAdminReplyText(e.target.value)}
-                                        placeholder="Explain why you cannot make this change..."
-                                        className="min-h-[100px] text-sm resize-none focus-visible:ring-blue-500 border-blue-200 bg-white"
-                                        autoFocus
-                                    />
-                                    <div className="flex gap-3 justify-end mt-2">
-                                        <Button variant="ghost" size="sm" onClick={() => { setAdminReplyText(''); setIsAdminReplying(false) }} className="text-slate-600 hover:bg-slate-50">Cancel</Button>
-                                        <Button
-                                            size="sm"
-                                            onClick={handleSaveAdminReply}
-                                            disabled={isSavingAdminReply || !adminReplyText.trim()}
-                                            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-                                        >
-                                            {isSavingAdminReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
-                                            Send Reply
-                                        </Button>
+                                <div className="ml-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="space-y-3 bg-white rounded-lg p-3 border border-blue-200 shadow-sm ring-1 ring-blue-50">
+                                        <div className="flex items-center gap-1.5">
+                                            <CornerDownRight className="w-3.5 h-3.5 text-blue-500" />
+                                            <Label className="text-xs font-semibold text-blue-700 uppercase">Illustrator Note:</Label>
+                                        </div>
+                                        <Textarea
+                                            value={adminReplyText}
+                                            onChange={(e) => setAdminReplyText(e.target.value)}
+                                            placeholder="Explain why you cannot make this change..."
+                                            className="min-h-[100px] text-sm resize-none focus-visible:ring-blue-500 border-blue-200 bg-white"
+                                            autoFocus
+                                        />
+                                        <div className="flex gap-3 justify-end mt-2">
+                                            <Button variant="ghost" size="sm" onClick={() => { setAdminReplyText(''); setIsAdminReplying(false) }} className="text-slate-600 hover:bg-slate-50">Cancel</Button>
+                                            <Button
+                                                size="sm"
+                                                onClick={handleSaveAdminReply}
+                                                disabled={isSavingAdminReply || !adminReplyText.trim()}
+                                                className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                                            >
+                                                {isSavingAdminReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
+                                                Send Reply
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             )}
