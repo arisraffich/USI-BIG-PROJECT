@@ -82,7 +82,10 @@ export async function POST(
 
           // Resolve Feedback Logic
           const updateData: any = {}
-          if (page.feedback_notes) {
+          
+          // If page has admin_reply, DON'T resolve - customer needs to see the reply first
+          // Only resolve if there's feedback but NO admin_reply (meaning admin regenerated instead of replying)
+          if (page.feedback_notes && !page.admin_reply) {
             const currentHistory = Array.isArray(page.feedback_history) ? page.feedback_history : []
             // Store revision_round: the NEW count (after this send completes)
             // This marks which "resend cycle" this feedback was resolved in
@@ -98,6 +101,7 @@ export async function POST(
             updateData.feedback_notes = null
             updateData.is_resolved = true
           }
+          // If page has admin_reply, keep feedback_notes and is_resolved=false so customer can see the reply
 
           // Sync Images (Ensure customer sees latest generated versions)
           // We only sync if there is a URL.
