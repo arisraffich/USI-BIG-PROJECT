@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 
-// POST: Customer adds a follow-up reply (replaces feedback_notes, clears admin_reply)
+// POST: Customer adds a follow-up reply to the conversation thread
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ pageId: string }> }
@@ -9,9 +9,9 @@ export async function POST(
     try {
         const { pageId } = await params
         const body = await request.json()
-        const { feedback_notes } = body
+        const { feedback_notes: followUpText } = body
 
-        if (!feedback_notes || !feedback_notes.trim()) {
+        if (!followUpText || !followUpText.trim()) {
             return NextResponse.json(
                 { error: 'Follow-up text is required' },
                 { status: 400 }
@@ -20,10 +20,10 @@ export async function POST(
 
         const supabase = await createAdminClient()
 
-        // Get page to verify it exists
+        // Get page with current state
         const { data: page, error: pageError } = await supabase
             .from('pages')
-            .select('id, project_id, admin_reply')
+            .select('id, project_id, page_number, admin_reply, admin_reply_at, conversation_thread')
             .eq('id', pageId)
             .single()
 
@@ -34,11 +34,30 @@ export async function POST(
             )
         }
 
-        // Update page: replace feedback_notes, clear admin_reply
+        if (!page.admin_reply) {
+            return NextResponse.json(
+                { error: 'No admin reply to respond to' },
+                { status: 400 }
+            )
+        }
+
+        // Build new conversation thread:
+        // 1. Get existing thread (or empty array)
+        // 2. Add the current admin reply to thread
+        // 3. Add customer's follow-up to thread
+        const currentThread = Array.isArray(page.conversation_thread) ? page.conversation_thread : []
+        const newThread = [
+            ...currentThread,
+            { type: 'admin' as const, text: page.admin_reply, at: page.admin_reply_at || new Date().toISOString() },
+            { type: 'customer' as const, text: followUpText.trim(), at: new Date().toISOString() }
+        ]
+
+        // Update page: add to thread, clear admin_reply (admin needs to respond)
+        // Note: feedback_notes (original request) stays unchanged
         const { data: updatedPage, error: updateError } = await supabase
             .from('pages')
             .update({
-                feedback_notes: feedback_notes.trim(),
+                conversation_thread: newThread,
                 is_resolved: false,
                 admin_reply: null,
                 admin_reply_at: null
@@ -55,29 +74,27 @@ export async function POST(
             )
         }
 
-        // --- NOTIFICATION Trigger (same as regular feedback) ---
+        // --- NOTIFICATION Trigger (follow-up specific) ---
         try {
             const { data: projectDetails, error: projError } = await supabase
                 .from('projects')
-                .select('book_title, author_firstname, author_lastname')
+                .select('id, book_title, author_firstname, author_lastname')
                 .eq('id', page.project_id)
                 .single()
 
             if (!projError && projectDetails) {
                 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-                const projectUrl = `${baseUrl}/admin/project/${page.project_id}?tab=illustrations`
+                const projectUrl = `${baseUrl}/admin/project/${projectDetails.id}?tab=illustrations`
+                const authorName = `${projectDetails.author_firstname || ''} ${projectDetails.author_lastname || ''}`.trim() || 'Customer'
 
-                const { notifyCustomerReview } = await import('@/lib/notifications')
-
-                const safeTitle = projectDetails.book_title || 'Untitled Project'
-                const safeAuthor = `${projectDetails.author_firstname || ''} ${projectDetails.author_lastname || ''}`.trim() || 'Customer'
+                const { notifyCustomerFollowUp } = await import('@/lib/notifications')
 
                 // Non-blocking call
-                notifyCustomerReview({
-                    projectTitle: safeTitle,
-                    authorName: safeAuthor,
-                    pageNumber: updatedPage.page_number,
-                    feedbackText: feedback_notes,
+                notifyCustomerFollowUp({
+                    projectTitle: projectDetails.book_title || 'Untitled Project',
+                    authorName,
+                    pageNumber: page.page_number,
+                    followUpText: followUpText.trim(),
                     projectUrl
                 }).catch(err => console.error('Notification error:', err))
             }

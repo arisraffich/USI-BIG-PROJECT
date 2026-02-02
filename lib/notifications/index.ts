@@ -755,3 +755,105 @@ export async function notifyCustomerCharacterReview(options: {
     console.error('Failed to send character review notification:', error)
   }
 }
+
+// Customer accepted admin's illustrator note
+export async function notifyCustomerAcceptedReply(options: {
+  projectTitle: string
+  authorName: string
+  pageNumber: number
+  projectUrl: string
+}): Promise<void> {
+  const { projectTitle, authorName, pageNumber, projectUrl } = options
+
+  try {
+    await sendSlackNotification({
+      text: `✅ Customer Accepted Illustrator Note for "${projectTitle}"`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Illustrator Note Accepted*\n${authorName} accepted your illustrator note for *Page ${pageNumber}* in "${projectTitle}".`,
+          },
+        },
+        {
+          type: 'context',
+          elements: [
+            {
+              type: 'mrkdwn',
+              text: '✅ The revision has been marked as resolved.',
+            },
+          ],
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'View Project' },
+              url: projectUrl,
+              style: 'primary',
+            },
+          ],
+        },
+      ],
+    })
+  } catch (error: any) {
+    console.error('Failed to send accepted reply notification:', error)
+  }
+}
+
+// Customer replied to admin's illustrator note (follow-up)
+export async function notifyCustomerFollowUp(options: {
+  projectTitle: string
+  authorName: string
+  pageNumber: number
+  followUpText: string
+  projectUrl: string
+}): Promise<void> {
+  const { projectTitle, authorName, pageNumber, followUpText, projectUrl } = options
+
+  try {
+    await sendSlackNotification({
+      text: `💬 Customer Follow-up for "${projectTitle}"`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Customer Follow-up*\n${authorName} replied to your illustrator note for *Page ${pageNumber}* in "${projectTitle}".`,
+          },
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `> ${followUpText.substring(0, 500)}${followUpText.length > 500 ? '...' : ''}`,
+          },
+        },
+        {
+          type: 'context',
+          elements: [
+            {
+              type: 'mrkdwn',
+              text: '⏳ Awaiting your response.',
+            },
+          ],
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'View & Reply' },
+              url: projectUrl,
+              style: 'primary',
+            },
+          ],
+        },
+      ],
+    })
+  } catch (error: any) {
+    console.error('Failed to send follow-up notification:', error)
+  }
+}

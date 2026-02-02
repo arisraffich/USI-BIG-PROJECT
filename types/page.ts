@@ -29,12 +29,19 @@ export interface Page {
   sketch_generated_at?: string | null
   // Feedback Module
   feedback_notes?: string | null
-  feedback_history?: Array<{ note: string; created_at: string; revision_round?: number }> | null
+  feedback_history?: Array<{ 
+    note: string; 
+    created_at: string; 
+    revision_round?: number;
+    conversation_thread?: Array<{ type: 'admin' | 'customer'; text: string; at: string }>;
+  }> | null
   is_approved?: boolean
   is_resolved?: boolean
   // Admin Reply (Illustrator Note)
   admin_reply?: string | null
   admin_reply_at?: string | null
+  // Conversation thread (back-and-forth after admin's first reply)
+  conversation_thread?: Array<{ type: 'admin' | 'customer'; text: string; at: string }> | null
   // Spread and Text Integration (per-page settings)
   is_spread?: boolean // Deprecated: use illustration_type instead
   text_integration?: 'integrated' | 'separated' | null

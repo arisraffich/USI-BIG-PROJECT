@@ -157,7 +157,9 @@ export function SharedIllustrationBoard({
     const [followUpText, setFollowUpText] = useState('')
     const [isSavingFollowUp, setIsSavingFollowUp] = useState(false)
     const [isAccepting, setIsAccepting] = useState(false)
+    const [conversationExpanded, setConversationExpanded] = useState(false) // For conversation thread
     const historyDropdownRef = useRef<HTMLDivElement>(null) // For click-outside collapse
+    const feedbackSectionRef = useRef<HTMLDivElement>(null) // For auto-scroll to buttons
 
     // NEW: View Mode for Sketch Card
     const [sketchViewMode, setSketchViewMode] = useState<'sketch' | 'text'>('sketch')
@@ -567,10 +569,10 @@ export function SharedIllustrationBoard({
                         )}
 
                         {/* FEEDBACK SECTION */}
-                        <div className="mt-2 space-y-3">
-                            {/* READ ONLY FEEDBACK (Customer's Request) - aligned left when admin reply exists */}
+                        <div className="mt-2 space-y-3" ref={feedbackSectionRef}>
+                            {/* READ ONLY FEEDBACK (Customer's Original Request) */}
                             {!isEditing && !isCustomerFollowingUp && page.feedback_notes && (
-                                <div className={`${page.is_resolved ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-100'} border rounded-md p-3 text-sm relative group animate-in fade-in zoom-in-95 duration-200 ${page.admin_reply && !page.is_resolved ? 'mr-6' : ''}`}>
+                                <div className={`${page.is_resolved ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-100'} border rounded-md p-3 text-sm relative group animate-in fade-in zoom-in-95 duration-200`}>
                                     <div className="flex items-center justify-between mb-1">
                                         <p className={`font-semibold text-xs uppercase ${page.is_resolved ? 'text-green-700' : 'text-amber-700'}`}>
                                             {page.is_resolved ? 'Resolved:' : 'Your Request:'}
@@ -582,8 +584,8 @@ export function SharedIllustrationBoard({
                                         )}
                                     </div>
                                     <p className={`whitespace-pre-wrap ${page.is_resolved ? 'text-green-900' : 'text-amber-900'}`}>{page.feedback_notes}</p>
-                                    {/* Customer Edit Button - only if no admin reply yet */}
-                                    {isCustomer && !page.is_resolved && !isLocked && !page.admin_reply && (
+                                    {/* Customer Edit Button - only if no admin reply yet and no conversation started */}
+                                    {isCustomer && !page.is_resolved && !isLocked && !page.admin_reply && (!page.conversation_thread || page.conversation_thread.length === 0) && (
                                         <Button
                                             variant="ghost"
                                             size="sm"
@@ -596,9 +598,52 @@ export function SharedIllustrationBoard({
                                 </div>
                             )}
 
-                            {/* ADMIN REPLY DISPLAY (Illustrator Note) - aligned right */}
+                            {/* CONVERSATION THREAD (collapsible history of back-and-forth) */}
+                            {page.conversation_thread && page.conversation_thread.length > 0 && !isCustomerFollowingUp && (
+                                <div className="ml-4">
+                                    {/* Collapse/Expand Toggle */}
+                                    <button
+                                        onClick={() => setConversationExpanded(!conversationExpanded)}
+                                        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 mb-2 transition-colors"
+                                    >
+                                        {conversationExpanded ? (
+                                            <ChevronUp className="w-3.5 h-3.5" />
+                                        ) : (
+                                            <ChevronDown className="w-3.5 h-3.5" />
+                                        )}
+                                        {conversationExpanded ? 'Hide' : 'View'} {page.conversation_thread.length} previous {page.conversation_thread.length === 1 ? 'message' : 'messages'}
+                                    </button>
+                                    
+                                    {/* Expanded Conversation History */}
+                                    {conversationExpanded && (
+                                        <div className="space-y-2 mb-3 pl-2 border-l-2 border-gray-200 animate-in fade-in slide-in-from-top-2 duration-200">
+                                            {page.conversation_thread.map((msg, idx) => (
+                                                <div 
+                                                    key={idx} 
+                                                    className={`p-2 rounded text-xs ${
+                                                        msg.type === 'admin' 
+                                                            ? 'bg-blue-50 border border-blue-100 ml-4' 
+                                                            : 'bg-amber-50 border border-amber-100'
+                                                    }`}
+                                                >
+                                                    <p className={`font-semibold text-[10px] uppercase mb-0.5 ${
+                                                        msg.type === 'admin' ? 'text-blue-600' : 'text-amber-600'
+                                                    }`}>
+                                                        {msg.type === 'admin' ? 'Illustrator:' : 'You:'}
+                                                    </p>
+                                                    <p className={`whitespace-pre-wrap ${
+                                                        msg.type === 'admin' ? 'text-blue-800' : 'text-amber-800'
+                                                    }`}>{msg.text}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* ADMIN REPLY DISPLAY (Illustrator Note) - Latest reply */}
                             {page.admin_reply && !page.is_resolved && !isCustomerFollowingUp && (
-                                <div className="ml-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <div className={`${page.conversation_thread && page.conversation_thread.length > 0 ? 'ml-4' : 'ml-6'} animate-in fade-in slide-in-from-top-2 duration-300`}>
                                     <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm">
                                         <div className="flex items-center gap-1.5 mb-1">
                                             <CornerDownRight className="w-3.5 h-3.5 text-blue-500" />
@@ -632,6 +677,13 @@ export function SharedIllustrationBoard({
                                 </div>
                             )}
 
+                            {/* CUSTOMER WAITING FOR RESPONSE (conversation thread exists but no admin reply yet) */}
+                            {isCustomer && !page.admin_reply && !page.is_resolved && page.conversation_thread && page.conversation_thread.length > 0 && !isCustomerFollowingUp && (
+                                <div className="ml-4 p-3 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600 italic">
+                                    Awaiting illustrator response...
+                                </div>
+                            )}
+
                             {/* ADMIN REPLY BUTTON (Admin sees this when there's unresolved feedback) */}
                             {isAdmin && page.feedback_notes && !page.is_resolved && !page.admin_reply && !isAdminReplying && onSaveAdminReply && (
                                 <Button
@@ -641,7 +693,7 @@ export function SharedIllustrationBoard({
                                     className="w-full h-9 gap-2 text-blue-600 border-blue-300 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400 bg-white font-medium"
                                 >
                                     <MessageSquarePlus className="w-4 h-4" />
-                                    Reply to Customer
+                                    {page.conversation_thread && page.conversation_thread.length > 0 ? 'Reply to Follow-up' : 'Reply to Customer'}
                                 </Button>
                             )}
 

@@ -469,6 +469,61 @@ export function CustomerProjectTabsContent({
     }
   }, [])
 
+  // Handle customer accepting admin reply (resolves the feedback)
+  const handleAcceptAdminReply = useCallback(async (pageId: string) => {
+    try {
+      const response = await fetch(`/api/review/pages/${pageId}/accept-reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to accept reply')
+      }
+
+      const updatedPage = await response.json()
+
+      // Update local state
+      setLocalPages(prev => prev.map(p =>
+        p.id === pageId ? { ...p, ...updatedPage } : p
+      ))
+
+      toast.success('Response accepted')
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to accept response')
+      throw error
+    }
+  }, [])
+
+  // Handle customer follow-up reply
+  const handleCustomerFollowUp = useCallback(async (pageId: string, notes: string) => {
+    try {
+      const response = await fetch(`/api/review/pages/${pageId}/follow-up`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedback_notes: notes }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save follow-up')
+      }
+
+      const updatedPage = await response.json()
+
+      // Update local state
+      setLocalPages(prev => prev.map(p =>
+        p.id === pageId ? { ...p, ...updatedPage } : p
+      ))
+
+      toast.success('Follow-up saved')
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to save follow-up')
+      throw error
+    }
+  }, [])
+
   const isLocked = ![
     'character_review', 'character_revision_needed',
     // New statuses
@@ -757,6 +812,8 @@ export function CustomerProjectTabsContent({
                   projectStatus={localProjectStatus}
                   illustrationSendCount={illustrationSendCount}
                   onSaveFeedback={async (pageId, notes) => handleIllustrationFeedbackChange(pageId, notes)}
+                  onAcceptAdminReply={handleAcceptAdminReply}
+                  onCustomerFollowUp={handleCustomerFollowUp}
                 />
               </div>
             )}
