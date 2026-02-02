@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, ChevronUp, AlignLeft, Users, Plus, Minus, Pencil, Check, Layers, CornerDownRight } from 'lucide-react'
+import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, ChevronUp, AlignLeft, Users, Plus, Minus, Pencil, Check, Layers, CornerDownRight, AlertCircle, ChevronRight } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
@@ -175,6 +175,9 @@ export function SharedIllustrationBoard({
     // Admin: Layout Change Dialog
     const [isLayoutDialogOpen, setIsLayoutDialogOpen] = useState(false)
     const [selectedLayoutType, setSelectedLayoutType] = useState<'spread' | 'spot' | null>(null)
+    
+    // Error display state
+    const [showTechnicalDetails, setShowTechnicalDetails] = useState(false)
     
     // NEW: Environment Reference & Character Control (Mode 3/4)
     const [selectedEnvPageId, setSelectedEnvPageId] = useState<string | null>(null)
@@ -531,6 +534,32 @@ export function SharedIllustrationBoard({
                     </div>
 
                     <div className="p-4 space-y-4 overflow-y-auto max-h-[800px] flex-1">
+                        {/* ERROR DISPLAY - Show generation/regeneration errors */}
+                        {generationError && (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left animate-in fade-in zoom-in-95 duration-200">
+                                <div className="flex items-start gap-3">
+                                    <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                                    <div className="flex-1">
+                                        <p className="text-sm font-medium text-red-800">{generationError.message}</p>
+                                        
+                                        {/* Expandable Technical Details */}
+                                        <button
+                                            onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+                                            className="mt-2 flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
+                                        >
+                                            <ChevronRight className={`w-3 h-3 transition-transform ${showTechnicalDetails ? 'rotate-90' : ''}`} />
+                                            Technical details
+                                        </button>
+                                        {showTechnicalDetails && (
+                                            <pre className="mt-2 p-2 bg-red-100 rounded text-xs text-red-700 overflow-x-auto whitespace-pre-wrap">
+                                                {generationError.technicalDetails}
+                                            </pre>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {isCustomer && (
                             <div className="text-sm text-slate-600 mb-4 leading-relaxed">
                                 <p>Request revisions here. Adjustments will be ready within 1-3 days.</p>
@@ -854,6 +883,30 @@ export function SharedIllustrationBoard({
                             onSave={handleCustomerSave}
                         />
                     </div>
+
+                    {/* MOBILE ERROR DISPLAY - Show generation/regeneration errors */}
+                    {generationError && (
+                        <div className="md:hidden bg-red-50 border-b border-red-200 p-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div className="flex items-start gap-2">
+                                <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium text-red-800">{generationError.message}</p>
+                                    <button
+                                        onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+                                        className="mt-1 flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
+                                    >
+                                        <ChevronRight className={`w-3 h-3 transition-transform ${showTechnicalDetails ? 'rotate-90' : ''}`} />
+                                        Details
+                                    </button>
+                                    {showTechnicalDetails && (
+                                        <pre className="mt-2 p-2 bg-red-100 rounded text-xs text-red-700 overflow-x-auto whitespace-pre-wrap max-h-32">
+                                            {generationError.technicalDetails}
+                                        </pre>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* DESKTOP HEADER (73px) */}
                     <div className="hidden md:grid grid-cols-2 divide-x border-b border-slate-100 h-[73px] bg-white text-sm">

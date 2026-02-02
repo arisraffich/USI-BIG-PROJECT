@@ -340,6 +340,9 @@ export function IllustrationsTabContent({
         const hasExistingIllustration = !!page.illustration_url
         
         try {
+            // Clear any previous error for this page
+            setPageError(page.id, null)
+            
             setGeneratingPageIds(prev => new Set(prev).add(page.id))
             setLoadingState(prev => ({ ...prev, [page.id]: { ...prev[page.id], illustration: true } }))
 
@@ -419,8 +422,12 @@ export function IllustrationsTabContent({
             
             // Refresh AFTER sketch generation to update UI with both illustration and sketch
             router.refresh()
-        } catch (error) {
-            toast.error('Failed to regenerate')
+        } catch (error: any) {
+            const errorMessage = error?.message || 'Regeneration failed'
+            const mappedError = mapErrorToUserMessage(errorMessage)
+            setPageError(page.id, mappedError)
+            toast.error('Regeneration failed', { description: mappedError.message })
+            console.error(error)
         } finally {
             setGeneratingPageIds(prev => {
                 const next = new Set(prev)
@@ -434,6 +441,9 @@ export function IllustrationsTabContent({
     // Handle layout change (triggers direct regeneration, no comparison mode)
     const handleLayoutChange = async (page: Page, newType: 'spread' | 'spot' | null) => {
         try {
+            // Clear any previous error for this page
+            setPageError(page.id, null)
+            
             setGeneratingPageIds(prev => new Set(prev).add(page.id))
             setLoadingState(prev => ({ ...prev, [page.id]: { illustration: true, sketch: false } }))
 
@@ -516,7 +526,9 @@ export function IllustrationsTabContent({
             router.refresh()
         } catch (error: any) {
             const errorMessage = error?.message || 'Layout change failed'
-            toast.error('Layout change failed', { description: errorMessage })
+            const mappedError = mapErrorToUserMessage(errorMessage)
+            setPageError(page.id, mappedError)
+            toast.error('Layout change failed', { description: mappedError.message })
             console.error(error)
         } finally {
             setGeneratingPageIds(prev => {
@@ -589,8 +601,12 @@ export function IllustrationsTabContent({
             }
             
             router.refresh()
-        } catch (error) {
-            toast.error('Failed to confirm decision')
+        } catch (error: any) {
+            const errorMessage = error?.message || 'Failed to confirm decision'
+            const mappedError = mapErrorToUserMessage(errorMessage)
+            setPageError(pageId, mappedError)
+            toast.error('Failed to confirm decision', { description: mappedError.message })
+            console.error(error)
         } finally {
             setLoadingState(prev => ({ ...prev, [pageId]: { illustration: false, sketch: false } }))
         }
@@ -598,6 +614,9 @@ export function IllustrationsTabContent({
 
     const handleUpload = async (page: Page, type: 'sketch' | 'illustration', file: File) => {
         try {
+            // Clear any previous error for this page
+            setPageError(page.id, null)
+            
             // Set granular loading state specifically for the type being uploaded
             setLoadingState(prev => ({
                 ...prev,
@@ -651,14 +670,20 @@ export function IllustrationsTabContent({
                     toast.success('Sketch generated from upload')
                     router.refresh()
 
-                } catch (sketchError) {
+                } catch (sketchError: any) {
+                    const errorMessage = sketchError?.message || 'Failed to auto-generate sketch'
+                    const mappedError = mapErrorToUserMessage(errorMessage)
+                    setPageError(page.id, mappedError)
                     console.error("Auto-sketch failed", sketchError)
-                    toast.error('Failed to auto-generate sketch')
+                    toast.error('Failed to auto-generate sketch', { description: mappedError.message })
                 }
             }
 
-        } catch (error) {
-            toast.error('Upload failed')
+        } catch (error: any) {
+            const errorMessage = error?.message || 'Upload failed'
+            const mappedError = mapErrorToUserMessage(errorMessage)
+            setPageError(page.id, mappedError)
+            toast.error('Upload failed', { description: mappedError.message })
             console.error(error)
         } finally {
             // Clear ALL loading states for this page to be safe
