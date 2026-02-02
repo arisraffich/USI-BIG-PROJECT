@@ -299,7 +299,7 @@ export function UnifiedIllustrationFeed({
                             onRegenerate={onRegenerate ? (prompt, referenceImages, referenceImageUrl, sceneCharacters) => onRegenerate(page, prompt, referenceImages, referenceImageUrl, sceneCharacters) : undefined}
                             onLayoutChange={onLayoutChange ? (newType) => onLayoutChange(page, newType) : undefined}
                             onUpload={async (type, file) => {
-                                if (onUpload) onUpload(page, type, file)
+                                if (onUpload) await onUpload(page, type, file)
                             }}
 
                             // State Config
