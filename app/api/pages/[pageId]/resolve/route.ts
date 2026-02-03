@@ -53,46 +53,49 @@ export async function POST(
             )
         }
 
-        // Build conversation thread for history (include admin reply if exists)
-        const conversationThread = Array.isArray(page.conversation_thread) ? page.conversation_thread : []
-        let finalThread = [...conversationThread]
-        
-        // If there's a current admin_reply, add it to the thread for history
-        if (page.admin_reply) {
-            finalThread = [
-                ...finalThread,
-                { type: 'admin' as const, text: page.admin_reply, at: page.admin_reply_at || new Date().toISOString() }
-            ]
-        }
-
-        // Move feedback to history with conversation thread
-        const currentHistory = Array.isArray(page.feedback_history) ? page.feedback_history : []
-        const currentRound = (project.illustration_send_count || 0)
-        
-        const newHistory = [
-            ...currentHistory,
-            {
-                note: page.feedback_notes,
-                created_at: new Date().toISOString(),
-                revision_round: currentRound,
-                conversation_thread: finalThread.length > 0 ? finalThread : undefined
-            }
-        ]
-
-        // Prepare update data
-        const updateData: any = {
-            feedback_notes: null,
-            feedback_history: newHistory,
+        // Prepare update data based on whether admin has a reply
+        let updateData: any = {
             is_resolved: true,
             conversation_thread: null
         }
 
-        // If admin_reply exists, convert it to a comment (informational note on resolved)
         if (page.admin_reply) {
+            // If admin has a reply, convert it to a comment and KEEP feedback_notes visible
+            // This way the resolved revision shows with the comment below it
             updateData.admin_reply_type = 'comment'
-            // Keep admin_reply and admin_reply_at as is
+            // Keep feedback_notes as is (visible as "RESOLVED:")
+            // Keep admin_reply as is (visible as "ILLUSTRATOR NOTE:")
+            
+            // Archive conversation_thread to history if exists (but not feedback_notes)
+            if (page.conversation_thread && page.conversation_thread.length > 0) {
+                const currentHistory = Array.isArray(page.feedback_history) ? page.feedback_history : []
+                const currentRound = (project.illustration_send_count || 0)
+                updateData.feedback_history = [
+                    ...currentHistory,
+                    {
+                        note: `[Conversation archived]`,
+                        created_at: new Date().toISOString(),
+                        revision_round: currentRound,
+                        conversation_thread: page.conversation_thread
+                    }
+                ]
+            }
         } else {
-            // Clear any reply data
+            // No admin reply - move feedback to history as normal
+            const conversationThread = Array.isArray(page.conversation_thread) ? page.conversation_thread : []
+            const currentHistory = Array.isArray(page.feedback_history) ? page.feedback_history : []
+            const currentRound = (project.illustration_send_count || 0)
+            
+            updateData.feedback_notes = null
+            updateData.feedback_history = [
+                ...currentHistory,
+                {
+                    note: page.feedback_notes,
+                    created_at: new Date().toISOString(),
+                    revision_round: currentRound,
+                    conversation_thread: conversationThread.length > 0 ? conversationThread : undefined
+                }
+            ]
             updateData.admin_reply = null
             updateData.admin_reply_at = null
             updateData.admin_reply_type = null
