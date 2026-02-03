@@ -1051,9 +1051,9 @@ export function SharedIllustrationBoard({
                                     </div>
                                 </div>
                             ) : (
-                                // CREATE BUTTON (Customer Only) - Only show if no feedback yet and not following up
-                                isCustomer && !page.feedback_notes && !isLocked && !isCustomerFollowingUp && (
-                                    <Button variant="outline" size="sm" className="w-full h-11 gap-2 text-amber-600 border-amber-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-700 shadow-sm bg-white font-medium" onClick={() => setIsEditing(true)}>
+                                // CREATE BUTTON (Customer Only) - Show if no feedback OR if resolved (can add new revision on resolved)
+                                isCustomer && (!page.feedback_notes || page.is_resolved) && !isLocked && !isCustomerFollowingUp && (
+                                    <Button variant="outline" size="sm" className="w-full h-11 gap-2 text-amber-600 border-amber-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-700 shadow-sm bg-white font-medium" onClick={() => { setNotes(''); setIsEditing(true) }}>
                                         <MessageSquarePlus className="w-4 h-4" />
                                         Request Revision
                                     </Button>

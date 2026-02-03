@@ -12,10 +12,10 @@ export async function PATCH(
 
         const supabase = await createAdminClient()
 
-        // Get page to verify it exists and get project_id
+        // Get page to verify it exists and get project_id (include resolved state and history)
         const { data: page, error: pageError } = await supabase
             .from('pages')
-            .select('id, project_id, page_number')
+            .select('id, project_id, page_number, is_resolved, feedback_notes, feedback_history, admin_reply, admin_reply_at, admin_reply_type, illustration_send_count')
             .eq('id', pageId)
             .single()
 
@@ -60,13 +60,41 @@ export async function PATCH(
         // This is a known "security through obscurity" flaw in the current app design (inherited from character review).
         // I will proceed with replicating the pattern as requested (admin client update).
 
+        // Build update data
+        let updateData: any = {
+            feedback_notes: body.feedback_notes || null,
+            is_resolved: false, // Reset resolved status on new feedback
+        }
+
+        // If page was resolved and has old feedback (with or without comment), archive it first
+        if (page.is_resolved && page.feedback_notes) {
+            // Build history entry from old resolved feedback
+            const historyEntry: any = {
+                note: page.feedback_notes,
+                created_at: new Date().toISOString(),
+                revision_round: page.illustration_send_count || 1
+            }
+            
+            // If there was an admin comment, include it in the history
+            if (page.admin_reply && page.admin_reply_type === 'comment') {
+                historyEntry.admin_comment = page.admin_reply
+                historyEntry.admin_comment_at = page.admin_reply_at
+            }
+            
+            // Prepend to existing history
+            const existingHistory = page.feedback_history || []
+            updateData.feedback_history = [historyEntry, ...existingHistory]
+            
+            // Clear admin comment fields since we're starting fresh
+            updateData.admin_reply = null
+            updateData.admin_reply_at = null
+            updateData.admin_reply_type = null
+        }
+
         // Update page
         const { data: updatedPage, error: updateError } = await supabase
             .from('pages')
-            .update({
-                feedback_notes: body.feedback_notes || null,
-                is_resolved: false, // Reset resolved status on new feedback
-            })
+            .update(updateData)
             .eq('id', pageId)
             .select()
             .single()
