@@ -12,9 +12,9 @@ function mapAspectRatio(ratio: string | null | undefined, isSpread: boolean = fa
     if (isSpread) {
         // Spread (double-page) aspect ratios
         switch (ratio) {
-            case '8:10': return '3:2';       // Portrait spread (was 21:9 - too wide)
-            case '8.5:8.5': return '16:9';   // Square spread
-            case '8.5:11': return '3:2';     // Letter spread (was 21:9 - too wide)
+            case '8:10': return '3:2';       // Portrait spread
+            case '8.5:8.5': return '21:9';   // Square spread (2.33:1 - double square)
+            case '8.5:11': return '3:2';     // Letter spread
             default: return '3:2';
         }
     }
