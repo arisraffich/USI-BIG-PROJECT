@@ -620,12 +620,12 @@ export function SharedIllustrationBoard({
                 {/* ----------------------------------------------------------- */}
                 <div className="hidden md:flex w-72 lg:w-80 flex-col shrink-0 border-r border-slate-100 bg-slate-50/50 h-full">
                     {/* Header 73px - Matches Backup */}
-                    <div className="p-4 border-b border-slate-100 h-[73px] flex items-center justify-end shrink-0">
+                    <div className="p-4 border-b border-slate-100 h-[73px] flex items-center justify-between shrink-0">
                         {/* ADMIN ONLY: LAYOUT + REGEN BUTTONS */}
-                        {isAdmin && onRegenerate && (
-                            <div className="flex items-center gap-2">
-                                {/* Layout Button */}
-                                {onLayoutChange && page.illustration_url && (
+                        {isAdmin && onRegenerate ? (
+                            <>
+                                {/* Layout Button - Left */}
+                                {onLayoutChange && page.illustration_url ? (
                                     <Button 
                                         variant="ghost" 
                                         size="sm" 
@@ -637,13 +637,14 @@ export function SharedIllustrationBoard({
                                         <Layers className="w-4 h-4 mr-1.5" />
                                         Layout
                                     </Button>
-                                )}
+                                ) : <div />}
+                                {/* Regenerate Button - Right */}
                                 <Button variant="outline" size="sm" onClick={handleOpenRegenerateDialog} disabled={isGenerating} title="Regenerate with Instructions">
                                     <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
                                     Regenerate
                                 </Button>
-                            </div>
-                        )}
+                            </>
+                        ) : <div />}
                     </div>
 
                     <div className="p-4 space-y-4 overflow-y-auto max-h-[800px] flex-1">
