@@ -632,10 +632,10 @@ export function SharedIllustrationBoard({
                                         size="icon" 
                                         onClick={handleOpenLayoutDialog} 
                                         disabled={isGenerating}
-                                        className="h-8 w-8 text-slate-500 hover:text-slate-700 hover:bg-slate-100"
                                         title="Change Layout"
                                     >
-                                        <Layers className="w-4 h-4" />
+                                        <Layers className="w-4 h-4 mr-2" />
+                                        Layout
                                     </Button>
                                 )}
                                 <Button variant="outline" size="sm" onClick={handleOpenRegenerateDialog} disabled={isGenerating} title="Regenerate with Instructions">
