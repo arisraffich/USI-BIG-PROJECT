@@ -74,9 +74,8 @@ export function SharedProjectHeader({
                     {/* For now, let's keep it Mobile-focused/Unified. */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="flex items-center gap-2 -ml-2 px-2 text-slate-900 hover:bg-slate-100/50">
+                            <Button variant="ghost" className="flex items-center -ml-2 px-2 text-slate-900 hover:bg-slate-100/50">
                                 <Menu className="w-5 h-5 text-slate-600" />
-                                <span className="font-bold text-lg">{activeTabLabel}</span>
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-[220px]">

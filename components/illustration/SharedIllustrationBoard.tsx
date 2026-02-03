@@ -620,8 +620,7 @@ export function SharedIllustrationBoard({
                 {/* ----------------------------------------------------------- */}
                 <div className="hidden md:flex w-72 lg:w-80 flex-col shrink-0 border-r border-slate-100 bg-slate-50/50 h-full">
                     {/* Header 73px - Matches Backup */}
-                    <div className="p-4 border-b border-slate-100 h-[73px] flex items-center justify-between shrink-0">
-                        <h4 className="font-semibold text-slate-800">Reviews</h4>
+                    <div className="p-4 border-b border-slate-100 h-[73px] flex items-center justify-end shrink-0">
                         {/* ADMIN ONLY: LAYOUT + REGEN BUTTONS */}
                         {isAdmin && onRegenerate && (
                             <div className="flex items-center gap-2">
