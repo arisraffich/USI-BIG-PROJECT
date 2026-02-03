@@ -66,26 +66,29 @@ export async function PATCH(
             is_resolved: false, // Reset resolved status on new feedback
         }
 
-        // If page was resolved and has old feedback (with or without comment), archive it first
-        if (page.is_resolved && page.feedback_notes) {
-            // Build history entry from old resolved feedback
-            const historyEntry: any = {
-                note: page.feedback_notes,
-                created_at: new Date().toISOString(),
-                revision_round: page.illustration_send_count || 1
+        // If page was resolved, handle archiving and cleanup
+        if (page.is_resolved) {
+            // Archive old feedback if it exists
+            if (page.feedback_notes) {
+                // Build history entry from old resolved feedback
+                const historyEntry: any = {
+                    note: page.feedback_notes,
+                    created_at: new Date().toISOString(),
+                    revision_round: page.illustration_send_count || 1
+                }
+                
+                // If there was an admin comment, include it in the history
+                if (page.admin_reply && page.admin_reply_type === 'comment') {
+                    historyEntry.admin_comment = page.admin_reply
+                    historyEntry.admin_comment_at = page.admin_reply_at
+                }
+                
+                // Prepend to existing history
+                const existingHistory = page.feedback_history || []
+                updateData.feedback_history = [historyEntry, ...existingHistory]
             }
             
-            // If there was an admin comment, include it in the history
-            if (page.admin_reply && page.admin_reply_type === 'comment') {
-                historyEntry.admin_comment = page.admin_reply
-                historyEntry.admin_comment_at = page.admin_reply_at
-            }
-            
-            // Prepend to existing history
-            const existingHistory = page.feedback_history || []
-            updateData.feedback_history = [historyEntry, ...existingHistory]
-            
-            // Clear admin comment fields since we're starting fresh
+            // Always clear admin reply fields when starting fresh feedback on a resolved page
             updateData.admin_reply = null
             updateData.admin_reply_at = null
             updateData.admin_reply_type = null
