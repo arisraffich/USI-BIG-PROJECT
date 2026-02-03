@@ -1293,7 +1293,7 @@ export function SharedIllustrationBoard({
                         {/* ILLUSTRATION HEADER (or PAGE TEXT for customer pages 2+) */}
                         <div className="flex items-center justify-center gap-2 relative bg-slate-50/30">
                             <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase">
-                                {isCustomer && page.page_number > 1 ? 'Page Text' : 'Final Illustration'}
+                                {isCustomer && page.page_number > 1 ? 'Page Text' : isAdmin ? 'Illustration' : 'Final Illustration'}
                             </h4>
                             {/* UPLOADED badge - Admin only */}
                             {isAdmin && isManualUpload(illustrationUrl) && (
