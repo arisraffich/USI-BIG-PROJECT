@@ -15,13 +15,14 @@ export async function PATCH(
         // Get page to verify it exists and get project_id (include resolved state and history)
         const { data: page, error: pageError } = await supabase
             .from('pages')
-            .select('id, project_id, page_number, is_resolved, feedback_notes, feedback_history, admin_reply, admin_reply_at, admin_reply_type, illustration_send_count')
+            .select('id, project_id, page_number, is_resolved, feedback_notes, feedback_history, admin_reply, admin_reply_at, admin_reply_type')
             .eq('id', pageId)
             .single()
 
         if (pageError || !page) {
+            console.error('Page query error:', pageError)
             return NextResponse.json(
-                { error: 'Page not found' },
+                { error: 'Page not found', details: pageError?.message },
                 { status: 404 }
             )
         }
@@ -31,7 +32,7 @@ export async function PATCH(
         // For safety, let's check the project status but ensure we don't block valid flows.
         const { data: project, error: projectError } = await supabase
             .from('projects')
-            .select('id, status')
+            .select('id, status, illustration_send_count')
             .eq('id', page.project_id)
             .single()
 
@@ -74,7 +75,7 @@ export async function PATCH(
                 const historyEntry: any = {
                     note: page.feedback_notes,
                     created_at: new Date().toISOString(),
-                    revision_round: page.illustration_send_count || 1
+                    revision_round: project.illustration_send_count || 1
                 }
                 
                 // If there was an admin comment, include it in the history
