@@ -624,22 +624,23 @@ export function SharedIllustrationBoard({
                         <h4 className="font-semibold text-slate-800">Reviews</h4>
                         {/* ADMIN ONLY: LAYOUT + REGEN BUTTONS */}
                         {isAdmin && onRegenerate && (
-                            <div className="flex items-center gap-1.5">
-                                {/* Layout Button - Icon only with tooltip */}
+                            <div className="flex items-center gap-2">
+                                {/* Layout Button */}
                                 {onLayoutChange && page.illustration_url && (
                                     <Button 
                                         variant="ghost" 
-                                        size="icon" 
+                                        size="sm" 
                                         onClick={handleOpenLayoutDialog} 
                                         disabled={isGenerating}
                                         title="Change Layout"
+                                        className="text-slate-500 hover:text-slate-700 px-2"
                                     >
-                                        <Layers className="w-4 h-4 mr-2" />
+                                        <Layers className="w-4 h-4 mr-1.5" />
                                         Layout
                                     </Button>
                                 )}
                                 <Button variant="outline" size="sm" onClick={handleOpenRegenerateDialog} disabled={isGenerating} title="Regenerate with Instructions">
-                                    <RefreshCw className="w-3.5 h-3.5 mr-2" />
+                                    <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
                                     Regenerate
                                 </Button>
                             </div>
