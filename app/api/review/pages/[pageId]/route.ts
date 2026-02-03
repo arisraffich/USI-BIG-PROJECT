@@ -103,9 +103,11 @@ export async function PATCH(
             .single()
 
         if (updateError) {
-            console.error('Error updating page:', updateError)
+            console.error('Error updating page:', JSON.stringify(updateError, null, 2))
+            console.error('Update data was:', JSON.stringify(updateData, null, 2))
+            console.error('Page state was:', JSON.stringify(page, null, 2))
             return NextResponse.json(
-                { error: 'Failed to update page' },
+                { error: 'Failed to update page', details: updateError.message, code: updateError.code },
                 { status: 500 }
             )
         }
