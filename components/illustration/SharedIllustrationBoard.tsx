@@ -1038,7 +1038,7 @@ export function SharedIllustrationBoard({
                             )}
 
                             {/* EDIT MODE (Customer Only - initial feedback) */}
-                            {isEditing && isCustomer ? (
+                            {isEditing && isCustomer && (
                                 <div className="space-y-3 animate-in fade-in zoom-in-95 duration-200 bg-white rounded-lg p-3 border border-amber-100 shadow-sm ring-1 ring-amber-50">
                                     <Label className="text-xs font-semibold text-amber-800 uppercase">Your Request:</Label>
                                     <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Describe what needs to be changed..." className="min-h-[120px] text-sm resize-none focus-visible:ring-amber-500 border-amber-200 bg-white" autoFocus />
@@ -1050,14 +1050,6 @@ export function SharedIllustrationBoard({
                                         </Button>
                                     </div>
                                 </div>
-                            ) : (
-                                // CREATE BUTTON (Customer Only) - Show if no feedback OR if resolved (can add new revision on resolved)
-                                isCustomer && (!page.feedback_notes || page.is_resolved) && !isLocked && !isCustomerFollowingUp && (
-                                    <Button variant="outline" size="sm" className="w-full h-11 gap-2 text-amber-600 border-amber-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-700 shadow-sm bg-white font-medium" onClick={() => { setNotes(''); setIsEditing(true) }}>
-                                        <MessageSquarePlus className="w-4 h-4" />
-                                        Request Revision
-                                    </Button>
-                                )
                             )}
                         </div>
 
@@ -1161,6 +1153,14 @@ export function SharedIllustrationBoard({
                             <div className="text-sm text-slate-400 italic text-center py-8">
                                 No reviews yet.
                             </div>
+                        )}
+
+                        {/* REQUEST REVISION BUTTON (Customer Only) - Always at bottom */}
+                        {!isEditing && isCustomer && (!page.feedback_notes || page.is_resolved) && !isLocked && !isCustomerFollowingUp && (
+                            <Button variant="outline" size="sm" className="w-full h-11 gap-2 text-amber-600 border-amber-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-700 shadow-sm bg-white font-medium mt-3" onClick={() => { setNotes(''); setIsEditing(true) }}>
+                                <MessageSquarePlus className="w-4 h-4" />
+                                Request Revision
+                            </Button>
                         )}
                     </div>
                 </div>
