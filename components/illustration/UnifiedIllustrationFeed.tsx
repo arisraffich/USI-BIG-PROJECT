@@ -72,8 +72,13 @@ interface UnifiedIllustrationFeedProps {
     
     // Admin Reply Feature
     onSaveAdminReply?: (pageId: string, reply: string) => Promise<void>
+    onEditAdminReply?: (pageId: string, reply: string) => Promise<void>
     onAcceptAdminReply?: (pageId: string) => Promise<void>
     onCustomerFollowUp?: (pageId: string, notes: string) => Promise<void>
+    onEditFollowUp?: (pageId: string, notes: string) => Promise<void>
+    // Admin Comment Feature (for resolved revisions)
+    onAddComment?: (pageId: string, comment: string) => Promise<void>
+    onRemoveComment?: (pageId: string) => Promise<void>
 }
 
 export function UnifiedIllustrationFeed({
@@ -110,8 +115,13 @@ export function UnifiedIllustrationFeed({
     onComparisonDecision,
     // Admin Reply Feature
     onSaveAdminReply,
+    onEditAdminReply,
     onAcceptAdminReply,
-    onCustomerFollowUp
+    onCustomerFollowUp,
+    onEditFollowUp,
+    // Admin Comment Feature
+    onAddComment,
+    onRemoveComment
 }: UnifiedIllustrationFeedProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const isScrollingRef = useRef(false)
@@ -331,8 +341,13 @@ export function UnifiedIllustrationFeed({
                             
                             // Admin Reply Feature
                             onSaveAdminReply={onSaveAdminReply ? (reply) => onSaveAdminReply(page.id, reply) : undefined}
+                            onEditAdminReply={onEditAdminReply ? (reply) => onEditAdminReply(page.id, reply) : undefined}
                             onAcceptAdminReply={onAcceptAdminReply ? () => onAcceptAdminReply(page.id) : undefined}
                             onCustomerFollowUp={onCustomerFollowUp ? (notes) => onCustomerFollowUp(page.id, notes) : undefined}
+                            onEditFollowUp={onEditFollowUp ? (notes) => onEditFollowUp(page.id, notes) : undefined}
+                            // Admin Comment Feature
+                            onAddComment={onAddComment ? (comment) => onAddComment(page.id, comment) : undefined}
+                            onRemoveComment={onRemoveComment ? () => onRemoveComment(page.id) : undefined}
                         />
                     </div>
                 )

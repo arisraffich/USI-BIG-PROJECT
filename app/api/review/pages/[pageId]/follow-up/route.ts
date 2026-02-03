@@ -111,3 +111,94 @@ export async function POST(
         )
     }
 }
+
+// PUT: Customer edits their last follow-up (only if admin hasn't responded)
+export async function PUT(
+    request: NextRequest,
+    { params }: { params: Promise<{ pageId: string }> }
+) {
+    try {
+        const { pageId } = await params
+        const body = await request.json()
+        const { feedback_notes: newText } = body
+
+        if (!newText || !newText.trim()) {
+            return NextResponse.json(
+                { error: 'Follow-up text is required' },
+                { status: 400 }
+            )
+        }
+
+        const supabase = await createAdminClient()
+
+        // Get page with current state
+        const { data: page, error: pageError } = await supabase
+            .from('pages')
+            .select('id, admin_reply, conversation_thread')
+            .eq('id', pageId)
+            .single()
+
+        if (pageError || !page) {
+            return NextResponse.json(
+                { error: 'Page not found' },
+                { status: 404 }
+            )
+        }
+
+        // Check that admin hasn't responded yet
+        if (page.admin_reply) {
+            return NextResponse.json(
+                { error: 'Cannot edit follow-up after admin has responded' },
+                { status: 400 }
+            )
+        }
+
+        // Check that the last message in thread is from customer
+        const thread = Array.isArray(page.conversation_thread) ? page.conversation_thread : []
+        if (thread.length === 0) {
+            return NextResponse.json(
+                { error: 'No follow-up to edit' },
+                { status: 400 }
+            )
+        }
+
+        const lastMessage = thread[thread.length - 1]
+        if (lastMessage.type !== 'customer') {
+            return NextResponse.json(
+                { error: 'Can only edit your own messages' },
+                { status: 400 }
+            )
+        }
+
+        // Update the last message in the thread
+        const updatedThread = [
+            ...thread.slice(0, -1),
+            { ...lastMessage, text: newText.trim() }
+        ]
+
+        const { data: updatedPage, error: updateError } = await supabase
+            .from('pages')
+            .update({
+                conversation_thread: updatedThread
+            })
+            .eq('id', pageId)
+            .select()
+            .single()
+
+        if (updateError) {
+            console.error('Error editing follow-up:', updateError)
+            return NextResponse.json(
+                { error: 'Failed to edit follow-up' },
+                { status: 500 }
+            )
+        }
+
+        return NextResponse.json(updatedPage)
+    } catch (error: any) {
+        console.error('Error editing follow-up:', error)
+        return NextResponse.json(
+            { error: error.message || 'Failed to edit follow-up' },
+            { status: 500 }
+        )
+    }
+}

@@ -40,6 +40,7 @@ export interface Page {
   // Admin Reply (Illustrator Note)
   admin_reply?: string | null
   admin_reply_at?: string | null
+  admin_reply_type?: 'reply' | 'comment' | null // 'reply' for unresolved, 'comment' for resolved
   // Conversation thread (back-and-forth after admin's first reply)
   conversation_thread?: Array<{ type: 'admin' | 'customer'; text: string; at: string }> | null
   // Spread and Text Integration (per-page settings)

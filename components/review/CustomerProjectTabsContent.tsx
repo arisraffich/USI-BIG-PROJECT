@@ -524,6 +524,34 @@ export function CustomerProjectTabsContent({
     }
   }, [])
 
+  // Handle customer edit follow-up (only last message, only if admin hasn't responded)
+  const handleEditFollowUp = useCallback(async (pageId: string, notes: string) => {
+    try {
+      const response = await fetch(`/api/review/pages/${pageId}/follow-up`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedback_notes: notes }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to edit follow-up')
+      }
+
+      const updatedPage = await response.json()
+
+      // Update local state
+      setLocalPages(prev => prev.map(p =>
+        p.id === pageId ? { ...p, ...updatedPage } : p
+      ))
+
+      toast.success('Follow-up updated')
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to edit follow-up')
+      throw error
+    }
+  }, [])
+
   const isLocked = ![
     'character_review', 'character_revision_needed',
     // New statuses
@@ -814,6 +842,7 @@ export function CustomerProjectTabsContent({
                   onSaveFeedback={async (pageId, notes) => handleIllustrationFeedbackChange(pageId, notes)}
                   onAcceptAdminReply={handleAcceptAdminReply}
                   onCustomerFollowUp={handleCustomerFollowUp}
+                  onEditFollowUp={handleEditFollowUp}
                 />
               </div>
             )}

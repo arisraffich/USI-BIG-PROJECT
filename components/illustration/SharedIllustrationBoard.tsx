@@ -98,8 +98,13 @@ export interface SharedIllustrationBoardProps {
     
     // Admin Reply Feature
     onSaveAdminReply?: (reply: string) => Promise<void>
+    onEditAdminReply?: (reply: string) => Promise<void>
     onAcceptAdminReply?: () => Promise<void>
     onCustomerFollowUp?: (notes: string) => Promise<void>
+    onEditFollowUp?: (notes: string) => Promise<void>
+    // Admin Comment Feature (for resolved revisions)
+    onAddComment?: (comment: string) => Promise<void>
+    onRemoveComment?: () => Promise<void>
 }
 
 export function SharedIllustrationBoard({
@@ -134,8 +139,13 @@ export function SharedIllustrationBoard({
     onComparisonDecision,
     // Admin Reply Feature
     onSaveAdminReply,
+    onEditAdminReply,
     onAcceptAdminReply,
-    onCustomerFollowUp
+    onCustomerFollowUp,
+    onEditFollowUp,
+    // Admin Comment Feature (for resolved revisions)
+    onAddComment,
+    onRemoveComment
 }: SharedIllustrationBoardProps) {
 
     // --------------------------------------------------------------------------
@@ -150,14 +160,19 @@ export function SharedIllustrationBoard({
     
     // Admin Reply State
     const [isAdminReplying, setIsAdminReplying] = useState(false)
+    const [isEditingAdminReply, setIsEditingAdminReply] = useState(false)
     const [adminReplyText, setAdminReplyText] = useState('')
     const [isSavingAdminReply, setIsSavingAdminReply] = useState(false)
     // Customer Follow-up State
     const [isCustomerFollowingUp, setIsCustomerFollowingUp] = useState(false)
+    const [isEditingFollowUp, setIsEditingFollowUp] = useState(false)
     const [followUpText, setFollowUpText] = useState('')
     const [isSavingFollowUp, setIsSavingFollowUp] = useState(false)
     const [isAccepting, setIsAccepting] = useState(false)
     const [conversationExpanded, setConversationExpanded] = useState(false) // For conversation thread
+    // Admin Comment State (for resolved revisions)
+    const [isAddingComment, setIsAddingComment] = useState(false)
+    const [isDeletingComment, setIsDeletingComment] = useState(false)
     const historyDropdownRef = useRef<HTMLDivElement>(null) // For click-outside collapse
     const feedbackSectionRef = useRef<HTMLDivElement>(null) // For auto-scroll to buttons
 
@@ -434,6 +449,79 @@ export function SharedIllustrationBoard({
         }
     }, [onCustomerFollowUp, followUpText])
 
+    // Handle Edit Admin Reply
+    const handleEditAdminReply = useCallback(async () => {
+        if (!onEditAdminReply || !adminReplyText.trim()) {
+            setIsEditingAdminReply(false)
+            return
+        }
+        setIsSavingAdminReply(true)
+        try {
+            await onEditAdminReply(adminReplyText.trim())
+            setIsEditingAdminReply(false)
+            toast.success('Reply updated')
+        } catch (e) {
+            console.error(e)
+            toast.error('Failed to update reply')
+        } finally {
+            setIsSavingAdminReply(false)
+        }
+    }, [onEditAdminReply, adminReplyText])
+
+    // Handle Edit Customer Follow-up
+    const handleEditFollowUp = useCallback(async () => {
+        if (!onEditFollowUp || !followUpText.trim()) {
+            setIsEditingFollowUp(false)
+            return
+        }
+        setIsSavingFollowUp(true)
+        try {
+            await onEditFollowUp(followUpText.trim())
+            setIsEditingFollowUp(false)
+            toast.success('Follow-up updated')
+        } catch (e) {
+            console.error(e)
+            toast.error('Failed to update follow-up')
+        } finally {
+            setIsSavingFollowUp(false)
+        }
+    }, [onEditFollowUp, followUpText])
+
+    // Handle Add Admin Comment (on resolved revision)
+    const handleAddComment = useCallback(async () => {
+        if (!onAddComment || !adminReplyText.trim()) {
+            setIsAddingComment(false)
+            return
+        }
+        setIsSavingAdminReply(true)
+        try {
+            await onAddComment(adminReplyText.trim())
+            setAdminReplyText('')
+            setIsAddingComment(false)
+            toast.success('Comment added')
+        } catch (e) {
+            console.error(e)
+            toast.error('Failed to add comment')
+        } finally {
+            setIsSavingAdminReply(false)
+        }
+    }, [onAddComment, adminReplyText])
+
+    // Handle Remove Admin Comment
+    const handleRemoveComment = useCallback(async () => {
+        if (!onRemoveComment) return
+        setIsDeletingComment(true)
+        try {
+            await onRemoveComment()
+            toast.success('Comment removed')
+        } catch (e) {
+            console.error(e)
+            toast.error('Failed to remove comment')
+        } finally {
+            setIsDeletingComment(false)
+        }
+    }, [onRemoveComment])
+
     const handleAdminUploadSelect = useCallback((type: 'sketch' | 'illustration') => (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0] && onUpload) {
             onUpload(type, e.target.files[0])
@@ -597,9 +685,79 @@ export function SharedIllustrationBoard({
                                     )}
                                 </div>
                             )}
+                            
+                            {/* ADMIN COMMENT ON RESOLVED (Illustrator Note - informational only) */}
+                            {page.is_resolved && page.admin_reply && page.admin_reply_type === 'comment' && (
+                                <div className="ml-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm relative group">
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <CornerDownRight className="w-3.5 h-3.5 text-blue-500" />
+                                            <p className="font-semibold text-xs uppercase text-blue-700">Illustrator Note:</p>
+                                        </div>
+                                        <p className="whitespace-pre-wrap text-blue-900">{page.admin_reply}</p>
+                                        
+                                        {/* Admin Remove Button */}
+                                        {isAdmin && onRemoveComment && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="absolute top-1 right-1 h-6 px-2 text-red-600 hover:text-red-800 hover:bg-red-100 transition-colors text-xs"
+                                                onClick={handleRemoveComment}
+                                                disabled={isDeletingComment}
+                                            >
+                                                {isDeletingComment ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Remove'}
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* ADD COMMENT BUTTON (Admin only, for resolved revisions without comment) */}
+                            {isAdmin && page.is_resolved && !page.admin_reply && !isAddingComment && onAddComment && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setIsAddingComment(true)}
+                                    className="w-full h-9 gap-2 text-blue-600 border-blue-300 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400 bg-white font-medium"
+                                >
+                                    <MessageSquarePlus className="w-4 h-4" />
+                                    Add Comment
+                                </Button>
+                            )}
+                            
+                            {/* ADD COMMENT INPUT MODE (Admin only) */}
+                            {isAdmin && isAddingComment && (
+                                <div className="ml-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="space-y-3 bg-white rounded-lg p-3 border border-blue-200 shadow-sm ring-1 ring-blue-50">
+                                        <div className="flex items-center gap-1.5">
+                                            <CornerDownRight className="w-3.5 h-3.5 text-blue-500" />
+                                            <Label className="text-xs font-semibold text-blue-700 uppercase">Illustrator Note:</Label>
+                                        </div>
+                                        <Textarea
+                                            value={adminReplyText}
+                                            onChange={(e) => setAdminReplyText(e.target.value)}
+                                            placeholder="Add a note for the customer..."
+                                            className="min-h-[100px] text-sm resize-none focus-visible:ring-blue-500 border-blue-200 bg-white"
+                                            autoFocus
+                                        />
+                                        <div className="flex gap-3 justify-end mt-2">
+                                            <Button variant="ghost" size="sm" onClick={() => { setAdminReplyText(''); setIsAddingComment(false) }} className="text-slate-600 hover:bg-slate-50">Cancel</Button>
+                                            <Button
+                                                size="sm"
+                                                onClick={handleAddComment}
+                                                disabled={isSavingAdminReply || !adminReplyText.trim()}
+                                                className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                                            >
+                                                {isSavingAdminReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
+                                                Add Comment
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* CONVERSATION THREAD (collapsible history of back-and-forth) */}
-                            {page.conversation_thread && page.conversation_thread.length > 0 && !isCustomerFollowingUp && (
+                            {page.conversation_thread && page.conversation_thread.length > 0 && !isCustomerFollowingUp && !isEditingFollowUp && (
                                 <div className="ml-4">
                                     {/* Collapse/Expand Toggle */}
                                     <button
@@ -617,39 +775,95 @@ export function SharedIllustrationBoard({
                                     {/* Expanded Conversation History */}
                                     {conversationExpanded && (
                                         <div className="space-y-2 mb-3 pl-2 border-l-2 border-gray-200 animate-in fade-in slide-in-from-top-2 duration-200">
-                                            {page.conversation_thread.map((msg, idx) => (
-                                                <div 
-                                                    key={idx} 
-                                                    className={`p-2 rounded text-xs ${
-                                                        msg.type === 'admin' 
-                                                            ? 'bg-blue-50 border border-blue-100 ml-4' 
-                                                            : 'bg-amber-50 border border-amber-100'
-                                                    }`}
-                                                >
-                                                    <p className={`font-semibold text-[10px] uppercase mb-0.5 ${
-                                                        msg.type === 'admin' ? 'text-blue-600' : 'text-amber-600'
-                                                    }`}>
-                                                        {msg.type === 'admin' ? 'Illustrator:' : 'You:'}
-                                                    </p>
-                                                    <p className={`whitespace-pre-wrap ${
-                                                        msg.type === 'admin' ? 'text-blue-800' : 'text-amber-800'
-                                                    }`}>{msg.text}</p>
-                                                </div>
-                                            ))}
+                                            {page.conversation_thread.map((msg, idx) => {
+                                                const isLastMessage = idx === page.conversation_thread!.length - 1
+                                                const canEdit = isCustomer && isLastMessage && msg.type === 'customer' && !page.admin_reply && onEditFollowUp
+                                                
+                                                return (
+                                                    <div 
+                                                        key={idx} 
+                                                        className={`p-2 rounded text-xs relative group ${
+                                                            msg.type === 'admin' 
+                                                                ? 'bg-blue-50 border border-blue-100 ml-4' 
+                                                                : 'bg-amber-50 border border-amber-100'
+                                                        }`}
+                                                    >
+                                                        <p className={`font-semibold text-[10px] uppercase mb-0.5 ${
+                                                            msg.type === 'admin' ? 'text-blue-600' : 'text-amber-600'
+                                                        }`}>
+                                                            {msg.type === 'admin' ? 'Illustrator:' : 'You:'}
+                                                        </p>
+                                                        <p className={`whitespace-pre-wrap ${
+                                                            msg.type === 'admin' ? 'text-blue-800' : 'text-amber-800'
+                                                        }`}>{msg.text}</p>
+                                                        
+                                                        {/* Customer Edit Button for their last follow-up */}
+                                                        {canEdit && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="absolute top-1 right-1 h-5 px-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-100 transition-colors text-[10px]"
+                                                                onClick={() => { setFollowUpText(msg.text); setIsEditingFollowUp(true) }}
+                                                            >
+                                                                Edit
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                )
+                                            })}
                                         </div>
                                     )}
                                 </div>
                             )}
+                            
+                            {/* CUSTOMER EDIT FOLLOW-UP MODE */}
+                            {isCustomer && isEditingFollowUp && (
+                                <div className="ml-4 space-y-3 animate-in fade-in zoom-in-95 duration-200 bg-white rounded-lg p-3 border border-amber-100 shadow-sm ring-1 ring-amber-50">
+                                    <Label className="text-xs font-semibold text-amber-800 uppercase">Edit Your Reply:</Label>
+                                    <Textarea
+                                        value={followUpText}
+                                        onChange={(e) => setFollowUpText(e.target.value)}
+                                        placeholder="Update your response..."
+                                        className="min-h-[100px] text-sm resize-none focus-visible:ring-amber-500 border-amber-200 bg-white"
+                                        autoFocus
+                                    />
+                                    <div className="flex gap-3 justify-end mt-2">
+                                        <Button variant="ghost" size="sm" onClick={() => { setFollowUpText(''); setIsEditingFollowUp(false) }} className="text-slate-600 hover:bg-slate-50">Cancel</Button>
+                                        <Button
+                                            size="sm"
+                                            onClick={handleEditFollowUp}
+                                            disabled={isSavingFollowUp || !followUpText.trim()}
+                                            className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+                                            style={{ backgroundColor: '#d97706', color: '#ffffff' }}
+                                        >
+                                            {isSavingFollowUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
+                                            Save Changes
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* ADMIN REPLY DISPLAY (Illustrator Note) - Latest reply */}
-                            {page.admin_reply && !page.is_resolved && !isCustomerFollowingUp && (
+                            {page.admin_reply && !page.is_resolved && !isCustomerFollowingUp && !isEditingAdminReply && (
                                 <div className={`${page.conversation_thread && page.conversation_thread.length > 0 ? 'ml-4' : 'ml-6'} animate-in fade-in slide-in-from-top-2 duration-300`}>
-                                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm">
+                                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm relative group">
                                         <div className="flex items-center gap-1.5 mb-1">
                                             <CornerDownRight className="w-3.5 h-3.5 text-blue-500" />
                                             <p className="font-semibold text-xs uppercase text-blue-700">Illustrator Note:</p>
                                         </div>
                                         <p className="whitespace-pre-wrap text-blue-900">{page.admin_reply}</p>
+                                        
+                                        {/* Admin Edit Button - only if customer hasn't followed up */}
+                                        {isAdmin && onEditAdminReply && (!page.conversation_thread || page.conversation_thread.length === 0 || page.conversation_thread[page.conversation_thread.length - 1]?.type !== 'customer') && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="absolute top-1 right-1 h-6 px-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 transition-colors text-xs"
+                                                onClick={() => { setAdminReplyText(page.admin_reply || ''); setIsEditingAdminReply(true) }}
+                                            >
+                                                Edit
+                                            </Button>
+                                        )}
                                         
                                         {/* Customer Actions: Accept or Reply */}
                                         {isCustomer && !isLocked && (
@@ -673,6 +887,37 @@ export function SharedIllustrationBoard({
                                                 </Button>
                                             </div>
                                         )}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* ADMIN EDIT REPLY MODE */}
+                            {isAdmin && isEditingAdminReply && (
+                                <div className="ml-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="space-y-3 bg-white rounded-lg p-3 border border-blue-200 shadow-sm ring-1 ring-blue-50">
+                                        <div className="flex items-center gap-1.5">
+                                            <CornerDownRight className="w-3.5 h-3.5 text-blue-500" />
+                                            <Label className="text-xs font-semibold text-blue-700 uppercase">Edit Illustrator Note:</Label>
+                                        </div>
+                                        <Textarea
+                                            value={adminReplyText}
+                                            onChange={(e) => setAdminReplyText(e.target.value)}
+                                            placeholder="Update your note..."
+                                            className="min-h-[100px] text-sm resize-none focus-visible:ring-blue-500 border-blue-200 bg-white"
+                                            autoFocus
+                                        />
+                                        <div className="flex gap-3 justify-end mt-2">
+                                            <Button variant="ghost" size="sm" onClick={() => { setAdminReplyText(''); setIsEditingAdminReply(false) }} className="text-slate-600 hover:bg-slate-50">Cancel</Button>
+                                            <Button
+                                                size="sm"
+                                                onClick={handleEditAdminReply}
+                                                disabled={isSavingAdminReply || !adminReplyText.trim()}
+                                                className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                                            >
+                                                {isSavingAdminReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
+                                                Save Changes
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             )}

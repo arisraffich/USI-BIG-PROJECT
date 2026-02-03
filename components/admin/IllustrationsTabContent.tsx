@@ -882,7 +882,7 @@ export function IllustrationsTabContent({
         const response = await fetch(`/api/pages/${pageId}/admin-reply`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ admin_reply: reply }),
+            body: JSON.stringify({ admin_reply: reply, type: 'reply' }),
         })
 
         if (!response.ok) {
@@ -891,6 +891,52 @@ export function IllustrationsTabContent({
         }
 
         // Refresh to show updated page with admin_reply
+        router.refresh()
+    }, [router])
+
+    // Handle edit admin reply
+    const handleEditAdminReply = useCallback(async (pageId: string, reply: string) => {
+        const response = await fetch(`/api/pages/${pageId}/admin-reply`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ admin_reply: reply }),
+        })
+
+        if (!response.ok) {
+            const data = await response.json()
+            throw new Error(data.error || 'Failed to edit reply')
+        }
+
+        router.refresh()
+    }, [router])
+
+    // Handle add comment on resolved revision
+    const handleAddComment = useCallback(async (pageId: string, comment: string) => {
+        const response = await fetch(`/api/pages/${pageId}/admin-reply`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ admin_reply: comment, type: 'comment' }),
+        })
+
+        if (!response.ok) {
+            const data = await response.json()
+            throw new Error(data.error || 'Failed to add comment')
+        }
+
+        router.refresh()
+    }, [router])
+
+    // Handle remove comment
+    const handleRemoveComment = useCallback(async (pageId: string) => {
+        const response = await fetch(`/api/pages/${pageId}/admin-reply`, {
+            method: 'DELETE',
+        })
+
+        if (!response.ok) {
+            const data = await response.json()
+            throw new Error(data.error || 'Failed to remove comment')
+        }
+
         router.refresh()
     }, [router])
 
@@ -938,6 +984,9 @@ export function IllustrationsTabContent({
             
             // Admin Reply Feature
             onSaveAdminReply={handleSaveAdminReply}
+            onEditAdminReply={handleEditAdminReply}
+            onAddComment={handleAddComment}
+            onRemoveComment={handleRemoveComment}
         />
     )
 }
