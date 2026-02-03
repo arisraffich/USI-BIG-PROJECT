@@ -79,6 +79,8 @@ interface UnifiedIllustrationFeedProps {
     // Admin Comment Feature (for resolved revisions)
     onAddComment?: (pageId: string, comment: string) => Promise<void>
     onRemoveComment?: (pageId: string) => Promise<void>
+    // Admin Manual Resolve Feature
+    onManualResolve?: (pageId: string) => Promise<void>
 }
 
 export function UnifiedIllustrationFeed({
@@ -121,7 +123,9 @@ export function UnifiedIllustrationFeed({
     onEditFollowUp,
     // Admin Comment Feature
     onAddComment,
-    onRemoveComment
+    onRemoveComment,
+    // Admin Manual Resolve Feature
+    onManualResolve
 }: UnifiedIllustrationFeedProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const isScrollingRef = useRef(false)
@@ -348,6 +352,8 @@ export function UnifiedIllustrationFeed({
                             // Admin Comment Feature
                             onAddComment={onAddComment ? (comment) => onAddComment(page.id, comment) : undefined}
                             onRemoveComment={onRemoveComment ? () => onRemoveComment(page.id) : undefined}
+                            // Admin Manual Resolve Feature
+                            onManualResolve={onManualResolve ? () => onManualResolve(page.id) : undefined}
                         />
                     </div>
                 )

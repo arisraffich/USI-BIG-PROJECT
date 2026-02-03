@@ -105,6 +105,8 @@ export interface SharedIllustrationBoardProps {
     // Admin Comment Feature (for resolved revisions)
     onAddComment?: (comment: string) => Promise<void>
     onRemoveComment?: () => Promise<void>
+    // Admin Manual Resolve Feature
+    onManualResolve?: () => Promise<void>
 }
 
 export function SharedIllustrationBoard({
@@ -145,7 +147,9 @@ export function SharedIllustrationBoard({
     onEditFollowUp,
     // Admin Comment Feature (for resolved revisions)
     onAddComment,
-    onRemoveComment
+    onRemoveComment,
+    // Admin Manual Resolve Feature
+    onManualResolve
 }: SharedIllustrationBoardProps) {
 
     // --------------------------------------------------------------------------
@@ -173,6 +177,9 @@ export function SharedIllustrationBoard({
     // Admin Comment State (for resolved revisions)
     const [isAddingComment, setIsAddingComment] = useState(false)
     const [isDeletingComment, setIsDeletingComment] = useState(false)
+    // Admin Manual Resolve State
+    const [showResolveDialog, setShowResolveDialog] = useState(false)
+    const [isResolving, setIsResolving] = useState(false)
     const historyDropdownRef = useRef<HTMLDivElement>(null) // For click-outside collapse
     const feedbackSectionRef = useRef<HTMLDivElement>(null) // For auto-scroll to buttons
 
@@ -522,6 +529,22 @@ export function SharedIllustrationBoard({
         }
     }, [onRemoveComment])
 
+    // Handle Manual Resolve (Admin)
+    const handleManualResolve = useCallback(async () => {
+        if (!onManualResolve) return
+        setIsResolving(true)
+        try {
+            await onManualResolve()
+            setShowResolveDialog(false)
+            toast.success('Revision resolved')
+        } catch (e) {
+            console.error(e)
+            toast.error('Failed to resolve revision')
+        } finally {
+            setIsResolving(false)
+        }
+    }, [onManualResolve])
+
     const handleAdminUploadSelect = useCallback((type: 'sketch' | 'illustration') => (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0] && onUpload) {
             onUpload(type, e.target.files[0])
@@ -662,9 +685,22 @@ export function SharedIllustrationBoard({
                             {!isEditing && !isCustomerFollowingUp && page.feedback_notes && (
                                 <div className={`${page.is_resolved ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-100'} border rounded-md p-3 text-sm relative group animate-in fade-in zoom-in-95 duration-200`}>
                                     <div className="flex items-center justify-between mb-1">
-                                        <p className={`font-semibold text-xs uppercase ${page.is_resolved ? 'text-green-700' : 'text-amber-700'}`}>
-                                            {page.is_resolved ? 'Resolved:' : 'Your Request:'}
-                                        </p>
+                                        <div className="flex items-center gap-2">
+                                            <p className={`font-semibold text-xs uppercase ${page.is_resolved ? 'text-green-700' : 'text-amber-700'}`}>
+                                                {page.is_resolved ? 'Resolved:' : 'Your Request:'}
+                                            </p>
+                                            {/* Admin Resolve Button - only for unresolved feedback */}
+                                            {isAdmin && !page.is_resolved && onManualResolve && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-5 px-1.5 text-[10px] text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                                                    onClick={() => setShowResolveDialog(true)}
+                                                >
+                                                    Resolve
+                                                </Button>
+                                            )}
+                                        </div>
                                         {page.is_resolved && (
                                             <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
                                                 RESOLVED
@@ -1563,6 +1599,35 @@ export function SharedIllustrationBoard({
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
                         </button>
                     </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* ADMIN MANUAL RESOLVE CONFIRMATION DIALOG */}
+            <Dialog open={showResolveDialog} onOpenChange={setShowResolveDialog}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Resolve Revision</DialogTitle>
+                        <DialogDescription>
+                            Resolve this revision without making changes?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="flex gap-2 sm:gap-0">
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowResolveDialog(false)}
+                            disabled={isResolving}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleManualResolve}
+                            disabled={isResolving}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                            {isResolving ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : null}
+                            Resolve
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 

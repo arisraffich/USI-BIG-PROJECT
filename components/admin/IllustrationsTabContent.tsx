@@ -940,6 +940,20 @@ export function IllustrationsTabContent({
         router.refresh()
     }, [router])
 
+    // Handle manual resolve
+    const handleManualResolve = useCallback(async (pageId: string) => {
+        const response = await fetch(`/api/pages/${pageId}/resolve`, {
+            method: 'POST',
+        })
+
+        if (!response.ok) {
+            const data = await response.json()
+            throw new Error(data.error || 'Failed to resolve revision')
+        }
+
+        router.refresh()
+    }, [router])
+
     return (
         <UnifiedIllustrationFeed
             mode="admin"
@@ -987,6 +1001,7 @@ export function IllustrationsTabContent({
             onEditAdminReply={handleEditAdminReply}
             onAddComment={handleAddComment}
             onRemoveComment={handleRemoveComment}
+            onManualResolve={handleManualResolve}
         />
     )
 }
