@@ -3,7 +3,7 @@
 import { Page } from '@/types/page'
 import { ProjectStatus } from '@/types/project'
 import { useIllustrationLock } from '@/hooks/use-illustration-lock'
-import { MessageSquare, CheckCircle2 } from 'lucide-react'
+import { MessageSquare, CheckCircle2, Check } from 'lucide-react'
 
 interface UnifiedIllustrationSidebarProps {
     pages: Page[]
@@ -29,7 +29,7 @@ export function UnifiedIllustrationSidebar({
     illustrationSendCount = 0
 }: UnifiedIllustrationSidebarProps) {
     // Centralized lock logic from useIllustrationLock hook
-    const { isPagesUnlocked, isPageLocked, filterVisiblePages } = useIllustrationLock({
+    const { filterVisiblePages } = useIllustrationLock({
         projectStatus,
         mode,
         pages,
@@ -42,29 +42,38 @@ export function UnifiedIllustrationSidebar({
                 <div className="p-2 space-y-1">
                     {filterVisiblePages(pages).map((page) => {
                         const isActive = activePageId === page.id
-                        const isLocked = isPageLocked(page.page_number)
 
                         return (
                             <button
                                 key={page.id}
-                                onClick={() => !isLocked && onPageClick(page.id)}
-                                disabled={disabled || isLocked}
+                                onClick={() => onPageClick(page.id)}
+                                disabled={disabled}
                                 className={`w-full text-left px-3 py-2.5 rounded-md text-sm transition-all flex items-center justify-between group ${isActive
                                     ? 'bg-purple-50 text-purple-700 font-medium border-l-4 border-purple-600'
                                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'
-                                    } ${(disabled || isLocked) ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
+                                    } ${disabled ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
                             >
                                 <span className="flex items-center gap-2">
-                                    {/* Feedback indicator - Admin only */}
-                                    {mode === 'admin' && page.feedback_notes && !page.is_resolved && (
-                                        <span title="Has unresolved feedback">
-                                            <MessageSquare className="w-4 h-4 text-amber-500" />
-                                        </span>
-                                    )}
-                                    {mode === 'admin' && page.feedback_notes && page.is_resolved && (
-                                        <span title="Feedback resolved">
-                                            <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                        </span>
+                                    {/* Feedback indicator - Admin only, only for generated pages */}
+                                    {mode === 'admin' && page.illustration_url && (
+                                        <>
+                                            {page.feedback_notes && !page.is_resolved ? (
+                                                /* Unresolved feedback - amber */
+                                                <span title="Has unresolved feedback">
+                                                    <MessageSquare className="w-4 h-4 text-amber-500" />
+                                                </span>
+                                            ) : page.feedback_notes && page.is_resolved ? (
+                                                /* Resolved feedback - green outline with green checkmark */
+                                                <span title="Feedback resolved">
+                                                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                                </span>
+                                            ) : (
+                                                /* No feedback - solid green with white checkmark */
+                                                <span title="No feedback" className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                                                    <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                                                </span>
+                                            )}
+                                        </>
                                     )}
                                     Page {page.page_number}
                                     {/* Illustration type indicators */}
@@ -103,13 +112,12 @@ export function UnifiedIllustrationSidebar({
                 <div className="flex items-center gap-2 overflow-x-auto pointer-events-auto px-4 py-2 [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-400/30 [&::-webkit-scrollbar-thumb]:rounded-full">
                     {filterVisiblePages(pages).map((page) => {
                         const isActive = activePageId === page.id
-                        const isLocked = isPageLocked(page.page_number)
 
                         return (
                             <div key={page.id} className="relative flex-shrink-0">
                                 <button
-                                    onClick={() => !isLocked && onPageClick(page.id)}
-                                    disabled={disabled || isLocked}
+                                    onClick={() => onPageClick(page.id)}
+                                    disabled={disabled}
                                     className={`w-9 h-9 flex items-center justify-center rounded-full text-xs font-bold transition-all shadow-sm ${isActive
                                         ? 'bg-purple-600 text-white shadow-lg scale-110 border border-purple-500'
                                         : failedPageIds.includes(page.id)
@@ -117,7 +125,7 @@ export function UnifiedIllustrationSidebar({
                                             : generatingPageIds.includes(page.id)
                                                 ? 'bg-orange-100 border border-orange-400 text-orange-700 animate-pulse'
                                                 : 'bg-white/30 backdrop-blur-md border border-white/20 text-slate-900 ring-1 ring-white/30 hover:bg-white/50'
-                                        } ${(disabled || isLocked) ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                        } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
                                 >
                                     {page.page_number}
                                 </button>
@@ -135,16 +143,24 @@ export function UnifiedIllustrationSidebar({
                                         2
                                     </span>
                                 )}
-                                {/* Feedback indicator - Admin only (mobile) */}
-                                {mode === 'admin' && page.feedback_notes && !page.is_resolved && (
-                                    <span className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full bg-amber-400 border border-white flex items-center justify-center">
-                                        <MessageSquare className="w-2 h-2 text-white" />
-                                    </span>
-                                )}
-                                {mode === 'admin' && page.feedback_notes && page.is_resolved && (
-                                    <span className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full bg-green-500 border border-white flex items-center justify-center">
-                                        <CheckCircle2 className="w-2 h-2 text-white" />
-                                    </span>
+                                {/* Feedback indicator - Admin only (mobile), only for generated pages */}
+                                {mode === 'admin' && page.illustration_url && (
+                                    page.feedback_notes && !page.is_resolved ? (
+                                        /* Unresolved feedback - amber */
+                                        <span className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full bg-amber-400 border border-white flex items-center justify-center">
+                                            <MessageSquare className="w-2 h-2 text-white" />
+                                        </span>
+                                    ) : page.feedback_notes && page.is_resolved ? (
+                                        /* Resolved feedback - green with checkmark outline style */
+                                        <span className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full bg-white border-2 border-green-500 flex items-center justify-center">
+                                            <Check className="w-2 h-2 text-green-500" strokeWidth={3} />
+                                        </span>
+                                    ) : (
+                                        /* No feedback - solid green with white checkmark */
+                                        <span className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full bg-green-500 border border-white flex items-center justify-center">
+                                            <Check className="w-2 h-2 text-white" strokeWidth={3} />
+                                        </span>
+                                    )
                                 )}
                             </div>
                         )

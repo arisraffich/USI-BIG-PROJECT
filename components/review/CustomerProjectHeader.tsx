@@ -245,20 +245,12 @@ export function CustomerProjectHeader({
           }
         />
 
-      {/* Mobile Page Navigator */}
+      {/* Mobile Page Navigator - Only show when NOT on illustrations tab (illustrations has its own nav) */}
       {!activeTab && (
         <MobilePageNavigator
           currentPage={1}
           totalPages={pageCount}
           onPageSelect={() => handleTabClick('pages')}
-          disabled={!showIllustrationsTab}
-        />
-      )}
-      {activeTab === 'illustrations' && (
-        <MobilePageNavigator
-          currentPage={1}
-          totalPages={pageCount}
-          onPageSelect={() => handleTabClick('illustrations')}
           disabled={!showIllustrationsTab}
         />
       )}

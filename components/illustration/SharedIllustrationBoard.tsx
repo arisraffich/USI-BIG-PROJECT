@@ -2048,22 +2048,20 @@ export function SharedIllustrationBoard({
                                     </Label>
                                 </div>
 
-                                {/* Spread Image - Hidden for Page 1 */}
-                                {page.page_number > 1 && (
-                                    <div className={`flex items-center space-x-3 p-3 rounded-lg border-2 transition-colors cursor-pointer ${
-                                        selectedLayoutType === 'spread' 
-                                            ? 'border-purple-500 bg-purple-50' 
-                                            : 'border-slate-200 hover:border-slate-300'
-                                    }`} onClick={() => setSelectedLayoutType('spread')}>
-                                        <RadioGroupItem value="spread" id="layout-spread" className="text-purple-600" />
-                                        <Label htmlFor="layout-spread" className="flex-1 cursor-pointer">
-                                            <span className="font-medium">Spread Image</span>
-                                            {currentIllustrationType === 'spread' && (
-                                                <span className="ml-2 text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">current</span>
-                                            )}
-                                        </Label>
-                                    </div>
-                                )}
+                                {/* Spread Image */}
+                                <div className={`flex items-center space-x-3 p-3 rounded-lg border-2 transition-colors cursor-pointer ${
+                                    selectedLayoutType === 'spread' 
+                                        ? 'border-purple-500 bg-purple-50' 
+                                        : 'border-slate-200 hover:border-slate-300'
+                                }`} onClick={() => setSelectedLayoutType('spread')}>
+                                    <RadioGroupItem value="spread" id="layout-spread" className="text-purple-600" />
+                                    <Label htmlFor="layout-spread" className="flex-1 cursor-pointer">
+                                        <span className="font-medium">Spread Image</span>
+                                        {currentIllustrationType === 'spread' && (
+                                            <span className="ml-2 text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">current</span>
+                                        )}
+                                    </Label>
+                                </div>
                             </RadioGroup>
 
                             {/* Warning */}

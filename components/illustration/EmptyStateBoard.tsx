@@ -357,28 +357,26 @@ export function EmptyStateBoard({
                                         <span className={`font-medium text-sm ${illustrationType === 'spot' ? 'text-pink-900' : 'text-slate-700'}`}>Spot Image</span>
                                     </div>
 
-                                    {/* Spread Image Checkbox - Hidden for Page 1 */}
-                                    {page.page_number > 1 && (
-                                        <div 
-                                            className={`flex items-center gap-2 p-2.5 rounded-lg cursor-pointer transition-colors ${illustrationType === 'spread' ? 'bg-purple-50 border-2 border-purple-300' : 'hover:bg-slate-100 border-2 border-transparent bg-white'}`}
-                                            onClick={() => {
-                                                const newType = illustrationType === 'spread' ? null : 'spread'
-                                                setIllustrationType(newType)
-                                                if (newType === 'spread' && setTextIntegration) {
-                                                    setTextIntegration('integrated')
-                                                }
-                                            }}
-                                        >
-                                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${illustrationType === 'spread' ? 'border-purple-600 bg-purple-600' : 'border-slate-300'}`}>
-                                                {illustrationType === 'spread' && (
-                                                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                                    </svg>
-                                                )}
-                                            </div>
-                                            <span className={`font-medium text-sm ${illustrationType === 'spread' ? 'text-purple-900' : 'text-slate-700'}`}>Spread Image</span>
+                                    {/* Spread Image Checkbox */}
+                                    <div 
+                                        className={`flex items-center gap-2 p-2.5 rounded-lg cursor-pointer transition-colors ${illustrationType === 'spread' ? 'bg-purple-50 border-2 border-purple-300' : 'hover:bg-slate-100 border-2 border-transparent bg-white'}`}
+                                        onClick={() => {
+                                            const newType = illustrationType === 'spread' ? null : 'spread'
+                                            setIllustrationType(newType)
+                                            if (newType === 'spread' && setTextIntegration) {
+                                                setTextIntegration('integrated')
+                                            }
+                                        }}
+                                    >
+                                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${illustrationType === 'spread' ? 'border-purple-600 bg-purple-600' : 'border-slate-300'}`}>
+                                            {illustrationType === 'spread' && (
+                                                <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            )}
                                         </div>
-                                    )}
+                                        <span className={`font-medium text-sm ${illustrationType === 'spread' ? 'text-purple-900' : 'text-slate-700'}`}>Spread Image</span>
+                                    </div>
                                 </div>
                             </>
                         )}
