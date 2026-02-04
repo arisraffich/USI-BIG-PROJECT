@@ -696,14 +696,14 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full justify-start gap-2 h-9"
+                className="w-full justify-start gap-2 h-9 border-purple-300 bg-purple-50 hover:bg-purple-100 hover:border-purple-400"
                 onClick={handleSendColoringRequest}
                 disabled={isSendingColoringRequest}
               >
                 {isSendingColoringRequest ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Palette className="w-4 h-4" />
+                  <Palette className="w-4 h-4 text-purple-600" />
                 )}
                 Request Page 1 Coloring
               </Button>
@@ -718,7 +718,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
           <div className="h-px bg-slate-100" />
           
           {/* Show Colored Images Toggle */}
-          <div className="space-y-2">
+          <div className="space-y-2 px-1">
             <div className="flex items-center justify-between">
               <label htmlFor="show-colored" className="text-sm font-medium text-slate-700">
                 Show Colored Images
@@ -732,7 +732,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
             </div>
             <p className="text-xs text-slate-500 flex items-start gap-1.5">
               <Info className="w-3 h-3 mt-0.5 shrink-0" />
-              <span>When enabled, customers see colored illustrations instead of story text on all pages.</span>
+              <span>Customers can see colored illustrations.</span>
             </p>
           </div>
         </>

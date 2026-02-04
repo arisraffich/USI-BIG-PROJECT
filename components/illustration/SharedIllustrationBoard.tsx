@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Switch } from '@/components/ui/switch'
 import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, ChevronUp, AlignLeft, Users, Plus, Minus, Pencil, Check, Layers, CornerDownRight, AlertCircle, ChevronRight } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -1253,42 +1254,41 @@ export function SharedIllustrationBoard({
                         {/* SKETCH HEADER */}
                         <div className="flex items-center justify-center gap-2 relative">
 
-                            <DropdownMenu>
-                                <DropdownMenuTrigger className="flex items-center gap-2 outline-none group">
-                                    <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase group-hover:text-purple-600 transition-colors">
+                            {/* Sketch/Text Toggle - Show for admin, or customer when colored images enabled */}
+                            {(isAdmin || showColoredToCustomer) ? (
+                                <div className="flex items-center gap-2">
+                                    <label className="text-xs font-bold tracking-wider text-slate-900 uppercase w-12">
                                         {sketchViewMode === 'sketch' ? 'Sketch' : 'Text'}
-                                    </h4>
-                                    <ChevronDown className="w-3 h-3 text-slate-400 group-hover:text-purple-600 transition-colors" />
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="center">
-                                    <DropdownMenuItem onClick={() => setSketchViewMode('sketch')} className={`gap-2 cursor-pointer ${sketchViewMode === 'sketch' ? 'bg-purple-50 text-purple-700' : ''}`}>
-                                        {sketchViewMode === 'sketch' ? <Check className="w-4 h-4 text-purple-600" /> : <Sparkles className="w-4 h-4 text-slate-500" />}
-                                        <span>Sketch</span>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => setSketchViewMode('text')} className={`gap-2 cursor-pointer ${sketchViewMode === 'text' ? 'bg-purple-50 text-purple-700' : ''}`}>
-                                        {sketchViewMode === 'text' ? <Check className="w-4 h-4 text-purple-600" /> : <AlignLeft className="w-4 h-4 text-slate-500" />}
-                                        <span>Text</span>
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                                    </label>
+                                    <Switch
+                                        checked={sketchViewMode === 'text'}
+                                        onCheckedChange={(checked) => setSketchViewMode(checked ? 'text' : 'sketch')}
+                                        className="!bg-slate-300"
+                                    />
+                                </div>
+                            ) : (
+                                <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase">
+                                    Sketch
+                                </h4>
+                            )}
 
                             {/* UPLOADED badge - Admin only */}
-                            {isAdmin && isManualUpload(sketchUrl) && sketchViewMode === 'sketch' && (
-                                <span className="absolute top-1/2 -translate-y-1/2 right-12 lg:right-16 px-1.5 py-0.5 text-[9px] font-bold bg-rose-50 text-rose-600 rounded border border-rose-100 leading-none">
+                            {isAdmin && isManualUpload(sketchUrl) && (
+                                <span className={`absolute top-1/2 -translate-y-1/2 right-12 lg:right-16 px-1.5 py-0.5 text-[9px] font-bold bg-rose-50 text-rose-600 rounded border border-rose-100 leading-none transition-opacity ${sketchViewMode === 'text' ? 'opacity-0' : ''}`}>
                                     UPLOADED
                                 </span>
                             )}
-                            {/* Admin Upload Button (From Admin Backup) - Only in Sketch Mode */}
-                            {isAdmin && onUpload && sketchViewMode === 'sketch' && (
-                                <>
+                            {/* Admin Upload Button (From Admin Backup) - Invisible in Text Mode to prevent layout shift */}
+                            {isAdmin && onUpload && (
+                                <div className={`transition-opacity ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`}>
                                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700" onClick={() => sketchInputRef.current?.click()} title="Upload Sketch">
                                         <Upload className="w-4 h-4" />
                                     </Button>
                                     <input type="file" ref={sketchInputRef} className="hidden" accept="image/*" onChange={handleAdminUploadSelect('sketch')} />
-                                </>
+                                </div>
                             )}
-                            {sketchUrl && sketchViewMode === 'sketch' && (
-                                <button onClick={() => handleDownload(sketchUrl!, `Page-${page.page_number}-Sketch.jpg`)} className="text-slate-400 hover:text-purple-600 transition-colors ml-2" title="Download Sketch">
+                            {sketchUrl && (
+                                <button onClick={() => handleDownload(sketchUrl!, `Page-${page.page_number}-Sketch.jpg`)} className={`text-slate-400 hover:text-purple-600 transition-colors ml-2 transition-opacity ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`} title="Download Sketch">
                                     <Download className="w-4 h-4" />
                                 </button>
                             )}
@@ -1379,31 +1379,30 @@ export function SharedIllustrationBoard({
                         <div className="flex flex-col items-center md:space-y-0 bg-white relative min-h-[300px] md:min-h-0">
                             {/* MOBILE HEADER FOR SKETCH (Overlay) */}
                             {/* MOBILE HEADER FOR SKETCH (Overlay) */}
-                            <div className="absolute top-0 left-0 right-0 z-10 flex items-center gap-2 md:hidden p-3 bg-gradient-to-b from-black/40 to-transparent">
+                            <div className="absolute top-0 left-0 right-0 z-10 flex items-center gap-2 md:hidden pt-1.5 px-3 pb-3 bg-gradient-to-b from-black/40 to-transparent">
 
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger className="flex items-center gap-1 outline-none">
-                                        <span className="text-xs font-bold tracking-wider text-white/90 uppercase shadow-sm">
+                                {/* Sketch/Text Toggle - Mobile: Show for admin, or customer when colored images enabled */}
+                                {(isAdmin || showColoredToCustomer) ? (
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold tracking-wider text-white/90 uppercase w-12">
                                             {sketchViewMode === 'sketch' ? 'Sketch' : 'Text'}
                                         </span>
-                                        <ChevronDown className="w-3 h-3 text-white/80" />
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="start">
-                                        <DropdownMenuItem onClick={() => setSketchViewMode('sketch')} className={`gap-2 cursor-pointer ${sketchViewMode === 'sketch' ? 'bg-purple-50 text-purple-700' : ''}`}>
-                                            {sketchViewMode === 'sketch' ? <Check className="w-4 h-4 text-purple-600" /> : <Sparkles className="w-4 h-4" />}
-                                            <span>Sketch</span>
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setSketchViewMode('text')} className={`gap-2 cursor-pointer ${sketchViewMode === 'text' ? 'bg-purple-50 text-purple-700' : ''}`}>
-                                            {sketchViewMode === 'text' ? <Check className="w-4 h-4 text-purple-600" /> : <AlignLeft className="w-4 h-4" />}
-                                            <span>Text</span>
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                        <Switch
+                                            checked={sketchViewMode === 'text'}
+                                            onCheckedChange={(checked) => setSketchViewMode(checked ? 'text' : 'sketch')}
+                                            className="!bg-slate-400"
+                                        />
+                                    </div>
+                                ) : (
+                                    <span className="text-xs font-bold tracking-wider text-white/90 uppercase">
+                                        Sketch
+                                    </span>
+                                )}
 
-                                {/* 1. REGENERATE (Admin) - Only show in Sketch Mode */}
-                                {isAdmin && onRegenerate && sketchViewMode === 'sketch' && (
+                                {/* 1. REGENERATE (Admin) - Invisible in Text Mode to prevent layout shift */}
+                                {isAdmin && onRegenerate && (
                                     <button
-                                        className="h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm transition-colors ml-auto"
+                                        className={`h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm transition-all ml-auto ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`}
                                         onClick={isGenerating ? undefined : handleOpenRegenerateDialog}
                                         disabled={isGenerating}
                                     >
@@ -1411,16 +1410,16 @@ export function SharedIllustrationBoard({
                                     </button>
                                 )}
 
-                                {/* 2. UPLOAD (Admin) - Only show in Sketch Mode */}
-                                {isAdmin && onUpload && sketchViewMode === 'sketch' && (
-                                    <Button variant="ghost" size="icon" className={`h-8 w-8 rounded-full bg-black/40 text-red-500 hover:bg-black/60 backdrop-blur-sm ${isAdmin && onRegenerate ? 'ml-1' : 'ml-auto'}`} onClick={() => sketchInputRef.current?.click()}>
+                                {/* 2. UPLOAD (Admin) - Invisible in Text Mode to prevent layout shift */}
+                                {isAdmin && onUpload && (
+                                    <Button variant="ghost" size="icon" className={`h-8 w-8 rounded-full bg-black/40 text-red-500 hover:bg-black/60 backdrop-blur-sm transition-opacity ${!isAdmin || !onRegenerate ? 'ml-auto' : ''} ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`} onClick={() => sketchInputRef.current?.click()}>
                                         <Upload className="w-4 h-4" />
                                     </Button>
                                 )}
 
-                                {/* 3. DOWNLOAD - Only show in Sketch Mode */}
-                                {sketchUrl && sketchViewMode === 'sketch' && (
-                                    <button onClick={() => handleDownload(sketchUrl!, `Page-${page.page_number}-Sketch.jpg`)} className={`h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm ${isAdmin && (onRegenerate || onUpload) ? 'ml-1' : 'ml-auto'}`}>
+                                {/* 3. DOWNLOAD - Invisible in Text Mode to prevent layout shift */}
+                                {sketchUrl && (
+                                    <button onClick={() => handleDownload(sketchUrl!, `Page-${page.page_number}-Sketch.jpg`)} className={`h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm transition-opacity ${(!isAdmin || (!onRegenerate && !onUpload)) ? 'ml-auto' : ''} ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`}>
                                         <Download className="w-4 h-4" />
                                     </button>
                                 )}
