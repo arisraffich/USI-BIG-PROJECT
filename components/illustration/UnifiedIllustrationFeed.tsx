@@ -78,6 +78,9 @@ interface UnifiedIllustrationFeedProps {
     onEditFollowUp?: (pageId: string, notes: string) => Promise<void>
     // Admin Comment Feature (for resolved revisions)
     onAddComment?: (pageId: string, comment: string) => Promise<void>
+    
+    // Customer Display Settings
+    showColoredToCustomer?: boolean
     onRemoveComment?: (pageId: string) => Promise<void>
     // Admin Manual Resolve Feature
     onManualResolve?: (pageId: string) => Promise<void>
@@ -125,7 +128,9 @@ export function UnifiedIllustrationFeed({
     onAddComment,
     onRemoveComment,
     // Admin Manual Resolve Feature
-    onManualResolve
+    onManualResolve,
+    // Customer Display Settings
+    showColoredToCustomer = false
 }: UnifiedIllustrationFeedProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const isScrollingRef = useRef(false)
@@ -354,6 +359,8 @@ export function UnifiedIllustrationFeed({
                             onRemoveComment={onRemoveComment ? () => onRemoveComment(page.id) : undefined}
                             // Admin Manual Resolve Feature
                             onManualResolve={onManualResolve ? () => onManualResolve(page.id) : undefined}
+                            // Customer Display Settings
+                            showColoredToCustomer={showColoredToCustomer}
                         />
                     </div>
                 )

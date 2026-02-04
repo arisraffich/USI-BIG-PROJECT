@@ -6,7 +6,7 @@ import { useTransition, useState, useEffect } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Home, Loader2, Send, Menu, FileText, Sparkles, ArrowLeft, Download } from 'lucide-react'
+import { Home, Loader2, Send, Menu, FileText, Sparkles, ArrowLeft, Download, ExternalLink, Info } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
@@ -15,6 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Switch } from '@/components/ui/switch'
 import { ProjectStatus } from '@/types/project'
 import { useProjectStatus } from '@/hooks/use-project-status'
 import { toast } from 'sonner'
@@ -32,6 +33,7 @@ interface ProjectInfo {
   illustration_send_count?: number
   review_token?: string | null
   send_count?: number
+  show_colored_to_customer?: boolean
 }
 
 interface ProjectHeaderProps {
@@ -80,11 +82,63 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const [isSendingToCustomer, setIsSendingToCustomer] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
   const [mounted, setMounted] = useState(false)
+  
+  // Settings state
+  const [showColoredToCustomer, setShowColoredToCustomer] = useState(projectInfo.show_colored_to_customer ?? false)
+  const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
 
   // Hydration fix
   useEffect(() => {
     setMounted(true)
   }, [])
+  
+  // Sync settings state when projectInfo changes
+  useEffect(() => {
+    setShowColoredToCustomer(projectInfo.show_colored_to_customer ?? false)
+  }, [projectInfo.show_colored_to_customer])
+  
+  // Handle toggle for showing colored images to customer
+  const handleToggleColoredImages = async (checked: boolean) => {
+    setIsUpdatingSettings(true)
+    try {
+      const response = await fetch(`/api/projects/${projectId}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ show_colored_to_customer: checked })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to update settings')
+      }
+      
+      setShowColoredToCustomer(checked)
+      toast.success(
+        checked 
+          ? 'Colored images now visible to customer' 
+          : 'Colored images hidden from customer',
+        { duration: 3000 }
+      )
+      router.refresh()
+    } catch (error: any) {
+      toast.error('Failed to update settings', {
+        description: error.message || 'An error occurred'
+      })
+      // Revert the toggle
+      setShowColoredToCustomer(!checked)
+    } finally {
+      setIsUpdatingSettings(false)
+    }
+  }
+  
+  // Handle opening customer view
+  const handleOpenCustomerView = () => {
+    if (projectInfo.review_token) {
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin
+      const customerUrl = `${baseUrl}/review/${projectInfo.review_token}?tab=illustrations`
+      window.open(customerUrl, '_blank')
+    }
+  }
 
   const status = projectInfo.status
   const sendCount = projectInfo.illustration_send_count || 0
@@ -507,6 +561,45 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         <span className={`hidden md:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${stage.tagStyle} shadow-sm`}>
           {stage.tag}
         </span>
+      }
+      showSettings={true}
+      settingsContent={
+        <>
+          {/* Customer View Button */}
+          {projectInfo.review_token && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start gap-2 h-9"
+              onClick={handleOpenCustomerView}
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open Customer View
+            </Button>
+          )}
+          
+          {/* Divider */}
+          <div className="h-px bg-slate-100" />
+          
+          {/* Show Colored Images Toggle */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label htmlFor="show-colored" className="text-sm font-medium text-slate-700">
+                Show Colored Images
+              </label>
+              <Switch
+                id="show-colored"
+                checked={showColoredToCustomer}
+                onCheckedChange={handleToggleColoredImages}
+                disabled={isUpdatingSettings}
+              />
+            </div>
+            <p className="text-xs text-slate-500 flex items-start gap-1.5">
+              <Info className="w-3 h-3 mt-0.5 shrink-0" />
+              <span>When enabled, customers see colored illustrations instead of story text on all pages.</span>
+            </p>
+          </div>
+        </>
       }
       actions={
         <Button

@@ -38,6 +38,7 @@ interface CustomerProjectTabsContentProps {
   authorName: string
   characterSendCount: number
   illustrationSendCount: number
+  showColoredToCustomer?: boolean
 }
 
 export function CustomerProjectTabsContent({
@@ -49,7 +50,8 @@ export function CustomerProjectTabsContent({
   projectTitle,
   authorName,
   characterSendCount,
-  illustrationSendCount
+  illustrationSendCount,
+  showColoredToCustomer = false
 }: CustomerProjectTabsContentProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -843,6 +845,7 @@ export function CustomerProjectTabsContent({
                   onAcceptAdminReply={handleAcceptAdminReply}
                   onCustomerFollowUp={handleCustomerFollowUp}
                   onEditFollowUp={handleEditFollowUp}
+                  showColoredToCustomer={showColoredToCustomer}
                 />
               </div>
             )}

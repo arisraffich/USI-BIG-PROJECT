@@ -1,7 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { ProjectTabsContent } from '@/components/admin/ProjectTabsContent'
-import { AdminCustomerViewButton } from '@/components/admin/AdminCustomerViewButton'
 import { Suspense } from 'react'
 
 export const dynamic = 'force-dynamic'
@@ -70,9 +69,6 @@ export default async function ProjectDetailPage({
         projectStatus={projectStatus}
         projectInfo={projectInfo}
       />
-      {projectInfo?.review_token && (
-        <AdminCustomerViewButton reviewToken={projectInfo.review_token} />
-      )}
     </Suspense>
   )
 }

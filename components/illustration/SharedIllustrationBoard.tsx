@@ -107,6 +107,8 @@ export interface SharedIllustrationBoardProps {
     onRemoveComment?: () => Promise<void>
     // Admin Manual Resolve Feature
     onManualResolve?: () => Promise<void>
+    // Customer Display Settings
+    showColoredToCustomer?: boolean
 }
 
 export function SharedIllustrationBoard({
@@ -149,7 +151,9 @@ export function SharedIllustrationBoard({
     onAddComment,
     onRemoveComment,
     // Admin Manual Resolve Feature
-    onManualResolve
+    onManualResolve,
+    // Customer Display Settings
+    showColoredToCustomer = false
 }: SharedIllustrationBoardProps) {
 
     // --------------------------------------------------------------------------
@@ -1293,7 +1297,7 @@ export function SharedIllustrationBoard({
                         {/* ILLUSTRATION HEADER (or PAGE TEXT for customer pages 2+) */}
                         <div className="flex items-center justify-center gap-2 relative bg-slate-50/30">
                             <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase">
-                                {isCustomer && page.page_number > 1 ? 'Page Text' : isAdmin ? 'Illustration' : 'Final Illustration'}
+                                {isCustomer && page.page_number > 1 && !showColoredToCustomer ? 'Page Text' : isAdmin ? 'Illustration' : 'Final Illustration'}
                             </h4>
                             {/* UPLOADED badge - Admin only */}
                             {isAdmin && isManualUpload(illustrationUrl) && (
@@ -1310,8 +1314,8 @@ export function SharedIllustrationBoard({
                                     <input type="file" ref={illustrationInputRef} className="hidden" accept="image/*" onChange={handleAdminUploadSelect('illustration')} />
                                 </>
                             )}
-                            {/* Download button only for admin or customer page 1 */}
-                            {!(isCustomer && page.page_number > 1) && illustrationUrl && (
+                            {/* Download button only for admin or customer page 1 (or all pages if showColoredToCustomer) */}
+                            {!(isCustomer && page.page_number > 1 && !showColoredToCustomer) && illustrationUrl && (
                                 <button onClick={() => handleDownload(illustrationUrl!, `Page-${page.page_number}-Illustration.jpg`)} className="text-slate-400 hover:text-purple-600 transition-colors ml-2" title="Download Illustration">
                                     <Download className="w-4 h-4" />
                                 </button>
@@ -1492,8 +1496,8 @@ export function SharedIllustrationBoard({
 
                         {/* 2. ILLUSTRATION BLOCK (or PAGE TEXT for customer pages 2+) */}
                         <div className="flex flex-col items-center md:space-y-0 bg-slate-50/10 relative min-h-[300px] md:min-h-0">
-                            {/* MOBILE HEADER FOR ILLUSTRATION (Overlay) - Only for admin or customer page 1 */}
-                            {!(isCustomer && page.page_number > 1) && (
+                            {/* MOBILE HEADER FOR ILLUSTRATION (Overlay) - Only for admin or customer page 1 (or all pages if showColoredToCustomer) */}
+                            {!(isCustomer && page.page_number > 1 && !showColoredToCustomer) && (
                                 <div className="absolute top-0 left-0 right-0 z-10 flex items-center gap-2 md:hidden p-3 bg-gradient-to-b from-black/40 to-transparent">
                                     <span className="text-xs font-bold tracking-wider text-white/90 uppercase shadow-sm">Colored</span>
 
@@ -1524,15 +1528,15 @@ export function SharedIllustrationBoard({
                                 </div>
                             )}
 
-                            {/* MOBILE HEADER FOR PAGE TEXT (Customer pages 2+) */}
-                            {isCustomer && page.page_number > 1 && (
+                            {/* MOBILE HEADER FOR PAGE TEXT (Customer pages 2+ when showColoredToCustomer is off) */}
+                            {isCustomer && page.page_number > 1 && !showColoredToCustomer && (
                                 <div className="absolute top-0 left-0 right-0 z-10 flex items-center gap-2 md:hidden p-3 bg-gradient-to-b from-black/40 to-transparent">
                                     <span className="text-xs font-bold tracking-wider text-white/90 uppercase shadow-sm">Page Text</span>
                                 </div>
                             )}
 
-                            {/* CONTENT: Page Text for customer pages 2+, Illustration otherwise */}
-                            {isCustomer && page.page_number > 1 ? (
+                            {/* CONTENT: Page Text for customer pages 2+ (when showColoredToCustomer is off), Illustration otherwise */}
+                            {isCustomer && page.page_number > 1 && !showColoredToCustomer ? (
                                 /* PAGE TEXT VIEW for customer pages 2+ */
                                 <div className="w-full h-full p-8 bg-white text-slate-900 overflow-y-auto">
                                     <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">Page {page.page_number}</span>
