@@ -108,7 +108,7 @@ export function UnifiedIllustrationSidebar({
             </div>
 
             {/* Mobile Bottom Navigation */}
-            <div className="block lg:hidden fixed bottom-6 left-0 right-0 z-50 pointer-events-none">
+            <div className="block lg:hidden fixed bottom-1 left-0 right-0 z-50 pointer-events-none">
                 <div className="flex items-center gap-2 overflow-x-auto pointer-events-auto px-4 py-2 [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-400/30 [&::-webkit-scrollbar-thumb]:rounded-full">
                     {filterVisiblePages(pages).map((page) => {
                         const isActive = activePageId === page.id
