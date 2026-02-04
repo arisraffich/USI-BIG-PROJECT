@@ -241,31 +241,6 @@ export function CustomerProjectHeader({
                 </Button>
               )}
 
-              {/* Approve Illustration Button (Mobile Only - shown in actions) */}
-              {showIllustrationsTab && showSubmitButton && (
-                <div className="md:hidden">
-                  <Button
-                    onClick={onSubmit}
-                    disabled={isSubmitting || isSubmitDisabled || isApprovedStage}
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-semibold uppercase"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        SUBMITTING...
-                      </>
-                    ) : isApprovedStage ? (
-                      <>
-                        <Check className="w-4 h-4 mr-2" />
-                        {approvedButtonText}
-                      </>
-                    ) : (
-                      approveButtonText
-                    )}
-                  </Button>
-                </div>
-              )}
             </>
           }
         />
