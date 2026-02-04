@@ -132,17 +132,6 @@ export function UnifiedIllustrationSidebar({
                                 {failedPageIds.includes(page.id) && (
                                     <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 border border-white animate-pulse" />
                                 )}
-                                {/* Illustration type indicator - mobile (bottom-right corner) */}
-                                {page.illustration_type === 'spot' && !failedPageIds.includes(page.id) && (
-                                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-pink-500 border border-white text-[6px] font-bold text-white flex items-center justify-center" title="Spot">
-                                        S
-                                    </span>
-                                )}
-                                {(page.illustration_type === 'spread' || (!page.illustration_type && page.is_spread)) && !failedPageIds.includes(page.id) && (
-                                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-purple-500 border border-white text-[6px] font-bold text-white flex items-center justify-center" title="Spread">
-                                        2
-                                    </span>
-                                )}
                                 {/* Feedback indicator - Admin only (mobile), only for generated pages */}
                                 {mode === 'admin' && page.illustration_url && (
                                     page.feedback_notes && !page.is_resolved ? (
