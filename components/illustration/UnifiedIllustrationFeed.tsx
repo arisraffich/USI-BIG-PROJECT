@@ -277,7 +277,7 @@ export function UnifiedIllustrationFeed({
     return (
         <div
             ref={scrollContainerRef}
-            className={`${heightClass} w-full overflow-y-auto pb-20`}
+            className={`${heightClass} w-full overflow-y-auto pb-20 md:snap-y md:snap-proximity`}
         >
             {visiblePages.map(page => {
                 // CALCULATE ILLUSTRATED PAGES FOR ENVIRONMENT REFERENCE
@@ -296,7 +296,7 @@ export function UnifiedIllustrationFeed({
                         }}
                         id={`page-${page.id}`}
                         data-page-id={page.id}
-                        className="min-h-screen w-full"
+                        className="min-h-screen w-full md:snap-start"
                     >
                         <SharedIllustrationBoard
                             mode={mode}

@@ -1252,19 +1252,36 @@ export function SharedIllustrationBoard({
 
                         {/* SKETCH HEADER */}
                         {/* SKETCH HEADER */}
-                        <div className="flex items-center justify-center gap-2 relative">
+                        <div className="flex items-center justify-between gap-2 px-3">
+                            {/* LEFT: Badge */}
+                            <div className="flex items-center gap-2 min-w-[80px]">
+                                {isAdmin && isManualUpload(sketchUrl) && (
+                                    <span className={`px-1.5 py-0.5 text-[9px] font-bold bg-rose-50 text-rose-600 rounded border border-rose-100 leading-none transition-opacity ${sketchViewMode === 'text' ? 'opacity-0' : ''}`}>
+                                        UPLOADED
+                                    </span>
+                                )}
+                            </div>
 
-                            {/* Sketch/Text Toggle - Show for admin, or customer when colored images enabled */}
+                            {/* CENTER: Sketch/Story Toggle */}
                             {(isAdmin || showColoredToCustomer) ? (
                                 <div className="flex items-center gap-2">
-                                    <label className="text-xs font-bold tracking-wider text-slate-900 uppercase w-12">
-                                        {sketchViewMode === 'sketch' ? 'Sketch' : 'Text'}
-                                    </label>
+                                    <button
+                                        onClick={() => setSketchViewMode('sketch')}
+                                        className={`text-xs font-bold tracking-wider uppercase transition-colors ${sketchViewMode === 'sketch' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600 cursor-pointer'}`}
+                                    >
+                                        Sketch
+                                    </button>
                                     <Switch
                                         checked={sketchViewMode === 'text'}
                                         onCheckedChange={(checked) => setSketchViewMode(checked ? 'text' : 'sketch')}
                                         className="!bg-slate-300"
                                     />
+                                    <button
+                                        onClick={() => setSketchViewMode('text')}
+                                        className={`text-xs font-bold tracking-wider uppercase transition-colors ${sketchViewMode === 'text' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600 cursor-pointer'}`}
+                                    >
+                                        Story
+                                    </button>
                                 </div>
                             ) : (
                                 <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase">
@@ -1272,54 +1289,56 @@ export function SharedIllustrationBoard({
                                 </h4>
                             )}
 
-                            {/* UPLOADED badge - Admin only */}
-                            {isAdmin && isManualUpload(sketchUrl) && (
-                                <span className={`absolute top-1/2 -translate-y-1/2 right-12 lg:right-16 px-1.5 py-0.5 text-[9px] font-bold bg-rose-50 text-rose-600 rounded border border-rose-100 leading-none transition-opacity ${sketchViewMode === 'text' ? 'opacity-0' : ''}`}>
-                                    UPLOADED
-                                </span>
-                            )}
-                            {/* Admin Upload Button (From Admin Backup) - Invisible in Text Mode to prevent layout shift */}
-                            {isAdmin && onUpload && (
-                                <div className={`transition-opacity ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`}>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700" onClick={() => sketchInputRef.current?.click()} title="Upload Sketch">
-                                        <Upload className="w-4 h-4" />
-                                    </Button>
-                                    <input type="file" ref={sketchInputRef} className="hidden" accept="image/*" onChange={handleAdminUploadSelect('sketch')} />
-                                </div>
-                            )}
-                            {sketchUrl && (
-                                <button onClick={() => handleDownload(sketchUrl!, `Page-${page.page_number}-Sketch.jpg`)} className={`text-slate-400 hover:text-purple-600 transition-colors ml-2 transition-opacity ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`} title="Download Sketch">
-                                    <Download className="w-4 h-4" />
-                                </button>
-                            )}
+                            {/* RIGHT: Buttons */}
+                            <div className="flex items-center gap-2 min-w-[80px] justify-end">
+                                {isAdmin && onUpload && (
+                                    <div className={`transition-opacity ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`}>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700" onClick={() => sketchInputRef.current?.click()} title="Upload Sketch">
+                                            <Upload className="w-4 h-4" />
+                                        </Button>
+                                        <input type="file" ref={sketchInputRef} className="hidden" accept="image/*" onChange={handleAdminUploadSelect('sketch')} />
+                                    </div>
+                                )}
+                                {sketchUrl && (
+                                    <button onClick={() => handleDownload(sketchUrl!, `Page-${page.page_number}-Sketch.jpg`)} className={`h-8 w-8 rounded-full bg-black/5 text-slate-500 hover:bg-black/10 hover:text-purple-600 transition-colors flex items-center justify-center ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`} title="Download Sketch">
+                                        <Download className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         {/* ILLUSTRATION HEADER (or PAGE TEXT for customer pages 2+) */}
-                        <div className="flex items-center justify-center gap-2 relative bg-slate-50/30">
+                        <div className="flex items-center justify-between gap-2 px-3 bg-slate-50/30">
+                            {/* LEFT: Badge */}
+                            <div className="flex items-center gap-2 min-w-[80px]">
+                                {isAdmin && isManualUpload(illustrationUrl) && (
+                                    <span className="px-1.5 py-0.5 text-[9px] font-bold bg-rose-50 text-rose-600 rounded border border-rose-100 leading-none">
+                                        UPLOADED
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* CENTER: Title */}
                             <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase">
                                 {isCustomer && page.page_number > 1 && !showColoredToCustomer ? 'Page Text' : isAdmin ? 'Illustration' : 'Final Illustration'}
                             </h4>
-                            {/* UPLOADED badge - Admin only */}
-                            {isAdmin && isManualUpload(illustrationUrl) && (
-                                <span className="absolute top-1/2 -translate-y-1/2 right-12 lg:right-16 px-1.5 py-0.5 text-[9px] font-bold bg-rose-50 text-rose-600 rounded border border-rose-100 leading-none">
-                                    UPLOADED
-                                </span>
-                            )}
-                            {/* Admin Upload Button (From Admin Backup) */}
-                            {isAdmin && onUpload && (
-                                <>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700" onClick={() => illustrationInputRef.current?.click()} title="Upload Illustration">
-                                        <Upload className="w-4 h-4" />
-                                    </Button>
-                                    <input type="file" ref={illustrationInputRef} className="hidden" accept="image/*" onChange={handleAdminUploadSelect('illustration')} />
-                                </>
-                            )}
-                            {/* Download button only for admin or customer page 1 (or all pages if showColoredToCustomer) */}
-                            {!(isCustomer && page.page_number > 1 && !showColoredToCustomer) && illustrationUrl && (
-                                <button onClick={() => handleDownload(illustrationUrl!, `Page-${page.page_number}-Illustration.jpg`)} className="text-slate-400 hover:text-purple-600 transition-colors ml-2" title="Download Illustration">
-                                    <Download className="w-4 h-4" />
-                                </button>
-                            )}
+
+                            {/* RIGHT: Buttons */}
+                            <div className="flex items-center gap-2 min-w-[80px] justify-end">
+                                {isAdmin && onUpload && (
+                                    <>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700" onClick={() => illustrationInputRef.current?.click()} title="Upload Illustration">
+                                            <Upload className="w-4 h-4" />
+                                        </Button>
+                                        <input type="file" ref={illustrationInputRef} className="hidden" accept="image/*" onChange={handleAdminUploadSelect('illustration')} />
+                                    </>
+                                )}
+                                {!(isCustomer && page.page_number > 1 && !showColoredToCustomer) && illustrationUrl && (
+                                    <button onClick={() => handleDownload(illustrationUrl!, `Page-${page.page_number}-Illustration.jpg`)} className="h-8 w-8 rounded-full bg-black/5 text-slate-500 hover:bg-black/10 hover:text-purple-600 transition-colors flex items-center justify-center" title="Download Illustration">
+                                        <Download className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -1381,17 +1400,26 @@ export function SharedIllustrationBoard({
                             {/* MOBILE HEADER FOR SKETCH (Overlay) */}
                             <div className="absolute top-0 left-0 right-0 z-10 flex items-center gap-2 md:hidden pt-1.5 px-3 pb-3 bg-gradient-to-b from-black/40 to-transparent">
 
-                                {/* Sketch/Text Toggle - Mobile: Show for admin, or customer when colored images enabled */}
+                                {/* Sketch/Story Toggle - Mobile: Show for admin, or customer when colored images enabled */}
                                 {(isAdmin || showColoredToCustomer) ? (
                                     <div className="flex items-center gap-2">
-                                        <span className="text-xs font-bold tracking-wider text-white/90 uppercase w-12">
-                                            {sketchViewMode === 'sketch' ? 'Sketch' : 'Text'}
-                                        </span>
+                                        <button
+                                            onClick={() => setSketchViewMode('sketch')}
+                                            className={`text-xs font-bold tracking-wider uppercase transition-colors ${sketchViewMode === 'sketch' ? 'text-white' : 'text-white/50 active:text-white/70'}`}
+                                        >
+                                            Sketch
+                                        </button>
                                         <Switch
                                             checked={sketchViewMode === 'text'}
                                             onCheckedChange={(checked) => setSketchViewMode(checked ? 'text' : 'sketch')}
                                             className="!bg-slate-400"
                                         />
+                                        <button
+                                            onClick={() => setSketchViewMode('text')}
+                                            className={`text-xs font-bold tracking-wider uppercase transition-colors ${sketchViewMode === 'text' ? 'text-white' : 'text-white/50 active:text-white/70'}`}
+                                        >
+                                            Story
+                                        </button>
                                     </div>
                                 ) : (
                                     <span className="text-xs font-bold tracking-wider text-white/90 uppercase">
