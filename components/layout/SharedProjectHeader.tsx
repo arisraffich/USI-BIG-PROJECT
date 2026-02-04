@@ -35,6 +35,7 @@ interface SharedProjectHeaderProps {
     actions?: ReactNode   // Right side buttons (Save, Send, etc.)
     statusTag?: ReactNode // Status badge
     settingsContent?: ReactNode // Content to show in settings panel
+    mobileLeftActions?: ReactNode // Actions to show next to hamburger menu on mobile only
 
     // Configuration
     dashboardLink?: {
@@ -55,6 +56,7 @@ export function SharedProjectHeader({
     actions,
     statusTag,
     settingsContent,
+    mobileLeftActions,
     dashboardLink,
     showSettings = false
 }: SharedProjectHeaderProps) {
@@ -161,6 +163,13 @@ export function SharedProjectHeader({
                             )}
                         </DropdownMenuContent>
                     </DropdownMenu>
+
+                    {/* MOBILE LEFT ACTIONS - Show next to hamburger on mobile only */}
+                    {mobileLeftActions && (
+                        <div className="flex md:hidden items-center gap-2">
+                            {mobileLeftActions}
+                        </div>
+                    )}
 
                     {/* DESKTOP TITLE INFO */}
                     {/* Hidden on Mobile as per request/design to save space */}

@@ -46,6 +46,7 @@ interface ProjectHeaderProps {
   onCreateIllustrations?: () => void
   generatedIllustrationCount?: number
   centerContent?: React.ReactNode
+  mobileLeftActions?: React.ReactNode
   hasUnresolvedFeedback?: boolean
   hasResolvedFeedback?: boolean
 }
@@ -74,7 +75,7 @@ function isInIllustrationPhase(status: ProjectStatus): boolean {
   ].includes(status)
 }
 
-export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations, generatedIllustrationCount = 0, centerContent, hasUnresolvedFeedback = false, hasResolvedFeedback = false }: ProjectHeaderProps) {
+export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations, generatedIllustrationCount = 0, centerContent, mobileLeftActions, hasUnresolvedFeedback = false, hasResolvedFeedback = false }: ProjectHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -557,6 +558,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         onClick: handleDashboardClick
       }}
       centerContent={centerContent}
+      mobileLeftActions={mobileLeftActions}
       statusTag={
         <span className={`hidden md:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${stage.tagStyle} shadow-sm`}>
           {stage.tag}
