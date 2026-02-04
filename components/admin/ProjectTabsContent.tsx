@@ -168,12 +168,6 @@ export function ProjectTabsContent({
   const [characterForms, setCharacterForms] = useState<{ [id: string]: { data: any; isValid: boolean } }>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   
-  // Push to Customer State (Illustrations)
-  const [isPushDialogOpen, setIsPushDialogOpen] = useState(false)
-  const [isPushing, setIsPushing] = useState(false)
-  
-  // Karine Request State
-  const [isSendingKarineRequest, setIsSendingKarineRequest] = useState(false)
   
   // Push Characters to Customer State
   const [isCharPushDialogOpen, setIsCharPushDialogOpen] = useState(false)
@@ -276,52 +270,6 @@ export function ProjectTabsContent({
     } catch (e) {
       console.error('Failed to skip to illustrations:', e)
       toast.error('Failed to skip to illustrations')
-    }
-  }
-
-  // Push to Customer (Silent Update) - Illustrations
-  const handlePushToCustomer = async () => {
-    setIsPushing(true)
-    try {
-      const response = await fetch(`/api/projects/${projectId}/push-to-customer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-      
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Push failed')
-      }
-      
-      const result = await response.json()
-      toast.success(result.message || 'Changes pushed to customer')
-      setIsPushDialogOpen(false)
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to push changes')
-    } finally {
-      setIsPushing(false)
-    }
-  }
-
-  // Send Karine Request (1st Illustration Coloring)
-  const handleSendKarineRequest = async () => {
-    setIsSendingKarineRequest(true)
-    try {
-      const response = await fetch(`/api/projects/${projectId}/send-karine-request`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-      
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to send email')
-      }
-      
-      toast.success('Email sent to Karine')
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to send email')
-    } finally {
-      setIsSendingKarineRequest(false)
     }
   }
 
@@ -610,131 +558,7 @@ export function ProjectTabsContent({
                 </div>
               )}
               
-              {/* Illustrations Push + Karine Buttons - Desktop Only (hidden on mobile) */}
-              {activeTab === 'illustrations' && (
-                <div className="hidden md:flex items-center gap-2">
-                  {/* Push Button - Only show after illustrations sent */}
-                  {(projectInfo?.illustration_send_count || 0) > 0 && (
-                    <AlertDialog open={isPushDialogOpen} onOpenChange={setIsPushDialogOpen}>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 text-xs px-3 border-blue-300 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                        >
-                          <Upload className="w-3 h-3 mr-1.5" />
-                          Push
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Push Changes to Customer?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will silently update all illustrations on the customer&apos;s side without sending any notifications. The customer will see the latest versions when they refresh or revisit the page.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel disabled={isPushing}>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={handlePushToCustomer}
-                            disabled={isPushing}
-                            className="bg-blue-600 hover:bg-blue-700"
-                          >
-                            {isPushing ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Pushing...
-                              </>
-                            ) : (
-                              'Push Changes'
-                            )}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
-                  
-                  {/* Karine Request Button - Only show when Page 1 has illustration */}
-                  {localPages?.find(p => p.page_number === 1)?.illustration_url && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 text-xs px-3 border-blue-300 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                      onClick={handleSendKarineRequest}
-                      disabled={isSendingKarineRequest}
-                    >
-                      {isSendingKarineRequest ? (
-                        <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
-                      ) : null}
-                      Karine
-                    </Button>
-                  )}
-                </div>
-              )}
             </>
-          }
-          mobileLeftActions={
-            /* Mobile Only: Push + Karine buttons next to hamburger */
-            activeTab === 'illustrations' ? (
-              <>
-                {/* Push Button - Only show after illustrations sent */}
-                {(projectInfo?.illustration_send_count || 0) > 0 && (
-                  <AlertDialog open={isPushDialogOpen} onOpenChange={setIsPushDialogOpen}>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs px-2 border-blue-300 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                      >
-                        <Upload className="w-3 h-3 mr-1" />
-                        Push
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Push Changes to Customer?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will silently update all illustrations on the customer&apos;s side without sending any notifications. The customer will see the latest versions when they refresh or revisit the page.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isPushing}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handlePushToCustomer}
-                          disabled={isPushing}
-                          className="bg-blue-600 hover:bg-blue-700"
-                        >
-                          {isPushing ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Pushing...
-                            </>
-                          ) : (
-                            'Push Changes'
-                          )}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-                
-                {/* Karine Request Button - Only show when Page 1 has illustration */}
-                {localPages?.find(p => p.page_number === 1)?.illustration_url && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs px-2 border-blue-300 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                    onClick={handleSendKarineRequest}
-                    disabled={isSendingKarineRequest}
-                  >
-                    {isSendingKarineRequest ? (
-                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                    ) : null}
-                    Karine
-                  </Button>
-                )}
-              </>
-            ) : null
           }
         />
       }

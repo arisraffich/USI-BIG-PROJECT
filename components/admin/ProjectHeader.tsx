@@ -6,7 +6,7 @@ import { useTransition, useState, useEffect } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Home, Loader2, Send, Menu, FileText, Sparkles, ArrowLeft, Download, ExternalLink, Info } from 'lucide-react'
+import { Home, Loader2, Send, Menu, FileText, Sparkles, ArrowLeft, Download, ExternalLink, Info, Upload, Palette } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
@@ -16,6 +16,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Switch } from '@/components/ui/switch'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { ProjectStatus } from '@/types/project'
 import { useProjectStatus } from '@/hooks/use-project-status'
 import { toast } from 'sonner'
@@ -46,7 +57,6 @@ interface ProjectHeaderProps {
   onCreateIllustrations?: () => void
   generatedIllustrationCount?: number
   centerContent?: React.ReactNode
-  mobileLeftActions?: React.ReactNode
   hasUnresolvedFeedback?: boolean
   hasResolvedFeedback?: boolean
 }
@@ -75,7 +85,7 @@ function isInIllustrationPhase(status: ProjectStatus): boolean {
   ].includes(status)
 }
 
-export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations, generatedIllustrationCount = 0, centerContent, mobileLeftActions, hasUnresolvedFeedback = false, hasResolvedFeedback = false }: ProjectHeaderProps) {
+export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations, generatedIllustrationCount = 0, centerContent, hasUnresolvedFeedback = false, hasResolvedFeedback = false }: ProjectHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -87,6 +97,11 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   // Settings state
   const [showColoredToCustomer, setShowColoredToCustomer] = useState(projectInfo.show_colored_to_customer ?? false)
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
+  
+  // Push & Coloring Request state
+  const [isPushDialogOpen, setIsPushDialogOpen] = useState(false)
+  const [isPushing, setIsPushing] = useState(false)
+  const [isSendingColoringRequest, setIsSendingColoringRequest] = useState(false)
 
   // Hydration fix
   useEffect(() => {
@@ -138,6 +153,52 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin
       const customerUrl = `${baseUrl}/review/${projectInfo.review_token}?tab=illustrations`
       window.open(customerUrl, '_blank')
+    }
+  }
+
+  // Push to Customer (Silent Update) - Illustrations
+  const handlePushToCustomer = async () => {
+    setIsPushing(true)
+    try {
+      const response = await fetch(`/api/projects/${projectId}/push-to-customer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Push failed')
+      }
+      
+      const result = await response.json()
+      toast.success(result.message || 'Changes pushed to customer')
+      setIsPushDialogOpen(false)
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to push changes')
+    } finally {
+      setIsPushing(false)
+    }
+  }
+
+  // Send Page 1 Coloring Request
+  const handleSendColoringRequest = async () => {
+    setIsSendingColoringRequest(true)
+    try {
+      const response = await fetch(`/api/projects/${projectId}/send-karine-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to send request')
+      }
+      
+      toast.success('Coloring request sent')
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to send request')
+    } finally {
+      setIsSendingColoringRequest(false)
     }
   }
 
@@ -558,7 +619,6 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         onClick: handleDashboardClick
       }}
       centerContent={centerContent}
-      mobileLeftActions={mobileLeftActions}
       statusTag={
         <span className={`hidden md:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${stage.tagStyle} shadow-sm`}>
           {stage.tag}
@@ -581,6 +641,80 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
           )}
           
           {/* Divider */}
+          <div className="h-px bg-slate-100" />
+          
+          {/* Push Changes Button - Only show after illustrations sent */}
+          {(projectInfo.illustration_send_count || 0) > 0 && (
+            <div className="space-y-1.5">
+              <AlertDialog open={isPushDialogOpen} onOpenChange={setIsPushDialogOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start gap-2 h-9"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Push Changes
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Push Changes to Customer?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will silently update all illustrations on the customer&apos;s side without sending any notifications. The customer will see the latest versions when they refresh or revisit the page.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isPushing}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handlePushToCustomer}
+                      disabled={isPushing}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {isPushing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Pushing...
+                        </>
+                      ) : (
+                        'Push Changes'
+                      )}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              <p className="text-xs text-slate-500 flex items-start gap-1.5 px-1">
+                <Info className="w-3 h-3 mt-0.5 shrink-0" />
+                <span>Silently update customer&apos;s illustrations without email.</span>
+              </p>
+            </div>
+          )}
+          
+          {/* Request Page 1 Coloring - Only show when illustrations exist */}
+          {generatedIllustrationCount > 0 && (
+            <div className="space-y-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start gap-2 h-9"
+                onClick={handleSendColoringRequest}
+                disabled={isSendingColoringRequest}
+              >
+                {isSendingColoringRequest ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Palette className="w-4 h-4" />
+                )}
+                Request Page 1 Coloring
+              </Button>
+              <p className="text-xs text-slate-500 flex items-start gap-1.5 px-1">
+                <Info className="w-3 h-3 mt-0.5 shrink-0" />
+                <span>Send Page 1 sketch for coloring.</span>
+              </p>
+            </div>
+          )}
+          
+          {/* Divider before toggle */}
           <div className="h-px bg-slate-100" />
           
           {/* Show Colored Images Toggle */}
