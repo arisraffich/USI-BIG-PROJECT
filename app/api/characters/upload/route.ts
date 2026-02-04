@@ -79,6 +79,7 @@ export async function POST(request: Request) {
             .update({
                 image_url: publicUrl,
                 is_resolved: true,
+                updated_at: new Date().toISOString(),
             })
             .eq('id', characterId)
 

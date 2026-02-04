@@ -207,6 +207,7 @@ INSTRUCTION: This image shows what the character should LOOK LIKE physically.
                 image_url: publicUrl,
                 generation_prompt: prompt,
                 is_resolved: true,
+                updated_at: new Date().toISOString(),
             })
             .eq('id', character.id)
 
