@@ -1,20 +1,11 @@
 'use client'
 
-import { UnifiedHeaderShell } from '@/components/layout/UnifiedHeaderShell'
 import { SharedProjectHeader } from '@/components/layout/SharedProjectHeader'
 import { useTransition, useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
-import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Home, Loader2, Send, Menu, FileText, Sparkles, ArrowLeft, Download, ExternalLink, Info, Upload, Palette, Pencil, CheckCircle2, XCircle, AlertTriangle, RefreshCw, Mail } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { Home, Loader2, Send, FileText, Sparkles, Download, ExternalLink, Info, Upload, Palette, Pencil, CheckCircle2, XCircle, AlertTriangle, RefreshCw, Mail } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Switch } from '@/components/ui/switch'
 import {
   AlertDialog,
@@ -39,7 +30,6 @@ import { ProjectStatus } from '@/types/project'
 import { useProjectStatus } from '@/hooks/use-project-status'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
-import { MobilePageNavigator } from '@/components/ui/mobile-page-navigator'
 import { BADGE_COLORS } from '@/lib/constants/statusBadgeConfig'
 
 interface ProjectInfo {

@@ -401,7 +401,8 @@ export function SharedIllustrationBoard({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     illustrationUrl: page.illustration_url,
-                    pageNumber: page.page_number
+                    pageNumber: page.page_number,
+                    projectId,
                 })
             })
 
