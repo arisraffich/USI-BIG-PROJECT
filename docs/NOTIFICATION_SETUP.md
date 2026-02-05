@@ -1,183 +1,68 @@
 # Notification Setup Guide
 
-This guide will help you set up email (Gmail), SMS (Quo.com), and Slack notifications for the USI Platform.
+The USI Platform sends notifications via three channels: Email (Resend), SMS (Quo.com), and Slack.
 
-## 📧 Step 1: Gmail Email Setup
+## 1. Email (Resend)
 
-### Prerequisites
-- Gmail account: `info@usillustrations.com`
-- Two-Factor Authentication (2FA) enabled
+### Setup
 
-### Steps
-
-1. **Enable 2-Step Verification:**
-   - Go to [Google Account Security](https://myaccount.google.com/security)
-   - Under "Signing in to Google," click "2-Step Verification"
-   - Follow the prompts to enable it
-
-2. **Generate App Password:**
-   - After enabling 2FA, return to [Google Account Security](https://myaccount.google.com/security)
-   - Click "App Passwords" (under "Signing in to Google")
-   - Select "Mail" as the app
-   - Select "Other (Custom name)" as device
-   - Enter name: "USI Platform Email"
-   - Click "Generate"
-   - **Copy the 16-character password** (you'll need this!)
-
-3. **Add to .env.local:**
-   ```env
-   SMTP_HOST=smtp.gmail.com
-   SMTP_PORT=587
-   SMTP_USERNAME=info@usillustrations.com
-   SMTP_PASSWORD=your-16-character-app-password-here
-   ```
-
-### Test
-Visit: `http://localhost:3000/api/notifications/test` to test email sending.
-
----
-
-## 📱 Step 2: Quo.com SMS Setup
-
-### Prerequisites
-- Quo.com account (formerly OpenPhone)
-- Active phone number in Quo.com
-
-### Steps
-
-1. **Get API Key:**
-   - Log in to [Quo.com](https://quo.com)
-   - Go to Settings → API (or Developer Settings)
-   - Generate a new API key
-   - **Copy the API key**
-
-2. **Get Your Phone Number:**
-   - In Quo.com dashboard, find your phone number
-   - Format: E.164 format (e.g., `+1234567890`)
-   - **Copy the phone number**
-
-3. **Add to .env.local:**
-   ```env
-   QUO_API_KEY=your-api-key-here
-   QUO_PHONE_NUMBER=+1234567890
-   ```
-
-### Test
-Visit: `http://localhost:3000/api/notifications/test` to test SMS sending.
-(You'll need to set `TEST_PHONE_NUMBER` in .env.local first)
-
----
-
-## 💬 Step 3: Slack Webhook Setup
-
-### Prerequisites
-- Slack workspace
-- Admin access (or permission to create apps)
-
-### Steps
-
-1. **Create Incoming Webhook:**
-   - Go to [Slack API - Incoming Webhooks](https://api.slack.com/messaging/webhooks)
-   - Click "Create New App" (or use existing app)
-   - Select your workspace
-   - Click "Incoming Webhooks"
-   - Toggle "Activate Incoming Webhooks" to ON
-   - Click "Add New Webhook to Workspace"
-   - Select the channel where you want notifications
-   - Click "Allow"
-   - **Copy the Webhook URL** (starts with `https://hooks.slack.com/services/...`)
-
-2. **Add to .env.local:**
-   ```env
-   SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
-   ```
-
-### Test
-Visit: `http://localhost:3000/api/notifications/test` to test Slack notifications.
-
----
-
-## ✅ Verification
-
-After setting up all three services, test them:
-
-```bash
-curl http://localhost:3000/api/notifications/test
-```
-
-You should see:
-```json
-{
-  "success": true,
-  "results": {
-    "email": { "success": true, "message": "..." },
-    "sms": { "success": true, "message": "..." },
-    "slack": { "success": true, "message": "..." }
-  }
-}
-```
-
----
-
-## 🔧 Troubleshooting
-
-### Email Issues
-- **"Invalid login"**: Make sure you're using the App Password, not your regular Gmail password
-- **"Connection timeout"**: Check firewall/network settings
-- **"Authentication failed"**: Verify 2FA is enabled and App Password is correct
-
-### SMS Issues
-- **"401 Unauthorized"**: Check your Quo.com API key
-- **"Invalid phone number"**: Ensure phone number is in E.164 format (`+1234567890`)
-- **"API endpoint not found"**: Quo.com may use a different endpoint - check their latest docs
-
-### Slack Issues
-- **"invalid_payload"**: Check webhook URL format
-- **"channel_not_found"**: Verify the webhook is for the correct channel
-- **"webhook_inactive"**: Recreate the webhook in Slack
-
----
-
-## 📝 Complete .env.local Example
+1. Create a [Resend](https://resend.com) account
+2. Add and verify your sending domain
+3. Generate an API key
+4. Add to `.env.local`:
 
 ```env
-# ... existing variables ...
-
-# Email (Gmail SMTP)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USERNAME=info@usillustrations.com
-SMTP_PASSWORD=abcd efgh ijkl mnop
-
-# SMS (Quo.com)
-QUO_API_KEY=your-quo-api-key
-QUO_PHONE_NUMBER=+1234567890
-
-# Slack
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR_WORKSPACE_ID/YOUR_CHANNEL_ID/YOUR_TOKEN
-
-# Optional: For testing SMS
-TEST_PHONE_NUMBER=+1234567890
+RESEND_API_KEY=re_your-api-key-here
 ```
 
----
+### What gets emailed
+- Customer review links (when admin sends project for review)
+- Approval confirmation emails
+- ZIP file delivery to `info@usillustrations.com` (sketches and line art)
 
-## 🚀 Next Steps
+## 2. SMS (Quo.com) - Optional
 
-Once all notifications are configured:
-1. Test each service individually
-2. Test the complete workflow (create project → send notifications)
-3. Monitor logs for any issues
-4. Set up error alerts if needed
+### Setup
 
+1. Create a [Quo.com](https://quo.com) account (formerly OpenPhone)
+2. Get your API key from Settings > API
+3. Get your phone number in E.164 format (e.g., `+1234567890`)
+4. Add to `.env.local`:
 
+```env
+QUO_API_KEY=your-api-key-here
+QUO_PHONE_NUMBER=+1234567890
+```
 
+### What gets sent via SMS
+- Customer notification when project is ready for review
 
+## 3. Slack Webhooks - Optional
 
+### Setup
 
+1. Go to [Slack API Apps](https://api.slack.com/apps)
+2. Create a new app (or use existing) for your workspace
+3. Enable Incoming Webhooks
+4. Add a webhook to your desired channel
+5. Copy the webhook URL
+6. Add to `.env.local`:
 
+```env
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+```
 
+### What gets sent to Slack
+- New project created
+- Characters submitted by customer
+- Characters approved/revision requested
+- Illustrations sent for review
+- Customer feedback received
+- Project approved
+- Error alerts
 
+See `docs/SLACK_SETUP_GUIDE.md` for detailed Slack setup instructions.
 
+## Verification
 
-
+All notification services fail gracefully - if one service is not configured or fails, the others still work. Check server logs for `[Notification]` prefixed messages to debug issues.

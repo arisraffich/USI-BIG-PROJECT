@@ -1,9 +1,21 @@
 # Children's Book Illustration Project Management Platform
-## Final Confirmed Technical Specifications
+## Original Technical Specifications (Historical)
 
-**Document Version:** Final
+**Document Version:** Final (Original)
 **Date:** December 2024
-**Status:** ✅ Confirmed and In Development
+**Status:** ⚠️ HISTORICAL - This was the original planning document. The app has evolved significantly since.
+
+> **For current documentation, see [README.md](../README.md) and [docs/SETUP.md](SETUP.md).**
+
+### Key differences from this original spec:
+> - **Framework:** Next.js 16 (was 14)
+> - **AI Models:** OpenAI GPT-5.2 + Google Gemini 3 Pro (was GPT-4o + Replicate)
+> - **Email:** Resend (was Gmail SMTP)
+> - **Deployment:** Railway (was Cloudflare Pages)
+> - **Colored Illustrations:** Fully implemented (was "Phase 2 - not included")
+> - **Line Art:** AI generation + Potrace vectorization (not in original spec)
+> - **Sketch Workflow:** Implemented with customer review, feedback threads, approval
+> - **All phases:** Complete and in production
 
 ---
 

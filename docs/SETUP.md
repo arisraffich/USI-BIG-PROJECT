@@ -1,108 +1,126 @@
 # USI Platform Setup Guide
 
-## ✅ Completed Steps
+## Prerequisites
 
-1. ✅ Next.js project created
-2. ✅ Dependencies installed
-3. ✅ Supabase database schema created
-4. ✅ Storage buckets created
-5. ✅ Project files structure created
+- Node.js 20+
+- npm
+- A Supabase project with Storage buckets configured
+- API keys for OpenAI, Google AI (Gemini), and Resend
 
-## 📝 Required: Create .env.local File
+## 1. Create `.env.local`
 
-**IMPORTANT:** You need to manually create the `.env.local` file in the project root with your API keys.
-
-Create `/Users/aris/Documents/GitHub/USI Project/usi-platform/.env.local` with this content:
+Create a `.env.local` file in the project root with your credentials:
 
 ```env
-# Supabase (already configured)
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
 
-# OpenAI (add your key when you have it)
-OPENAI_API_KEY=
-
-
-
-# Resend (add your key when you have it)
-RESEND_API_KEY=
-
-# Twilio (add your credentials when you have them)
-TWILIO_ACCOUNT_SID=
-TWILIO_AUTH_TOKEN=
-TWILIO_PHONE_NUMBER=
-
-# Slack (add your webhook URL when you have it)
-SLACK_WEBHOOK_URL=
+# AI Services
+OPENAI_API_KEY=sk-...
+GOOGLE_GENERATIVE_AI_API_KEY=your-google-ai-key
 
 # Admin Auth
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=change-this-to-secure-password
 
+# Email
+RESEND_API_KEY=re_...
+
 # App Config
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
+
+# Optional: Slack Notifications
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+
+# Optional: SMS (Quo.com)
+QUO_API_KEY=your-quo-api-key
+QUO_PHONE_NUMBER=+1234567890
+
+# Optional: Direct DB access (for migration scripts only)
+DATABASE_URL=postgresql://...
 ```
 
-## 🚀 Running the Project
+**The app validates required env vars on startup.** If any are missing, you'll see a clear error listing exactly which ones are needed.
 
-1. **Create the .env.local file** (see above)
+### Required vs Optional
 
-2. **Start the development server:**
-   ```bash
-   cd "/Users/aris/Documents/GitHub/USI Project/usi-platform"
-   npm run dev
-   ```
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anonymous key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase admin access |
+| `OPENAI_API_KEY` | Yes | Story analysis, character identification |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | Yes | Image generation (characters, illustrations, line art) |
+| `ADMIN_USERNAME` | Yes | Admin login |
+| `ADMIN_PASSWORD` | Yes | Admin login |
+| `RESEND_API_KEY` | Yes | Email delivery |
+| `NEXT_PUBLIC_BASE_URL` | No | Defaults to `http://localhost:3000` |
+| `SLACK_WEBHOOK_URL` | No | Slack notifications |
+| `QUO_API_KEY` | No | SMS notifications |
+| `QUO_PHONE_NUMBER` | No | SMS sender number |
+| `DATABASE_URL` | No | Only for migration scripts |
 
-3. **Open your browser:**
-   - Go to: http://localhost:3000
-   - Admin login: http://localhost:3000/admin/login
-   - Default credentials (change in .env.local):
-     - Username: `admin`
-     - Password: `change-this-to-secure-password`
+## 2. Install Dependencies
 
-## 📋 Next Steps
-
-The foundation is set up! Next, we need to build:
-
-1. **Project Creation Flow** - File uploads, project creation
-2. **Story Parsing** - Parse uploaded story files
-3. **Character Identification** - AI-powered character extraction
-4. **Character Generation** - Generate character illustrations
-5. **Customer Review Pages** - Mobile-responsive review forms
-6. **Sketch Generation** - Generate black & white sketches
-
-## 🔧 Project Structure
-
-```
-usi-platform/
-├── app/
-│   ├── admin/          # Admin dashboard pages
-│   ├── api/            # API routes
-│   └── review/         # Customer review pages (to be created)
-├── components/         # React components
-├── lib/
-│   ├── ai/            # AI service integrations
-│   ├── supabase/      # Supabase clients
-│   └── utils/         # Utility functions
-└── types/             # TypeScript type definitions
+```bash
+cd "/Users/aris/Documents/GitHub/USI Project/usi-platform"
+npm install
 ```
 
-## 📚 Documentation
+## 3. Start Development Server
 
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Supabase Documentation](https://supabase.com/docs)
-- [shadcn/ui Components](https://ui.shadcn.com)
+```bash
+npm run dev
+```
 
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+- **Admin login:** http://localhost:3000/admin/login
+- **Credentials:** Use the `ADMIN_USERNAME` and `ADMIN_PASSWORD` from `.env.local`
 
+## 4. Supabase Storage Buckets
 
+The app uses these Supabase Storage buckets (create them in Supabase Dashboard > Storage):
 
+| Bucket | Access | Purpose |
+|--------|--------|---------|
+| `project-files` | Public | Uploaded manuscripts |
+| `character-images` | Public | Generated character illustrations |
+| `character-sketches` | Public | Character sketch images |
+| `illustrations` | Public | Page illustrations and sketches |
+| `lineart` | Public | Generated line art PNGs |
 
+## 5. Supabase Realtime
 
+For live updates on the customer review side, enable Realtime for these tables:
 
+```sql
+ALTER TABLE "characters" REPLICA IDENTITY FULL;
+ALTER TABLE "pages" REPLICA IDENTITY FULL;
+ALTER TABLE "projects" REPLICA IDENTITY FULL;
 
+ALTER PUBLICATION supabase_realtime ADD TABLE "characters";
+ALTER PUBLICATION supabase_realtime ADD TABLE "pages";
+ALTER PUBLICATION supabase_realtime ADD TABLE "projects";
+```
 
+See `supabase/REALTIME_FIX.md` for details.
 
+## Deployment (Railway)
 
+The app deploys to Railway with auto-deploy from GitHub:
 
+1. Push to `main` branch
+2. Railway auto-builds and deploys
+3. Set all required env vars in Railway dashboard
+
+The `start` script binds to `0.0.0.0` and uses the `PORT` environment variable provided by Railway.
+
+## Troubleshooting
+
+- **Port already in use:** Try `PORT=3001 npm run dev`
+- **Module errors:** Run `npm install` first
+- **Missing env vars:** The app will show a clear error on startup listing which vars are missing
+- **Build errors:** Run `npm run build` locally to check before pushing
