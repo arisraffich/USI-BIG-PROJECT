@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export async function GET(
   request: NextRequest,
@@ -29,7 +30,7 @@ export async function GET(
     }
 
     return NextResponse.json({ ...project, pages_count: pagesCount || 0 })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in GET /api/projects/[id]:', error)
     return NextResponse.json(
       { error: 'Failed to fetch project' },
@@ -97,7 +98,7 @@ export async function DELETE(
       } catch (folderError) {
         // Folder deletion might not be supported
       }
-    } catch (storageError: any) {
+    } catch (storageError: unknown) {
       console.error('Storage deletion error:', storageError)
     }
 
@@ -137,13 +138,13 @@ export async function DELETE(
         reviews: reviewCount,
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Unexpected error deleting project:', error)
     return NextResponse.json(
       {
         error: 'An unexpected error occurred while deleting project',
-        details: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+        details: getErrorMessage(error),
+        stack: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : undefined) : undefined,
       },
       { status: 500 }
     )

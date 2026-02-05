@@ -31,6 +31,7 @@ import { useProjectStatus } from '@/hooks/use-project-status'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { BADGE_COLORS } from '@/lib/constants/statusBadgeConfig'
+import { getErrorMessage } from '@/lib/utils/error'
 
 interface ProjectInfo {
   id: string
@@ -172,9 +173,9 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         { duration: 3000 }
       )
       router.refresh()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error('Failed to update settings', {
-        description: error.message || 'An error occurred'
+        description: getErrorMessage(error, 'An error occurred')
       })
       // Revert the toggle
       setShowColoredToCustomer(!checked)
@@ -209,8 +210,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       const result = await response.json()
       toast.success(result.message || 'Changes pushed to customer')
       setIsPushDialogOpen(false)
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to push changes')
+    } catch (e: unknown) {
+      toast.error(getErrorMessage(e, 'Failed to push changes'))
     } finally {
       setIsPushing(false)
     }
@@ -231,8 +232,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
       
       toast.success('Coloring request sent')
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to send request')
+    } catch (e: unknown) {
+      toast.error(getErrorMessage(e, 'Failed to send request'))
     } finally {
       setIsSendingColoringRequest(false)
     }
@@ -544,9 +545,9 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       toast.success('Download started!', {
         description: `Downloading ${filename}`,
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error('Failed to download illustrations', {
-        description: error.message || 'An error occurred',
+        description: getErrorMessage(error, 'An error occurred'),
       })
     } finally {
       setIsDownloading(false)
@@ -612,11 +613,11 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         phase: 'done',
         message: `All ${prev.successCount} line arts downloaded!`,
       }))
-    } catch (error: any) {
+    } catch (error: unknown) {
       setLineArtModal(prev => ({
         ...prev,
         phase: 'error',
-        message: error.message || 'Failed to create ZIP',
+        message: getErrorMessage(error, 'Failed to create ZIP'),
       }))
     }
   }, [projectInfo.book_title])
@@ -791,12 +792,12 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         }))
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       setIsDownloadingLineArt(false)
       setLineArtModal(prev => ({
         ...prev,
         phase: 'error',
-        message: error.message || 'An unexpected error occurred',
+        message: getErrorMessage(error, 'An unexpected error occurred'),
       }))
     }
   }
@@ -816,8 +817,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         throw new Error(error.error || 'Failed to send email')
       }
       toast.success('Sketches emailed!', { description: 'Sent to info@usillustrations.com' })
-    } catch (error: any) {
-      toast.error('Failed to send email', { description: error.message })
+    } catch (error: unknown) {
+      toast.error('Failed to send email', { description: getErrorMessage(error) })
     } finally {
       setIsSendingEmail(false)
     }
@@ -837,8 +838,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         throw new Error(error.error || 'Failed to send email')
       }
       toast.success('Line art emailed!', { description: 'Sent to info@usillustrations.com' })
-    } catch (error: any) {
-      toast.error('Failed to send email', { description: error.message })
+    } catch (error: unknown) {
+      toast.error('Failed to send email', { description: getErrorMessage(error) })
     } finally {
       setIsSendingEmail(false)
     }
@@ -874,9 +875,9 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       })
       
       router.refresh()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error('Failed to send project to customer', {
-        description: error.message || 'An error occurred',
+        description: getErrorMessage(error, 'An error occurred'),
       })
     } finally {
       setIsSendingToCustomer(false)

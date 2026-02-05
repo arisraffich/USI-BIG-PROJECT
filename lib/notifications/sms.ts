@@ -1,3 +1,5 @@
+import { getErrorMessage } from '@/lib/utils/error'
+
 /**
  * Normalize phone number to E.164 format (+1234567890)
  * Handles formats like: (508) 300-9508, 508-300-9508, 5083009508, +15083009508
@@ -134,13 +136,13 @@ export async function sendSMS(options: {
       console.log(`[SMS] Response is not JSON, raw response: ${responseText}`)
       result = { raw: responseText }
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[SMS] Error sending SMS:', error)
     console.error('[SMS] Error details:', {
-      message: error.message,
-      stack: error.stack,
-      cause: error.cause,
+      message: getErrorMessage(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      cause: error instanceof Error ? error.cause : undefined,
     })
-    throw new Error(`Failed to send SMS: ${error.message}`)
+    throw new Error(`Failed to send SMS: ${getErrorMessage(error)}`)
   }
 }

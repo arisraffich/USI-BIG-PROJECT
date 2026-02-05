@@ -7,6 +7,7 @@ import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, X, AlertTriangle
 import { toast } from 'sonner'
 import { Character } from '@/types/character'
 import { useRouter } from 'next/navigation'
+import { getErrorMessage } from '@/lib/utils/error'
 
 interface AdminCharacterGalleryCardProps {
     character: Character
@@ -71,9 +72,9 @@ export function AdminCharacterGalleryCard({ character, projectId, isGenerating =
 
             toast.success('Character generated successfully')
             // Character update handled by realtime subscription
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Regeneration error:', error)
-            toast.error(error.message || 'Failed to regenerate')
+            toast.error(getErrorMessage(error, 'Failed to regenerate'))
             // Don't close dialog on error so user keeps their prompt
             setIsDialogOpen(true)
         } finally {

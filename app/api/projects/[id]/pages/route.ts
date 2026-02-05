@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,8 +34,8 @@ export async function GET(
             pages: pages || []
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('API Error fetching pages:', error)
-        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+        return NextResponse.json({ error: getErrorMessage(error, 'Internal Server Error') }, { status: 500 })
     }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export async function GET(
   request: NextRequest,
@@ -72,10 +73,10 @@ export async function GET(
       pages: pages || [],
       characters: characters || [],
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching review project:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch project' },
+      { error: getErrorMessage(error, 'Failed to fetch project') },
       { status: 500 }
     )
   }

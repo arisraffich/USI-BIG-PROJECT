@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { buildCharacterPrompt } from '@/lib/utils/prompt-builder'
 import { removeMetadata, sanitizeFilename } from '@/lib/utils/metadata-cleaner'
+import { getErrorMessage } from '@/lib/utils/error'
 import { Character } from '@/types/character'
 
 const GOOGLE_API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY
@@ -233,8 +234,8 @@ INSTRUCTION: This image shows what the character should LOOK LIKE physically.
         }
 
         return { success: true, imageUrl: publicUrl, error: null }
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`Error generating image for character ${character.id}:`, error)
-        return { success: false, imageUrl: null, error: error.message || 'Generation failed' }
+        return { success: false, imageUrl: null, error: getErrorMessage(error, 'Generation failed') }
     }
 }

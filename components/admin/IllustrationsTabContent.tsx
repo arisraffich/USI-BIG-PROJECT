@@ -8,6 +8,7 @@ import { uploadImageAction } from '@/app/actions/upload-image'
 import { toast } from 'sonner'
 
 import { useRouter } from 'next/navigation'
+import { getErrorMessage } from '@/lib/utils/error'
 
 // Batch generation state type
 interface BatchGenerationState {
@@ -321,8 +322,8 @@ export function IllustrationsTabContent({
             
             // Refresh AFTER sketch generation to update UI with both illustration and sketch
             router.refresh()
-        } catch (error: any) {
-            const errorMessage = error?.message || 'Generation failed'
+        } catch (error: unknown) {
+            const errorMessage = getErrorMessage(error, 'Generation failed')
             const mappedError = mapErrorToUserMessage(errorMessage)
             
             // Set error state for this page
@@ -450,8 +451,8 @@ export function IllustrationsTabContent({
             
             // Refresh AFTER sketch generation to update UI with both illustration and sketch
             router.refresh()
-        } catch (error: any) {
-            const errorMessage = error?.message || 'Regeneration failed'
+        } catch (error: unknown) {
+            const errorMessage = getErrorMessage(error, 'Regeneration failed')
             const mappedError = mapErrorToUserMessage(errorMessage)
             setPageError(page.id, mappedError)
             toast.error('Regeneration failed', { description: mappedError.message })
@@ -552,8 +553,8 @@ export function IllustrationsTabContent({
             }
             
             router.refresh()
-        } catch (error: any) {
-            const errorMessage = error?.message || 'Layout change failed'
+        } catch (error: unknown) {
+            const errorMessage = getErrorMessage(error, 'Layout change failed')
             const mappedError = mapErrorToUserMessage(errorMessage)
             setPageError(page.id, mappedError)
             toast.error('Layout change failed', { description: mappedError.message })
@@ -629,8 +630,8 @@ export function IllustrationsTabContent({
             }
             
             router.refresh()
-        } catch (error: any) {
-            const errorMessage = error?.message || 'Failed to confirm decision'
+        } catch (error: unknown) {
+            const errorMessage = getErrorMessage(error, 'Failed to confirm decision')
             const mappedError = mapErrorToUserMessage(errorMessage)
             setPageError(pageId, mappedError)
             toast.error('Failed to confirm decision', { description: mappedError.message })
@@ -698,8 +699,8 @@ export function IllustrationsTabContent({
                     toast.success('Sketch generated from upload')
                     router.refresh()
 
-                } catch (sketchError: any) {
-                    const errorMessage = sketchError?.message || 'Failed to auto-generate sketch'
+                } catch (sketchError: unknown) {
+                    const errorMessage = getErrorMessage(sketchError, 'Failed to auto-generate sketch')
                     const mappedError = mapErrorToUserMessage(errorMessage)
                     setPageError(page.id, mappedError)
                     console.error("Auto-sketch failed", sketchError)
@@ -707,8 +708,8 @@ export function IllustrationsTabContent({
                 }
             }
 
-        } catch (error: any) {
-            const errorMessage = error?.message || 'Upload failed'
+        } catch (error: unknown) {
+            const errorMessage = getErrorMessage(error, 'Upload failed')
             const mappedError = mapErrorToUserMessage(errorMessage)
             setPageError(page.id, mappedError)
             toast.error('Upload failed', { description: mappedError.message })
@@ -758,8 +759,8 @@ export function IllustrationsTabContent({
             }
 
             return true
-        } catch (error: any) {
-            const errorMessage = error?.message || 'Generation failed'
+        } catch (error: unknown) {
+            const errorMessage = getErrorMessage(error, 'Generation failed')
             const mappedError = mapErrorToUserMessage(errorMessage)
             
             // Set error state for this page

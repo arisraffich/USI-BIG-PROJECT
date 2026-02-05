@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { ProjectStatus } from '@/types/project'
+import { getErrorMessage } from '@/lib/utils/error'
 
 interface ProjectStatusResponse {
   id: string
@@ -80,7 +81,7 @@ export function useProjectStatus(projectId: string, initialStatus: ProjectStatus
               router.refresh()
             }
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           consecutiveFailuresRef.current++
           console.error('Error polling project status:', error)
 

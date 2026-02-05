@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { removeMetadata, sanitizeFilename } from '@/lib/utils/metadata-cleaner'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export const maxDuration = 60
 
@@ -123,10 +124,10 @@ export async function POST(request: Request) {
             imageUrl: publicUrl,
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Character upload error:', error)
         return NextResponse.json(
-            { error: error.message || 'Upload failed' },
+            { error: getErrorMessage(error, 'Upload failed') },
             { status: 500 }
         )
     }

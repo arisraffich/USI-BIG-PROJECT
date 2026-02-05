@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { v4 as uuidv4 } from 'uuid'
 import { notifyProjectSentToCustomer } from '@/lib/notifications'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export async function POST(
   request: NextRequest,
@@ -345,10 +346,10 @@ export async function POST(
     }
 
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error sending project to customer:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to send project to customer' },
+      { error: getErrorMessage(error, 'Failed to send project to customer') },
       { status: 500 }
     )
   }

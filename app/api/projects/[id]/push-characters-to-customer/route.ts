@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 /**
  * Silent Push Characters to Customer
@@ -106,10 +107,10 @@ export async function POST(
       updatedCount,
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error pushing characters to customer:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to push characters to customer' },
+      { error: getErrorMessage(error, 'Failed to push characters to customer') },
       { status: 500 }
     )
   }

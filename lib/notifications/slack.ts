@@ -1,3 +1,5 @@
+import { getErrorMessage } from '@/lib/utils/error'
+
 export async function sendSlackNotification(options: {
   text: string
   blocks?: any[]
@@ -24,8 +26,8 @@ export async function sendSlackNotification(options: {
       const errorText = await response.text()
       throw new Error(`Slack API error: ${response.status} ${errorText}`)
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error sending Slack notification:', error)
-    throw new Error(`Failed to send Slack notification: ${error.message}`)
+    throw new Error(`Failed to send Slack notification: ${getErrorMessage(error)}`)
   }
 }

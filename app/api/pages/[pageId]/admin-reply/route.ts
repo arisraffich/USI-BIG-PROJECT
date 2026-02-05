@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 // POST: Save admin reply (to unresolved feedback) or comment (to resolved feedback)
 export async function POST(
@@ -86,10 +87,10 @@ export async function POST(
         }
 
         return NextResponse.json(updatedPage)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error saving admin reply:', error)
         return NextResponse.json(
-            { error: error.message || 'Failed to save reply' },
+            { error: getErrorMessage(error, 'Failed to save reply') },
             { status: 500 }
         )
     }
@@ -168,10 +169,10 @@ export async function PUT(
         }
 
         return NextResponse.json(updatedPage)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error editing admin reply:', error)
         return NextResponse.json(
-            { error: error.message || 'Failed to edit reply' },
+            { error: getErrorMessage(error, 'Failed to edit reply') },
             { status: 500 }
         )
     }
@@ -205,10 +206,10 @@ export async function DELETE(
         }
 
         return NextResponse.json({ success: true })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error clearing admin reply:', error)
         return NextResponse.json(
-            { error: error.message || 'Failed to clear reply' },
+            { error: getErrorMessage(error, 'Failed to clear reply') },
             { status: 500 }
         )
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/notifications/email'
+import { getErrorMessage } from '@/lib/utils/error'
 
 /**
  * Send Karine Coloring Request
@@ -124,10 +125,10 @@ export async function POST(
       message: 'Email sent to Karine'
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error sending Karine request:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to send email' },
+      { error: getErrorMessage(error, 'Failed to send email') },
       { status: 500 }
     )
   }

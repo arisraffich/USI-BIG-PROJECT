@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { openai } from '@/lib/ai/openai'
+import { getErrorMessage } from '@/lib/utils/error'
 
 // Exported function for direct calls (e.g., from project creation)
 export async function identifyCharactersForProject(project_id: string) {
@@ -153,8 +154,8 @@ ${mainCharName ? `- DO NOT include "${mainCharName}" - they are the main charact
           effort: 'high'
         }
       })
-    } catch (error: any) {
-      const errorMessage = error.message || String(error)
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error)
       console.error('OpenAI API Error in identify-characters:', errorMessage)
       console.error('Full API Error:', error)
       throw new Error(`Failed to identify characters with GPT-5.2: ${errorMessage}`)
@@ -386,10 +387,10 @@ export async function POST(request: NextRequest) {
     const result = await identifyCharactersForProject(project_id)
     return NextResponse.json(result)
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Character ID] Error identifying characters:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to identify characters' },
+      { error: getErrorMessage(error, 'Failed to identify characters') },
       { status: 500 }
     )
   }

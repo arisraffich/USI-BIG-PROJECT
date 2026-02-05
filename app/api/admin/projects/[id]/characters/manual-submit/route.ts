@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notifyCustomerSubmission } from '@/lib/notifications' // Only triggers Slack, safe to use or I will verify internal logic again
+import { getErrorMessage } from '@/lib/utils/error'
 
 // We will NOT import notification functions that send emails.
 // The notifyCustomerSubmission function in lib/notifications MAINLY sends Slack.
@@ -213,8 +214,8 @@ export async function POST(
             })
         }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Manual Submit Error:', error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 })
     }
 }

@@ -4,6 +4,7 @@ import { notifyCustomerSubmission, notifyIllustrationsApproved, notifyIllustrati
 
 import { buildCharacterPrompt } from '@/lib/utils/prompt-builder'
 import { removeMetadata, sanitizeFilename } from '@/lib/utils/metadata-cleaner'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export async function POST(
   request: NextRequest,
@@ -393,10 +394,10 @@ export async function POST(
               console.error('Error sending completion notification', e)
             }
 
-          } catch (err: any) { 
+          } catch (err: unknown) { 
             console.error('[Bg Generation] CRITICAL ERROR:', err)
-            console.error('[Bg Generation] Error stack:', err?.stack)
-            console.error('[Bg Generation] Error message:', err?.message)
+            console.error('[Bg Generation] Error stack:', err instanceof Error ? err.stack : undefined)
+            console.error('[Bg Generation] Error message:', getErrorMessage(err))
           }
         })().catch(err => {
           console.error('[Bg Generation] Unhandled rejection:', err)
@@ -436,10 +437,10 @@ export async function POST(
         status: newStatus
       })
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error submitting changes:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to submit changes' },
+      { error: getErrorMessage(error, 'Failed to submit changes') },
       { status: 500 }
     )
   }

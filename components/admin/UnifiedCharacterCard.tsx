@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { Character } from '@/types/character'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { getErrorMessage } from '@/lib/utils/error'
 
 interface UnifiedCharacterCardProps {
     character: Character
@@ -239,9 +240,9 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             toast.success('Character regenerated successfully')
             // Clear reference image after successful regeneration
             removeReferenceImage()
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Regeneration error:', error)
-            toast.error(error.message || 'Failed to regenerate')
+            toast.error(getErrorMessage(error, 'Failed to regenerate'))
             setIsDialogOpen(true)
         } finally {
             setIsRegenerating(false)
@@ -314,9 +315,9 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                 })
                 setOptimisticColoredImage(data.imageUrl)
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Upload error:', error)
-            toast.error(error.message || 'Failed to upload colored image')
+            toast.error(getErrorMessage(error, 'Failed to upload colored image'))
         } finally {
             setIsRegenerating(false)
             // Reset file input
@@ -362,9 +363,9 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                     sketch_url: data.sketchUrl
                 })
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Upload error:', error)
-            toast.error(error.message || 'Failed to upload sketch')
+            toast.error(getErrorMessage(error, 'Failed to upload sketch'))
         } finally {
             setIsRegenerating(false)
             // Reset file input

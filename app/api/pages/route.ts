@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(pages || [])
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in pages API:', error)
     return NextResponse.json(
       { error: 'Failed to fetch pages' },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { parseStoryFile, parsePagesWithAI } from '@/lib/utils/file-parser'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export async function POST(
   request: NextRequest,
@@ -141,10 +142,10 @@ export async function POST(
       pagesCreated: pages.length,
       message: `Successfully parsed story and created ${pages.length} pages`
     })
-  } catch (error: any) {
-    console.error('Error re-parsing story:', error.message)
+  } catch (error: unknown) {
+    console.error('Error re-parsing story:', getErrorMessage(error))
     return NextResponse.json(
-      { error: 'Failed to parse story', details: error.message },
+      { error: 'Failed to parse story', details: getErrorMessage(error) },
       { status: 500 }
     )
   }

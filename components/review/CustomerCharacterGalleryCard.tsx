@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { MessageSquarePlus, Save, Loader2, CheckCircle2, Info, Download, X, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { getErrorMessage } from '@/lib/utils/error'
 
 interface CustomerCharacterGalleryCardProps {
     character: Character
@@ -155,8 +156,8 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
             toast.success('Change request saved')
             setIsEditing(false)
             // Update handled by realtime subscription
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to save change request')
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, 'Failed to save change request'))
             console.error('Save error:', error)
         } finally {
             setIsSaving(false)

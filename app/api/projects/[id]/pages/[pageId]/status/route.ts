@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export async function GET(
     request: Request,
@@ -25,7 +26,7 @@ export async function GET(
             actions: data.character_actions
         })
 
-    } catch (e: any) {
-        return NextResponse.json({ error: e.message }, { status: 500 })
+    } catch (e: unknown) {
+        return NextResponse.json({ error: getErrorMessage(e) }, { status: 500 })
     }
 }

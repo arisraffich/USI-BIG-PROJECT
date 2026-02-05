@@ -27,6 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { getErrorMessage } from '@/lib/utils/error'
 
 interface CustomerProjectTabsContentProps {
   projectId: string
@@ -646,9 +647,9 @@ export function CustomerProjectTabsContent({
       setSubmissionStatus('success')
       // Success screen and status updates handled by project status realtime subscription
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error submitting changes:', error)
-      toast.error(error.message || 'Failed to submit changes')
+      toast.error(getErrorMessage(error, 'Failed to submit changes'))
       setSubmissionStatus('idle')
       setIsSubmitting(false)
     }
@@ -682,7 +683,7 @@ export function CustomerProjectTabsContent({
       setSubmissionStatus('success')
       // Status update handled by project status realtime subscription
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error approving:', error)
       toast.error('Failed to approve characters')
       setSubmissionStatus('idle')

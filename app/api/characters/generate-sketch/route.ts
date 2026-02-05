@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { generateSketch } from '@/lib/ai/google-ai'
 import { sanitizeFilename } from '@/lib/utils/metadata-cleaner'
+import { getErrorMessage } from '@/lib/utils/error'
 
 // Allow max duration
 export const maxDuration = 60
@@ -103,10 +104,10 @@ The result must look like a faithful pencil-line tracing of the original image â
             sketchUrl: publicUrl
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Character Sketch] Generation Error:', error)
         return NextResponse.json(
-            { error: error.message || 'Internal Server Error' },
+            { error: getErrorMessage(error, 'Internal Server Error') },
             { status: 500 }
         )
     }

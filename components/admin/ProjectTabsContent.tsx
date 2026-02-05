@@ -18,6 +18,7 @@ import { Page } from '@/types/page'
 import { Character } from '@/types/character'
 import { ProjectStatus } from '@/types/project'
 import { CharacterFormData } from '@/components/shared/UniversalCharacterCard'
+import { getErrorMessage } from '@/lib/utils/error'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -290,8 +291,8 @@ export function ProjectTabsContent({
       const result = await response.json()
       toast.success(result.message || 'Characters pushed to customer')
       setIsCharPushDialogOpen(false)
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to push characters')
+    } catch (e: unknown) {
+      toast.error(getErrorMessage(e, 'Failed to push characters'))
     } finally {
       setIsCharPushing(false)
     }

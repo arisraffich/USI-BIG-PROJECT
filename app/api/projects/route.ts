@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { parseStoryFile, parsePagesWithAI } from '@/lib/utils/file-parser'
 import { v4 as uuidv4 } from 'uuid'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300 // 5 minutes for story parsing + AI enhancement
@@ -99,10 +100,10 @@ export async function POST(request: NextRequest) {
     try {
       mainCharacterBuffer = Buffer.from(await mainCharacterImage.arrayBuffer())
       storyBuffer = Buffer.from(await storyFile.arrayBuffer())
-    } catch (bufferError: any) {
+    } catch (bufferError: unknown) {
       console.error('Error converting files to buffers:', bufferError)
       return NextResponse.json(
-        { error: 'Failed to process files', details: bufferError.message },
+        { error: 'Failed to process files', details: getErrorMessage(bufferError) },
         { status: 500 }
       )
     }
@@ -264,13 +265,13 @@ export async function POST(request: NextRequest) {
         } else {
           console.log(`[Character Identification] Completed for ${projectId} (response format unknown)`)
         }
-      } catch (charError: any) {
-        console.error(`[Character Identification] Error for project ${projectId}:`, charError.message)
+      } catch (charError: unknown) {
+        console.error(`[Character Identification] Error for project ${projectId}:`, getErrorMessage(charError))
         // Don't fail the whole request - characters can be identified manually later
       }
 
-    } catch (parsingError: any) {
-      console.error(`[Story Parsing] Error for project ${projectId}:`, parsingError.message)
+    } catch (parsingError: unknown) {
+      console.error(`[Story Parsing] Error for project ${projectId}:`, getErrorMessage(parsingError))
       // Update status to indicate parsing failed
       await supabase
         .from('projects')
@@ -285,15 +286,15 @@ export async function POST(request: NextRequest) {
       success: true,
       project_id: projectId
     }, { status: 200 })
-  } catch (error: any) {
-    console.error('Error creating project:', error.message)
+  } catch (error: unknown) {
+    console.error('Error creating project:', getErrorMessage(error))
 
     // Check if it's a formData parsing error
-    if (error?.message?.includes('form-data') || error?.message?.includes('Content-Type')) {
+    if (getErrorMessage(error).includes('form-data') || getErrorMessage(error).includes('Content-Type')) {
       return NextResponse.json(
         {
           error: 'Failed to parse form data',
-          details: error.message,
+          details: getErrorMessage(error),
           hint: 'Make sure the request is sent as multipart/form-data'
         },
         { status: 400 }
@@ -302,9 +303,9 @@ export async function POST(request: NextRequest) {
 
     const errorResponse = {
       error: 'Failed to create project',
-      details: error?.message || String(error) || 'Unknown error',
+      details: getErrorMessage(error, 'Unknown error'),
       ...(process.env.NODE_ENV === 'development' && {
-        stack: error?.stack,
+        stack: error instanceof Error ? error.stack : undefined,
       })
     }
 

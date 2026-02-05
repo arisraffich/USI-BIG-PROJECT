@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
+import { getErrorMessage } from '@/lib/utils/error'
 import { CheckCircle2 } from 'lucide-react'
 
 export default async function SubmittedPage({ params }: { params: Promise<{ token: string }> }) {
@@ -49,7 +50,7 @@ export default async function SubmittedPage({ params }: { params: Promise<{ toke
         </div>
       </div>
     )
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in SubmittedPage:', error)
     notFound()
   }

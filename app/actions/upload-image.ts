@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import sharp from 'sharp'
+import { getErrorMessage } from '@/lib/utils/error'
 
 interface UploadResult {
     success: boolean
@@ -101,8 +102,8 @@ export async function uploadImageAction(formData: FormData): Promise<UploadResul
 
         return { success: true, url: versionedUrl }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Server Upload Action Error DETAILS:', error);
-        return { success: false, error: error.message || 'Unknown server error' }
+        return { success: false, error: getErrorMessage(error, 'Unknown server error') }
     }
 }

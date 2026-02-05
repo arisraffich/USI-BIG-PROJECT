@@ -16,6 +16,7 @@ import {
 import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useState, useEffect } from 'react'
+import { getErrorMessage } from '@/lib/utils/error'
 
 interface AddCharacterButtonProps {
   mainCharacterName: string | null
@@ -98,9 +99,9 @@ export function AddCharacterButton({ mainCharacterName, mode = 'button', classNa
           }, 2000)
         }
       }, 500)
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error('Failed to add character', {
-        description: error.message || 'An error occurred',
+        description: getErrorMessage(error, 'An error occurred'),
       })
     } finally {
       setIsAddingCharacter(false)

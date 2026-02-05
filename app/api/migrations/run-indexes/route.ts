@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import { getErrorMessage } from '@/lib/utils/error'
 
 /**
  * One-time migration endpoint to add performance indexes
@@ -66,11 +67,11 @@ export async function GET(request: NextRequest) {
           success: false,
           error: 'Cannot execute raw SQL via Supabase JS client. Please run manually in SQL Editor.',
         })
-      } catch (error: any) {
+      } catch (error: unknown) {
         results.push({
           statement: fullStatement,
           success: false,
-          error: error.message,
+          error: getErrorMessage(error),
         })
       }
     }
@@ -84,9 +85,9 @@ export async function GET(request: NextRequest) {
       statements: statements.map(s => s + ';'),
       note: 'Copy the SQL above and paste it into your Supabase SQL Editor, then click Run.',
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: 'Failed to read migration file', details: error.message },
+      { error: 'Failed to read migration file', details: getErrorMessage(error) },
       { status: 500 }
     )
   }

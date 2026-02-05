@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 // POST: Customer accepts the admin reply - resolves the feedback
 export async function POST(
@@ -109,10 +110,10 @@ export async function POST(
         }
 
         return NextResponse.json(updatedPage)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error accepting reply:', error)
         return NextResponse.json(
-            { error: error.message || 'Failed to accept reply' },
+            { error: getErrorMessage(error, 'Failed to accept reply') },
             { status: 500 }
         )
     }

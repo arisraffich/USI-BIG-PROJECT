@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 // POST: Admin manually resolves a revision without regeneration
 export async function POST(
@@ -118,10 +119,10 @@ export async function POST(
         }
 
         return NextResponse.json(updatedPage)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error resolving feedback:', error)
         return NextResponse.json(
-            { error: error.message || 'Failed to resolve feedback' },
+            { error: getErrorMessage(error, 'Failed to resolve feedback') },
             { status: 500 }
         )
     }

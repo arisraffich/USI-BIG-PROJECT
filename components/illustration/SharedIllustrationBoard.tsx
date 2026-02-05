@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch'
 import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, ChevronUp, AlignLeft, Users, Plus, Minus, Pencil, Check, Layers, CornerDownRight, AlertCircle, ChevronRight } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { getErrorMessage } from '@/lib/utils/error'
 
 import Image from 'next/image'
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from '@/components/ui/dialog'
@@ -327,7 +328,7 @@ export function SharedIllustrationBoard({
             if (error) throw error
             
             toast.success('Illustration notes saved')
-        } catch (error: any) {
+        } catch (error: unknown) {
             toast.error('Failed to save notes')
             console.error(error)
         } finally {

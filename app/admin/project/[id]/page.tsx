@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
+import { getErrorMessage } from '@/lib/utils/error'
 import { ProjectTabsContent } from '@/components/admin/ProjectTabsContent'
 import { Suspense } from 'react'
 
@@ -55,7 +56,7 @@ export default async function ProjectDetailPage({
     projectStatus = projectResult.data?.status || 'draft'
     projectInfo = projectResult.data
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in ProjectDetailPage:', error)
     // Continue rendering with null data - component will handle empty state
   }

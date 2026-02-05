@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { generateIllustration } from '@/lib/ai/google-ai'
 import { sanitizeFilename } from '@/lib/utils/metadata-cleaner'
+import { getErrorMessage } from '@/lib/utils/error'
 
 // Allow max duration for AI generation
 export const maxDuration = 60
@@ -621,10 +622,10 @@ ${textPromptSection}`
             isPreview: !!skipDbUpdate // Indicate this is a preview (not saved to DB)
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Illustration Generation Error:', error)
         return NextResponse.json(
-            { error: error.message || 'Internal Server Error' },
+            { error: getErrorMessage(error, 'Internal Server Error') },
             { status: 500 }
         )
     }

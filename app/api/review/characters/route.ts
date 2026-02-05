@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,10 +60,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(character)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating character:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to create character' },
+      { error: getErrorMessage(error, 'Failed to create character') },
       { status: 500 }
     )
   }

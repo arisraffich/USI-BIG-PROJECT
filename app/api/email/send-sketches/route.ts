@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/notifications/email'
 import JSZip from 'jszip'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export const maxDuration = 120
 
@@ -105,10 +106,10 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({ success: true, message: 'Email sent' })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Email] Error sending sketches email:', error)
         return NextResponse.json(
-            { error: error.message || 'Failed to send email' },
+            { error: getErrorMessage(error, 'Failed to send email') },
             { status: 500 }
         )
     }

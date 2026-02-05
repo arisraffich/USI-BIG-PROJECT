@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import sharp from 'sharp'
+import { getErrorMessage } from '@/lib/utils/error'
 
 const MAX_STYLE_REFS = 3
 const MAX_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
@@ -129,10 +130,10 @@ export async function POST(
             message: `Successfully uploaded ${uploadedUrls.length} style reference(s)`
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Style References] Error:', error)
         return NextResponse.json(
-            { error: error.message || 'Unknown error occurred' },
+            { error: getErrorMessage(error, 'Unknown error occurred') },
             { status: 500 }
         )
     }
@@ -192,10 +193,10 @@ export async function DELETE(
             message: 'Style references cleared'
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Style References] Delete error:', error)
         return NextResponse.json(
-            { error: error.message || 'Unknown error occurred' },
+            { error: getErrorMessage(error, 'Unknown error occurred') },
             { status: 500 }
         )
     }

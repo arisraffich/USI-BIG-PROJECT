@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { generateLineArt } from '@/lib/ai/google-ai'
 import { processLineArtToTransparentPng, LINE_ART_PROMPT } from '@/lib/line-art/processor'
 import { uploadLineArt } from '@/lib/line-art/storage'
+import { getErrorMessage } from '@/lib/utils/error'
 
 // Allow max duration for AI generation + processing
 export const maxDuration = 120
@@ -48,10 +49,10 @@ export async function POST(request: Request) {
             },
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[LineArt] Generation Error:', error)
         return NextResponse.json(
-            { error: error.message || 'Failed to generate line art' },
+            { error: getErrorMessage(error, 'Failed to generate line art') },
             { status: 500 }
         )
     }

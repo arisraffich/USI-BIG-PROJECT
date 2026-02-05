@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 // POST: Customer adds a follow-up reply to the conversation thread
 export async function POST(
@@ -98,15 +99,15 @@ export async function POST(
                     projectUrl
                 }).catch(err => console.error('Notification error:', err))
             }
-        } catch (notifyError: any) {
+        } catch (notifyError: unknown) {
             console.error('Notification setup failed:', notifyError)
         }
 
         return NextResponse.json(updatedPage)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error saving follow-up:', error)
         return NextResponse.json(
-            { error: error.message || 'Failed to save follow-up' },
+            { error: getErrorMessage(error, 'Failed to save follow-up') },
             { status: 500 }
         )
     }
@@ -194,10 +195,10 @@ export async function PUT(
         }
 
         return NextResponse.json(updatedPage)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error editing follow-up:', error)
         return NextResponse.json(
-            { error: error.message || 'Failed to edit follow-up' },
+            { error: getErrorMessage(error, 'Failed to edit follow-up') },
             { status: 500 }
         )
     }

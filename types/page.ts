@@ -19,7 +19,7 @@ export interface Page {
   created_at: string
   updated_at: string
   // Illustration Module
-  character_actions?: any | null // JSONB
+  character_actions?: Record<string, string> | null // JSONB
   background_elements?: string | null
   atmosphere?: string | null
   illustration_prompt?: string | null

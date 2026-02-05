@@ -1,4 +1,5 @@
 import { removeMetadata } from '@/lib/utils/metadata-cleaner'
+import { getErrorMessage } from '@/lib/utils/error'
 import sharp from 'sharp'
 
 const API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY
@@ -25,24 +26,25 @@ async function retryWithBackoff<T>(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await fn()
-    } catch (error: any) {
-      lastError = error
+    } catch (error: unknown) {
+      lastError = error instanceof Error ? error : new Error(String(error))
       
       // Check if error is retryable (503, 429, or network errors)
+      const errorMsg = getErrorMessage(error)
       const isRetryable = 
-        error.message?.includes('503') || 
-        error.message?.includes('429') ||
-        error.message?.includes('overloaded') ||
-        error.message?.includes('UNAVAILABLE')
+        errorMsg.includes('503') || 
+        errorMsg.includes('429') ||
+        errorMsg.includes('overloaded') ||
+        errorMsg.includes('UNAVAILABLE')
       
       if (!isRetryable || attempt === maxRetries) {
-        console.error(`[${context}] ❌ Non-retryable error or max retries reached:`, error.message)
+        console.error(`[${context}] ❌ Non-retryable error or max retries reached:`, errorMsg)
         throw error
       }
       
       // Calculate delay with exponential backoff
       const delay = Math.min(INITIAL_DELAY_MS * Math.pow(2, attempt), MAX_DELAY_MS)
-      console.log(`[${context}] ⚠️ Attempt ${attempt + 1}/${maxRetries + 1} failed: ${error.message}`)
+      console.log(`[${context}] ⚠️ Attempt ${attempt + 1}/${maxRetries + 1} failed: ${errorMsg}`)
       console.log(`[${context}] ⏳ Retrying in ${delay}ms...`)
       
       await new Promise(resolve => setTimeout(resolve, delay))
@@ -328,9 +330,9 @@ Apply the style uniformly to characters, backgrounds, props, and all scene eleme
 
         return { success: true, imageBuffer: cleanBuffer, error: null }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('generateIllustration error:', error)
-        return { success: false, imageBuffer: null, error: error.message }
+        return { success: false, imageBuffer: null, error: getErrorMessage(error) }
     }
 }
 
@@ -412,9 +414,9 @@ export async function generateSketch(
 
         return { success: true, imageBuffer: cleanBuffer, error: null }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('generateSketch error:', error)
-        return { success: false, imageBuffer: null, error: error.message }
+        return { success: false, imageBuffer: null, error: getErrorMessage(error) }
     }
 }
 
@@ -492,8 +494,8 @@ export async function generateLineArt(
 
         return { success: true, imageBuffer: cleanBuffer, error: null }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('generateLineArt error:', error)
-        return { success: false, imageBuffer: null, error: error.message }
+        return { success: false, imageBuffer: null, error: getErrorMessage(error) }
     }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 /**
  * Confirm Illustration Regeneration
@@ -104,10 +105,10 @@ export async function POST(request: Request) {
             { status: 400 }
         )
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Illustration confirm error:', error)
         return NextResponse.json(
-            { error: error.message || 'Failed to confirm illustration' },
+            { error: getErrorMessage(error, 'Failed to confirm illustration') },
             { status: 500 }
         )
     }

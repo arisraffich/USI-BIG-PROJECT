@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export async function PATCH(
   request: NextRequest,
@@ -108,12 +109,12 @@ export async function PATCH(
       failed: 0,
       pages: results,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating pages:', error)
     return NextResponse.json(
       {
         error: 'Failed to update pages',
-        details: error.message,
+        details: getErrorMessage(error),
       },
       { status: 500 }
     )

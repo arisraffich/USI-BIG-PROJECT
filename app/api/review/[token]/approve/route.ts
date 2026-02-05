@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notifyCharactersApproved } from '@/lib/notifications'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export async function POST(
     request: NextRequest,
@@ -74,10 +75,10 @@ export async function POST(
             message: 'Characters approved successfully'
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error in approve route:', error)
         return NextResponse.json(
-            { error: error.message || 'Internal server error' },
+            { error: getErrorMessage(error, 'Internal server error') },
             { status: 500 }
         )
     }

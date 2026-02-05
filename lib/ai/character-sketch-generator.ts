@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { generateSketch } from '@/lib/ai/google-ai'
 import { sanitizeFilename } from '@/lib/utils/metadata-cleaner'
+import { getErrorMessage } from '@/lib/utils/error'
 
 /**
  * Generate a pencil sketch from a character's colored illustration
@@ -100,11 +101,11 @@ The result must look like a faithful pencil-line tracing of the original image ‚
       error: null
     }
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`[Character Sketch] ‚ùå CRITICAL FAILURE for ${characterName}:`, error)
     console.error(`[Character Sketch] Error details:`, {
-      message: error.message,
-      stack: error.stack,
+      message: getErrorMessage(error),
+      stack: error instanceof Error ? error.stack : undefined,
       characterId,
       imageUrl
     })
@@ -114,7 +115,7 @@ The result must look like a faithful pencil-line tracing of the original image ‚
       const supabase = await createAdminClient()
       await supabase
         .from('characters')
-        .update({ sketch_url: `error:${error.message || 'Sketch generation failed'}` })
+        .update({ sketch_url: `error:${getErrorMessage(error, 'Sketch generation failed')}` })
         .eq('id', characterId)
       console.log(`[Character Sketch] ‚ö†Ô∏è Saved error state for ${characterName}`)
     } catch (dbErr) {
@@ -124,7 +125,7 @@ The result must look like a faithful pencil-line tracing of the original image ‚
     return {
       success: false,
       sketchUrl: null,
-      error: error.message || 'Unknown error during sketch generation'
+      error: getErrorMessage(error, 'Unknown error during sketch generation')
     }
   }
 }

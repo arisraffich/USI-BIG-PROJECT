@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export async function DELETE(
   request: NextRequest,
@@ -63,7 +64,7 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting character:', error)
     return NextResponse.json(
       { error: 'Failed to delete character' },
@@ -135,7 +136,7 @@ export async function PATCH(
     }
 
     return NextResponse.json(character)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating character:', error)
     return NextResponse.json(
       { error: 'Failed to update character' },

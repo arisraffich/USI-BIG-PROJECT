@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import JSZip from 'jszip'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export async function GET(
   request: NextRequest,
@@ -116,10 +117,10 @@ export async function GET(
         'Content-Disposition': `attachment; filename="${filename}"`,
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error generating download:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to generate download' },
+      { error: getErrorMessage(error, 'Failed to generate download') },
       { status: 500 }
     )
   }

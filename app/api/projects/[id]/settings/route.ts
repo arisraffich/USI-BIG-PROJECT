@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 // GET - Fetch project settings
 export async function GET(
@@ -23,8 +24,8 @@ export async function GET(
         return NextResponse.json({
             show_colored_to_customer: data?.show_colored_to_customer ?? false
         })
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
+    } catch (error: unknown) {
+        return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 })
     }
 }
 
@@ -62,7 +63,7 @@ export async function PATCH(
             success: true,
             show_colored_to_customer: data?.show_colored_to_customer ?? false
         })
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
+    } catch (error: unknown) {
+        return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 })
     }
 }

@@ -1,6 +1,7 @@
 import { sendEmail } from './email'
 import { sendSlackNotification } from './slack'
 import { sendSMS } from './sms'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export async function notifyCustomerSubmission(options: {
   projectId: string
@@ -78,7 +79,7 @@ export async function notifyCustomerSubmission(options: {
       text: `📝 Customer submitted character forms for "${projectTitle}"`,
       blocks,
     })
-  } catch (slackError: any) {
+  } catch (slackError: unknown) {
     console.error('Slack notification failed:', slackError)
     // Don't send email fallback - only notify via Slack
   }
@@ -124,7 +125,7 @@ export async function notifyCharacterReview(options: {
         },
       ],
     })
-  } catch (slackError: any) {
+  } catch (slackError: unknown) {
     console.error('Slack notification failed:', slackError)
   }
 }
@@ -163,13 +164,13 @@ export async function notifyProjectSentToCustomer(options: {
         </div>
       `,
     })
-  } catch (emailError: any) {
+  } catch (emailError: unknown) {
     console.error('[Notification] Failed to send customer notification email:', emailError)
     console.error('[Notification] Email error details:', {
-      message: emailError.message,
-      code: emailError.code,
-      response: emailError.response,
-      stack: emailError.stack,
+      message: getErrorMessage(emailError),
+      code: emailError instanceof Error ? (emailError as any).code : undefined,
+      response: emailError instanceof Error ? (emailError as any).response : undefined,
+      stack: emailError instanceof Error ? emailError.stack : undefined,
     })
     // Don't throw - we still want to send SMS and notify Slack even if email fails
   }
@@ -181,11 +182,11 @@ export async function notifyProjectSentToCustomer(options: {
         to: authorPhone as string,
         message: `Hi ${authorFirstName}, your project "${projectTitle}" is ready for review! Check your email (including spam) for the review link: ${reviewUrl} - US Illustrations`,
       })
-    } catch (smsError: any) {
+    } catch (smsError: unknown) {
       console.error('[Notification] Failed to send customer SMS:', smsError)
       console.error('[Notification] SMS error details:', {
-        message: smsError.message,
-        stack: smsError.stack,
+        message: getErrorMessage(smsError),
+        stack: smsError instanceof Error ? (smsError as Error).stack : undefined,
       })
       // Don't throw - we still want to notify Slack even if SMS fails
     }
@@ -216,7 +217,7 @@ export async function notifyProjectSentToCustomer(options: {
         },
       ],
     })
-  } catch (slackError: any) {
+  } catch (slackError: unknown) {
     console.error('Failed to send Slack notification:', slackError)
     // Don't send email fallback - only notify via Slack
   }
@@ -252,7 +253,7 @@ export async function notifySecondaryCharactersReady(options: {
         </div>
       `,
     })
-  } catch (emailError: any) {
+  } catch (emailError: unknown) {
     console.error('[Notification] Failed to send Stage 2 email:', emailError)
   }
 
@@ -281,7 +282,7 @@ export async function notifySecondaryCharactersReady(options: {
         },
       ],
     })
-  } catch (slackError: any) {
+  } catch (slackError: unknown) {
     console.error('Failed to send Slack notification:', slackError)
   }
 }
@@ -320,7 +321,7 @@ export async function notifyCharacterRevisions(options: {
         </div>
       `,
     })
-  } catch (emailError: any) {
+  } catch (emailError: unknown) {
     console.error('[Notification] Failed to send revision email:', emailError)
   }
 
@@ -349,7 +350,7 @@ export async function notifyCharacterRevisions(options: {
         },
       ],
     })
-  } catch (slackError: any) {
+  } catch (slackError: unknown) {
     console.error('Failed to send Slack notification:', slackError)
   }
 }
@@ -388,7 +389,7 @@ export async function notifyCharacterGenerationComplete(options: {
         },
       ],
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to send character generation notification:', error)
   }
 }
@@ -425,7 +426,7 @@ export async function notifyCharactersApproved(options: {
         },
       ],
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to send character approval notification:', error)
   }
 }
@@ -467,7 +468,7 @@ export async function notifyAllSketchesSent(options: {
         </div>
       `,
     })
-  } catch (emailError: any) {
+  } catch (emailError: unknown) {
     console.error('[Notification] Failed to send all sketches email:', emailError)
   }
 
@@ -490,7 +491,7 @@ export async function notifyAllSketchesSent(options: {
         },
       ],
     })
-  } catch (slackError: any) {
+  } catch (slackError: unknown) {
     console.error('Failed to send Slack notification:', slackError)
   }
 }
@@ -529,7 +530,7 @@ export async function notifyIllustrationsUpdate(options: {
         </div>
       `,
     })
-  } catch (emailError: any) {
+  } catch (emailError: unknown) {
     console.error('[Notification] Failed to send sketches revision email:', emailError)
   }
 
@@ -558,7 +559,7 @@ export async function notifyIllustrationsUpdate(options: {
         },
       ],
     })
-  } catch (slackError: any) {
+  } catch (slackError: unknown) {
     console.error('Failed to send Slack notification:', slackError)
   }
 }
@@ -596,7 +597,7 @@ export async function notifyIllustrationsApproved(options: {
         },
       ],
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to send illustration approval notification:', error)
   }
 
@@ -624,7 +625,7 @@ export async function notifyIllustrationsApproved(options: {
       `,
     })
     console.log(`[Email] Sketches approval email sent for project ${projectId}`)
-  } catch (emailError: any) {
+  } catch (emailError: unknown) {
     console.error('Failed to send sketches approval email:', emailError)
   }
 }
@@ -661,7 +662,7 @@ export async function notifyIllustrationFeedback(options: {
         },
       ],
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to send illustration feedback notification:', error)
   }
 }
@@ -706,7 +707,7 @@ export async function notifyCustomerReview(options: {
         },
       ],
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to send customer review notification:', error)
   }
 }
@@ -751,7 +752,7 @@ export async function notifyCustomerCharacterReview(options: {
         },
       ],
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to send character review notification:', error)
   }
 }
@@ -798,7 +799,7 @@ export async function notifyCustomerAcceptedReply(options: {
         },
       ],
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to send accepted reply notification:', error)
   }
 }
@@ -853,7 +854,7 @@ export async function notifyCustomerFollowUp(options: {
         },
       ],
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to send follow-up notification:', error)
   }
 }

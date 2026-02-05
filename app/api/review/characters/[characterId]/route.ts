@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export async function PATCH(
   request: NextRequest,
@@ -96,10 +97,10 @@ export async function PATCH(
     }
 
     return NextResponse.json(updatedCharacter)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating character:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to update character' },
+      { error: getErrorMessage(error, 'Failed to update character') },
       { status: 500 }
     )
   }

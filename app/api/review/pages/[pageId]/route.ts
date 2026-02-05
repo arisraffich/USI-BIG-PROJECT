@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 
 export async function PATCH(
@@ -150,7 +151,7 @@ export async function PATCH(
                 } else {
                     // No Project Details Found for ID: ${page.project_id}
                 }
-            } catch (notifyError: any) {
+            } catch (notifyError: unknown) {
                 console.error('Notification setup failed:', notifyError)
             }
         } else {
@@ -158,10 +159,10 @@ export async function PATCH(
         }
 
         return NextResponse.json(updatedPage)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error updating page:', error)
         return NextResponse.json(
-            { error: error.message || 'Failed to update page' },
+            { error: getErrorMessage(error, 'Failed to update page') },
             { status: 500 }
         )
     }

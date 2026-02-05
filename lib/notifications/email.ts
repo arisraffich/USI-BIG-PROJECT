@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { getErrorMessage } from '@/lib/utils/error'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -42,8 +43,8 @@ export async function sendEmail(options: {
     }
 
     console.log(`[Email] Email sent successfully via Resend. ID: ${data?.id}`)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Email] Error sending email:', error)
-    throw new Error(`Failed to send email: ${error.message}`)
+    throw new Error(`Failed to send email: ${getErrorMessage(error)}`)
   }
 }

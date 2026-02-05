@@ -8,6 +8,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
+import { getErrorMessage } from '@/lib/utils/error'
 
 interface BatchState {
     isRunning: boolean
@@ -95,7 +96,7 @@ export function EmptyStateBoard({
             
             toast.success('Illustration notes saved')
             // Update the local page reference (will be refreshed on next render)
-        } catch (error: any) {
+        } catch (error: unknown) {
             toast.error('Failed to save notes')
             console.error(error)
         } finally {
@@ -156,8 +157,8 @@ export function EmptyStateBoard({
             const data = await response.json()
             setStyleRefs(data.urls)
             toast.success(`Uploaded ${filesToUpload.length} style reference(s)`)
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to upload style references')
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, 'Failed to upload style references'))
         } finally {
             setIsUploadingStyleRef(false)
             if (fileInputRef.current) fileInputRef.current.value = ''
@@ -180,8 +181,8 @@ export function EmptyStateBoard({
 
             setStyleRefs([])
             toast.success('Style references removed')
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to remove style references')
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, 'Failed to remove style references'))
         }
     }, [projectId])
 

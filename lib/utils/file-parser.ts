@@ -1,5 +1,6 @@
 import mammoth from 'mammoth'
 import { openai } from '@/lib/ai/openai'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export async function parseStoryFile(
   fileBuffer: Buffer,
@@ -239,8 +240,8 @@ Example output format:
       scene_description: page.scene_description || null,
       description_auto_generated: page.description_auto_generated || false,
     }))
-  } catch (error: any) {
-    const errorMessage = error.message || String(error)
+  } catch (error: unknown) {
+    const errorMessage = getErrorMessage(error)
     console.error('Error parsing story with GPT-5.2:', errorMessage)
     console.error('Full parsing error details:', error)
     throw new Error(`Failed to parse story with GPT-5.2: ${errorMessage}`)
@@ -348,8 +349,8 @@ Return ONLY valid JSON in this exact format:
             atmosphere: enhancedJson.atmosphere,
             description_auto_generated: false, // Still author-provided, just enhanced
           }
-        } catch (error: any) {
-          const errorMessage = error.message || String(error)
+        } catch (error: unknown) {
+          const errorMessage = getErrorMessage(error)
           console.error(`Error enhancing description for page ${page.page_number}:`, errorMessage)
           // Fallback: use original description if enhancement fails
           console.warn(`Using original description for page ${page.page_number} after enhancement error`)
@@ -459,8 +460,8 @@ Return ONLY valid JSON in this exact format:
           atmosphere: generatedJson.atmosphere,
           description_auto_generated: true,
         }
-      } catch (error: any) {
-        const errorMessage = error.message || String(error)
+      } catch (error: unknown) {
+        const errorMessage = getErrorMessage(error)
         console.error(`Error generating description for page ${page.page_number} with GPT-5.2:`, errorMessage)
         throw new Error(`Failed to generate description for page ${page.page_number} with GPT-5.2: ${errorMessage}`)
       }

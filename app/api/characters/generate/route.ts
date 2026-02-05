@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 
 import { buildCharacterPrompt } from '@/lib/utils/prompt-builder'
 import { removeMetadata, sanitizeFilename } from '@/lib/utils/metadata-cleaner'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export async function POST(request: NextRequest) {
   try {
@@ -155,9 +156,9 @@ export async function POST(request: NextRequest) {
         } else {
           console.log(`[Character Generate] ⚠️ Skipping sketch for ${character.name || character.role} - colored generation failed or no image URL`)
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Should catch errors that escaped generateCharacterImage
-        const errorMessage = error.message || 'Generation failed'
+        const errorMessage = getErrorMessage(error, 'Generation failed')
         console.error(`Error in loop for character ${character.id}:`, error)
 
         // Persist error to database so UI knows to stop loading
@@ -224,10 +225,10 @@ export async function POST(request: NextRequest) {
       generated: results.filter((r) => r.success).length,
       failed: results.filter((r) => !r.success).length,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error generating character images:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to generate character images' },
+      { error: getErrorMessage(error, 'Failed to generate character images') },
       { status: 500 }
     )
   }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export async function GET(
   request: NextRequest,
@@ -23,7 +24,7 @@ export async function GET(
     }
 
     return NextResponse.json(page)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching page:', error)
     return NextResponse.json(
       { error: 'Failed to fetch page' },
@@ -94,7 +95,7 @@ export async function PATCH(
     }
 
     return NextResponse.json(page)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating page:', error)
     return NextResponse.json(
       { error: 'Failed to update page' },

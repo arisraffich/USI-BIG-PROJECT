@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { getErrorMessage } from '@/lib/utils/error'
 
 export const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({
@@ -14,9 +15,9 @@ export async function parseCharacterForm(pdfBuffer: Buffer) {
   try {
     rawText = await parsePdf(pdfBuffer)
     // console.log('[parseCharacterForm] PDF extracted text length:', rawText.length)
-  } catch (pdfError: any) {
-    console.error('Error extracting PDF text:', pdfError.message)
-    throw new Error(`Failed to extract text from PDF: ${pdfError.message}`)
+  } catch (pdfError: unknown) {
+    console.error('Error extracting PDF text:', getErrorMessage(pdfError))
+    throw new Error(`Failed to extract text from PDF: ${getErrorMessage(pdfError)}`)
   }
 
   if (!rawText || rawText.trim().length < 10) {
@@ -105,8 +106,8 @@ Return valid JSON only with this structure:
     const result = await processCompletion(completion)
     console.log('[parseCharacterForm] Extraction result:', JSON.stringify(result, null, 2))
     return result
-  } catch (error: any) {
-    console.error('[parseCharacterForm] OpenAI API Error:', error.message)
+  } catch (error: unknown) {
+    console.error('[parseCharacterForm] OpenAI API Error:', getErrorMessage(error))
     // Return empty data on failure so process can continue
     return createEmptyCharacterData()
   }
@@ -141,8 +142,8 @@ async function processCompletion(completion: any) {
   let result
   try {
     result = JSON.parse(content)
-  } catch (parseError: any) {
-    console.error('Failed to parse OpenAI JSON response:', parseError.message)
+  } catch (parseError: unknown) {
+    console.error('Failed to parse OpenAI JSON response:', getErrorMessage(parseError))
     // Return empty on parse error
     return createEmptyCharacterData()
   }
