@@ -208,6 +208,9 @@ export function SharedIllustrationBoard({
     // Error display state
     const [showTechnicalDetails, setShowTechnicalDetails] = useState(false)
     
+    // Line Art Generation State
+    const [isGeneratingLineArt, setIsGeneratingLineArt] = useState(false)
+    
     // NEW: Environment Reference & Character Control (Mode 3/4)
     const [selectedEnvPageId, setSelectedEnvPageId] = useState<string | null>(null)
     const [sceneCharacters, setSceneCharacters] = useState<SceneCharacter[]>([])
@@ -381,6 +384,68 @@ export function SharedIllustrationBoard({
         link.click()
         document.body.removeChild(link)
     }, [])
+
+    // Line Art Generation Handler (Admin only)
+    const handleGenerateLineArt = useCallback(async () => {
+        if (!page.illustration_url) {
+            toast.error('No illustration available')
+            return
+        }
+
+        setIsGeneratingLineArt(true)
+        toast.info('Generating line art...', { duration: 60000, id: 'lineart-progress' })
+
+        try {
+            const response = await fetch('/api/line-art/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    illustrationUrl: page.illustration_url,
+                    pageNumber: page.page_number
+                })
+            })
+
+            if (!response.ok) {
+                // Try to parse error as JSON, fallback to text
+                let errorMessage = 'Failed to generate line art'
+                try {
+                    const errorData = await response.json()
+                    errorMessage = errorData.error || errorMessage
+                } catch {
+                    // Response wasn't JSON, try text
+                    try {
+                        errorMessage = await response.text() || errorMessage
+                    } catch {
+                        // Ignore
+                    }
+                }
+                toast.error(errorMessage, { id: 'lineart-progress' })
+                return
+            }
+
+            // Download the PNG directly
+            const blob = await response.blob()
+            const url = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = `lineart ${page.page_number}.png`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            URL.revokeObjectURL(url)
+
+            toast.success('Line art downloaded!', { id: 'lineart-progress' })
+
+        } catch (err) {
+            console.error('Line art generation error:', err)
+            const message = err && typeof err === 'object' && 'message' in err 
+                ? String(err.message) 
+                : 'Failed to generate line art'
+            toast.error(message, { id: 'lineart-progress' })
+        } finally {
+            setIsGeneratingLineArt(false)
+        }
+    }, [page.illustration_url, page.page_number])
 
     const handleCustomerSave = useCallback(async (textOverride?: string) => {
         if (!onSaveFeedback) return
@@ -1309,8 +1374,30 @@ export function SharedIllustrationBoard({
 
                         {/* ILLUSTRATION HEADER (or PAGE TEXT for customer pages 2+) */}
                         <div className="flex items-center justify-between gap-2 px-3 bg-slate-50/30">
-                            {/* LEFT: Badge */}
+                            {/* LEFT: Create LineArt Button (Admin only, when illustration exists) */}
                             <div className="flex items-center gap-2 min-w-[80px]">
+                                {isAdmin && illustrationUrl && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleGenerateLineArt}
+                                        disabled={isGeneratingLineArt}
+                                        className="h-7 px-2.5 text-[10px] font-semibold bg-white border-purple-200 text-purple-700 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-800 transition-colors"
+                                        title="Generate transparent line art PNG"
+                                    >
+                                        {isGeneratingLineArt ? (
+                                            <>
+                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                                Creating...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Pencil className="w-3 h-3 mr-1" />
+                                                Create LineArt
+                                            </>
+                                        )}
+                                    </Button>
+                                )}
                                 {isAdmin && isManualUpload(illustrationUrl) && (
                                     <span className="px-1.5 py-0.5 text-[9px] font-bold bg-rose-50 text-rose-600 rounded border border-rose-100 leading-none">
                                         UPLOADED

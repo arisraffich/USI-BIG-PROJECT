@@ -417,3 +417,83 @@ export async function generateSketch(
         return { success: false, imageBuffer: null, error: error.message }
     }
 }
+
+/**
+ * Generate Line Art from a colored illustration
+ * Uses the same model as sketch but with line art specific prompt
+ */
+export async function generateLineArt(
+    sourceImageUrl: string,
+    prompt: string
+): Promise<{ success: boolean, imageBuffer: Buffer | null, error: string | null }> {
+    if (!API_KEY) throw new Error('Google API Key missing')
+
+    try {
+        const parts: any[] = [{ text: prompt }]
+
+        // Attach Source Image (The Illustration)
+        const img = await fetchImageAsBase64(sourceImageUrl)
+        if (img) {
+            parts.push({
+                inline_data: {
+                    mime_type: img.mimeType,
+                    data: img.data
+                }
+            })
+        } else {
+            throw new Error('Failed to download source illustration for line art')
+        }
+
+        const payload = {
+            contents: [{ parts }],
+            generationConfig: {
+                responseModalities: ['IMAGE'],
+                imageConfig: {
+                    imageSize: "2K" // Match sketch quality
+                }
+            }
+        }
+
+        // Wrap API call in retry logic
+        const result = await retryWithBackoff(async () => {
+            const response = await fetch(`${BASE_URL}/${ILLUSTRATION_MODEL}:generateContent?key=${API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+
+            if (!response.ok) {
+                const txt = await response.text()
+                throw new Error(`Google API Error (Line Art): ${response.status} - ${txt}`)
+            }
+
+            return await response.json()
+        }, 'Generate Line Art')
+
+        const candidate = result.candidates?.[0]?.content?.parts?.[0]
+        const base64Image = candidate?.inline_data?.data || candidate?.inlineData?.data
+        
+        if (!base64Image) {
+            const blockReason = result.promptFeedback?.blockReason
+            const finishReason = result.candidates?.[0]?.finishReason
+            
+            if (blockReason) {
+                throw new Error(`Content blocked: ${blockReason}`)
+            }
+            if (finishReason === 'SAFETY' || finishReason === 'IMAGE_SAFETY') {
+                throw new Error('Image blocked by safety filters')
+            }
+            
+            throw new Error('No image generated')
+        }
+
+        const rawBuffer = Buffer.from(base64Image, 'base64')
+        const cleanBuffer = await removeMetadata(rawBuffer)
+
+        return { success: true, imageBuffer: cleanBuffer, error: null }
+
+    } catch (error: any) {
+        console.error('generateLineArt error:', error)
+        return { success: false, imageBuffer: null, error: error.message }
+    }
+}

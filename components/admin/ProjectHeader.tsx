@@ -2,11 +2,11 @@
 
 import { UnifiedHeaderShell } from '@/components/layout/UnifiedHeaderShell'
 import { SharedProjectHeader } from '@/components/layout/SharedProjectHeader'
-import { useTransition, useState, useEffect } from 'react'
+import { useTransition, useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Home, Loader2, Send, Menu, FileText, Sparkles, ArrowLeft, Download, ExternalLink, Info, Upload, Palette } from 'lucide-react'
+import { Home, Loader2, Send, Menu, FileText, Sparkles, ArrowLeft, Download, ExternalLink, Info, Upload, Palette, Pencil, CheckCircle2, XCircle, AlertTriangle, RefreshCw, Mail } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
@@ -27,6 +27,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
+import JSZip from 'jszip'
 import { ProjectStatus } from '@/types/project'
 import { useProjectStatus } from '@/hooks/use-project-status'
 import { toast } from 'sonner'
@@ -102,6 +110,34 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const [isPushDialogOpen, setIsPushDialogOpen] = useState(false)
   const [isPushing, setIsPushing] = useState(false)
   const [isSendingColoringRequest, setIsSendingColoringRequest] = useState(false)
+  
+  // Line Art Download state
+  const [isDownloadingLineArt, setIsDownloadingLineArt] = useState(false)
+  const [lineArtModal, setLineArtModal] = useState<{
+    open: boolean
+    phase: 'generating' | 'zipping' | 'done' | 'error'
+    total: number
+    successCount: number
+    failedPages: number[]
+    retryingPages: number[]
+    message: string
+  }>({
+    open: false,
+    phase: 'generating',
+    total: 0,
+    successCount: 0,
+    failedPages: [],
+    retryingPages: [],
+    message: '',
+  })
+
+  // Refs for storing blobs (don't trigger re-renders)
+  const lineArtBlobsRef = useRef<Map<number, Blob>>(new Map())
+  const illustrationPagesRef = useRef<Array<{ page_number: number; illustration_url: string }>>([])
+
+  // Email & Line Art status state
+  const [isSendingEmail, setIsSendingEmail] = useState(false)
+  const [hasLineArtInStorage, setHasLineArtInStorage] = useState(false)
 
   // Hydration fix
   useEffect(() => {
@@ -112,6 +148,16 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   useEffect(() => {
     setShowColoredToCustomer(projectInfo.show_colored_to_customer ?? false)
   }, [projectInfo.show_colored_to_customer])
+
+  // Check if line art exists in storage (for showing/enabling buttons)
+  useEffect(() => {
+    if (projectInfo.status === 'illustration_approved') {
+      fetch(`/api/line-art/status?projectId=${projectId}`)
+        .then(res => res.json())
+        .then(data => setHasLineArtInStorage(data.hasLineArt || false))
+        .catch(() => setHasLineArtInStorage(false))
+    }
+  }, [projectId, projectInfo.status])
   
   // Handle toggle for showing colored images to customer
   const handleToggleColoredImages = async (checked: boolean) => {
@@ -517,13 +563,299 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     }
   }
 
+  // Build ZIP and trigger download
+  const buildAndDownloadZip = useCallback(async () => {
+    setLineArtModal(prev => ({ ...prev, phase: 'zipping', message: 'Creating ZIP file...' }))
+
+    try {
+      const zip = new JSZip()
+      const lineArtFolder = zip.folder('Line Art')!
+      const illustrationsFolder = zip.folder('Illustrations')!
+
+      // Add all collected line art blobs
+      for (const [pageNumber, blob] of lineArtBlobsRef.current) {
+        lineArtFolder.file(`lineart ${pageNumber}.png`, blob)
+      }
+
+      // Fetch illustrations concurrently (bounded to 5)
+      const pages = [...illustrationPagesRef.current]
+      const illustrationQueue = [...pages]
+      const fetchIllustration = async () => {
+        while (illustrationQueue.length > 0) {
+          const page = illustrationQueue.shift()!
+          try {
+            const res = await fetch(page.illustration_url)
+            if (res.ok) {
+              const blob = await res.blob()
+              illustrationsFolder.file(`illustration ${page.page_number}.png`, blob)
+            }
+          } catch {
+            // Non-critical: skip failed illustration downloads
+          }
+        }
+      }
+      const illWorkers = Array(Math.min(5, pages.length))
+        .fill(null)
+        .map(() => fetchIllustration())
+      await Promise.all(illWorkers)
+
+      // Generate and download ZIP
+      const zipBlob = await zip.generateAsync({ type: 'blob' })
+
+      const safeTitle = (projectInfo.book_title || 'line-art')
+        .replace(/[^a-zA-Z0-9\s]/g, '')
+        .replace(/\s+/g, '_')
+        .trim()
+
+      const url = window.URL.createObjectURL(zipBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${safeTitle}_LineArt.zip`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      setHasLineArtInStorage(true)
+      setLineArtModal(prev => ({
+        ...prev,
+        phase: 'done',
+        message: `All ${prev.successCount} line arts downloaded!`,
+      }))
+    } catch (error: any) {
+      setLineArtModal(prev => ({
+        ...prev,
+        phase: 'error',
+        message: error.message || 'Failed to create ZIP',
+      }))
+    }
+  }, [projectInfo.book_title])
+
+  // Retry a single failed page
+  const handleRetryPage = useCallback(async (pageNumber: number) => {
+    // Find illustration URL for this page
+    const page = illustrationPagesRef.current.find(p => p.page_number === pageNumber)
+    if (!page) return
+
+    // Mark as retrying
+    setLineArtModal(prev => ({
+      ...prev,
+      retryingPages: [...prev.retryingPages, pageNumber],
+    }))
+
+    try {
+      const response = await fetch('/api/line-art/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          illustrationUrl: page.illustration_url,
+          pageNumber,
+          projectId,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Page ${pageNumber} failed`)
+      }
+
+      const blob = await response.blob()
+      lineArtBlobsRef.current.set(pageNumber, blob)
+
+      // Update state: remove from failed + retrying, increment success
+      setLineArtModal(prev => {
+        const newFailed = prev.failedPages.filter(p => p !== pageNumber)
+        const newRetrying = prev.retryingPages.filter(p => p !== pageNumber)
+        const newSuccessCount = prev.successCount + 1
+
+        // If all pages now succeeded, auto-download
+        if (newFailed.length === 0) {
+          // Trigger auto-download after state update
+          setTimeout(() => buildAndDownloadZip(), 100)
+        }
+
+        return {
+          ...prev,
+          successCount: newSuccessCount,
+          failedPages: newFailed,
+          retryingPages: newRetrying,
+          message: newFailed.length === 0
+            ? `All ${newSuccessCount} line arts generated!`
+            : `${newSuccessCount} of ${prev.total} generated, ${newFailed.length} remaining`,
+        }
+      })
+    } catch {
+      // Remove from retrying but keep in failed
+      setLineArtModal(prev => ({
+        ...prev,
+        retryingPages: prev.retryingPages.filter(p => p !== pageNumber),
+        message: `Page ${pageNumber} failed again. Try once more.`,
+      }))
+    }
+  }, [buildAndDownloadZip])
+
+  const handleDownloadLineArt = async () => {
+    if (isDownloadingLineArt) return
+
+    setIsDownloadingLineArt(true)
+    lineArtBlobsRef.current = new Map()
+    illustrationPagesRef.current = []
+
+    setLineArtModal({
+      open: true,
+      phase: 'generating',
+      total: 0,
+      successCount: 0,
+      failedPages: [],
+      retryingPages: [],
+      message: 'Fetching pages...',
+    })
+
+    try {
+      // Step 1: Fetch all pages with illustrations
+      const supabase = createClient()
+      const { data: pages, error: pagesError } = await supabase
+        .from('pages')
+        .select('id, page_number, illustration_url')
+        .eq('project_id', projectId)
+        .not('illustration_url', 'is', null)
+        .order('page_number', { ascending: true })
+
+      if (pagesError || !pages || pages.length === 0) {
+        throw new Error('No illustrated pages found')
+      }
+
+      // Store pages for retry + illustration fetching
+      illustrationPagesRef.current = pages.map(p => ({
+        page_number: p.page_number,
+        illustration_url: p.illustration_url!,
+      }))
+
+      const total = pages.length
+      let successCount = 0
+      const failedPages: number[] = []
+
+      setLineArtModal(prev => ({ ...prev, total, message: `Generating line art 0/${total}...` }))
+
+      // Step 2: Generate line art for each page (3 concurrent)
+      const MAX_CONCURRENT = 3
+      const queue = [...pages]
+
+      const processNext = async () => {
+        while (queue.length > 0) {
+          const page = queue.shift()!
+          try {
+            const response = await fetch('/api/line-art/generate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                illustrationUrl: page.illustration_url,
+                pageNumber: page.page_number,
+                projectId,
+              }),
+            })
+
+            if (!response.ok) {
+              throw new Error(`Page ${page.page_number} failed`)
+            }
+
+            const blob = await response.blob()
+            lineArtBlobsRef.current.set(page.page_number, blob)
+            successCount++
+          } catch {
+            failedPages.push(page.page_number)
+          }
+
+          const processed = successCount + failedPages.length
+          setLineArtModal(prev => ({
+            ...prev,
+            successCount,
+            failedPages: [...failedPages],
+            message: `Generating line art ${processed}/${total}...`,
+          }))
+        }
+      }
+
+      const workers = Array(Math.min(MAX_CONCURRENT, pages.length))
+        .fill(null)
+        .map(() => processNext())
+      await Promise.all(workers)
+
+      setIsDownloadingLineArt(false)
+
+      if (lineArtBlobsRef.current.size === 0) {
+        throw new Error('All line art generations failed')
+      }
+
+      // Step 3: If no failures, auto-download. Otherwise show retry UI.
+      if (failedPages.length === 0) {
+        setLineArtModal(prev => ({
+          ...prev,
+          message: `All ${successCount} line arts generated!`,
+        }))
+        await buildAndDownloadZip()
+      } else {
+        setLineArtModal(prev => ({
+          ...prev,
+          phase: 'generating', // Stay in generating phase to show retry UI
+          message: `${successCount} of ${total} generated, ${failedPages.length} failed`,
+        }))
+      }
+
+    } catch (error: any) {
+      setIsDownloadingLineArt(false)
+      setLineArtModal(prev => ({
+        ...prev,
+        phase: 'error',
+        message: error.message || 'An unexpected error occurred',
+      }))
+    }
+  }
+
+  // Email handlers
+  const handleEmailSketches = async () => {
+    if (isSendingEmail) return
+    setIsSendingEmail(true)
+    try {
+      const response = await fetch('/api/email/send-sketches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      })
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to send email')
+      }
+      toast.success('Sketches emailed!', { description: 'Sent to info@usillustrations.com' })
+    } catch (error: any) {
+      toast.error('Failed to send email', { description: error.message })
+    } finally {
+      setIsSendingEmail(false)
+    }
+  }
+
+  const handleEmailLineArt = async () => {
+    if (isSendingEmail) return
+    setIsSendingEmail(true)
+    try {
+      const response = await fetch('/api/email/send-lineart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      })
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to send email')
+      }
+      toast.success('Line art emailed!', { description: 'Sent to info@usillustrations.com' })
+    } catch (error: any) {
+      toast.error('Failed to send email', { description: error.message })
+    } finally {
+      setIsSendingEmail(false)
+    }
+  }
+
   const handleSendToCustomer = async () => {
     if (stage.buttonDisabled || isSendingToCustomer) return
-
-    if (stage.isDownload) {
-      handleDownloadIllustrations()
-      return
-    }
 
     if (stage.buttonLabel === 'Create Illustrations') {
       if (onCreateIllustrations) {
@@ -607,6 +939,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   }
 
   return (
+    <>
     <SharedProjectHeader
       projectTitle={projectInfo.book_title}
       authorName={`${projectInfo.author_firstname} ${projectInfo.author_lastname}'s Project`}
@@ -735,30 +1068,250 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
               <span>Customers can see colored illustrations.</span>
             </p>
           </div>
+
+          {/* Downloads & Email section - only after approval */}
+          {stage.isDownload && (
+            <>
+              <div className="h-px bg-slate-100" />
+              
+              {/* Downloads */}
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1">Downloads</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start gap-2 h-9"
+                  onClick={handleDownloadIllustrations}
+                  disabled={isDownloading || isSendingEmail}
+                >
+                  {isDownloading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 text-blue-600" />
+                  )}
+                  Download Sketches
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start gap-2 h-9"
+                  onClick={handleDownloadLineArt}
+                  disabled={isDownloadingLineArt || isSendingEmail}
+                >
+                  {isDownloadingLineArt ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 text-purple-600" />
+                  )}
+                  Download Line Art
+                </Button>
+              </div>
+
+              {/* Email */}
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1">Email to info@</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start gap-2 h-9"
+                  onClick={handleEmailSketches}
+                  disabled={isSendingEmail || isDownloading || isDownloadingLineArt}
+                >
+                  {isSendingEmail ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Mail className="w-4 h-4 text-blue-600" />
+                  )}
+                  Email Sketches
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start gap-2 h-9"
+                  onClick={handleEmailLineArt}
+                  disabled={!hasLineArtInStorage || isSendingEmail || isDownloading || isDownloadingLineArt}
+                  title={!hasLineArtInStorage ? 'Generate line art first using Download Line Art' : 'Email line art to info@usillustrations.com'}
+                >
+                  <Mail className={cn("w-4 h-4", hasLineArtInStorage ? "text-purple-600" : "text-slate-300")} />
+                  Email Line Art
+                </Button>
+                {!hasLineArtInStorage && (
+                  <p className="text-[10px] text-slate-400 px-1">Generate line art first to enable email.</p>
+                )}
+              </div>
+            </>
+          )}
         </>
       }
       actions={
-        <Button
-          onClick={handleSendToCustomer}
-          disabled={isSendingToCustomer || isDownloading || stage.buttonDisabled}
-          size="sm"
-          className={`flex px-3 md:px-4 ${stage.buttonDisabled ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none' : stage.isDownload ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg' : 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg'} font-semibold transition-all duration-75 rounded-md whitespace-nowrap items-center justify-center h-9`}
-        >
-          {stage.isDownload ? (
-            <Download className="w-4 h-4 md:mr-2" />
-          ) : (
+        !stage.isDownload ? (
+          <Button
+            onClick={handleSendToCustomer}
+            disabled={isSendingToCustomer || isDownloading || stage.buttonDisabled}
+            size="sm"
+            className={`flex px-3 md:px-4 ${stage.buttonDisabled ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none' : 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg'} font-semibold transition-all duration-75 rounded-md whitespace-nowrap items-center justify-center h-9`}
+          >
             <Send className="w-4 h-4 md:mr-2" />
-          )}
-          <span className="hidden md:inline">{buttonDisplayLabel}</span>
-          <span className="md:hidden">{stage.isDownload ? 'Download' : 'Send'}</span>
+            <span className="hidden md:inline">{buttonDisplayLabel}</span>
+            <span className="md:hidden">Send</span>
 
-          {stage.showCount && !isSendingToCustomer && displayCount > 0 && (
-            <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
-              {displayCount}
-            </span>
-          )}
-        </Button>
+            {stage.showCount && !isSendingToCustomer && displayCount > 0 && (
+              <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
+                {displayCount}
+              </span>
+            )}
+          </Button>
+        ) : undefined
       }
     />
+
+    {/* Line Art Progress Modal */}
+    <Dialog open={lineArtModal.open} onOpenChange={(open) => {
+      // Allow closing when done, error, or showing retry UI (not during active generation/zipping)
+      const canClose = lineArtModal.phase === 'done' || lineArtModal.phase === 'error' || 
+        (lineArtModal.failedPages.length > 0 && !isDownloadingLineArt && lineArtModal.retryingPages.length === 0 && lineArtModal.phase !== 'zipping')
+      if (!open && canClose) {
+        setLineArtModal(prev => ({ ...prev, open: false }))
+      }
+    }}>
+      <DialogContent
+        showCloseButton={lineArtModal.phase === 'done' || lineArtModal.phase === 'error' || (lineArtModal.failedPages.length > 0 && !isDownloadingLineArt && lineArtModal.retryingPages.length === 0)}
+        onInteractOutside={(e) => {
+          const canClose = lineArtModal.phase === 'done' || lineArtModal.phase === 'error' || 
+            (lineArtModal.failedPages.length > 0 && !isDownloadingLineArt && lineArtModal.retryingPages.length === 0 && lineArtModal.phase !== 'zipping')
+          if (!canClose) e.preventDefault()
+        }}
+        onEscapeKeyDown={(e) => {
+          const canClose = lineArtModal.phase === 'done' || lineArtModal.phase === 'error' || 
+            (lineArtModal.failedPages.length > 0 && !isDownloadingLineArt && lineArtModal.retryingPages.length === 0 && lineArtModal.phase !== 'zipping')
+          if (!canClose) e.preventDefault()
+        }}
+        className="sm:max-w-md"
+      >
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {lineArtModal.phase === 'done' ? (
+              <>
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                Line Art Complete
+              </>
+            ) : lineArtModal.phase === 'error' ? (
+              <>
+                <XCircle className="w-5 h-5 text-red-600" />
+                Generation Failed
+              </>
+            ) : lineArtModal.phase === 'zipping' ? (
+              <>
+                <Loader2 className="w-5 h-5 text-purple-600 animate-spin" />
+                Preparing Download
+              </>
+            ) : lineArtModal.failedPages.length > 0 && !isDownloadingLineArt ? (
+              <>
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+                Some Pages Failed
+              </>
+            ) : (
+              <>
+                <Pencil className="w-5 h-5 text-purple-600" />
+                Generating Line Art
+              </>
+            )}
+          </DialogTitle>
+          <DialogDescription>
+            {lineArtModal.phase === 'done'
+              ? 'Your line art ZIP has been downloaded.'
+              : lineArtModal.phase === 'error'
+              ? 'Something went wrong during generation.'
+              : lineArtModal.phase === 'zipping'
+              ? 'Building your ZIP file...'
+              : lineArtModal.failedPages.length > 0 && !isDownloadingLineArt
+              ? 'Retry failed pages or download what succeeded.'
+              : 'Please wait while line art is being generated.'}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Progress Bar */}
+          {lineArtModal.total > 0 && lineArtModal.phase !== 'error' && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm text-slate-600">
+                <span>{lineArtModal.successCount} of {lineArtModal.total} generated</span>
+                <span className="font-medium">
+                  {Math.round((lineArtModal.successCount / lineArtModal.total) * 100)}%
+                </span>
+              </div>
+              <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all duration-500 ease-out",
+                    lineArtModal.phase === 'done' ? 'bg-green-500' : 'bg-purple-500'
+                  )}
+                  style={{
+                    width: `${lineArtModal.total > 0 ? (lineArtModal.successCount / lineArtModal.total) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Status Message */}
+          <div className={cn(
+            "flex items-center gap-2 text-sm",
+            lineArtModal.phase === 'error' ? 'text-red-600' : 'text-slate-600'
+          )}>
+            {isDownloadingLineArt || lineArtModal.retryingPages.length > 0 || lineArtModal.phase === 'zipping' ? (
+              <Loader2 className="w-4 h-4 animate-spin text-purple-500 shrink-0" />
+            ) : null}
+            <span>{lineArtModal.message}</span>
+          </div>
+
+          {/* Failed pages with retry buttons */}
+          {lineArtModal.failedPages.length > 0 && !isDownloadingLineArt && lineArtModal.phase !== 'done' && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Failed pages</p>
+              <div className="flex flex-wrap gap-2">
+                {lineArtModal.failedPages.map(pageNum => {
+                  const isRetrying = lineArtModal.retryingPages.includes(pageNum)
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => handleRetryPage(pageNum)}
+                      disabled={isRetrying}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors",
+                        isRetrying
+                          ? "bg-purple-50 text-purple-400 cursor-wait"
+                          : "bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 hover:border-red-300"
+                      )}
+                    >
+                      {isRetrying ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-3 h-3" />
+                      )}
+                      Page {pageNum}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Download button (when there are failures but some succeeded) */}
+          {lineArtModal.failedPages.length > 0 && !isDownloadingLineArt && lineArtModal.successCount > 0 && lineArtModal.phase !== 'done' && lineArtModal.phase !== 'zipping' && lineArtModal.retryingPages.length === 0 && (
+            <Button
+              onClick={buildAndDownloadZip}
+              size="sm"
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download {lineArtModal.successCount} Line Arts
+            </Button>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    </>
   )
 }

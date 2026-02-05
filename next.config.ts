@@ -20,6 +20,7 @@ const nextConfig: NextConfig = {
   // Add empty turbopack config to silence the warning
   // (webpack config is still used when --webpack flag is passed)
   turbopack: {},
+  serverExternalPackages: ['potrace'],
   experimental: {
     serverActions: {
       bodySizeLimit: '10mb',
