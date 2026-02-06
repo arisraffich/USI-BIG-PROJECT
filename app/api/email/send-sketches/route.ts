@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
         // Build ZIP
         const zip = new JSZip()
         const sketchesFolder = zip.folder('Sketches')!
-        const illustrationsFolder = zip.folder('Illustrations')!
+        const illustrationsFolder = zip.folder('Color References')!
 
         const downloadPromises: Promise<void>[] = []
 

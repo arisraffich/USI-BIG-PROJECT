@@ -563,7 +563,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     try {
       const zip = new JSZip()
       const lineArtFolder = zip.folder('Line Art')!
-      const illustrationsFolder = zip.folder('Illustrations')!
+      const illustrationsFolder = zip.folder('Color References')!
 
       // Add all collected line art blobs
       for (const [pageNumber, blob] of lineArtBlobsRef.current) {
@@ -657,7 +657,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
 
       const zip = new JSZip()
       const lineArtFolder = zip.folder('Line Art')!
-      const illustrationsFolder = zip.folder('Illustrations')!
+      const illustrationsFolder = zip.folder('Color References')!
 
       // Fetch line art files from storage
       const lineArtUrls = statusData.urls || []
