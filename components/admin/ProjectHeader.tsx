@@ -1424,7 +1424,6 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
               <Button
                 onClick={buildAndDownloadZip}
                 size="sm"
-                disabled={lineArtModal.phase === 'zipping'}
                 className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold"
               >
                 <Download className="w-4 h-4 mr-2" />
