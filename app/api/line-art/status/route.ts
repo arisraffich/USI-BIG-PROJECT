@@ -13,5 +13,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
         hasLineArt: files.length > 0,
         count: files.length,
+        urls: files,
     })
 }

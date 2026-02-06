@@ -127,7 +127,9 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const illustrationPagesRef = useRef<Array<{ page_number: number; illustration_url: string }>>([])
 
   // Email & Line Art status state
-  const [isSendingEmail, setIsSendingEmail] = useState(false)
+  const [isSendingSketchesEmail, setIsSendingSketchesEmail] = useState(false)
+  const [isSendingLineArtEmail, setIsSendingLineArtEmail] = useState(false)
+  const [isDownloadingExistingLineArt, setIsDownloadingExistingLineArt] = useState(false)
   const [hasLineArtInStorage, setHasLineArtInStorage] = useState(false)
 
   // Hydration fix
@@ -554,7 +556,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     }
   }
 
-  // Build ZIP and trigger download
+  // Build ZIP and trigger download (used from modal buttons and settings download)
   const buildAndDownloadZip = useCallback(async () => {
     setLineArtModal(prev => ({ ...prev, phase: 'zipping', message: 'Creating ZIP file...' }))
 
@@ -622,6 +624,99 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     }
   }, [projectInfo.book_title])
 
+  // Download existing line art from storage (no generation, for settings button)
+  const handleDownloadExistingLineArt = useCallback(async () => {
+    if (isDownloadingExistingLineArt) return
+    setIsDownloadingExistingLineArt(true)
+
+    try {
+      // Fetch line art status to get URLs
+      const statusRes = await fetch(`/api/line-art/status?projectId=${projectId}`)
+      const statusData = await statusRes.json()
+
+      if (!statusData.hasLineArt) {
+        toast.error('No line art found. Generate line art first.')
+        return
+      }
+
+      // Fetch pages for illustrations
+      const supabase = createClient()
+      const { data: pages } = await supabase
+        .from('pages')
+        .select('page_number, illustration_url')
+        .eq('project_id', projectId)
+        .not('illustration_url', 'is', null)
+        .order('page_number', { ascending: true })
+
+      if (!pages || pages.length === 0) {
+        toast.error('No pages found')
+        return
+      }
+
+      toast.info('Preparing download...')
+
+      const zip = new JSZip()
+      const lineArtFolder = zip.folder('Line Art')!
+      const illustrationsFolder = zip.folder('Illustrations')!
+
+      // Fetch line art files from storage
+      const lineArtUrls = statusData.urls || []
+      const downloadPromises: Promise<void>[] = []
+
+      for (const file of lineArtUrls) {
+        downloadPromises.push(
+          fetch(file.url)
+            .then(async (res) => {
+              if (res.ok) {
+                const blob = await res.blob()
+                lineArtFolder.file(`lineart ${file.pageNumber}.png`, blob)
+              }
+            })
+            .catch(() => {})
+        )
+      }
+
+      // Fetch illustrations
+      for (const page of pages) {
+        if (page.illustration_url) {
+          downloadPromises.push(
+            fetch(page.illustration_url)
+              .then(async (res) => {
+                if (res.ok) {
+                  const blob = await res.blob()
+                  illustrationsFolder.file(`illustration ${page.page_number}.png`, blob)
+                }
+              })
+              .catch(() => {})
+          )
+        }
+      }
+
+      await Promise.all(downloadPromises)
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' })
+      const safeTitle = (projectInfo.book_title || 'line-art')
+        .replace(/[^a-zA-Z0-9\s]/g, '')
+        .replace(/\s+/g, '_')
+        .trim()
+
+      const url = window.URL.createObjectURL(zipBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${safeTitle}_LineArt.zip`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      toast.success('Download started!')
+    } catch (error: unknown) {
+      toast.error('Failed to download', { description: getErrorMessage(error) })
+    } finally {
+      setIsDownloadingExistingLineArt(false)
+    }
+  }, [projectId, projectInfo.book_title, isDownloadingExistingLineArt])
+
   // Retry a single failed page
   const handleRetryPage = useCallback(async (pageNumber: number) => {
     // Find illustration URL for this page
@@ -658,14 +753,13 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         const newRetrying = prev.retryingPages.filter(p => p !== pageNumber)
         const newSuccessCount = prev.successCount + 1
 
-        // If all pages now succeeded, auto-download
         if (newFailed.length === 0) {
-          // Trigger auto-download after state update
-          setTimeout(() => buildAndDownloadZip(), 100)
+          setHasLineArtInStorage(true)
         }
 
         return {
           ...prev,
+          phase: newFailed.length === 0 ? 'done' : prev.phase,
           successCount: newSuccessCount,
           failedPages: newFailed,
           retryingPages: newRetrying,
@@ -682,7 +776,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         message: `Page ${pageNumber} failed again. Try once more.`,
       }))
     }
-  }, [buildAndDownloadZip])
+  }, [projectId])
 
   const handleDownloadLineArt = async () => {
     if (isDownloadingLineArt) return
@@ -777,13 +871,14 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         throw new Error('All line art generations failed')
       }
 
-      // Step 3: If no failures, auto-download. Otherwise show retry UI.
+      // Step 3: If no failures, show done state with Download/Email buttons. Otherwise show retry UI.
       if (failedPages.length === 0) {
+        setHasLineArtInStorage(true)
         setLineArtModal(prev => ({
           ...prev,
+          phase: 'done',
           message: `All ${successCount} line arts generated!`,
         }))
-        await buildAndDownloadZip()
       } else {
         setLineArtModal(prev => ({
           ...prev,
@@ -804,8 +899,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
 
   // Email handlers
   const handleEmailSketches = async () => {
-    if (isSendingEmail) return
-    setIsSendingEmail(true)
+    if (isSendingSketchesEmail) return
+    setIsSendingSketchesEmail(true)
     try {
       const response = await fetch('/api/email/send-sketches', {
         method: 'POST',
@@ -820,13 +915,13 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     } catch (error: unknown) {
       toast.error('Failed to send email', { description: getErrorMessage(error) })
     } finally {
-      setIsSendingEmail(false)
+      setIsSendingSketchesEmail(false)
     }
   }
 
   const handleEmailLineArt = async () => {
-    if (isSendingEmail) return
-    setIsSendingEmail(true)
+    if (isSendingLineArtEmail) return
+    setIsSendingLineArtEmail(true)
     try {
       const response = await fetch('/api/email/send-lineart', {
         method: 'POST',
@@ -841,7 +936,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     } catch (error: unknown) {
       toast.error('Failed to send email', { description: getErrorMessage(error) })
     } finally {
-      setIsSendingEmail(false)
+      setIsSendingLineArtEmail(false)
     }
   }
 
@@ -1073,7 +1168,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
                   size="sm"
                   className="w-full justify-start gap-2 h-9"
                   onClick={handleDownloadIllustrations}
-                  disabled={isDownloading || isSendingEmail}
+                  disabled={isDownloading || isSendingSketchesEmail || isSendingLineArtEmail}
                 >
                   {isDownloading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -1086,16 +1181,20 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
                   variant="outline"
                   size="sm"
                   className="w-full justify-start gap-2 h-9"
-                  onClick={handleDownloadLineArt}
-                  disabled={isDownloadingLineArt || isSendingEmail}
+                  onClick={handleDownloadExistingLineArt}
+                  disabled={!hasLineArtInStorage || isDownloadingExistingLineArt || isDownloading || isSendingSketchesEmail || isSendingLineArtEmail}
+                  title={!hasLineArtInStorage ? 'Generate line art first' : 'Download line art from storage'}
                 >
-                  {isDownloadingLineArt ? (
+                  {isDownloadingExistingLineArt ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <Download className="w-4 h-4 text-purple-600" />
+                    <Download className={cn("w-4 h-4", hasLineArtInStorage ? "text-purple-600" : "text-slate-300")} />
                   )}
                   Download Line Art
                 </Button>
+                {!hasLineArtInStorage && (
+                  <p className="text-[10px] text-slate-400 px-1">Generate line art first to enable download.</p>
+                )}
               </div>
 
               {/* Email */}
@@ -1106,9 +1205,9 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
                   size="sm"
                   className="w-full justify-start gap-2 h-9"
                   onClick={handleEmailSketches}
-                  disabled={isSendingEmail || isDownloading || isDownloadingLineArt}
+                  disabled={isSendingSketchesEmail || isSendingLineArtEmail || isDownloading || isDownloadingLineArt}
                 >
-                  {isSendingEmail ? (
+                  {isSendingSketchesEmail ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <Mail className="w-4 h-4 text-blue-600" />
@@ -1120,10 +1219,14 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
                   size="sm"
                   className="w-full justify-start gap-2 h-9"
                   onClick={handleEmailLineArt}
-                  disabled={!hasLineArtInStorage || isSendingEmail || isDownloading || isDownloadingLineArt}
-                  title={!hasLineArtInStorage ? 'Generate line art first using Download Line Art' : 'Email line art to info@usillustrations.com'}
+                  disabled={!hasLineArtInStorage || isSendingSketchesEmail || isSendingLineArtEmail || isDownloading || isDownloadingLineArt}
+                  title={!hasLineArtInStorage ? 'Generate line art first' : 'Email line art to info@usillustrations.com'}
                 >
-                  <Mail className={cn("w-4 h-4", hasLineArtInStorage ? "text-purple-600" : "text-slate-300")} />
+                  {isSendingLineArtEmail ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Mail className={cn("w-4 h-4", hasLineArtInStorage ? "text-purple-600" : "text-slate-300")} />
+                  )}
                   Email Line Art
                 </Button>
                 {!hasLineArtInStorage && (
@@ -1155,7 +1258,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         ) : (
           <Button
             onClick={handleDownloadLineArt}
-            disabled={isDownloadingLineArt || isSendingEmail}
+            disabled={isDownloadingLineArt || isSendingSketchesEmail || isSendingLineArtEmail}
             size="sm"
             className="flex px-3 md:px-4 bg-purple-600 hover:bg-purple-700 text-white shadow-md hover:shadow-lg font-semibold transition-all duration-75 rounded-md whitespace-nowrap items-center justify-center h-9"
           >
@@ -1164,7 +1267,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
             ) : (
               <Pencil className="w-4 h-4 md:mr-2" />
             )}
-            <span className="hidden md:inline">{isDownloadingLineArt ? 'Generating...' : 'Download Line Art'}</span>
+            <span className="hidden md:inline">{isDownloadingLineArt ? 'Generating...' : 'Generate Line Art'}</span>
             <span className="md:hidden">Line Art</span>
           </Button>
         )
@@ -1225,7 +1328,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
           </DialogTitle>
           <DialogDescription>
             {lineArtModal.phase === 'done'
-              ? 'Your line art ZIP has been downloaded.'
+              ? 'Line art generation complete. Download or email the results.'
               : lineArtModal.phase === 'error'
               ? 'Something went wrong during generation.'
               : lineArtModal.phase === 'zipping'
@@ -1313,6 +1416,37 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
               <Download className="w-4 h-4 mr-2" />
               Download {lineArtModal.successCount} Line Arts
             </Button>
+          )}
+
+          {/* Done state: Download + Email buttons */}
+          {lineArtModal.phase === 'done' && (
+            <div className="flex gap-2">
+              <Button
+                onClick={buildAndDownloadZip}
+                size="sm"
+                disabled={lineArtModal.phase === 'zipping'}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download Line Art
+              </Button>
+              <Button
+                onClick={() => {
+                  handleEmailLineArt()
+                }}
+                size="sm"
+                disabled={isSendingLineArtEmail}
+                variant="outline"
+                className="flex-1 border-purple-300 hover:bg-purple-50"
+              >
+                {isSendingLineArtEmail ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Mail className="w-4 h-4 mr-2 text-purple-600" />
+                )}
+                Email Line Art
+              </Button>
+            </div>
           )}
         </div>
       </DialogContent>
