@@ -339,11 +339,12 @@ export function SharedIllustrationBoard({
     // --------------------------------------------------------------------------
     // HANDLERS
     // --------------------------------------------------------------------------
-    const handleReferenceSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files) return
+    // Shared logic for adding reference image files (used by file input, drag-drop, and paste)
+    const addReferenceFiles = useCallback((files: File[]) => {
+        const imageFiles = files.filter(f => f.type.startsWith('image/'))
+        if (imageFiles.length === 0) return
 
-        const files = Array.from(e.target.files)
-        const validFiles = files.filter(file => {
+        const validFiles = imageFiles.filter(file => {
             if (file.size > 10 * 1024 * 1024) { // 10MB limit
                 toast.error(`"${file.name}" is too large (max 10MB).`)
                 return false
@@ -362,10 +363,55 @@ export function SharedIllustrationBoard({
         }))
 
         setReferenceImages(prev => [...prev, ...newrefs])
+    }, [referenceImages.length])
 
+    const handleReferenceSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files) return
+        addReferenceFiles(Array.from(e.target.files))
         // Clear input value so same file can be selected again if needed
         if (e.target) e.target.value = ''
     }
+
+    // Drag-and-drop handlers for reference images area
+    const handleRefDragOver = useCallback((e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+    }, [])
+
+    const handleRefDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (e.dataTransfer.files?.length) {
+            addReferenceFiles(Array.from(e.dataTransfer.files))
+        }
+    }, [addReferenceFiles])
+
+    // Clipboard paste handler for reference images (active when regen dialog is open)
+    useEffect(() => {
+        if (!isRegenerateDialogOpen) return
+
+        const handlePaste = (e: ClipboardEvent) => {
+            const items = e.clipboardData?.items
+            if (!items) return
+
+            const imageFiles: File[] = []
+            for (const item of Array.from(items)) {
+                if (item.type.startsWith('image/')) {
+                    const file = item.getAsFile()
+                    if (file) imageFiles.push(file)
+                }
+            }
+
+            if (imageFiles.length > 0) {
+                e.preventDefault()
+                addReferenceFiles(imageFiles)
+                toast.success('Image pasted as reference')
+            }
+        }
+
+        document.addEventListener('paste', handlePaste)
+        return () => document.removeEventListener('paste', handlePaste)
+    }, [isRegenerateDialogOpen, addReferenceFiles])
 
     const removeReference = (index: number) => {
         setReferenceImages(prev => {
@@ -624,10 +670,6 @@ export function SharedIllustrationBoard({
         // Reset input so same file can be selected again
         e.target.value = ''
     }, [onUpload])
-
-    const isManualUpload = (url: string | null | undefined) => {
-        return url?.includes('-manual')
-    }
 
     // --------------------------------------------------------------------------
     // MAIN RENDER (RESTORED LAYOUT)
@@ -1322,11 +1364,6 @@ export function SharedIllustrationBoard({
                         <div className="flex items-center justify-between gap-2 px-3">
                             {/* LEFT: Badge */}
                             <div className="flex items-center gap-2 min-w-[80px]">
-                                {isAdmin && isManualUpload(sketchUrl) && (
-                                    <span className={`px-1.5 py-0.5 text-[9px] font-bold bg-rose-50 text-rose-600 rounded border border-rose-100 leading-none transition-opacity ${sketchViewMode === 'text' ? 'opacity-0' : ''}`}>
-                                        UPLOADED
-                                    </span>
-                                )}
                             </div>
 
                             {/* CENTER: Sketch/Story Toggle */}
@@ -1399,11 +1436,6 @@ export function SharedIllustrationBoard({
                                             </>
                                         )}
                                     </Button>
-                                )}
-                                {isAdmin && isManualUpload(illustrationUrl) && (
-                                    <span className="px-1.5 py-0.5 text-[9px] font-bold bg-rose-50 text-rose-600 rounded border border-rose-100 leading-none">
-                                        UPLOADED
-                                    </span>
                                 )}
                             </div>
 
@@ -1868,16 +1900,17 @@ export function SharedIllustrationBoard({
                                     )}
 
                                     {referenceImages.length < 5 && (
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            className="w-full border-dashed border-slate-300 text-slate-500 hover:text-slate-700 hover:border-slate-400 hover:bg-slate-50 gap-2 h-16"
+                                        <div
+                                            onDragOver={handleRefDragOver}
+                                            onDrop={handleRefDrop}
                                             onClick={() => fileInputRef.current?.click()}
+                                            className="w-full border-2 border-dashed border-slate-300 rounded-md flex flex-col items-center justify-center gap-1 h-16 text-slate-500 hover:text-slate-700 hover:border-slate-400 hover:bg-slate-50 cursor-pointer transition-colors"
                                         >
-                                            <Upload className="w-4 h-4" />
-                                            Add Reference Image
-                                        </Button>
+                                            <div className="flex items-center gap-2 text-sm font-medium">
+                                                <Upload className="w-4 h-4" />
+                                                Drop, paste, or click to add
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                             )}

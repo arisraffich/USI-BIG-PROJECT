@@ -155,7 +155,7 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }:
           <Link href={`/admin/project/${project.id}?tab=${getDefaultTabForStatus(project.status)}`} className="flex-1 block cursor-pointer">
             <h2 className="text-xl font-semibold mb-0">{project.book_title}</h2>
             <p className="text-sm text-gray-600">
-              By {project.author_firstname} {project.author_lastname} | {pageCount} {pageCount === 1 ? 'Page' : 'Pages'} | Created: {formatDate(project.created_at)}
+              By <span className="font-semibold text-blue-600">{project.author_firstname} {project.author_lastname}</span> | {pageCount} {pageCount === 1 ? 'Page' : 'Pages'} | Created: {formatDate(project.created_at)}
             </p>
             {/* Status Badge - Line 3 */}
             <div className="mt-1.5">
