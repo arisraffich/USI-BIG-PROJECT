@@ -1152,7 +1152,22 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
               </span>
             )}
           </Button>
-        ) : undefined
+        ) : (
+          <Button
+            onClick={handleDownloadLineArt}
+            disabled={isDownloadingLineArt || isSendingEmail}
+            size="sm"
+            className="flex px-3 md:px-4 bg-purple-600 hover:bg-purple-700 text-white shadow-md hover:shadow-lg font-semibold transition-all duration-75 rounded-md whitespace-nowrap items-center justify-center h-9"
+          >
+            {isDownloadingLineArt ? (
+              <Loader2 className="w-4 h-4 md:mr-2 animate-spin" />
+            ) : (
+              <Pencil className="w-4 h-4 md:mr-2" />
+            )}
+            <span className="hidden md:inline">{isDownloadingLineArt ? 'Generating...' : 'Download Line Art'}</span>
+            <span className="md:hidden">Line Art</span>
+          </Button>
+        )
       }
     />
 
