@@ -29,6 +29,11 @@ export default async function ReviewPage({ params }: { params: Promise<{ token: 
     notFound()
   }
 
+  // Redirect to submission wizard if still awaiting customer input
+  if (project.status === 'awaiting_customer_input') {
+    redirect(`/submit/${token}`)
+  }
+
   // Fetch pages and characters in parallel
   const [pagesResult, charactersResult] = await Promise.all([
     supabase

@@ -434,6 +434,18 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
     }
 
+    // STAGE: Awaiting customer input (Path B)
+    if (status === 'awaiting_customer_input') {
+      return {
+        tag: 'Awaiting Customer',
+        tagStyle: BADGE_COLORS.AMBER,
+        buttonLabel: 'Waiting...',
+        showCount: false,
+        isResend: false,
+        buttonDisabled: true
+      }
+    }
+
     // Default: Project setup
     return {
       tag: 'Project Setup',

@@ -118,9 +118,7 @@ The app deploys to Railway with auto-deploy from GitHub:
 
 The `start` script binds to `0.0.0.0` and uses the `PORT` environment variable provided by Railway.
 
-## Troubleshooting
-
-- **Port already in use:** Try `PORT=3001 npm run dev`
+## Troubleshooting- **Port already in use:** Try `PORT=3001 npm run dev`
 - **Module errors:** Run `npm install` first
 - **Missing env vars:** The app will show a clear error on startup listing which vars are missing
 - **Build errors:** Run `npm run build` locally to check before pushing

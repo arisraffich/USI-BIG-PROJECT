@@ -1,5 +1,6 @@
 export type ProjectStatus =
   | 'draft'
+  | 'awaiting_customer_input' // Customer submission wizard (Path B)
   // Character Phase
   | 'character_review'
   | 'character_generation'
@@ -42,4 +43,7 @@ export interface Project {
   style_reference_page_id?: string | null
   // Style Reference Images (for sequel books or specific style requirements)
   style_reference_urls?: string[] | null
+  // Customer submission wizard (Path B)
+  number_of_illustrations?: number | null
+  show_colored_to_customer?: boolean
 }

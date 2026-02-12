@@ -21,6 +21,7 @@
 export const PROJECT_STATUSES = {
   // Initial
   DRAFT: 'draft',
+  AWAITING_CUSTOMER_INPUT: 'awaiting_customer_input', // Customer submission wizard (Path B)
   
   // Character Phase
   CHARACTER_REVIEW: 'character_review',

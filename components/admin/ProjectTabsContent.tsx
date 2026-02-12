@@ -11,7 +11,7 @@ import { ManuscriptEditor } from '@/components/project/manuscript/ManuscriptEdit
 import { ProjectHeader } from '@/components/admin/ProjectHeader'
 import { UnifiedIllustrationSidebar } from '@/components/illustration/UnifiedIllustrationSidebar'
 import { UnifiedProjectLayout } from '@/components/layout/UnifiedProjectLayout'
-import { Loader2, Sparkles, Upload } from 'lucide-react'
+import { Loader2, Sparkles, Upload, Clock, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IllustrationsTabContent } from '@/components/admin/IllustrationsTabContent'
 import { Page } from '@/types/page'
@@ -590,6 +590,35 @@ export function ProjectTabsContent({
 
         {/* Pages Tab Content */}
         <div className={activeTab === 'pages' ? 'block' : 'hidden'}>
+          {/* Awaiting customer input banner */}
+          {localProjectStatus === 'awaiting_customer_input' && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 sm:p-8 flex flex-col items-center justify-center gap-4 text-center mb-6">
+              <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
+                <Clock className="w-6 h-6 text-amber-600" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-semibold text-amber-900 text-lg">Waiting for Customer</h3>
+                <p className="text-sm text-amber-700/80 max-w-md">
+                  A submission link has been sent to the author. Once they submit their story text and character details, the project will automatically proceed to the next stage.
+                </p>
+              </div>
+              {(() => {
+                const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+                const fullUrl = `${baseUrl}/submit/${projectInfo?.review_token}`
+                return (
+                  <a
+                    href={fullUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-xs text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-full px-4 py-2 transition-colors"
+                  >
+                    <span className="font-mono truncate max-w-[400px]">{fullUrl}</span>
+                    <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                  </a>
+                )
+              })()}
+            </div>
+          )}
           {/* No secondary characters banner - show on Pages tab when stuck in character_review with no secondaries */}
           {localCharacters.length <= 1 && localProjectStatus === 'character_review' && sortedCharacters.secondary.length === 0 && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 sm:p-8 flex flex-col items-center justify-center gap-4 text-center mb-6">

@@ -382,7 +382,8 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
                             )}
                         </div>
 
-                        {/* Image (Right) */}
+                        {/* Image (Right) — hidden when no image and not generating */}
+                        {(showLoadingState || character.generation_error || character.image_url) && (
                         <div className="flex-shrink-0 md:w-32 lg:w-40 flex flex-col items-center md:items-end space-y-3">
                             {showLoadingState ? (
                                 <div className="w-32 h-32 md:w-32 md:h-32 lg:w-40 lg:h-40 rounded-xl border border-gray-100 bg-gray-50 flex flex-col items-center justify-center relative overflow-hidden group">
@@ -411,13 +412,9 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
                                         </div>
                                     )}
                                 </div>
-                            ) : (
-                                <div className="w-32 h-32 md:w-32 md:h-32 lg:w-40 lg:h-40 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center text-gray-400 gap-2">
-                                    <User className="w-10 h-10 opacity-20" />
-                                    <span className="text-[10px] uppercase font-bold tracking-wider opacity-40">No Image</span>
-                                </div>
-                            )}
+                            ) : null}
                         </div>
+                        )}
                     </div>
 
                     {/* Bottom Section: Full Width Grid + Details */}

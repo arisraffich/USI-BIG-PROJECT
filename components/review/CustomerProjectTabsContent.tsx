@@ -780,31 +780,8 @@ export function CustomerProjectTabsContent({
               ) : (
                 // Character Forms - only show secondary characters (main character has no form data)
                 <div className="space-y-6">
-                  {/* Progress Bar */}
-                  {totalForms > 0 && (
-                    <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-sm font-semibold text-gray-700">Character Details</h3>
-                        <span className="text-sm font-medium text-gray-500">
-                          {completedCount} of {totalForms} completed
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                        <div 
-                          className="bg-gradient-to-r from-green-500 to-emerald-500 h-2.5 rounded-full transition-all duration-500 ease-out"
-                          style={{ width: `${totalForms > 0 ? (completedCount / totalForms) * 100 : 0}%` }}
-                        />
-                      </div>
-                      {completedCount < totalForms && (
-                        <p className="text-xs text-gray-500 mt-2 hidden md:block">
-                          Please complete form {activeFormIndex + 1} to continue
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  
                   {/* Character Forms Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
                     {/* Main character form is no longer shown - main character data comes from uploaded image and story extraction */}
                     {sortedCharacters.secondary.map((character, index) => (
                       <CustomerCharacterCard
@@ -823,6 +800,23 @@ export function CustomerProjectTabsContent({
                       />
                     </div>
                   </div>
+
+                  {/* Fixed Bottom Progress Bar */}
+                  {totalForms > 0 && (
+                    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-lg">
+                      <div className="w-full bg-gray-100 h-1.5 overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-green-500 to-emerald-500 h-1.5 transition-all duration-500 ease-out"
+                          style={{ width: `${(completedCount / totalForms) * 100}%` }}
+                        />
+                      </div>
+                      <div className="px-4 sm:px-8 py-3 flex items-center justify-center">
+                        <span className="text-sm font-medium text-gray-500">
+                          {completedCount} of {totalForms} completed
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               {(!localCharacters || localCharacters.length === 0) && !showGallery && (

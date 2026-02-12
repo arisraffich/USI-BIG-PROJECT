@@ -62,6 +62,13 @@ export function getStatusBadgeConfig(
     }
   }
   
+  if (status === 'awaiting_customer_input') {
+    return {
+      text: 'Awaiting Customer',
+      style: AMBER,
+    }
+  }
+  
   if (status === 'character_review') {
     // Distinguish between forms sent (no characters yet) vs characters sent
     if (!characterSendCount || characterSendCount === 0) {
