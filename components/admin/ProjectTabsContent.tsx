@@ -76,11 +76,18 @@ export function ProjectTabsContent({
     }
   }, [projectStatus])
 
-  // Check if Illustrations are unlocked
-  const isIllustrationsUnlocked = localProjectStatus === 'characters_approved' ||
-    localProjectStatus === 'sketch_generation' ||
-    localProjectStatus === 'sketch_ready' ||
-    localProjectStatus === 'completed'
+  // Check if Illustrations are unlocked (must match isInIllustrationPhase in ProjectHeader.tsx)
+  const isIllustrationsUnlocked = [
+    'characters_approved',
+    'sketches_review', 'sketches_revision',
+    'illustration_approved',
+    'completed',
+    // Legacy statuses (migration compatibility)
+    'trial_review', 'trial_revision', 'trial_approved',
+    'illustrations_generating',
+    'illustration_review', 'illustration_revision_needed',
+    'sketch_generation', 'sketch_ready',
+  ].includes(localProjectStatus)
 
   // Auto-heal status mismatch - REMOVED: illustration_status field no longer used
 
@@ -583,6 +590,36 @@ export function ProjectTabsContent({
 
         {/* Pages Tab Content */}
         <div className={activeTab === 'pages' ? 'block' : 'hidden'}>
+          {/* No secondary characters banner - show on Pages tab when stuck in character_review with no secondaries */}
+          {localCharacters.length <= 1 && localProjectStatus === 'character_review' && sortedCharacters.secondary.length === 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 sm:p-8 flex flex-col items-center justify-center gap-4 text-center mb-6">
+              <div className="relative">
+                <div className="relative bg-white rounded-full p-3 shadow-sm border border-blue-200">
+                  <Sparkles className="w-6 h-6 text-blue-500" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-semibold text-blue-900 text-lg">No Secondary Characters Found</h3>
+                <p className="text-sm text-blue-700/80 max-w-[320px]">
+                  The AI did not identify any secondary characters in this story. You can proceed directly to illustrations or manually add characters.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row items-center gap-3 mt-2 w-full sm:w-auto px-4 sm:px-0">
+                <AddCharacterButton
+                  mode="button"
+                  forceShow
+                  mainCharacterName={sortedCharacters.main?.name || sortedCharacters.main?.role || null}
+                  className="w-full sm:w-auto h-11 px-5 flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-sm font-medium"
+                />
+                <Button 
+                  onClick={handleSkipToIllustrations}
+                  className="w-full sm:w-auto h-11 px-5 bg-blue-600 hover:bg-blue-700"
+                >
+                  Proceed to Illustrations
+                </Button>
+              </div>
+            </div>
+          )}
           <ManuscriptEditor
             pages={localPages as Page[]}
             projectId={projectId}

@@ -23,9 +23,11 @@ interface AddCharacterButtonProps {
   mode?: 'button' | 'card'
   className?: string
   triggerRef?: React.RefObject<HTMLButtonElement>
+  /** When true, renders even if the Characters tab is not active */
+  forceShow?: boolean
 }
 
-export function AddCharacterButton({ mainCharacterName, mode = 'button', className, triggerRef }: AddCharacterButtonProps) {
+export function AddCharacterButton({ mainCharacterName, mode = 'button', className, triggerRef, forceShow }: AddCharacterButtonProps) {
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -84,6 +86,13 @@ export function AddCharacterButton({ mainCharacterName, mode = 'button', classNa
       setNameRole('')
       setDescription('')
 
+      // If used from outside the Characters tab, navigate there
+      if (!isCharactersActive && forceShow && pathname) {
+        const params = new URLSearchParams(searchParams?.toString() || '')
+        params.set('tab', 'characters')
+        router.replace(`${pathname}?${params.toString()}`)
+      }
+
       // Refresh the page to show the new character
       router.refresh()
 
@@ -114,7 +123,7 @@ export function AddCharacterButton({ mainCharacterName, mode = 'button', classNa
     setDescription('')
   }
 
-  if (!isCharactersActive || !projectId) return null
+  if ((!isCharactersActive && !forceShow) || !projectId) return null
 
   if (mode === 'card') {
     return (
