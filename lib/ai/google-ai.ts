@@ -266,10 +266,10 @@ Apply the style uniformly to characters, backgrounds, props, and all scene eleme
         const payload = {
             contents: [{ parts }],
             generationConfig: {
-                responseModalities: ['TEXT', 'IMAGE'],
+                responseModalities: ['IMAGE'],
                 imageConfig: {
                     aspectRatio: aspectRatio,
-                    imageSize: '4K'
+                    imageSize: '2K' // 4K broken on Google side as of Feb 2026
                 }
             }
         }
@@ -362,9 +362,9 @@ export async function generateSketch(
         const payload = {
             contents: [{ parts }],
             generationConfig: {
-                responseModalities: ['TEXT', 'IMAGE'],
+                responseModalities: ['IMAGE'],
                 imageConfig: {
-                    imageSize: '4K'
+                    imageSize: '2K'
                 }
             }
         }
@@ -445,9 +445,9 @@ export async function generateLineArt(
         const payload = {
             contents: [{ parts }],
             generationConfig: {
-                responseModalities: ['TEXT', 'IMAGE'],
+                responseModalities: ['IMAGE'],
                 imageConfig: {
-                    imageSize: '4K'
+                    imageSize: '2K'
                 }
             }
         }
