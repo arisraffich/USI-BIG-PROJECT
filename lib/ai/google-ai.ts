@@ -258,10 +258,7 @@ Apply the style uniformly to characters, backgrounds, props, and all scene eleme
         // 4. Final Instruction Prompt (The Scene)
         parts.push({ text: prompt })
 
-        // Always use 4K output for maximum quality (premium product)
-        const outputSize = "4K"
-        
-        console.log('[GoogleAI] 📸 Generating at 4K resolution')
+        console.log('[GoogleAI] 📸 Generating illustration')
         if (isSceneRecreation) {
             console.log('[GoogleAI] 🎬 Scene Recreation Mode active')
         }
@@ -269,10 +266,9 @@ Apply the style uniformly to characters, backgrounds, props, and all scene eleme
         const payload = {
             contents: [{ parts }],
             generationConfig: {
-                responseModalities: ['IMAGE'], // We only want image
+                responseModalities: ['IMAGE'],
                 imageConfig: {
-                    aspectRatio: aspectRatio,
-                    imageSize: outputSize
+                    aspectRatio: aspectRatio
                 }
             }
         }
@@ -364,14 +360,7 @@ export async function generateSketch(
             contents: [{ parts }],
             generationConfig: {
                 responseModalities: ['IMAGE'],
-                imageConfig: {
-                    // Keep same aspect ratio? 
-                    // We usually don't specify aspect ratio if we want it to match input, 
-                    // but Gemini might default to 1:1 if not specified. 
-                    // Ideally we pass the same AR as illustration.
-                    // For now let's try not sending AR and see if it respects input, or we might need to pass it.
-                    imageSize: "2K" // Higher quality sketches
-                }
+                imageConfig: {}
             }
         }
 
@@ -450,9 +439,7 @@ export async function generateLineArt(
             contents: [{ parts }],
             generationConfig: {
                 responseModalities: ['IMAGE'],
-                imageConfig: {
-                    imageSize: "2K" // Match sketch quality
-                }
+                imageConfig: {}
             }
         }
 
