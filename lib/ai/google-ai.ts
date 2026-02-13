@@ -258,7 +258,7 @@ Apply the style uniformly to characters, backgrounds, props, and all scene eleme
         // 4. Final Instruction Prompt (The Scene)
         parts.push({ text: prompt })
 
-        console.log('[GoogleAI] 📸 Generating illustration')
+        console.log('[GoogleAI] 📸 Generating illustration at 4K resolution')
         if (isSceneRecreation) {
             console.log('[GoogleAI] 🎬 Scene Recreation Mode active')
         }
@@ -266,9 +266,10 @@ Apply the style uniformly to characters, backgrounds, props, and all scene eleme
         const payload = {
             contents: [{ parts }],
             generationConfig: {
-                responseModalities: ['IMAGE'],
+                responseModalities: ['TEXT', 'IMAGE'],
                 imageConfig: {
-                    aspectRatio: aspectRatio
+                    aspectRatio: aspectRatio,
+                    imageSize: '4K'
                 }
             }
         }
@@ -289,8 +290,10 @@ Apply the style uniformly to characters, backgrounds, props, and all scene eleme
             return await response.json()
         }, 'Generate Illustration')
 
-        const candidate = result.candidates?.[0]?.content?.parts?.[0]
-        const base64Image = candidate?.inline_data?.data || candidate?.inlineData?.data
+        // With TEXT+IMAGE modalities, the image may not be the first part — search all parts
+        const allIllustrationParts = result.candidates?.[0]?.content?.parts || []
+        const illustrationImagePart = allIllustrationParts.find((p: Record<string, unknown>) => p.inline_data || p.inlineData)
+        const base64Image = illustrationImagePart?.inline_data?.data || illustrationImagePart?.inlineData?.data
 
         if (!base64Image) {
             // Log the full response to understand why no image was generated
@@ -359,8 +362,10 @@ export async function generateSketch(
         const payload = {
             contents: [{ parts }],
             generationConfig: {
-                responseModalities: ['IMAGE'],
-                imageConfig: {}
+                responseModalities: ['TEXT', 'IMAGE'],
+                imageConfig: {
+                    imageSize: '4K'
+                }
             }
         }
 
@@ -380,8 +385,10 @@ export async function generateSketch(
 
             return await response.json()
         }, 'Generate Sketch')
-        const candidate = result.candidates?.[0]?.content?.parts?.[0]
-        const base64Image = candidate?.inline_data?.data || candidate?.inlineData?.data
+        // With TEXT+IMAGE modalities, the image may not be the first part — search all parts
+        const allSketchParts = result.candidates?.[0]?.content?.parts || []
+        const sketchImagePart = allSketchParts.find((p: Record<string, unknown>) => p.inline_data || p.inlineData)
+        const base64Image = sketchImagePart?.inline_data?.data || sketchImagePart?.inlineData?.data
         if (!base64Image) {
             // Fallback or check structure
             // 1.5 Flash outputs text by default unless prompted for JSON/Image via weird ways? 
@@ -438,8 +445,10 @@ export async function generateLineArt(
         const payload = {
             contents: [{ parts }],
             generationConfig: {
-                responseModalities: ['IMAGE'],
-                imageConfig: {}
+                responseModalities: ['TEXT', 'IMAGE'],
+                imageConfig: {
+                    imageSize: '4K'
+                }
             }
         }
 
@@ -459,8 +468,10 @@ export async function generateLineArt(
             return await response.json()
         }, 'Generate Line Art')
 
-        const candidate = result.candidates?.[0]?.content?.parts?.[0]
-        const base64Image = candidate?.inline_data?.data || candidate?.inlineData?.data
+        // With TEXT+IMAGE modalities, the image may not be the first part — search all parts
+        const allLineArtParts = result.candidates?.[0]?.content?.parts || []
+        const lineArtImagePart = allLineArtParts.find((p: Record<string, unknown>) => p.inline_data || p.inlineData)
+        const base64Image = lineArtImagePart?.inline_data?.data || lineArtImagePart?.inlineData?.data
         
         if (!base64Image) {
             const blockReason = result.promptFeedback?.blockReason
