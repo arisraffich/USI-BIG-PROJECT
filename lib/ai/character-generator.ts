@@ -136,36 +136,76 @@ INSTRUCTION: This image shows what the character should LOOK LIKE physically.
             ]
         }
 
-        const response = await fetch(`${API_URL}?key=${GOOGLE_API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-
-        if (!response.ok) {
-            const errorText = await response.text()
-            throw new Error(`Google API Error: ${response.status} - ${errorText}`)
-        }
-
-        const result = await response.json()
+        // Retry up to 3 times for intermittent blocks (blockReason: OTHER, IMAGE_SAFETY)
+        const MAX_ATTEMPTS = 3
         let base64Image: string | null = null
+        let lastError = 'No image found in Google API response'
+        
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            console.log(`[Character Generate] API attempt ${attempt}/${MAX_ATTEMPTS} for ${character.name || character.role}...`)
+            
+            const response = await fetch(`${API_URL}?key=${GOOGLE_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
 
-        // Parse response to find image data
-        if (result.candidates && result.candidates.length > 0) {
-            const candidate = result.candidates[0]
-            if (candidate.content && candidate.content.parts) {
-                for (const part of candidate.content.parts) {
-                    if (part.inlineData && part.inlineData.data) {
+            if (!response.ok) {
+                const errorText = await response.text()
+                const isRetryable = response.status === 503 || response.status === 429
+                lastError = `Google API ${response.status}: ${errorText.substring(0, 200)}`
+                
+                if (!isRetryable || attempt === MAX_ATTEMPTS) {
+                    throw new Error(lastError)
+                }
+                console.log(`[Character Generate] ⚠️ HTTP ${response.status}, retrying in ${attempt * 3}s...`)
+                await new Promise(r => setTimeout(r, attempt * 3000))
+                continue
+            }
+
+            const result = await response.json()
+            
+            // Search for image in response
+            if (result.candidates?.[0]?.content?.parts) {
+                for (const part of result.candidates[0].content.parts) {
+                    if (part.inlineData?.data) {
                         base64Image = part.inlineData.data
                         break
                     }
                 }
             }
+
+            if (base64Image) {
+                console.log(`[Character Generate] ✅ Image received on attempt ${attempt}`)
+                break
+            }
+            
+            // No image — log and determine if retryable
+            const finishReason = result.candidates?.[0]?.finishReason
+            const blockReason = result.promptFeedback?.blockReason
+            
+            console.error(`[Character Generate] ⚠️ No image on attempt ${attempt}:`, JSON.stringify({
+                finishReason, blockReason, 
+                finishMessage: result.candidates?.[0]?.finishMessage?.substring(0, 100)
+            }))
+            
+            if (blockReason) {
+                lastError = `Content blocked: ${blockReason} (attempt ${attempt}/${MAX_ATTEMPTS})`
+            } else if (finishReason === 'IMAGE_SAFETY') {
+                lastError = `Image blocked by safety filter (attempt ${attempt}/${MAX_ATTEMPTS})`
+            } else {
+                lastError = `No image generated (finishReason: ${finishReason || 'unknown'}, attempt ${attempt}/${MAX_ATTEMPTS})`
+            }
+            
+            if (attempt < MAX_ATTEMPTS) {
+                const delay = 3000 + (attempt * 2000)
+                console.log(`[Character Generate] Retrying in ${delay / 1000}s...`)
+                await new Promise(r => setTimeout(r, delay))
+            }
         }
 
         if (!base64Image) {
-            console.error('Google API Response:', JSON.stringify(result, null, 2))
-            throw new Error('No image found in Google API response')
+            throw new Error(lastError)
         }
 
         // Convert base64 back to buffer for upload
