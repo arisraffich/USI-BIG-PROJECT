@@ -5,7 +5,6 @@ import { getErrorMessage } from '@/lib/utils/error'
 import { Character } from '@/types/character'
 
 const GOOGLE_API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY
-// Nano Banana Pro model
 const MODEL = 'gemini-3-pro-image-preview'
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
 
@@ -124,11 +123,17 @@ INSTRUCTION: This image shows what the character should LOOK LIKE physically.
             generationConfig: {
                 responseModalities: ['TEXT', 'IMAGE'],
                 imageConfig: {
-                    // Portrait aspect ratio for characters
                     aspectRatio: "9:16",
                     imageSize: "2K"
                 }
-            }
+            },
+            safetySettings: [
+                { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
+            ]
         }
 
         const response = await fetch(`${API_URL}?key=${GOOGLE_API_KEY}`, {

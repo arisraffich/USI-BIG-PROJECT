@@ -519,17 +519,16 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                             </button>
 
                             {/* Regenerate Dialog Trigger - Icon Only */}
-                            {!character.is_main && (
-                                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                                    <DialogTrigger asChild>
-                                        <div
-                                            className="cursor-pointer bg-violet-600 text-white w-[25px] h-[25px] rounded-md hover:bg-violet-700 hover:scale-105 transition-all shadow-sm flex items-center justify-center"
-                                            onClick={handleOpenRegenerate}
-                                            title="Regenerate"
-                                        >
-                                            <RefreshCw className="w-3.5 h-3.5" />
-                                        </div>
-                                    </DialogTrigger>
+                            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <div
+                                        className="cursor-pointer bg-violet-600 text-white w-[25px] h-[25px] rounded-md hover:bg-violet-700 hover:scale-105 transition-all shadow-sm flex items-center justify-center"
+                                        onClick={handleOpenRegenerate}
+                                        title="Regenerate"
+                                    >
+                                        <RefreshCw className="w-3.5 h-3.5" />
+                                    </div>
+                                </DialogTrigger>
                                     <DialogContent className="sm:max-w-[500px]">
                                         <DialogHeader>
                                             <DialogTitle>Regenerate {displayName}</DialogTitle>
@@ -603,8 +602,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                                             </Button>
                                         </DialogFooter>
                                     </DialogContent>
-                                </Dialog>
-                            )}
+                            </Dialog>
                         </div>
                     </div>
                 </CardContent>

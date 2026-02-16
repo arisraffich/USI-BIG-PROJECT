@@ -51,13 +51,6 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      if (character.is_main) {
-        return NextResponse.json(
-          { error: 'Cannot regenerate main character' },
-          { status: 400 }
-        )
-      }
-
       charactersToGenerate = [character]
     } else {
       // Generate all secondary characters
