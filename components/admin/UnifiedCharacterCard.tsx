@@ -122,6 +122,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     const [showTooltip, setShowTooltip] = useState(false)
     const [optimisticColoredImage, setOptimisticColoredImage] = useState<string | null>(null)
     const [localCharacter, setLocalCharacter] = useState(character)
+    const [isSketchGenerating, setIsSketchGenerating] = useState(false)
     const [referenceImage, setReferenceImage] = useState<{ file: File; preview: string } | null>(null)
     const referenceInputRef = useRef<HTMLInputElement>(null)
 
@@ -332,6 +333,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
 
             // Trigger sketch generation as a separate awaited call
             if (data.imageUrl) {
+                setIsSketchGenerating(true)
                 try {
                     const sketchRes = await fetch('/api/characters/generate-sketch', {
                         method: 'POST',
@@ -356,6 +358,8 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                     const errMsg = sketchErr instanceof Error ? sketchErr.message : 'Network error'
                     console.error('Sketch generation error:', sketchErr)
                     setLocalCharacter(prev => ({ ...prev, sketch_url: `error:${errMsg}` }))
+                } finally {
+                    setIsSketchGenerating(false)
                 }
             }
         } catch (error: unknown) {
@@ -423,7 +427,8 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             return
         }
         
-        // Show spinner
+        // Show spinner via explicit flag
+        setIsSketchGenerating(true)
         setLocalCharacter(prev => ({ ...prev, sketch_url: null }))
         
         try {
@@ -451,6 +456,8 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             const errMsg = err instanceof Error ? err.message : 'Network error'
             console.error('Sketch retry error:', err)
             setLocalCharacter(prev => ({ ...prev, sketch_url: `error:${errMsg}` }))
+        } finally {
+            setIsSketchGenerating(false)
         }
     }
 
@@ -466,8 +473,10 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     // Show loading on colored if regenerating OR if project generating and no image
     const showColoredLoading = !!(isRegenerating || (isGenerating && !displayColoredImageUrl))
     
-    // Show loading on sketch if colored exists but sketch isn't ready and hasn't errored
-    const showSketchLoading = !!(displayColoredImageUrl && !sketchIsReady && !sketchHasError && !isRegenerating)
+    // Show loading on sketch ONLY when:
+    // 1. We explicitly started sketch generation (isSketchGenerating), OR
+    // 2. Parent says project is generating AND colored exists but sketch isn't ready yet
+    const showSketchLoading = !!(isSketchGenerating || (isGenerating && displayColoredImageUrl && !sketchIsReady && !sketchHasError))
 
     const lightboxImageUrl = lightboxImage === 'sketch' ? displaySketchImageUrl : displayColoredImageUrl
 
