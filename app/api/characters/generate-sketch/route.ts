@@ -73,13 +73,7 @@ The result must look like a faithful pencil-line tracing of the original image â
         console.log(`[Character Sketch] ðŸ“Š Generation result: success=${result.success}, hasBuffer=${!!result.imageBuffer}, error=${result.error || 'none'} (${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`)
 
         if (!result.success || !result.imageBuffer) {
-            const errorMsg = result.error || 'Failed to generate character sketch'
-            // Save error to DB so we can track it
-            await supabase
-                .from('characters')
-                .update({ sketch_url: `error:${errorMsg}` })
-                .eq('id', characterId)
-            throw new Error(errorMsg)
+            throw new Error(result.error || 'Failed to generate character sketch')
         }
 
         // Upload to Storage

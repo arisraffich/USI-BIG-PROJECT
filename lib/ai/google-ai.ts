@@ -3,7 +3,7 @@ import { getErrorMessage } from '@/lib/utils/error'
 import sharp from 'sharp'
 
 const API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY
-const ILLUSTRATION_MODEL = 'gemini-3-pro-image-preview' // Nano Banana Pro
+const ILLUSTRATION_MODEL = 'gemini-3-pro-image-preview'
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 
@@ -300,7 +300,7 @@ Apply the style uniformly to characters, backgrounds, props, and all scene eleme
             return await response.json()
         }, 'Generate Illustration')
 
-        // With TEXT+IMAGE modalities, the image may not be the first part — search all parts
+        // Search all response parts for the image
         const allIllustrationParts = result.candidates?.[0]?.content?.parts || []
         const illustrationImagePart = allIllustrationParts.find((p: Record<string, unknown>) => p.inline_data || p.inlineData)
         const base64Image = illustrationImagePart?.inline_data?.data || illustrationImagePart?.inlineData?.data
@@ -379,35 +379,41 @@ export async function generateSketch(
             safetySettings: SAFETY_SETTINGS
         }
 
-        // Retry up to 3 times — API can intermittently block or return empty responses
-        const MAX_SKETCH_ATTEMPTS = 3
+        // Retry up to 3 times for empty/blocked responses and transient HTTP errors
+        const MAX_ATTEMPTS = 3
         let lastError: string = 'No image generated'
         
-        for (let attempt = 1; attempt <= MAX_SKETCH_ATTEMPTS; attempt++) {
-            console.log(`[generateSketch] API call attempt ${attempt}/${MAX_SKETCH_ATTEMPTS}...`)
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            console.log(`[generateSketch] Attempt ${attempt}/${MAX_ATTEMPTS}...`)
             const callStart = Date.now()
             
-            const result = await retryWithBackoff(async () => {
-                const response = await fetch(`${BASE_URL}/${ILLUSTRATION_MODEL}:generateContent?key=${API_KEY}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                })
-
-                if (!response.ok) {
-                    const txt = await response.text()
-                    throw new Error(`Google API Error (Sketch): ${response.status} - ${txt}`)
-                }
-
-                return await response.json()
-            }, 'Generate Sketch')
+            const response = await fetch(`${BASE_URL}/${ILLUSTRATION_MODEL}:generateContent?key=${API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
             
             const callElapsed = ((Date.now() - callStart) / 1000).toFixed(1)
+
+            if (!response.ok) {
+                const txt = await response.text()
+                const isRetryable = response.status === 503 || response.status === 429
+                lastError = `Google API ${response.status} (${callElapsed}s): ${txt.substring(0, 200)}`
+                console.error(`[generateSketch] ⚠️ HTTP ${response.status} on attempt ${attempt} (${callElapsed}s)`)
+                
+                if (!isRetryable || attempt === MAX_ATTEMPTS) throw new Error(lastError)
+                const delay = 3000 * attempt
+                console.log(`[generateSketch] Retrying in ${delay / 1000}s...`)
+                await new Promise(r => setTimeout(r, delay))
+                continue
+            }
+
+            const result = await response.json()
             
             // Search all parts for the image
-            const allSketchParts = result.candidates?.[0]?.content?.parts || []
-            const sketchImagePart = allSketchParts.find((p: Record<string, unknown>) => p.inline_data || p.inlineData)
-            const base64Image = sketchImagePart?.inline_data?.data || sketchImagePart?.inlineData?.data
+            const allParts = result.candidates?.[0]?.content?.parts || []
+            const imagePart = allParts.find((p: Record<string, unknown>) => p.inline_data || p.inlineData)
+            const base64Image = imagePart?.inline_data?.data || imagePart?.inlineData?.data
             
             if (base64Image) {
                 console.log(`[generateSketch] ✅ Image received on attempt ${attempt} (${callElapsed}s)`)
@@ -419,33 +425,24 @@ export async function generateSketch(
             // No image — log diagnostics
             const finishReason = result.candidates?.[0]?.finishReason
             const blockReason = result.promptFeedback?.blockReason
-            const safetyRatings = result.candidates?.[0]?.safetyRatings
-            const partTypes = allSketchParts.map((p: Record<string, unknown>) => Object.keys(p))
             
             console.error(`[generateSketch] ⚠️ No image on attempt ${attempt} (${callElapsed}s):`, JSON.stringify({
-                finishReason,
-                blockReason,
-                safetyRatings,
-                partTypes,
-                partsCount: allSketchParts.length,
-                hasCandidate: !!result.candidates?.[0],
-                modelVersion: result.modelVersion
+                finishReason, blockReason,
+                safetyRatings: result.candidates?.[0]?.safetyRatings,
+                partsCount: allParts.length,
             }, null, 2))
             
-            // Explicit safety blocks with specific categories — hard fail, don't retry
+            // Hard safety blocks — don't retry
             if (finishReason === 'SAFETY' || finishReason === 'IMAGE_SAFETY') {
                 throw new Error(`Image blocked by safety filter (${finishReason})`)
             }
             
-            // "OTHER" blockReason and empty responses are intermittent — retry
-            if (blockReason) {
-                lastError = `Content blocked: ${blockReason} (attempt ${attempt}/${MAX_SKETCH_ATTEMPTS})`
-            } else {
-                lastError = `No image generated (finishReason: ${finishReason || 'unknown'}, attempt ${attempt}/${MAX_SKETCH_ATTEMPTS})`
-            }
+            lastError = blockReason
+                ? `Content blocked: ${blockReason} (attempt ${attempt}/${MAX_ATTEMPTS})`
+                : `No image generated (finishReason: ${finishReason || 'unknown'}, attempt ${attempt}/${MAX_ATTEMPTS})`
             
-            if (attempt < MAX_SKETCH_ATTEMPTS) {
-                const delay = 3000 + (attempt * 2000) // 5s, 7s between retries
+            if (attempt < MAX_ATTEMPTS) {
+                const delay = 3000 + (attempt * 2000)
                 console.log(`[generateSketch] Retrying in ${delay / 1000}s...`)
                 await new Promise(r => setTimeout(r, delay))
             }
@@ -512,7 +509,7 @@ export async function generateLineArt(
             return await response.json()
         }, 'Generate Line Art')
 
-        // With TEXT+IMAGE modalities, the image may not be the first part — search all parts
+        // Search all response parts for the image
         const allLineArtParts = result.candidates?.[0]?.content?.parts || []
         const lineArtImagePart = allLineArtParts.find((p: Record<string, unknown>) => p.inline_data || p.inlineData)
         const base64Image = lineArtImagePart?.inline_data?.data || lineArtImagePart?.inlineData?.data

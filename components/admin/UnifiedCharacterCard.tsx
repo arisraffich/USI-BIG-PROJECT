@@ -7,7 +7,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, Download, Upload, X, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Character } from '@/types/character'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getErrorMessage } from '@/lib/utils/error'
 
@@ -113,7 +112,6 @@ function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownloa
 }
 
 export function UnifiedCharacterCard({ character, projectId, isGenerating = false }: UnifiedCharacterCardProps) {
-    const router = useRouter()
     const [isRegenerating, setIsRegenerating] = useState(false)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [customPrompt, setCustomPrompt] = useState(character.generation_prompt || '')
@@ -147,7 +145,6 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                 (payload) => {
                     if (payload.new) {
                         setLocalCharacter(payload.new as Character)
-                        router.refresh()
                     }
                 }
             )
@@ -156,7 +153,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [character.id, router])
+    }, [character.id])
 
     const handleOpenRegenerate = () => {
         // Pre-populate with customer feedback if unresolved, otherwise empty
@@ -329,9 +326,10 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                 setLocalCharacter(prev => ({ ...prev, sketch_url: null }))
             }
 
+            // Upload done — stop colored loading (finally block also handles this for error cases)
             setIsRegenerating(false)
 
-            // Trigger sketch generation as a separate awaited call
+            // Trigger sketch generation
             if (data.imageUrl) {
                 setIsSketchGenerating(true)
                 try {
