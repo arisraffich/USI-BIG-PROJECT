@@ -8,8 +8,15 @@ import { getErrorMessage } from '@/lib/utils/error'
 export const maxDuration = 60
 
 export async function POST(request: Request) {
+    const startTime = Date.now()
+    let characterId: string | undefined
+    
     try {
-        const { characterId, imageUrl } = await request.json()
+        const body = await request.json()
+        characterId = body.characterId
+        const imageUrl = body.imageUrl
+
+        console.log(`[Character Sketch] 📥 Request received - characterId: ${characterId}, imageUrl: ${imageUrl?.substring(0, 80)}...`)
 
         if (!characterId || !imageUrl) {
             return NextResponse.json({ 
@@ -27,6 +34,7 @@ export async function POST(request: Request) {
             .single()
 
         if (charError || !character) {
+            console.error(`[Character Sketch] Character not found: ${characterId}`, charError)
             return NextResponse.json({ error: 'Character not found' }, { status: 404 })
         }
 
@@ -57,19 +65,29 @@ ABSOLUTE FIDELITY RULES — NO EXCEPTIONS:
 
 The result must look like a faithful pencil-line tracing of the original image — only translated into a natural, hand-drawn pencil style, with no added or missing elements.`
 
-        console.log(`[Character Sketch] Generating sketch for character: ${character.name || character.role || characterId}`)
+        console.log(`[Character Sketch] 🎨 Generating sketch for: ${character.name || character.role || characterId} (${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`)
 
         // Generate Sketch
         const result = await generateSketch(imageUrl, prompt)
 
+        console.log(`[Character Sketch] 📊 Generation result: success=${result.success}, hasBuffer=${!!result.imageBuffer}, error=${result.error || 'none'} (${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`)
+
         if (!result.success || !result.imageBuffer) {
-            throw new Error(result.error || 'Failed to generate character sketch')
+            const errorMsg = result.error || 'Failed to generate character sketch'
+            // Save error to DB so we can track it
+            await supabase
+                .from('characters')
+                .update({ sketch_url: `error:${errorMsg}` })
+                .eq('id', characterId)
+            throw new Error(errorMsg)
         }
 
         // Upload to Storage
         const timestamp = Date.now()
         const characterName = sanitizeFilename(character.name || character.role || 'character')
         const filename = `${character.project_id}/characters/${characterName}-sketch-${timestamp}.png`
+
+        console.log(`[Character Sketch] 📤 Uploading sketch: ${filename} (${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`)
 
         const { error: uploadError } = await supabase.storage
             .from('character-sketches')
@@ -97,7 +115,7 @@ The result must look like a faithful pencil-line tracing of the original image �
             })
             .eq('id', characterId)
 
-        console.log(`[Character Sketch] ✅ Sketch generated successfully for: ${character.name || character.role}`)
+        console.log(`[Character Sketch] ✅ Sketch generated successfully for: ${character.name || character.role} (${((Date.now() - startTime) / 1000).toFixed(1)}s total)`)
 
         return NextResponse.json({
             success: true,
@@ -105,9 +123,25 @@ The result must look like a faithful pencil-line tracing of the original image �
         })
 
     } catch (error: unknown) {
-        console.error('[Character Sketch] Generation Error:', error)
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
+        const errorMsg = getErrorMessage(error, 'Internal Server Error')
+        console.error(`[Character Sketch] ❌ Generation Error (${elapsed}s): ${errorMsg}`, error)
+        
+        // Save error to DB for debugging
+        if (characterId) {
+            try {
+                const supabase = await createAdminClient()
+                await supabase
+                    .from('characters')
+                    .update({ sketch_url: `error:${errorMsg}` })
+                    .eq('id', characterId)
+            } catch (dbErr) {
+                console.error('[Character Sketch] Failed to save error to DB:', dbErr)
+            }
+        }
+        
         return NextResponse.json(
-            { error: getErrorMessage(error, 'Internal Server Error') },
+            { error: errorMsg },
             { status: 500 }
         )
     }

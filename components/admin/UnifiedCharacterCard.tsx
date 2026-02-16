@@ -25,11 +25,12 @@ interface SubCardProps {
     characterName: string
     onDownload?: (e: React.MouseEvent) => void
     onUpload?: (e: React.ChangeEvent<HTMLInputElement>) => void
+    onRetry?: () => void
     showUpload?: boolean
     showDownload?: boolean
 }
 
-function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownload, onUpload, showUpload = false, showDownload = true }: SubCardProps) {
+function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownload, onUpload, onRetry, showUpload = false, showDownload = true }: SubCardProps) {
     // Check if imageUrl contains an error
     const isError = imageUrl?.startsWith('error:') ?? false
     const errorMessage = isError && imageUrl ? imageUrl.replace('error:', '') : null
@@ -47,6 +48,15 @@ function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownloa
                         <AlertTriangle className="w-8 h-8 mb-2" />
                         <span className="text-xs font-medium text-center">Generation Failed</span>
                         <span className="text-[10px] text-red-400 text-center mt-1 line-clamp-3">{errorMessage}</span>
+                        {onRetry && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onRetry() }}
+                                className="mt-2 px-3 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1"
+                            >
+                                <RefreshCw className="w-3 h-3" />
+                                Retry
+                            </button>
+                        )}
                     </div>
                 ) : actualImageUrl ? (
                     <>
@@ -337,12 +347,15 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                             setLocalCharacter(prev => ({ ...prev, sketch_url: sketchData.sketchUrl }))
                         }
                     } else {
-                        console.error('Sketch generation failed after upload')
-                        setLocalCharacter(prev => ({ ...prev, sketch_url: 'error:Sketch generation failed' }))
+                        const errorData = await sketchRes.json().catch(() => null)
+                        const errorMsg = errorData?.error || `HTTP ${sketchRes.status}`
+                        console.error('Sketch generation failed:', sketchRes.status, errorData)
+                        setLocalCharacter(prev => ({ ...prev, sketch_url: `error:${errorMsg}` }))
                     }
                 } catch (sketchErr) {
+                    const errMsg = sketchErr instanceof Error ? sketchErr.message : 'Network error'
                     console.error('Sketch generation error:', sketchErr)
-                    setLocalCharacter(prev => ({ ...prev, sketch_url: 'error:Sketch generation failed' }))
+                    setLocalCharacter(prev => ({ ...prev, sketch_url: `error:${errMsg}` }))
                 }
             }
         } catch (error: unknown) {
@@ -400,6 +413,44 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             setIsRegenerating(false)
             // Reset file input
             e.target.value = ''
+        }
+    }
+
+    const handleRetrySketch = async () => {
+        const coloredUrl = optimisticColoredImage || localCharacter.image_url
+        if (!coloredUrl) {
+            toast.error('No colored image to generate sketch from')
+            return
+        }
+        
+        // Show spinner
+        setLocalCharacter(prev => ({ ...prev, sketch_url: null }))
+        
+        try {
+            const sketchRes = await fetch('/api/characters/generate-sketch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    characterId: character.id,
+                    imageUrl: coloredUrl,
+                }),
+            })
+            if (sketchRes.ok) {
+                const sketchData = await sketchRes.json()
+                if (sketchData.sketchUrl) {
+                    setLocalCharacter(prev => ({ ...prev, sketch_url: sketchData.sketchUrl }))
+                    toast.success('Sketch generated successfully')
+                }
+            } else {
+                const errorData = await sketchRes.json().catch(() => null)
+                const errorMsg = errorData?.error || `HTTP ${sketchRes.status}`
+                console.error('Sketch retry failed:', sketchRes.status, errorData)
+                setLocalCharacter(prev => ({ ...prev, sketch_url: `error:${errorMsg}` }))
+            }
+        } catch (err) {
+            const errMsg = err instanceof Error ? err.message : 'Network error'
+            console.error('Sketch retry error:', err)
+            setLocalCharacter(prev => ({ ...prev, sketch_url: `error:${errMsg}` }))
         }
     }
 
@@ -561,6 +612,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                             onClick={() => handleOpenLightbox('sketch')}
                             characterName={displayName}
                             onUpload={handleUploadSketch}
+                            onRetry={sketchHasError ? handleRetrySketch : undefined}
                             showDownload={false}
                             showUpload={true}
                         />
