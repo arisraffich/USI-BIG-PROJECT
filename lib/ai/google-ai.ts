@@ -368,8 +368,8 @@ export async function generateSketch(
             }
         }
 
-        // Retry up to 2 times for "no image" responses (API can intermittently return empty)
-        const MAX_SKETCH_ATTEMPTS = 2
+        // Retry up to 3 times — API can intermittently block or return empty responses
+        const MAX_SKETCH_ATTEMPTS = 3
         let lastError: string = 'No image generated'
         
         for (let attempt = 1; attempt <= MAX_SKETCH_ATTEMPTS; attempt++) {
@@ -421,19 +421,22 @@ export async function generateSketch(
                 modelVersion: result.modelVersion
             }, null, 2))
             
-            // Hard failures — don't retry
-            if (blockReason) {
-                throw new Error(`Content blocked: ${blockReason}`)
-            }
+            // Explicit safety blocks with specific categories — hard fail, don't retry
             if (finishReason === 'SAFETY' || finishReason === 'IMAGE_SAFETY') {
                 throw new Error(`Image blocked by safety filter (${finishReason})`)
             }
             
-            lastError = `No image generated (finishReason: ${finishReason || 'unknown'}, attempt ${attempt}/${MAX_SKETCH_ATTEMPTS})`
+            // "OTHER" blockReason and empty responses are intermittent — retry
+            if (blockReason) {
+                lastError = `Content blocked: ${blockReason} (attempt ${attempt}/${MAX_SKETCH_ATTEMPTS})`
+            } else {
+                lastError = `No image generated (finishReason: ${finishReason || 'unknown'}, attempt ${attempt}/${MAX_SKETCH_ATTEMPTS})`
+            }
             
             if (attempt < MAX_SKETCH_ATTEMPTS) {
-                console.log(`[generateSketch] Retrying in 3s...`)
-                await new Promise(r => setTimeout(r, 3000))
+                const delay = 3000 + (attempt * 2000) // 5s, 7s between retries
+                console.log(`[generateSketch] Retrying in ${delay / 1000}s...`)
+                await new Promise(r => setTimeout(r, delay))
             }
         }
         
