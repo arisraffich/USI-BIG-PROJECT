@@ -339,16 +339,15 @@ export async function generateSketch(
     sourceImageUrl: string,
     prompt: string
 ): Promise<{ success: boolean, imageBuffer: Buffer | null, error: string | null }> {
-    // Similar logic but using Sketch Model and source image as input
     if (!API_KEY) throw new Error('Google API Key missing')
 
     try {
+        console.log(`[generateSketch] Downloading source image: ${sourceImageUrl.substring(0, 80)}...`)
         const parts: any[] = [{ text: prompt }]
 
-        // Attach Source Image (The Illustration)
-        // Nano Banana supports multimodal input (Image + Text)
         const img = await fetchImageAsBase64(sourceImageUrl)
         if (img) {
+            console.log(`[generateSketch] Image downloaded and resized: ${(img.data.length / 1024).toFixed(0)}KB base64`)
             parts.push({
                 inline_data: {
                     mime_type: img.mimeType,
@@ -369,49 +368,79 @@ export async function generateSketch(
             }
         }
 
-        // Use the same image generation model for sketches for now, as 1.5 Flash is text-only
-        // Wrap API call in retry logic
-        const result = await retryWithBackoff(async () => {
-            const response = await fetch(`${BASE_URL}/${ILLUSTRATION_MODEL}:generateContent?key=${API_KEY}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            })
+        // Retry up to 2 times for "no image" responses (API can intermittently return empty)
+        const MAX_SKETCH_ATTEMPTS = 2
+        let lastError: string = 'No image generated'
+        
+        for (let attempt = 1; attempt <= MAX_SKETCH_ATTEMPTS; attempt++) {
+            console.log(`[generateSketch] API call attempt ${attempt}/${MAX_SKETCH_ATTEMPTS}...`)
+            const callStart = Date.now()
+            
+            const result = await retryWithBackoff(async () => {
+                const response = await fetch(`${BASE_URL}/${ILLUSTRATION_MODEL}:generateContent?key=${API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                })
 
-            if (!response.ok) {
-                const txt = await response.text()
-                throw new Error(`Google API Error (Sketch): ${response.status} - ${txt}`)
+                if (!response.ok) {
+                    const txt = await response.text()
+                    throw new Error(`Google API Error (Sketch): ${response.status} - ${txt}`)
+                }
+
+                return await response.json()
+            }, 'Generate Sketch')
+            
+            const callElapsed = ((Date.now() - callStart) / 1000).toFixed(1)
+            
+            // Search all parts for the image
+            const allSketchParts = result.candidates?.[0]?.content?.parts || []
+            const sketchImagePart = allSketchParts.find((p: Record<string, unknown>) => p.inline_data || p.inlineData)
+            const base64Image = sketchImagePart?.inline_data?.data || sketchImagePart?.inlineData?.data
+            
+            if (base64Image) {
+                console.log(`[generateSketch] ✅ Image received on attempt ${attempt} (${callElapsed}s)`)
+                const rawBuffer = Buffer.from(base64Image, 'base64')
+                const cleanBuffer = await removeMetadata(rawBuffer)
+                return { success: true, imageBuffer: cleanBuffer, error: null }
             }
-
-            return await response.json()
-        }, 'Generate Sketch')
-        // With TEXT+IMAGE modalities, the image may not be the first part — search all parts
-        const allSketchParts = result.candidates?.[0]?.content?.parts || []
-        const sketchImagePart = allSketchParts.find((p: Record<string, unknown>) => p.inline_data || p.inlineData)
-        const base64Image = sketchImagePart?.inline_data?.data || sketchImagePart?.inlineData?.data
-        if (!base64Image) {
-            // Fallback or check structure
-            // 1.5 Flash outputs text by default unless prompted for JSON/Image via weird ways? 
-            // Actually 1.5 Flash is multimodal INPUT, but text OUTPUT. 
-            // Wait, does Flash support IMAGE OUTPUT? 
-            // Gemini 1.5 Flash does NOT support image generation (Imagen does).
-            // Gemini 3 Pro (Nano Banana Pro) supports image generation.
-            // User said "Nano Banana Flash (Gemini 2.5 Flash Image)". If such a model exists with Image Output.
-            // If not, we might need to use Pro for sketch too, or Imagen.
-            // I will assume for now we use the same model (gemini-3-pro-image-preview) for sketch too, 
-            // just prompting it differently, OR standard Imagen.
-            // Given the ambiguity, I will use `gemini-3-pro-image-preview` for BOTH for now to be safe,
-            // as we know it generates images.
-            throw new Error('No image generated')
+            
+            // No image — log diagnostics
+            const finishReason = result.candidates?.[0]?.finishReason
+            const blockReason = result.promptFeedback?.blockReason
+            const safetyRatings = result.candidates?.[0]?.safetyRatings
+            const partTypes = allSketchParts.map((p: Record<string, unknown>) => Object.keys(p))
+            
+            console.error(`[generateSketch] ⚠️ No image on attempt ${attempt} (${callElapsed}s):`, JSON.stringify({
+                finishReason,
+                blockReason,
+                safetyRatings,
+                partTypes,
+                partsCount: allSketchParts.length,
+                hasCandidate: !!result.candidates?.[0],
+                modelVersion: result.modelVersion
+            }, null, 2))
+            
+            // Hard failures — don't retry
+            if (blockReason) {
+                throw new Error(`Content blocked: ${blockReason}`)
+            }
+            if (finishReason === 'SAFETY' || finishReason === 'IMAGE_SAFETY') {
+                throw new Error(`Image blocked by safety filter (${finishReason})`)
+            }
+            
+            lastError = `No image generated (finishReason: ${finishReason || 'unknown'}, attempt ${attempt}/${MAX_SKETCH_ATTEMPTS})`
+            
+            if (attempt < MAX_SKETCH_ATTEMPTS) {
+                console.log(`[generateSketch] Retrying in 3s...`)
+                await new Promise(r => setTimeout(r, 3000))
+            }
         }
-
-        const rawBuffer = Buffer.from(base64Image, 'base64')
-        const cleanBuffer = await removeMetadata(rawBuffer)
-
-        return { success: true, imageBuffer: cleanBuffer, error: null }
+        
+        throw new Error(lastError)
 
     } catch (error: unknown) {
-        console.error('generateSketch error:', error)
+        console.error('[generateSketch] ❌ Final error:', error)
         return { success: false, imageBuffer: null, error: getErrorMessage(error) }
     }
 }
