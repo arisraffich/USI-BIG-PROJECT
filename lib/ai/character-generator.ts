@@ -39,43 +39,19 @@ export async function generateCharacterImage(
 
     try {
         const prompt = customPrompt || buildCharacterPrompt(character, !!mainCharacterImageUrl)
-        // console.log(`Generating image for character ${character.id} using Google Nano Banana Pro...`)
 
         const parts: any[] = []
+        const isMainCharRegen = character.is_main && customPrompt && mainCharacterImageUrl
 
-        // 1. ADD STYLE REFERENCE FIRST (Context Priming)
-        // We show the style reference BEFORE the character description to prevent semantic bias.
-        if (mainCharacterImageUrl) {
+        if (isMainCharRegen) {
+            // MAIN CHARACTER REGENERATION: Simple modification prompt
+            // Send the current image as the source to modify, with a concise instruction
             const refImage = await fetchImageAsBase64(mainCharacterImageUrl)
             if (refImage) {
-                // LABEL THE REFERENCE EXPLICITLY
                 parts.push({
-                    text: `[STYLE REFERENCE IMAGE - PRIMARY SOURCE OF TRUTH]
+                    text: `Here is the current illustration of a character. Modify this character based on the following instruction while keeping the same art style, proportions, pose, background, and all other visual details unchanged.
 
-Analyze this image thoroughly and extract its complete visual style AND drawing technique.
-Identify and replicate the medium used (e.g., watercolor, digital watercolor, gouache, soft digital painting, pencil, ink, marker, or any other).
-
-MATCH FROM THIS REFERENCE:
-- Stroke style, texture, shading softness, edge quality
-- Color blending method and overall rendering technique
-- Color palette and saturation levels
-- Line quality and proportions
-- Facial style and overall aesthetic
-
-The new character must look like it was created by the SAME ILLUSTRATOR using the same tools and artistic method.
-Do NOT copy the reference character's identity — only its stylistic technique.
-
-OVERRIDE SEMANTIC BIAS:
-- If the reference is 2D/Stylized/Flat: Do NOT render fur, feathers, or scales realistically. NO 3D shading, NO photorealism.
-- If the reference is 3D/Realistic: Match that realism level.
-- The Reference Image is the SOLE TRUTH for rendering style.
-
-MUST AVOID:
-- Disney/Pixar 3D CGI aesthetic
-- Plastic, glossy, or shiny surfaces
-- Generic stock illustration look
-- Over-detailed or hyper-realistic rendering
-- Harsh lighting or over-rendered shading`
+Modification: ${prompt}`
                 })
 
                 parts.push({
@@ -85,43 +61,85 @@ MUST AVOID:
                     }
                 })
             }
-        }
 
-        // 2. ADD VISUAL REFERENCE IMAGE (if provided)
-        // This guides the character's physical appearance, separate from style
-        if (visualReferenceImage) {
-            // Parse base64 data URL
-            const matches = visualReferenceImage.match(/^data:(.+);base64,(.+)$/)
-            if (matches) {
-                const mimeType = matches[1]
-                const base64Data = matches[2]
-                
-                parts.push({
-                    text: `[APPEARANCE REFERENCE IMAGE]
-INSTRUCTION: This image shows what the character should LOOK LIKE physically.
-1. Use this image to guide the CHARACTER'S PHYSICAL APPEARANCE, PROPORTIONS, and DISTINCTIVE FEATURES.
-2. DO NOT copy the art style from this image - the STYLE REFERENCE IMAGE above defines the art style.
-3. Match the body shape, pose references, and physical characteristics shown here.
-4. The goal is: "Draw this subject in the style of the main character reference."`
-                })
-                
-                parts.push({
-                    inlineData: {
-                        mimeType: mimeType,
-                        data: base64Data
-                    }
-                })
+            // Add visual reference if provided
+            if (visualReferenceImage) {
+                const matches = visualReferenceImage.match(/^data:(.+);base64,(.+)$/)
+                if (matches) {
+                    parts.push({
+                        text: `Use this additional reference image to guide the modification:`
+                    })
+                    parts.push({
+                        inlineData: {
+                            mimeType: matches[1],
+                            data: matches[2]
+                        }
+                    })
+                }
             }
-        }
+        } else {
+            // SECONDARY CHARACTER GENERATION: Full style reference approach
+            // Show the style reference BEFORE the character description to prevent semantic bias
+            if (mainCharacterImageUrl) {
+                const refImage = await fetchImageAsBase64(mainCharacterImageUrl)
+                if (refImage) {
+                    parts.push({
+                        text: `[STYLE REFERENCE IMAGE]
 
-        // 3. ADD CHARACTER DESCRIPTION
-        // The model now views this description through the lens of the style and appearance established above.
-        parts.push({ text: `TARGET CHARACTER DESCRIPTION:\n${prompt}` })
+Analyze this image and extract its complete visual style and drawing technique.
+Identify and replicate the medium used (e.g., watercolor, digital watercolor, gouache, soft digital painting).
+
+MATCH FROM THIS REFERENCE:
+- Stroke style, texture, shading softness, edge quality
+- Color blending method and rendering technique
+- Color palette and saturation levels
+- Line quality and proportions
+- Facial style and overall aesthetic
+
+The new character must look like it was created by the same illustrator using the same tools and method.
+Do NOT copy the reference character's identity — only its stylistic technique.
+
+If the reference is 2D/Stylized/Flat: Do NOT render fur, feathers, or scales realistically. No 3D shading, no photorealism.
+If the reference is 3D/Realistic: Match that realism level.`
+                    })
+
+                    parts.push({
+                        inlineData: {
+                            mimeType: refImage.mimeType,
+                            data: refImage.data
+                        }
+                    })
+                }
+            }
+
+            // ADD VISUAL REFERENCE IMAGE (if provided)
+            if (visualReferenceImage) {
+                const matches = visualReferenceImage.match(/^data:(.+);base64,(.+)$/)
+                if (matches) {
+                    parts.push({
+                        text: `[APPEARANCE REFERENCE IMAGE]
+This image shows what the character should look like physically.
+Use it to guide the character's physical appearance, proportions, and distinctive features.
+Do NOT copy the art style from this image — the style reference above defines the art style.`
+                    })
+
+                    parts.push({
+                        inlineData: {
+                            mimeType: matches[1],
+                            data: matches[2]
+                        }
+                    })
+                }
+            }
+
+            // ADD CHARACTER DESCRIPTION
+            parts.push({ text: `TARGET CHARACTER DESCRIPTION:\n${prompt}` })
+        }
 
         const payload = {
             contents: [{ parts }],
             generationConfig: {
-                responseModalities: ['TEXT', 'IMAGE'],
+                responseModalities: ['IMAGE'],
                 imageConfig: {
                     aspectRatio: "9:16",
                     imageSize: "2K"
@@ -198,7 +216,7 @@ INSTRUCTION: This image shows what the character should LOOK LIKE physically.
             }
             
             if (attempt < MAX_ATTEMPTS) {
-                const delay = 3000 + (attempt * 2000)
+                const delay = blockReason === 'OTHER' ? 6000 + (attempt * 3000) : 3000 + (attempt * 2000)
                 console.log(`[Character Generate] Retrying in ${delay / 1000}s...`)
                 await new Promise(r => setTimeout(r, delay))
             }
