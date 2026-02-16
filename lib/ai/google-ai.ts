@@ -7,6 +7,15 @@ const ILLUSTRATION_MODEL = 'gemini-3-pro-image-preview' // Nano Banana Pro
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 
+// Reduce false-positive content blocks from datacenter IPs
+const SAFETY_SETTINGS = [
+    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
+]
+
 // Retry configuration
 const MAX_RETRIES = 1 // 2 total attempts (1 initial + 1 retry)
 const INITIAL_DELAY_MS = 2000 // 2 seconds
@@ -269,9 +278,10 @@ Apply the style uniformly to characters, backgrounds, props, and all scene eleme
                 responseModalities: ['IMAGE'],
                 imageConfig: {
                     aspectRatio: aspectRatio,
-                    imageSize: '2K' // 4K broken on Google side as of Feb 2026
+                    imageSize: '2K'
                 }
-            }
+            },
+            safetySettings: SAFETY_SETTINGS
         }
 
         // Wrap API call in retry logic
@@ -365,7 +375,8 @@ export async function generateSketch(
                 imageConfig: {
                     imageSize: '2K'
                 }
-            }
+            },
+            safetySettings: SAFETY_SETTINGS
         }
 
         // Retry up to 3 times — API can intermittently block or return empty responses
@@ -481,7 +492,8 @@ export async function generateLineArt(
                 imageConfig: {
                     imageSize: '2K'
                 }
-            }
+            },
+            safetySettings: SAFETY_SETTINGS
         }
 
         // Wrap API call in retry logic
