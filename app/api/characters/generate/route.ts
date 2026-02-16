@@ -88,9 +88,11 @@ export async function POST(request: NextRequest) {
     for (const character of charactersToGenerate) {
       console.log(`[Character Generate] Processing: ${character.name || character.role || character.id}`)
       try {
+        // Save current image_url before generation so we can restore on failure
+        const previousImageUrl = character.image_url
+        
         // Clear sketch_url for regeneration (if character already has valid images)
-        // This ensures the loading spinner appears on the sketch card during regeneration
-        const hasValidImage = character.image_url && !character.image_url.startsWith('error:')
+        const hasValidImage = previousImageUrl && !previousImageUrl.startsWith('error:')
         const hasValidSketch = character.sketch_url && !character.sketch_url.startsWith('error:')
         if (hasValidImage && hasValidSketch) {
           console.log(`[Character Generate] 🧹 Clearing old sketch_url for regeneration: ${character.name || character.role}`)
@@ -114,13 +116,26 @@ export async function POST(request: NextRequest) {
 
         console.log(`[Character Generate] Result for ${character.name || character.role}: ${result.success ? '✅ SUCCESS' : '❌ FAILED'}`)
         
-        // If generation failed, save error to image_url field so UI can display it
+        // If generation failed, preserve existing images for regeneration
         if (!result.success && result.error) {
-          console.log(`[Character Generate] ⚠️ Saving error state for ${character.name || character.role}: ${result.error}`)
-          await supabase
-            .from('characters')
-            .update({ image_url: `error:${result.error}` })
-            .eq('id', character.id)
+          const hadValidImage = previousImageUrl && !previousImageUrl.startsWith('error:')
+          if (hadValidImage) {
+            // Regeneration failed — restore sketch_url if we cleared it
+            console.log(`[Character Generate] ⚠️ Generation failed for ${character.name || character.role}: ${result.error} (preserving existing image)`)
+            if (hasValidSketch) {
+              await supabase
+                .from('characters')
+                .update({ sketch_url: character.sketch_url })
+                .eq('id', character.id)
+            }
+          } else {
+            // Initial generation failed — save error state
+            console.log(`[Character Generate] ⚠️ Saving error state for ${character.name || character.role}: ${result.error}`)
+            await supabase
+              .from('characters')
+              .update({ image_url: `error:${result.error}` })
+              .eq('id', character.id)
+          }
         }
         
         results.push({
