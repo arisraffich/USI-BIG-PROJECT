@@ -105,23 +105,19 @@ export async function POST(request: Request) {
             }
         }
 
-        // Trigger sketch generation (fire-and-forget)
-        console.log(`[Character Upload] 🎨 Triggering sketch generation...`)
-        ;(async () => {
-            const { generateCharacterSketch } = await import('@/lib/ai/character-sketch-generator')
-            await generateCharacterSketch(
-                characterId,
-                publicUrl,
-                projectId,
-                character.name || character.role || 'Character'
-            )
-        })().catch(err => {
-            console.error(`[Character Upload] Sketch generation failed:`, err)
-        })
+        // Return upload result immediately — frontend triggers sketch generation separately
+        console.log(`[Character Upload] ✅ Upload complete, sketch will be triggered by frontend`)
+
+        // Clear any previous sketch error so UI shows spinner
+        await supabase
+            .from('characters')
+            .update({ sketch_url: null })
+            .eq('id', characterId)
 
         return NextResponse.json({
             success: true,
             imageUrl: publicUrl,
+            characterId,
         })
 
     } catch (error: unknown) {

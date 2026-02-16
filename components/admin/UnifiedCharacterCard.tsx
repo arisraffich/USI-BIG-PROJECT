@@ -305,7 +305,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             const data = await response.json()
             toast.success('Colored image uploaded successfully')
             
-            // Preload the new image
+            // Preload the new image and clear sketch state to show spinner
             if (data.imageUrl) {
                 await new Promise((resolve) => {
                     const img = new Image()
@@ -314,6 +314,36 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                     img.src = data.imageUrl
                 })
                 setOptimisticColoredImage(data.imageUrl)
+                // Clear sketch to show spinner while generating
+                setLocalCharacter(prev => ({ ...prev, sketch_url: null }))
+            }
+
+            setIsRegenerating(false)
+
+            // Trigger sketch generation as a separate awaited call
+            if (data.imageUrl) {
+                try {
+                    const sketchRes = await fetch('/api/characters/generate-sketch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            characterId: character.id,
+                            imageUrl: data.imageUrl,
+                        }),
+                    })
+                    if (sketchRes.ok) {
+                        const sketchData = await sketchRes.json()
+                        if (sketchData.sketchUrl) {
+                            setLocalCharacter(prev => ({ ...prev, sketch_url: sketchData.sketchUrl }))
+                        }
+                    } else {
+                        console.error('Sketch generation failed after upload')
+                        setLocalCharacter(prev => ({ ...prev, sketch_url: 'error:Sketch generation failed' }))
+                    }
+                } catch (sketchErr) {
+                    console.error('Sketch generation error:', sketchErr)
+                    setLocalCharacter(prev => ({ ...prev, sketch_url: 'error:Sketch generation failed' }))
+                }
             }
         } catch (error: unknown) {
             console.error('Upload error:', error)
@@ -379,12 +409,14 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
 
     const displayColoredImageUrl = optimisticColoredImage || localCharacter.image_url
     const displaySketchImageUrl = localCharacter.sketch_url
+    const sketchHasError = !!(displaySketchImageUrl && displaySketchImageUrl.startsWith('error:'))
+    const sketchIsReady = !!(displaySketchImageUrl && !sketchHasError)
 
     // Show loading on colored if regenerating OR if project generating and no image
     const showColoredLoading = !!(isRegenerating || (isGenerating && !displayColoredImageUrl))
     
-    // Show loading on sketch if colored exists but sketch doesn't (sketch generation in progress)
-    const showSketchLoading = !!(displayColoredImageUrl && !displaySketchImageUrl && !isRegenerating)
+    // Show loading on sketch if colored exists but sketch isn't ready and hasn't errored
+    const showSketchLoading = !!(displayColoredImageUrl && !sketchIsReady && !sketchHasError && !isRegenerating)
 
     const lightboxImageUrl = lightboxImage === 'sketch' ? displaySketchImageUrl : displayColoredImageUrl
 
