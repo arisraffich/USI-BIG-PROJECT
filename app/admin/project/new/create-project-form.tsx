@@ -542,22 +542,22 @@ export default function CreateProjectForm() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button
                   type="button"
-                  onClick={handleCreateManuallyClick}
+                  onClick={handleSendToCustomer}
                   disabled={!isFormComplete || isSubmitting}
                   className="flex-1 bg-blue-600 hover:bg-blue-700"
                 >
-                  <BookOpen className="w-4 h-4 mr-2" />
-                  Create Manually
+                  <Send className="w-4 h-4 mr-2" />
+                  Send to Customer
                 </Button>
                 <Button
                   type="button"
-                  onClick={handleSendToCustomer}
+                  onClick={handleCreateManuallyClick}
                   disabled={!isFormComplete || isSubmitting}
                   variant="outline"
                   className="flex-1 border-purple-300 text-purple-700 hover:bg-purple-50 hover:text-purple-800"
                 >
-                  <Send className="w-4 h-4 mr-2" />
-                  Send to Customer
+                  <BookOpen className="w-4 h-4 mr-2" />
+                  Create Manually
                 </Button>
               </div>
               <p className="text-xs text-gray-500 text-center">

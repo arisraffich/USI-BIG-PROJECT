@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     const lastName = nameParts.slice(1).join(' ') || ''
 
     // Validate required fields
-    if (!authorFullname.trim() || !authorEmail || !authorPhone) {
+    if (!authorFullname.trim() || !authorEmail) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
