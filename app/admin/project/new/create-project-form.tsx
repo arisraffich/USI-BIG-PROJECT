@@ -47,7 +47,6 @@ export default function CreateProjectForm() {
     return !!(
       formData.author_fullname.trim() &&
       formData.author_email.trim() &&
-      formData.author_phone.trim() &&
       formData.main_character_name.trim() &&
       formData.number_of_illustrations >= 1 &&
       mainCharacterImage
@@ -112,10 +111,6 @@ export default function CreateProjectForm() {
       toast.error('Please enter the author\'s email')
       return false
     }
-    if (!formData.author_phone.trim()) {
-      toast.error('Please enter the author\'s phone number')
-      return false
-    }
     if (!formData.main_character_name.trim()) {
       toast.error('Please enter the main character name')
       return false
@@ -165,7 +160,7 @@ export default function CreateProjectForm() {
       formDataToSend.append('path', 'upload_story')
       formDataToSend.append('author_fullname', formData.author_fullname)
       formDataToSend.append('author_email', formData.author_email)
-      formDataToSend.append('author_phone', formData.author_phone)
+      formDataToSend.append('author_phone', formData.author_phone || '')
       formDataToSend.append('main_character_name', formData.main_character_name)
       formDataToSend.append('number_of_illustrations', String(formData.number_of_illustrations))
       formDataToSend.append('main_character_image', mainCharacterImage!)
@@ -258,7 +253,7 @@ export default function CreateProjectForm() {
       formDataToSend.append('path', 'send_to_customer')
       formDataToSend.append('author_fullname', formData.author_fullname)
       formDataToSend.append('author_email', formData.author_email)
-      formDataToSend.append('author_phone', formData.author_phone)
+      formDataToSend.append('author_phone', formData.author_phone || '')
       formDataToSend.append('main_character_name', formData.main_character_name)
       formDataToSend.append('number_of_illustrations', String(formData.number_of_illustrations))
       formDataToSend.append('main_character_image', mainCharacterImage!)
@@ -421,10 +416,10 @@ export default function CreateProjectForm() {
       <Card>
         <CardContent className="pt-6">
           <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
-            {/* Section 1: Contact Info */}
+            {/* Section 1: Contact Info (2 cols) */}
             <div className="space-y-4">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Contact Info</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="author_fullname">Author&apos;s Full Name *</Label>
                   <Input
@@ -447,25 +442,13 @@ export default function CreateProjectForm() {
                     className="mt-1"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="author_phone">Author Phone *</Label>
-                  <Input
-                    id="author_phone"
-                    type="tel"
-                    value={formData.author_phone}
-                    onChange={(e) => setFormData({ ...formData, author_phone: e.target.value })}
-                    required
-                    className="mt-1"
-                    placeholder="+1234567890"
-                  />
-                </div>
               </div>
             </div>
 
-            {/* Section 2: Project Info (3 cols: Name, # Illustrations, Character Image) */}
+            {/* Section 2: Project Info (2 cols + image below) */}
             <div className="space-y-4">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Project Info</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="main_character_name">Main Character Name *</Label>
                   <Input
@@ -490,41 +473,43 @@ export default function CreateProjectForm() {
                     className="mt-1"
                   />
                 </div>
-                <div>
-                  <Label>Main Character Image *</Label>
-                  <p className="text-xs text-gray-500 mb-1">PNG, JPG, WEBP (max 10MB)</p>
-                  {mainCharacterImage ? (
-                    <div className="relative inline-block">
-                      <img
-                        src={mainCharacterImage.preview}
-                        alt="Main character"
-                        className="w-20 h-20 object-cover rounded-lg border"
-                      />
-                      <button
-                        type="button"
-                        onClick={removeImage}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div
-                      {...getImageRootProps()}
-                      className={`border-2 border-dashed rounded-lg py-3 px-2 text-center cursor-pointer transition-colors ${
-                        isImageDragActive
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-300 hover:border-gray-400'
-                      }`}
+              </div>
+
+              {/* Main Character Image — full-width row */}
+              <div>
+                <Label>Main Character Image *</Label>
+                <p className="text-xs text-gray-500 mb-2">PNG, JPG, WEBP (max 10MB)</p>
+                {mainCharacterImage ? (
+                  <div className="relative inline-block">
+                    <img
+                      src={mainCharacterImage.preview}
+                      alt="Main character"
+                      className="w-28 h-28 object-cover rounded-lg border"
+                    />
+                    <button
+                      type="button"
+                      onClick={removeImage}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
                     >
-                      <input {...getImageInputProps()} />
-                      <ImageIcon className="w-6 h-6 mx-auto text-gray-400 mb-0.5" />
-                      <p className="text-xs text-gray-600">
-                        {isImageDragActive ? 'Drop here' : 'Drag & drop or click'}
-                      </p>
-                    </div>
-                  )}
-                </div>
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    {...getImageRootProps()}
+                    className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors max-w-sm ${
+                      isImageDragActive
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <input {...getImageInputProps()} />
+                    <ImageIcon className="w-10 h-10 mx-auto text-gray-400 mb-1" />
+                    <p className="text-sm text-gray-600">
+                      {isImageDragActive ? 'Drop image here' : 'Drag & drop or click'}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
