@@ -107,29 +107,34 @@ async function fetchImageAsBase64(input: string, highQuality: boolean = false): 
             mimeType = response.headers.get('content-type') || 'image/jpeg'
         }
 
-        // 3. Resize & Standardize (For BOTH URL and Data URI)
-        // High quality mode (Scene Recreation): 2048px, 95% JPEG - preserves detail for image editing
-        // Standard mode: 1024px, 80% JPEG - prevents payload issues (500 errors)
+        // 3. Resize to fit within max dimensions, preserving format quality
+        // - PNG inputs stay as PNG (lossless) to prevent quality degradation
+        // - JPEG inputs stay as high-quality JPEG
+        // - Max size: 2048px for all modes (was 1024px standard / 2048px high quality)
         try {
-            const maxSize = highQuality ? 2048 : 1024
-            const quality = highQuality ? 95 : 80
+            const maxSize = 2048
+            const isPng = mimeType === 'image/png'
             
-            if (highQuality) {
-                console.log('[fetchImageAsBase64] 🎨 Using HIGH QUALITY mode (2048px, 95% JPEG)')
-            }
-            
-            buffer = await sharp(buffer)
+            const sharpInstance = sharp(buffer)
                 .resize(maxSize, maxSize, { fit: 'inside', withoutEnlargement: true })
-                .jpeg({ quality })
-                .toBuffer()
-
-            return {
-                mimeType: 'image/jpeg',
-                data: buffer.toString('base64')
+            
+            if (isPng) {
+                // Keep PNG as PNG — no lossy conversion
+                buffer = await sharpInstance.png().toBuffer()
+                return {
+                    mimeType: 'image/png',
+                    data: buffer.toString('base64')
+                }
+            } else {
+                // JPEG/other: use high quality
+                buffer = await sharpInstance.jpeg({ quality: 95 }).toBuffer()
+                return {
+                    mimeType: 'image/jpeg',
+                    data: buffer.toString('base64')
+                }
             }
         } catch (resizeError) {
             console.warn('Image resize failed, using original:', resizeError)
-            // Fallback to original
             return {
                 mimeType,
                 data: buffer.toString('base64')

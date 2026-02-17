@@ -212,12 +212,38 @@ export function SharedIllustrationBoard({
     // Line Art Generation State
     const [isGeneratingLineArt, setIsGeneratingLineArt] = useState(false)
     
+    // Reset to Original state
+    const [isResettingToOriginal, setIsResettingToOriginal] = useState(false)
+    const hasOriginal = !!page.original_illustration_url
+    const isShowingOriginal = hasOriginal && page.illustration_url === page.original_illustration_url
+
     // NEW: Environment Reference & Character Control (Mode 3/4)
     const [selectedEnvPageId, setSelectedEnvPageId] = useState<string | null>(null)
     const [sceneCharacters, setSceneCharacters] = useState<SceneCharacter[]>([])
     const [editingCharacterId, setEditingCharacterId] = useState<string | null>(null)
     const [editAction, setEditAction] = useState('')
     const [editEmotion, setEditEmotion] = useState('')
+    const [promptWasAutoPopulated, setPromptWasAutoPopulated] = useState(false)
+    
+    const ENV_AUTO_PROMPT = 'Use the same environment as in the reference image. Keep all characters and composition the same.'
+    
+    // Handle environment reference selection with auto-prompt
+    const handleEnvSelect = (envPageId: string | null) => {
+        setSelectedEnvPageId(envPageId)
+        if (envPageId) {
+            // Selecting an environment: auto-populate prompt if empty or was previously auto-populated
+            if (!regenerationPrompt.trim() || promptWasAutoPopulated) {
+                setRegenerationPrompt(ENV_AUTO_PROMPT)
+                setPromptWasAutoPopulated(true)
+            }
+        } else {
+            // Deselecting environment: clear only if prompt was auto-populated
+            if (promptWasAutoPopulated) {
+                setRegenerationPrompt('')
+                setPromptWasAutoPopulated(false)
+            }
+        }
+    }
 
     // Handler to open regenerate dialog with saved prompt or customer feedback pre-populated
     const handleOpenRegenerateDialog = () => {
@@ -1794,6 +1820,7 @@ export function SharedIllustrationBoard({
                         setSelectedEnvPageId(null)
                         setSceneCharacters([])
                         setEditingCharacterId(null)
+                        setPromptWasAutoPopulated(false)
                     }
                 }}>
                     <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
@@ -1827,7 +1854,7 @@ export function SharedIllustrationBoard({
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent className="w-[calc(550px-3rem)]" align="start">
                                             <DropdownMenuItem 
-                                                onClick={() => setSelectedEnvPageId(null)} 
+                                                onClick={() => handleEnvSelect(null)} 
                                                 className="cursor-pointer"
                                             >
                                                 <X className="w-4 h-4 mr-2 text-slate-400" />
@@ -1836,7 +1863,7 @@ export function SharedIllustrationBoard({
                                             {illustratedPages.map(prevPage => (
                                                 <DropdownMenuItem
                                                     key={prevPage.id}
-                                                    onClick={() => setSelectedEnvPageId(prevPage.id)}
+                                                    onClick={() => handleEnvSelect(prevPage.id)}
                                                     className="cursor-pointer"
                                                 >
                                                     <Bookmark className="w-4 h-4 mr-2 text-purple-500" />
@@ -1858,7 +1885,13 @@ export function SharedIllustrationBoard({
                                 <Label>Instructions {isSceneRecreationMode && <span className="text-slate-400 font-normal">(Optional)</span>}</Label>
                                 <Textarea
                                     value={regenerationPrompt}
-                                    onChange={(e) => setRegenerationPrompt(e.target.value)}
+                                    onChange={(e) => {
+                                        setRegenerationPrompt(e.target.value)
+                                        // If user edits the auto-populated text, mark as manual
+                                        if (promptWasAutoPopulated && e.target.value !== ENV_AUTO_PROMPT) {
+                                            setPromptWasAutoPopulated(false)
+                                        }
+                                    }}
                                     placeholder={isSceneRecreationMode 
                                         ? "e.g. Make the lighting warmer, change the camera angle..."
                                         : "e.g. Make the lighting warmer, add sunglasses..."}
@@ -2093,6 +2126,45 @@ export function SharedIllustrationBoard({
 
                         <DialogFooter>
                             <Button variant="ghost" onClick={() => setIsRegenerateDialogOpen(false)}>Cancel</Button>
+                            
+                            {/* Reset to Original button — only when original exists, not already showing it, and no custom input */}
+                            {hasOriginal && !isShowingOriginal && !regenerationPrompt.trim() && referenceImages.length === 0 && !isSceneRecreationMode && (
+                                <Button
+                                    onClick={async () => {
+                                        setIsResettingToOriginal(true)
+                                        setIsRegenerateDialogOpen(false)
+                                        try {
+                                            const res = await fetch('/api/illustrations/reset-to-original', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ pageId: page.id, projectId })
+                                            })
+                                            if (!res.ok) {
+                                                const data = await res.json().catch(() => ({}))
+                                                throw new Error(data.error || 'Failed to reset')
+                                            }
+                                            toast.success('Restored to original illustration')
+                                            // Force page refresh to update the UI
+                                            window.location.reload()
+                                        } catch (err) {
+                                            toast.error(getErrorMessage(err, 'Failed to reset to original'))
+                                        } finally {
+                                            setIsResettingToOriginal(false)
+                                        }
+                                    }}
+                                    disabled={isResettingToOriginal}
+                                    className="bg-red-600 hover:bg-red-700 text-white"
+                                >
+                                    {isResettingToOriginal ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                            Restoring...
+                                        </>
+                                    ) : "Reset to Original"}
+                                </Button>
+                            )}
+
+                            {/* Regenerate / Recreate Scene button */}
                             <Button
                                 onClick={async () => {
                                     // Convert uploaded images to base64 (Mode 1/2 only)
@@ -2127,18 +2199,14 @@ export function SharedIllustrationBoard({
                                 }}
                                 disabled={isSceneRecreationMode && sceneCharacters.filter(c => c.isIncluded).length === 0}
                                 className={
-                                    (!regenerationPrompt.trim() && referenceImages.length === 0 && !isSceneRecreationMode) 
-                                        ? "bg-red-600 hover:bg-red-700 text-white" 
-                                        : isSceneRecreationMode 
-                                            ? "bg-purple-600 hover:bg-purple-700 text-white"
-                                            : ""
+                                    isSceneRecreationMode 
+                                        ? "bg-purple-600 hover:bg-purple-700 text-white"
+                                        : ""
                                 }
                             >
-                                {(!regenerationPrompt.trim() && referenceImages.length === 0 && !isSceneRecreationMode) 
-                                    ? "Reset to Original" 
-                                    : isSceneRecreationMode 
-                                        ? "Recreate Scene"
-                                        : "Regenerate"}
+                                {isSceneRecreationMode 
+                                    ? "Recreate Scene"
+                                    : "Regenerate"}
                             </Button>
                         </DialogFooter>
                     </DialogContent>

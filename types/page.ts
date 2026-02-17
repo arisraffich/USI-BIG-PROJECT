@@ -9,6 +9,7 @@ export interface Page {
   sketch_url?: string | null
   sketch_prompt?: string | null
   illustration_url?: string | null
+  original_illustration_url?: string | null // First-ever successful generation (immutable reference)
   // Published versions (Synrchronized on "Send")
   customer_illustration_url?: string | null
   customer_sketch_url?: string | null

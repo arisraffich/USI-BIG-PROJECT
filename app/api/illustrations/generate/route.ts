@@ -220,14 +220,19 @@ IMAGE CONTEXT:
                 anchorImage = referenceImageUrl
             } else if (pageData.page_number > 1) {
                 // PAGES 2-N: Use Page 1 as Style Anchor (maintains internal consistency)
+                // Prefer original_illustration_url (immutable first generation) to prevent quality degradation
                 const { data: p1 } = await supabase
                     .from('pages')
-                    .select('illustration_url')
+                    .select('illustration_url, original_illustration_url')
                     .eq('project_id', projectId)
                     .eq('page_number', 1)
                     .single()
-                if (p1?.illustration_url) {
-                    anchorImage = p1.illustration_url
+                const page1Anchor = p1?.original_illustration_url || p1?.illustration_url
+                if (page1Anchor) {
+                    anchorImage = page1Anchor
+                    if (p1?.original_illustration_url) {
+                        console.log('[Illustration Generate] 📌 Using Page 1 ORIGINAL illustration as style anchor (quality preserved)')
+                    }
                 }
             } else if (pageData.page_number === 1) {
                 // PAGE 1: Check for custom style references first
@@ -588,10 +593,14 @@ ${textPromptSection}`
         // Update illustration URL and mark any feedback as resolved (same pattern as character regeneration)
 
         if (!skipDbUpdate) {
+            // Save original_illustration_url on first generation (immutable quality reference)
+            const isFirstGeneration = !pageData.original_illustration_url
+            
             await supabase.from('pages')
                 .update({
                     illustration_url: publicUrl,
                     is_resolved: true, // Mark feedback as resolved after regeneration
+                    ...(isFirstGeneration ? { original_illustration_url: publicUrl } : {}),
                 })
                 .eq('id', pageData.id)
 
