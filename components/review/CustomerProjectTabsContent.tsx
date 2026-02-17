@@ -397,11 +397,15 @@ export function CustomerProjectTabsContent({
 
   const showIllustrationsTab = isIllustrationMode
 
-  // Redirect Logic
+  // Redirect Logic — only on initial page load (not after in-app navigation)
+  const hasRedirected = useRef(false)
   useEffect(() => {
+    if (hasRedirected.current) return
     if (showIllustrationsTab && !searchParams?.get('tab')) {
+      hasRedirected.current = true
       router.replace(`${pathname}?tab=illustrations`)
     } else if (showGallery && !searchParams?.get('tab') && isCharacterMode) {
+      hasRedirected.current = true
       router.replace(`${pathname}?tab=characters`)
     }
   }, [showIllustrationsTab, showGallery, searchParams, pathname, router, isCharacterMode])
