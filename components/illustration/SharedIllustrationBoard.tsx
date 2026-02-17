@@ -247,13 +247,30 @@ export function SharedIllustrationBoard({
 
     // Handler to open regenerate dialog with saved prompt or customer feedback pre-populated
     const handleOpenRegenerateDialog = () => {
-        // Priority: 1) Saved prompt from localStorage, 2) Customer feedback if unresolved, 3) Empty
-        const savedPrompt = typeof window !== 'undefined' 
-            ? localStorage.getItem(`regen-prompt-${page.id}`) 
-            : null
-        const prompt = savedPrompt 
-            || (page.feedback_notes && !page.is_resolved ? page.feedback_notes : '')
-        setRegenerationPrompt(prompt)
+        // Current customer feedback for this round (only if unresolved)
+        const currentFeedback = (page.feedback_notes && !page.is_resolved) ? page.feedback_notes : ''
+        
+        // Check localStorage for admin's edited prompt from the same round
+        // Stored as JSON { prompt, feedbackKey } — only valid if feedbackKey matches current feedback
+        let savedPrompt: string | null = null
+        if (typeof window !== 'undefined') {
+            try {
+                const stored = localStorage.getItem(`regen-prompt-${page.id}`)
+                if (stored) {
+                    const parsed = JSON.parse(stored)
+                    if (parsed.feedbackKey === currentFeedback) {
+                        savedPrompt = parsed.prompt
+                    } else {
+                        // Stale prompt from a previous round — clean up
+                        localStorage.removeItem(`regen-prompt-${page.id}`)
+                    }
+                }
+            } catch {
+                localStorage.removeItem(`regen-prompt-${page.id}`)
+            }
+        }
+        
+        setRegenerationPrompt(savedPrompt || currentFeedback)
         setIsRegenerateDialogOpen(true)
     }
 
@@ -2189,9 +2206,13 @@ export function SharedIllustrationBoard({
                                         ? sceneCharacters.filter(c => c.isIncluded)
                                         : undefined
                                     
-                                    // Save prompt to localStorage for next regeneration
+                                    // Save prompt to localStorage (scoped to current round's feedback)
                                     if (regenerationPrompt.trim()) {
-                                        localStorage.setItem(`regen-prompt-${page.id}`, regenerationPrompt)
+                                        const currentFeedback = (page.feedback_notes && !page.is_resolved) ? page.feedback_notes : ''
+                                        localStorage.setItem(`regen-prompt-${page.id}`, JSON.stringify({
+                                            prompt: regenerationPrompt,
+                                            feedbackKey: currentFeedback
+                                        }))
                                     }
                                     
                                     setIsRegenerateDialogOpen(false)

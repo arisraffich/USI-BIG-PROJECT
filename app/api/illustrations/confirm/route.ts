@@ -41,20 +41,14 @@ export async function POST(request: Request) {
         }
 
         if (decision === 'keep_new') {
-            // Check if this page already has an original saved
-            const { data: pageData } = await supabase.from('pages')
-                .select('original_illustration_url')
-                .eq('id', pageId)
-                .single()
-            
-            const isFirstGeneration = !pageData?.original_illustration_url
-
             // 1. Update DB with new illustration URL
+            // Always update original_illustration_url to the last approved version
+            // This powers "Reset to Original" (restores last accepted regeneration)
             await supabase.from('pages')
                 .update({
                     illustration_url: newUrl,
+                    original_illustration_url: newUrl,
                     is_resolved: true,
-                    ...(isFirstGeneration ? { original_illustration_url: newUrl } : {}),
                 })
                 .eq('id', pageId)
 

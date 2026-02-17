@@ -219,20 +219,16 @@ IMAGE CONTEXT:
                 // MANUAL OVERRIDE - Environment Consistency Mode
                 anchorImage = referenceImageUrl
             } else if (pageData.page_number > 1) {
-                // PAGES 2-N: Use Page 1 as Style Anchor (maintains internal consistency)
-                // Prefer original_illustration_url (immutable first generation) to prevent quality degradation
+                // PAGES 2-N: Use Page 1's current illustration as Style Anchor
+                // Quality is preserved by Solution A (PNG lossless, 2048px references)
                 const { data: p1 } = await supabase
                     .from('pages')
-                    .select('illustration_url, original_illustration_url')
+                    .select('illustration_url')
                     .eq('project_id', projectId)
                     .eq('page_number', 1)
                     .single()
-                const page1Anchor = p1?.original_illustration_url || p1?.illustration_url
-                if (page1Anchor) {
-                    anchorImage = page1Anchor
-                    if (p1?.original_illustration_url) {
-                        console.log('[Illustration Generate] 📌 Using Page 1 ORIGINAL illustration as style anchor (quality preserved)')
-                    }
+                if (p1?.illustration_url) {
+                    anchorImage = p1.illustration_url
                 }
             } else if (pageData.page_number === 1) {
                 // PAGE 1: Check for custom style references first
