@@ -47,15 +47,32 @@ function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownloa
                         <AlertTriangle className="w-8 h-8 mb-2" />
                         <span className="text-xs font-medium text-center">Generation Failed</span>
                         <span className="text-[10px] text-red-400 text-center mt-1 line-clamp-3">{errorMessage}</span>
-                        {onRetry && (
-                            <button
-                                onClick={(e) => { e.stopPropagation(); onRetry() }}
-                                className="mt-2 px-3 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1"
-                            >
-                                <RefreshCw className="w-3 h-3" />
-                                Retry
-                            </button>
-                        )}
+                        <div className="flex items-center gap-2 mt-2">
+                            {onRetry && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onRetry() }}
+                                    className="px-3 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1"
+                                >
+                                    <RefreshCw className="w-3 h-3" />
+                                    Retry
+                                </button>
+                            )}
+                            {showUpload && onUpload && (
+                                <label
+                                    className="px-3 py-1 bg-orange-500 text-white text-xs rounded-md hover:bg-orange-600 transition-colors flex items-center gap-1 cursor-pointer"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <Upload className="w-3 h-3" />
+                                    Upload
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={onUpload}
+                                    />
+                                </label>
+                            )}
+                        </div>
                     </div>
                 ) : actualImageUrl ? (
                     <>
