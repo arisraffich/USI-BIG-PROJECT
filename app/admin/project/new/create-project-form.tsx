@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -26,6 +27,7 @@ export default function CreateProjectForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [processingStep, setProcessingStep] = useState<string>('')
   const [isCancelled, setIsCancelled] = useState(false)
+  const [showStoryUploadDialog, setShowStoryUploadDialog] = useState(false)
 
   // Form data — single step with all fields
   const [formData, setFormData] = useState({
@@ -39,6 +41,18 @@ export default function CreateProjectForm() {
   // File uploads
   const [mainCharacterImage, setMainCharacterImage] = useState<FileWithPreview | null>(null)
   const [storyFile, setStoryFile] = useState<File | null>(null)
+
+  // All required fields filled?
+  const isFormComplete = useMemo(() => {
+    return !!(
+      formData.author_fullname.trim() &&
+      formData.author_email.trim() &&
+      formData.author_phone.trim() &&
+      formData.main_character_name.trim() &&
+      formData.number_of_illustrations >= 1 &&
+      mainCharacterImage
+    )
+  }, [formData, mainCharacterImage])
 
   // Dropzone for main character image
   const {
@@ -61,7 +75,7 @@ export default function CreateProjectForm() {
     },
   })
 
-  // Dropzone for story file
+  // Dropzone for story file (used inside the popup)
   const {
     getRootProps: getStoryRootProps,
     getInputProps: getStoryInputProps,
@@ -117,12 +131,23 @@ export default function CreateProjectForm() {
     return true
   }
 
-  // PATH A: Upload Story — admin uploads a manuscript file, AI parses it
-  async function handleUploadStory(e: React.MouseEvent) {
+  // Open the story upload popup
+  function handleCreateManuallyClick(e: React.MouseEvent) {
     e.preventDefault()
+    setShowStoryUploadDialog(true)
+  }
+
+  // Cancel the story upload popup — discard any selected file
+  function handleStoryUploadCancel() {
+    setStoryFile(null)
+    setShowStoryUploadDialog(false)
+  }
+
+  // PATH A: Create Manually — admin uploads a manuscript file, AI parses it
+  async function handleCreateManuallySubmit() {
     if (!validateCommonFields()) return
     if (!storyFile) {
-      toast.error('Please upload a story file for Path A')
+      toast.error('Please upload a story file')
       return
     }
     if (storyFile.size > 10 * 1024 * 1024) {
@@ -130,13 +155,14 @@ export default function CreateProjectForm() {
       return
     }
 
+    setShowStoryUploadDialog(false)
     setIsSubmitting(true)
     setIsCancelled(false)
     setProcessingStep('Uploading files...')
 
     try {
       const formDataToSend = new FormData()
-      formDataToSend.append('path', 'upload_story') // Signal path A
+      formDataToSend.append('path', 'upload_story')
       formDataToSend.append('author_fullname', formData.author_fullname)
       formDataToSend.append('author_email', formData.author_email)
       formDataToSend.append('author_phone', formData.author_phone)
@@ -174,7 +200,6 @@ export default function CreateProjectForm() {
       if (result.project_id) {
         setProcessingStep('Parsing story (this may take a minute)...')
 
-        // Poll for pages to be created
         let attempts = 0
         const maxAttempts = 90
 
@@ -230,7 +255,7 @@ export default function CreateProjectForm() {
 
     try {
       const formDataToSend = new FormData()
-      formDataToSend.append('path', 'send_to_customer') // Signal path B
+      formDataToSend.append('path', 'send_to_customer')
       formDataToSend.append('author_fullname', formData.author_fullname)
       formDataToSend.append('author_email', formData.author_email)
       formDataToSend.append('author_phone', formData.author_phone)
@@ -285,21 +310,18 @@ export default function CreateProjectForm() {
     }
   }
 
-  function removeFile(type: 'image' | 'story') {
-    if (type === 'image') {
-      if (mainCharacterImage?.preview) {
-        URL.revokeObjectURL(mainCharacterImage.preview)
-      }
-      setMainCharacterImage(null)
-    } else {
-      setStoryFile(null)
+  function removeImage() {
+    if (mainCharacterImage?.preview) {
+      URL.revokeObjectURL(mainCharacterImage.preview)
     }
+    setMainCharacterImage(null)
   }
 
   const estimatedMinutes = Math.ceil(formData.number_of_illustrations * 1.5)
 
   return (
     <div className="max-w-4xl">
+      {/* Processing Dialog */}
       <Dialog open={isSubmitting}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -331,6 +353,68 @@ export default function CreateProjectForm() {
               Cancel and Go to Dashboard
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Story Upload Dialog (Create Manually popup) */}
+      <Dialog open={showStoryUploadDialog} onOpenChange={(open) => {
+        if (!open) handleStoryUploadCancel()
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload Story File</DialogTitle>
+            <DialogDescription>
+              Since you&apos;re creating this project manually, please upload the formatted story file so we can parse it into pages.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label>Story File *</Label>
+            <p className="text-xs text-gray-500 mb-3">PDF, DOCX, or TXT (max 10MB)</p>
+            {storyFile ? (
+              <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border">
+                <File className="w-5 h-5 text-gray-600" />
+                <span className="flex-1 text-sm truncate">{storyFile.name}</span>
+                <button
+                  type="button"
+                  onClick={() => setStoryFile(null)}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div
+                {...getStoryRootProps()}
+                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                  isStoryDragActive
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}
+              >
+                <input {...getStoryInputProps()} />
+                <Upload className="w-10 h-10 mx-auto text-gray-400 mb-2" />
+                <p className="text-sm text-gray-600">
+                  {isStoryDragActive ? 'Drop file here' : 'Drag & drop or click'}
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={handleStoryUploadCancel}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateManuallySubmit}
+              disabled={!storyFile}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <BookOpen className="w-4 h-4 mr-2" />
+              Create Project
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -378,10 +462,10 @@ export default function CreateProjectForm() {
               </div>
             </div>
 
-            {/* Section 2: Project Info */}
+            {/* Section 2: Project Info (3 cols: Name, # Illustrations, Character Image) */}
             <div className="space-y-4">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Project Info</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="main_character_name">Main Character Name *</Label>
                   <Input
@@ -406,84 +490,42 @@ export default function CreateProjectForm() {
                     className="mt-1"
                   />
                 </div>
-              </div>
-            </div>
-
-            {/* Section 3: Files */}
-            <div className="space-y-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Files</p>
-
-            {/* Row 3: Main Character Image + Story File side by side */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label>Main Character Image *</Label>
-                <p className="text-xs text-gray-500 mb-2">PNG, JPG, WEBP (max 10MB)</p>
-                {mainCharacterImage ? (
-                  <div className="relative inline-block">
-                    <img
-                      src={mainCharacterImage.preview}
-                      alt="Main character"
-                      className="w-28 h-28 object-cover rounded-lg border"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeFile('image')}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                <div>
+                  <Label>Main Character Image *</Label>
+                  <p className="text-xs text-gray-500 mb-1">PNG, JPG, WEBP (max 10MB)</p>
+                  {mainCharacterImage ? (
+                    <div className="relative inline-block">
+                      <img
+                        src={mainCharacterImage.preview}
+                        alt="Main character"
+                        className="w-20 h-20 object-cover rounded-lg border"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeImage}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      {...getImageRootProps()}
+                      className={`border-2 border-dashed rounded-lg py-3 px-2 text-center cursor-pointer transition-colors ${
+                        isImageDragActive
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
                     >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <div
-                    {...getImageRootProps()}
-                    className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                      isImageDragActive
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-300 hover:border-gray-400'
-                    }`}
-                  >
-                    <input {...getImageInputProps()} />
-                    <ImageIcon className="w-10 h-10 mx-auto text-gray-400 mb-1" />
-                    <p className="text-sm text-gray-600">
-                      {isImageDragActive ? 'Drop image here' : 'Drag & drop or click'}
-                    </p>
-                  </div>
-                )}
+                      <input {...getImageInputProps()} />
+                      <ImageIcon className="w-6 h-6 mx-auto text-gray-400 mb-0.5" />
+                      <p className="text-xs text-gray-600">
+                        {isImageDragActive ? 'Drop here' : 'Drag & drop or click'}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
-
-              <div>
-                <Label>Story File <span className="text-gray-400 font-normal">(optional)</span></Label>
-                <p className="text-xs text-gray-500 mb-2">PDF, DOCX, or TXT (max 10MB)</p>
-                {storyFile ? (
-                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border">
-                    <File className="w-5 h-5 text-gray-600" />
-                    <span className="flex-1 text-sm truncate">{storyFile.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeFile('story')}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div
-                    {...getStoryRootProps()}
-                    className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                      isStoryDragActive
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-300 hover:border-gray-400'
-                    }`}
-                  >
-                    <input {...getStoryInputProps()} />
-                    <Upload className="w-10 h-10 mx-auto text-gray-400 mb-1" />
-                    <p className="text-sm text-gray-600">
-                      {isStoryDragActive ? 'Drop file here' : 'Drag & drop or click'}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
             </div>
 
             {/* Action Buttons */}
@@ -494,17 +536,17 @@ export default function CreateProjectForm() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button
                   type="button"
-                  onClick={handleUploadStory}
-                  disabled={isSubmitting || !storyFile}
+                  onClick={handleCreateManuallyClick}
+                  disabled={!isFormComplete || isSubmitting}
                   className="flex-1 bg-blue-600 hover:bg-blue-700"
                 >
                   <BookOpen className="w-4 h-4 mr-2" />
-                  Upload Story
+                  Create Manually
                 </Button>
                 <Button
                   type="button"
                   onClick={handleSendToCustomer}
-                  disabled={isSubmitting}
+                  disabled={!isFormComplete || isSubmitting}
                   variant="outline"
                   className="flex-1 border-purple-300 text-purple-700 hover:bg-purple-50 hover:text-purple-800"
                 >
@@ -512,11 +554,6 @@ export default function CreateProjectForm() {
                   Send to Customer
                 </Button>
               </div>
-              {!storyFile && (
-                <p className="text-xs text-gray-400 text-center">
-                  Upload a story file above to enable the &quot;Upload Story&quot; option
-                </p>
-              )}
               <p className="text-xs text-gray-500 text-center">
                 &quot;Send to Customer&quot; will email the author a link to submit their story text.
                 <br />
