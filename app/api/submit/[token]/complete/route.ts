@@ -121,7 +121,7 @@ export async function POST(
     // Update project status to character_generation
     const { data: allCharacters } = await supabase
       .from('characters')
-      .select('id, name, role, is_main, image_url')
+      .select('id, name, role, is_main, image_url, age, gender, description, skin_color, hair_color, hair_style, eye_color, clothing, accessories, special_features')
       .eq('project_id', project.id)
 
     const secondaryCharacters = allCharacters?.filter(c => !c.is_main) || []
@@ -226,11 +226,28 @@ export async function POST(
     // Send notifications
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 
-    // Slack notification to admin
+    // Slack notification to admin (with character form data, same as legacy path)
     try {
-      const { sendSlackNotification } = await import('@/lib/notifications/slack')
-      await sendSlackNotification({
-        text: `Customer submission completed!\n*Author:* ${authorName}\n*Characters:* ${secondaryCharacters.length} secondary\n*Project:* <${baseUrl}/admin/project/${project.id}|View Project>`,
+      const { notifyCustomerSubmission } = await import('@/lib/notifications')
+      await notifyCustomerSubmission({
+        projectId: project.id,
+        projectTitle: project.book_title,
+        authorName,
+        projectUrl: `${baseUrl}/admin/project/${project.id}`,
+        characters: secondaryCharacters.map(c => ({
+          name: c.name,
+          role: c.role,
+          age: c.age,
+          gender: c.gender,
+          description: c.description,
+          skin_color: c.skin_color,
+          hair_color: c.hair_color,
+          hair_style: c.hair_style,
+          eye_color: c.eye_color,
+          clothing: c.clothing,
+          accessories: c.accessories,
+          special_features: c.special_features,
+        })),
       })
     } catch (e) {
       console.error('[Submission Complete] Slack notification failed:', e)

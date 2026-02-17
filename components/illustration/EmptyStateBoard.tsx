@@ -340,7 +340,7 @@ export function EmptyStateBoard({
                         {setIllustrationType && (
                             <>
                                 <div className="h-px bg-slate-200"></div>
-                                <div className={`grid gap-2 ${page.page_number > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                <div className="grid grid-cols-2 gap-2">
                                     {/* Spot Image Checkbox - Available on all pages */}
                                     <div 
                                         className={`flex items-center gap-2 p-2.5 rounded-lg cursor-pointer transition-colors ${illustrationType === 'spot' ? 'bg-pink-50 border-2 border-pink-300' : 'hover:bg-slate-100 border-2 border-transparent bg-white'}`}

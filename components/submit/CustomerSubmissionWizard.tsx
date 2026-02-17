@@ -1132,14 +1132,7 @@ export function CustomerSubmissionWizard({
               Thank you for filling out the character details. Ready to submit your project?
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-center mt-4">
-            <Button
-              onClick={() => setShowCompletionPopup(false)}
-              variant="outline"
-              className="w-full sm:w-auto"
-            >
-              Review First
-            </Button>
+          <DialogFooter className="sm:justify-center mt-4">
             <Button
               onClick={() => {
                 setShowCompletionPopup(false)
