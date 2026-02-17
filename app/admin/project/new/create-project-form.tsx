@@ -35,7 +35,7 @@ export default function CreateProjectForm() {
     author_email: 'arisraffich@gmail.com', // v1: autopopulate for testing
     author_phone: '',
     main_character_name: '',
-    number_of_illustrations: 12,
+    number_of_illustrations: '' as unknown as number,
   })
 
   // File uploads
@@ -48,7 +48,8 @@ export default function CreateProjectForm() {
       formData.author_fullname.trim() &&
       formData.author_email.trim() &&
       formData.main_character_name.trim() &&
-      formData.number_of_illustrations >= 1 &&
+      formData.number_of_illustrations !== ('' as unknown as number) &&
+      Number(formData.number_of_illustrations) >= 1 &&
       mainCharacterImage
     )
   }, [formData, mainCharacterImage])
@@ -312,10 +313,26 @@ export default function CreateProjectForm() {
     setMainCharacterImage(null)
   }
 
-  const estimatedMinutes = Math.ceil(formData.number_of_illustrations * 1.5)
+  const illustrationCount = Number(formData.number_of_illustrations) || 0
+  const estimatedMinutes = Math.ceil(illustrationCount * 1.5)
 
   return (
-    <div className="max-w-4xl">
+    <div className="w-full">
+      {/* Header: Title + Cancel */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Create New Project</h1>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => router.back()}
+          className="text-gray-500 hover:text-gray-700"
+        >
+          <X className="w-4 h-4 mr-1" />
+          Cancel
+        </Button>
+      </div>
+
       {/* Processing Dialog */}
       <Dialog open={isSubmitting}>
         <DialogContent className="sm:max-w-md">
@@ -468,9 +485,13 @@ export default function CreateProjectForm() {
                     min={1}
                     max={50}
                     value={formData.number_of_illustrations}
-                    onChange={(e) => setFormData({ ...formData, number_of_illustrations: parseInt(e.target.value) || 1 })}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setFormData({ ...formData, number_of_illustrations: val === '' ? ('' as unknown as number) : (parseInt(val) || 0) })
+                    }}
                     required
                     className="mt-1"
+                    placeholder="e.g., 12"
                   />
                 </div>
               </div>
@@ -497,7 +518,7 @@ export default function CreateProjectForm() {
                 ) : (
                   <div
                     {...getImageRootProps()}
-                    className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors max-w-sm ${
+                    className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
                       isImageDragActive
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-300 hover:border-gray-400'
@@ -541,20 +562,15 @@ export default function CreateProjectForm() {
               </div>
               <p className="text-xs text-gray-500 text-center">
                 &quot;Send to Customer&quot; will email the author a link to submit their story text.
-                <br />
-                Estimated time for customer: ~{estimatedMinutes} minutes ({formData.number_of_illustrations} pages)
+                {illustrationCount > 0 && (
+                  <>
+                    <br />
+                    Estimated time for customer: ~{estimatedMinutes} minutes ({illustrationCount} pages)
+                  </>
+                )}
               </p>
             </div>
 
-            <div className="flex justify-start">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => router.back()}
-              >
-                Cancel
-              </Button>
-            </div>
           </form>
         </CardContent>
       </Card>
