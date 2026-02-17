@@ -9,19 +9,21 @@ interface CustomerCharacterCardProps {
   character: Character
   isGenerating?: boolean
   onChange?: (id: string, data: any, isValid: boolean) => void
+  onSaved?: (id: string) => void
   isLocked?: boolean
+  showSaveToast?: boolean
 }
 
 export const CustomerCharacterCard = memo(function CustomerCharacterCard({
   character,
   isGenerating = false,
   onChange,
-  isLocked = false
+  onSaved,
+  isLocked = false,
+  showSaveToast = true
 }: CustomerCharacterCardProps) {
 
   const handleSave = async (data: CharacterFormData) => {
-    // Legacy save - disable or keep as backup
-    // With hideSaveButton, this is only called if we manually trigger it
     try {
       const response = await fetch(`/api/review/characters/${character.id}`, {
         method: 'PATCH',
@@ -33,7 +35,10 @@ export const CustomerCharacterCard = memo(function CustomerCharacterCard({
         throw new Error('Failed to save character')
       }
 
-      toast.success('Character updated')
+      if (showSaveToast) {
+        toast.success('Character updated')
+      }
+      onSaved?.(character.id)
     } catch (error) {
       toast.error('Failed to save changes')
       throw error

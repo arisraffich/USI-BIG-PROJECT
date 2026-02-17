@@ -7,9 +7,10 @@ interface AdminCharacterGalleryProps {
     characters: Character[]
     projectId: string
     isGenerating?: boolean
+    isSketchPhase?: boolean
 }
 
-export function AdminCharacterGallery({ characters, projectId, isGenerating = false }: AdminCharacterGalleryProps) {
+export function AdminCharacterGallery({ characters, projectId, isGenerating = false, isSketchPhase = false }: AdminCharacterGalleryProps) {
     // Sort: Main first, then by creation date
     const sortedCharacters = [...characters].sort((a, b) => {
         if (a.is_main && !b.is_main) return -1
@@ -32,6 +33,7 @@ export function AdminCharacterGallery({ characters, projectId, isGenerating = fa
                             character={character}
                             projectId={projectId}
                             isGenerating={isGenerating}
+                            isSketchPhase={isSketchPhase}
                         />
                     </div>
                 ))}

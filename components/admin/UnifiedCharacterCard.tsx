@@ -14,6 +14,7 @@ interface UnifiedCharacterCardProps {
     character: Character
     projectId: string
     isGenerating?: boolean
+    isSketchPhase?: boolean
 }
 
 interface SubCardProps {
@@ -128,7 +129,7 @@ function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownloa
     )
 }
 
-export function UnifiedCharacterCard({ character, projectId, isGenerating = false }: UnifiedCharacterCardProps) {
+export function UnifiedCharacterCard({ character, projectId, isGenerating = false, isSketchPhase = false }: UnifiedCharacterCardProps) {
     const [isRegenerating, setIsRegenerating] = useState(false)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [customPrompt, setCustomPrompt] = useState(character.generation_prompt || '')
@@ -490,8 +491,9 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     
     // Show loading on sketch ONLY when:
     // 1. We explicitly started sketch generation (isSketchGenerating), OR
-    // 2. Parent says project is generating AND colored exists but sketch isn't ready yet
-    const showSketchLoading = !!(isSketchGenerating || (isGenerating && displayColoredImageUrl && !sketchIsReady && !sketchHasError))
+    // 2. Parent says project is generating AND colored exists but sketch isn't ready yet, OR
+    // 3. Sketch phase (character_generation_complete) AND colored exists but sketch isn't ready yet
+    const showSketchLoading = !!(isSketchGenerating || (isGenerating && displayColoredImageUrl && !sketchIsReady && !sketchHasError) || (isSketchPhase && displayColoredImageUrl && !sketchIsReady && !sketchHasError))
 
     const lightboxImageUrl = lightboxImage === 'sketch' ? displaySketchImageUrl : displayColoredImageUrl
 

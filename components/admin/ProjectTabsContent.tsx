@@ -148,6 +148,7 @@ export function ProjectTabsContent({
   const showSidebar = showPagesSidebar || showIllustrationsSidebar
 
   const isGenerating = localProjectStatus === 'character_generation'
+  const isSketchPhase = localProjectStatus === 'character_generation_complete'
   const isCharactersLoading = isGenerating
   // NOTE: isAnalyzing removed - illustration_status field no longer used
   const isAnalyzing = false
@@ -663,6 +664,7 @@ export function ProjectTabsContent({
               characters={localCharacters}
               projectId={projectId}
               isGenerating={localProjectStatus === 'character_generation'}
+              isSketchPhase={isSketchPhase}
             />
           ) : (
             <>

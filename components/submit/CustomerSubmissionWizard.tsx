@@ -12,6 +12,14 @@ import {
 import { getErrorMessage } from '@/lib/utils/error'
 import { Character } from '@/types/character'
 import { CustomerCharacterCard } from '@/components/review/CustomerCharacterCard'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 // ============================================================================
 // TYPES
@@ -120,6 +128,7 @@ export function CustomerSubmissionWizard({
   const [savedPageIndices, setSavedPageIndices] = useState<Set<number>>(new Set())
   const [hydrated, setHydrated] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
+  const storyNavRef = useRef<HTMLDivElement>(null)
 
   // Restore from localStorage AFTER hydration to avoid SSR/client mismatch
   useEffect(() => {
@@ -417,10 +426,10 @@ export function CustomerSubmissionWizard({
   // CHARACTER FORM LOGIC (reuses existing UniversalCharacterCard flow)
   // ============================================================================
 
-  // Track form validity in a separate state to avoid infinite re-render loops.
-  // UniversalCharacterCard's useEffect calls onChange when character prop changes,
-  // so updating the character objects from onChange would cause an infinite loop.
+  // Track form validity for progress display (updates on every keystroke)
   const [characterFormStates, setCharacterFormStates] = useState<Record<string, { isValid: boolean }>>({})
+  // Track which characters have been SAVED (only updates on Save button click)
+  const [savedCharacterIds, setSavedCharacterIds] = useState<Set<string>>(new Set())
 
   const handleCharacterChange = useCallback((id: string, _data: unknown, isValid: boolean) => {
     setCharacterFormStates(prev => ({
@@ -429,26 +438,41 @@ export function CustomerSubmissionWizard({
     }))
   }, [])
 
+  const handleCharacterSaved = useCallback((id: string) => {
+    setSavedCharacterIds(prev => new Set(prev).add(id))
+  }, [])
+
+  // activeFormIndex based on SAVED state (not just filled)
   const { activeFormIndex, completedCount, totalForms } = useMemo(() => {
     const total = identifiedCharacters.length
-    let firstIncomplete = -1
+    let firstUnsaved = -1
     let completed = 0
     for (let i = 0; i < identifiedCharacters.length; i++) {
-      const formState = characterFormStates[identifiedCharacters[i].id]
-      if (formState?.isValid) {
+      if (savedCharacterIds.has(identifiedCharacters[i].id)) {
         completed++
-      } else if (firstIncomplete === -1) {
-        firstIncomplete = i
+      } else if (firstUnsaved === -1) {
+        firstUnsaved = i
       }
     }
     return {
-      activeFormIndex: firstIncomplete === -1 ? total : firstIncomplete,
+      activeFormIndex: firstUnsaved === -1 ? total : firstUnsaved,
       completedCount: completed,
       totalForms: total,
     }
-  }, [identifiedCharacters, characterFormStates])
+  }, [identifiedCharacters, savedCharacterIds])
 
   const allCharacterFormsComplete = completedCount === totalForms && totalForms > 0
+
+  // Completion popup — shown when all character forms are saved
+  const [showCompletionPopup, setShowCompletionPopup] = useState(false)
+  const completionPopupShown = useRef(false)
+
+  useEffect(() => {
+    if (allCharacterFormsComplete && currentStep === 'character_forms' && !completionPopupShown.current) {
+      completionPopupShown.current = true
+      setShowCompletionPopup(true)
+    }
+  }, [allCharacterFormsComplete, currentStep])
 
   // ============================================================================
   // PROGRESS BAR
@@ -731,6 +755,10 @@ export function CustomerSubmissionWizard({
                               } else {
                                 // All pages saved — deselect so the last card collapses too
                                 setCurrentPageIndex(-1)
+                                // Scroll down to show the Continue button
+                                setTimeout(() => {
+                                  storyNavRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+                                }, 150)
                               }
                             }}
                             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4"
@@ -754,7 +782,7 @@ export function CustomerSubmissionWizard({
             </div>
 
             {/* Add page + navigation */}
-            <div className="flex items-center justify-between">
+            <div ref={storyNavRef} className="flex items-center justify-between">
               <Button
                 variant="ghost"
                 onClick={() => setCurrentStep('welcome')}
@@ -997,7 +1025,9 @@ export function CustomerSubmissionWizard({
                   key={character.id}
                   character={character}
                   onChange={handleCharacterChange}
+                  onSaved={handleCharacterSaved}
                   isLocked={index > activeFormIndex}
+                  showSaveToast={false}
                 />
               ))}
             </div>
@@ -1087,6 +1117,42 @@ export function CustomerSubmissionWizard({
           </div>
         )}
       </div>
+
+      {/* Character Forms Completion Popup */}
+      <Dialog open={showCompletionPopup} onOpenChange={(open) => {
+        if (!open) setShowCompletionPopup(false)
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-center flex items-center justify-center gap-2">
+              <PartyPopper className="w-6 h-6 text-green-600" />
+              All Forms Complete!
+            </DialogTitle>
+            <DialogDescription className="text-center text-base pt-2">
+              Thank you for filling out the character details. Ready to submit your project?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-center mt-4">
+            <Button
+              onClick={() => setShowCompletionPopup(false)}
+              variant="outline"
+              className="w-full sm:w-auto"
+            >
+              Review First
+            </Button>
+            <Button
+              onClick={() => {
+                setShowCompletionPopup(false)
+                handleFinalSubmission()
+              }}
+              className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold uppercase tracking-wide"
+            >
+              <Check className="w-4 h-4 mr-1.5" />
+              Submit Project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add fadeIn animation */}
       <style jsx global>{`
