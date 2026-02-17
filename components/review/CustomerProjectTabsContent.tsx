@@ -311,8 +311,10 @@ export function CustomerProjectTabsContent({
   // Read active tab directly from search params
   const activeTab = useMemo(() => {
     const tab = searchParams?.get('tab')
-    if (tab === 'illustations') return 'illustrations' // typo handle?
-    return tab === 'characters' ? 'characters' : (tab === 'illustrations' ? 'illustrations' : 'pages')
+    if (tab === 'pages') return 'pages'
+    if (tab === 'characters') return 'characters'
+    if (tab === 'illustrations' || tab === 'illustations') return 'illustrations'
+    return 'pages'
   }, [searchParams])
 
   // Helper to check if a character's form is complete (based on saved database data)

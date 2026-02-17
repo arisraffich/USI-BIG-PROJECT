@@ -59,11 +59,7 @@ export function CustomerProjectHeader({
   const handleTabClick = (tab: 'pages' | 'characters' | 'illustrations') => {
     startTransition(() => {
       const params = new URLSearchParams(searchParams?.toString() || '')
-      if (tab === 'pages') {
-        params.delete('tab')
-      } else {
-        params.set('tab', tab)
-      }
+      params.set('tab', tab)
       router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     })
   }
@@ -246,7 +242,7 @@ export function CustomerProjectHeader({
         />
 
       {/* Mobile Page Navigator - Only show when NOT on illustrations tab (illustrations has its own nav) */}
-      {!activeTab && (
+      {isPagesActive && (
         <MobilePageNavigator
           currentPage={1}
           totalPages={pageCount}
