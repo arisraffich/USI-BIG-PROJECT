@@ -365,6 +365,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     }
 
     // Customer requested character revision
+    // Button disabled until admin resolves feedback (by regenerating or uploading new images)
     if (status === 'character_revision_needed') {
       return {
         tag: 'Regenerate Characters',
@@ -372,7 +373,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         buttonLabel: 'Resend Characters',
         showCount: true,
         isResend: true,
-        buttonDisabled: true
+        buttonDisabled: !hasResolvedFeedback
       }
     }
 

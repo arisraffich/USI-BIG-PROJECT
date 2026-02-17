@@ -90,6 +90,22 @@ export async function POST(request: Request) {
 
         console.log(`[Character Upload] ✅ Upload complete: ${publicUrl}`)
 
+        // Transition project status if in character_revision_needed
+        // (matches behavior of /api/characters/generate which sets characters_regenerated)
+        const { data: project } = await supabase
+            .from('projects')
+            .select('status')
+            .eq('id', projectId)
+            .single()
+
+        if (project?.status === 'character_revision_needed') {
+            await supabase
+                .from('projects')
+                .update({ status: 'characters_regenerated' })
+                .eq('id', projectId)
+            console.log(`[Character Upload] Project status → characters_regenerated`)
+        }
+
         // Cleanup old image
         if (character.image_url) {
             try {

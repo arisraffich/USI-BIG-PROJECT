@@ -715,7 +715,11 @@ export function CustomerProjectTabsContent({
     return hasUnresolvedFeedback
   }, [sortedCharacters.secondary, showIllustrationsTab])
 
-  const showStatusScreen = (isLocked && !showIllustrationsTab && !showGallery) || isHiddenGenerationState || (isApprovedState && !showIllustrationsTab)
+  // Show status screen when:
+  // 1. Locked and no illustrations/gallery to show
+  // 2. Hidden generation state (character_generation, character_generation_complete)
+  // 3. Characters approved but no illustrations sent yet (prevent premature APPROVE SKETCHES button)
+  const showStatusScreen = (isLocked && !showIllustrationsTab && !showGallery) || isHiddenGenerationState || (isApprovedState && illustrationSendCount === 0)
 
   const page1 = localPages.find(p => p.page_number === 1)
   const pageCount = localPages.length
