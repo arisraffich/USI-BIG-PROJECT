@@ -4,7 +4,6 @@ import { Character } from '@/types/character'
 import { createClient } from '@/lib/supabase/client'
 import { UnifiedIllustrationFeed } from '@/components/illustration/UnifiedIllustrationFeed'
 import { SceneCharacter } from '@/components/illustration/SharedIllustrationBoard'
-import { uploadImageAction } from '@/app/actions/upload-image'
 import { toast } from 'sonner'
 
 import { useRouter } from 'next/navigation'
@@ -662,8 +661,9 @@ export function IllustrationsTabContent({
             formData.append('pageNumber', page.page_number.toString())
             formData.append('type', type)
 
-            const result = await uploadImageAction(formData)
-            if (result.error) throw new Error(result.error)
+            const response = await fetch('/api/illustrations/upload', { method: 'POST', body: formData })
+            const result = await response.json()
+            if (!result.success) throw new Error(result.error || 'Upload failed')
 
             toast.success('Image uploaded successfully')
             

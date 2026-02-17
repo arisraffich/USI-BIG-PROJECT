@@ -13,7 +13,6 @@ import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
 import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogFooter, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
-import { uploadImageAction } from '@/app/actions/upload-image'
 import { SharedIllustrationBoard } from '@/components/illustration/SharedIllustrationBoard'
 
 // ... imports ...
@@ -164,12 +163,12 @@ export function IllustrationItem({
             formData.append('file', file)
             formData.append('projectId', projectId)
             formData.append('pageId', page.id)
+            formData.append('pageNumber', page.page_number.toString())
             formData.append('type', type)
-            if (type === 'sketch' && page.sketch_url) formData.append('currentUrl', page.sketch_url)
-            if (type === 'illustration' && page.illustration_url) formData.append('currentUrl', page.illustration_url)
 
-            const result = await uploadImageAction(formData)
-            if (!result.success) throw new Error(result.error)
+            const response = await fetch('/api/illustrations/upload', { method: 'POST', body: formData })
+            const result = await response.json()
+            if (!result.success) throw new Error(result.error || 'Upload failed')
 
             toast.success("Upload Successful", { id: toastId })
 

@@ -21,11 +21,7 @@ const nextConfig: NextConfig = {
   // (webpack config is still used when --webpack flag is passed)
   turbopack: {},
   serverExternalPackages: ['potrace'],
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '10mb',
-    },
-  },
+  experimental: {},
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
