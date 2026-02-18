@@ -489,10 +489,18 @@ export function EmptyStateBoard({
                                         <DropdownMenuItem
                                             key={prevPage.id}
                                             onClick={() => setSelectedRefPageId(prevPage.id)}
-                                            className="cursor-pointer"
+                                            className="cursor-pointer flex items-center gap-2.5 py-2"
                                         >
-                                            <Bookmark className="w-4 h-4 mr-2 text-slate-400" />
-                                            Page {prevPage.page_number}
+                                            {prevPage.illustration_url ? (
+                                                <img
+                                                    src={prevPage.illustration_url}
+                                                    alt={`Page ${prevPage.page_number}`}
+                                                    className="w-8 h-8 rounded object-cover border border-slate-200 flex-shrink-0"
+                                                />
+                                            ) : (
+                                                <Bookmark className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                                            )}
+                                            <span>Page {prevPage.page_number}</span>
                                         </DropdownMenuItem>
                                     ))}
                                 </DropdownMenuContent>

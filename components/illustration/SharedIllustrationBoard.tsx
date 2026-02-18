@@ -311,10 +311,19 @@ export function SharedIllustrationBoard({
     // Initialize scene characters when dialog opens in Scene Recreation mode
     useEffect(() => {
         if (isRegenerateDialogOpen && isSceneRecreationMode && characters.length > 0) {
+            const pageCharIds = new Set(page.character_ids || [])
+            
             const initialSceneChars: SceneCharacter[] = characters.map(char => {
                 const charName = char.name || char.role || 'Character'
+                // Try exact name match first, then try partial/case-insensitive match
                 const existingAction = pageCharacterActions[charName]
-                const isInScene = !!existingAction
+                    || Object.entries(pageCharacterActions).find(([key]) => 
+                        key.toLowerCase().includes(charName.toLowerCase()) || 
+                        charName.toLowerCase().includes(key.toLowerCase())
+                    )?.[1]
+                
+                // Use character_ids (reliable, ID-based) for toggle, name match for action/emotion
+                const isInScene = pageCharIds.has(char.id) || !!existingAction
                 
                 return {
                     id: char.id,
@@ -328,7 +337,7 @@ export function SharedIllustrationBoard({
             })
             setSceneCharacters(initialSceneChars)
         }
-    }, [isRegenerateDialogOpen, isSceneRecreationMode, characters, pageCharacterActions])
+    }, [isRegenerateDialogOpen, isSceneRecreationMode, characters, pageCharacterActions, page.character_ids])
     
     // Reset scene characters when dropdown changes to None
     useEffect(() => {
@@ -1881,10 +1890,18 @@ export function SharedIllustrationBoard({
                                                 <DropdownMenuItem
                                                     key={prevPage.id}
                                                     onClick={() => handleEnvSelect(prevPage.id)}
-                                                    className="cursor-pointer"
+                                                    className="cursor-pointer flex items-center gap-2.5 py-2"
                                                 >
-                                                    <Bookmark className="w-4 h-4 mr-2 text-purple-500" />
-                                                    Page {prevPage.page_number} Environment
+                                                    {prevPage.illustration_url ? (
+                                                        <img
+                                                            src={prevPage.illustration_url}
+                                                            alt={`Page ${prevPage.page_number}`}
+                                                            className="w-8 h-8 rounded object-cover border border-slate-200 flex-shrink-0"
+                                                        />
+                                                    ) : (
+                                                        <Bookmark className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                                                    )}
+                                                    <span>Page {prevPage.page_number} Environment</span>
                                                 </DropdownMenuItem>
                                             ))}
                                         </DropdownMenuContent>
