@@ -106,6 +106,7 @@ interface IllustrationsTabContentProps {
     // Callback to sync generating state with parent (for sidebar)
     onGeneratingPageIdsChange?: (pageIds: string[]) => void
     onComparisonPageIdsChange?: (pageIds: string[]) => void
+    onSketchGeneratingPageIdsChange?: (pageIds: string[]) => void
 }
 
 export function IllustrationsTabContent({
@@ -121,7 +122,8 @@ export function IllustrationsTabContent({
     pageErrors = {},
     onPageErrorsChange,
     onGeneratingPageIdsChange,
-    onComparisonPageIdsChange
+    onComparisonPageIdsChange,
+    onSketchGeneratingPageIdsChange
 }: IllustrationsTabContentProps) {
     const router = useRouter()
 
@@ -209,6 +211,16 @@ export function IllustrationsTabContent({
             onComparisonPageIdsChange(Object.keys(comparisonStates))
         }
     }, [comparisonStates, onComparisonPageIdsChange])
+    
+    // Sync sketch-generating page IDs to parent (for sidebar gray dots)
+    useEffect(() => {
+        if (onSketchGeneratingPageIdsChange) {
+            const sketchPages = Object.entries(loadingState)
+                .filter(([, state]) => state.sketch)
+                .map(([pageId]) => pageId)
+            onSketchGeneratingPageIdsChange(sketchPages)
+        }
+    }, [loadingState, onSketchGeneratingPageIdsChange])
     
     // Sync per-page state when pages prop changes (e.g., new pages added)
     useEffect(() => {

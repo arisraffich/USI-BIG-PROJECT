@@ -15,6 +15,7 @@ interface UnifiedIllustrationSidebarProps {
     failedPageIds?: string[]
     generatingPageIds?: string[]
     comparisonPageIds?: string[]
+    sketchGeneratingPageIds?: string[]
     illustrationSendCount?: number
 }
 
@@ -28,6 +29,7 @@ export function UnifiedIllustrationSidebar({
     failedPageIds = [],
     generatingPageIds = [],
     comparisonPageIds = [],
+    sketchGeneratingPageIds = [],
     illustrationSendCount = 0
 }: UnifiedIllustrationSidebarProps) {
     // Centralized lock logic from useIllustrationLock hook
@@ -104,10 +106,12 @@ export function UnifiedIllustrationSidebar({
                                         ? 'bg-red-500' 
                                         : generatingPageIds.includes(page.id)
                                             ? 'bg-orange-400 animate-pulse'
-                                            : page.illustration_url 
-                                                ? 'bg-green-400' 
-                                                : 'bg-gray-300'
-                                    }`} title={failedPageIds.includes(page.id) ? "Failed" : generatingPageIds.includes(page.id) ? "Generating..." : page.illustration_url ? "Completed" : "Pending"}></span>
+                                            : sketchGeneratingPageIds.includes(page.id)
+                                                ? 'bg-gray-400 animate-pulse'
+                                                : page.illustration_url 
+                                                    ? 'bg-green-400' 
+                                                    : 'bg-gray-300'
+                                    }`} title={failedPageIds.includes(page.id) ? "Failed" : generatingPageIds.includes(page.id) ? "Generating illustration..." : sketchGeneratingPageIds.includes(page.id) ? "Generating sketch..." : page.illustration_url ? "Completed" : "Pending"}></span>
                             </button>
                         )
                     })}
@@ -131,13 +135,18 @@ export function UnifiedIllustrationSidebar({
                                             ? 'bg-red-100 border border-red-400 text-red-700'
                                             : generatingPageIds.includes(page.id)
                                                 ? 'bg-orange-100 border border-orange-400 text-orange-700 animate-pulse'
-                                                : 'bg-white/30 backdrop-blur-md border border-white/20 text-slate-900 ring-1 ring-white/30 hover:bg-white/50'
+                                                : sketchGeneratingPageIds.includes(page.id)
+                                                    ? 'bg-gray-100 border border-gray-400 text-gray-700 animate-pulse'
+                                                    : 'bg-white/30 backdrop-blur-md border border-white/20 text-slate-900 ring-1 ring-white/30 hover:bg-white/50'
                                         } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
                                 >
                                     {page.page_number}
                                 </button>
                                 {failedPageIds.includes(page.id) && (
                                     <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 border border-white animate-pulse" />
+                                )}
+                                {sketchGeneratingPageIds.includes(page.id) && !failedPageIds.includes(page.id) && !generatingPageIds.includes(page.id) && (
+                                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-gray-400 border border-white animate-pulse" />
                                 )}
                                 {comparisonPageIds.includes(page.id) && !failedPageIds.includes(page.id) && (
                                     <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-blue-500 border border-white flex items-center justify-center">
