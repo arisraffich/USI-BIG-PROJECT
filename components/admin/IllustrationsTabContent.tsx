@@ -105,6 +105,7 @@ interface IllustrationsTabContentProps {
     
     // Callback to sync generating state with parent (for sidebar)
     onGeneratingPageIdsChange?: (pageIds: string[]) => void
+    onComparisonPageIdsChange?: (pageIds: string[]) => void
 }
 
 export function IllustrationsTabContent({
@@ -119,7 +120,8 @@ export function IllustrationsTabContent({
     onPageChange,
     pageErrors = {},
     onPageErrorsChange,
-    onGeneratingPageIdsChange
+    onGeneratingPageIdsChange,
+    onComparisonPageIdsChange
 }: IllustrationsTabContentProps) {
     const router = useRouter()
 
@@ -200,6 +202,13 @@ export function IllustrationsTabContent({
             onGeneratingPageIdsChange(Array.from(generatingPageIds))
         }
     }, [generatingPageIds, onGeneratingPageIdsChange])
+    
+    // Sync comparisonStates to parent (for sidebar comparison indicator)
+    useEffect(() => {
+        if (onComparisonPageIdsChange) {
+            onComparisonPageIdsChange(Object.keys(comparisonStates))
+        }
+    }, [comparisonStates, onComparisonPageIdsChange])
     
     // Sync per-page state when pages prop changes (e.g., new pages added)
     useEffect(() => {

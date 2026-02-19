@@ -3,7 +3,7 @@
 import { Page } from '@/types/page'
 import { ProjectStatus } from '@/types/project'
 import { useIllustrationLock } from '@/hooks/use-illustration-lock'
-import { MessageSquare, CheckCircle2, Check } from 'lucide-react'
+import { MessageSquare, CheckCircle2, Check, Layers2 } from 'lucide-react'
 
 interface UnifiedIllustrationSidebarProps {
     pages: Page[]
@@ -14,6 +14,7 @@ interface UnifiedIllustrationSidebarProps {
     disabled?: boolean
     failedPageIds?: string[]
     generatingPageIds?: string[]
+    comparisonPageIds?: string[]
     illustrationSendCount?: number
 }
 
@@ -26,6 +27,7 @@ export function UnifiedIllustrationSidebar({
     disabled = false,
     failedPageIds = [],
     generatingPageIds = [],
+    comparisonPageIds = [],
     illustrationSendCount = 0
 }: UnifiedIllustrationSidebarProps) {
     // Centralized lock logic from useIllustrationLock hook
@@ -87,6 +89,11 @@ export function UnifiedIllustrationSidebar({
                                             Spread
                                         </span>
                                     )}
+                                    {comparisonPageIds.includes(page.id) && (
+                                        <span title="Comparison pending">
+                                            <Layers2 className="w-4 h-4 text-blue-500" />
+                                        </span>
+                                    )}
                                     {failedPageIds.includes(page.id) && (
                                         <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" title="Generation failed" />
                                     )}
@@ -131,6 +138,11 @@ export function UnifiedIllustrationSidebar({
                                 </button>
                                 {failedPageIds.includes(page.id) && (
                                     <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 border border-white animate-pulse" />
+                                )}
+                                {comparisonPageIds.includes(page.id) && !failedPageIds.includes(page.id) && (
+                                    <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-blue-500 border border-white flex items-center justify-center">
+                                        <Layers2 className="w-2 h-2 text-white" />
+                                    </span>
                                 )}
                                 {/* Feedback indicator - Admin only (mobile), only for generated pages */}
                                 {mode === 'admin' && page.illustration_url && (

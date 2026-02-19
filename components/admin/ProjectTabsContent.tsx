@@ -61,6 +61,9 @@ export function ProjectTabsContent({
   
   // Generating page IDs state (shared between IllustrationsTabContent and sidebar for orange dots)
   const [generatingPageIds, setGeneratingPageIds] = useState<string[]>([])
+  
+  // Comparison page IDs state (shared between IllustrationsTabContent and sidebar for comparison indicator)
+  const [comparisonPageIds, setComparisonPageIds] = useState<string[]>([])
 
   // Sync local characters when server props update
   useEffect(() => {
@@ -582,6 +585,7 @@ export function ProjectTabsContent({
             illustrationSendCount={projectInfo?.illustration_send_count || 0}
             failedPageIds={Object.keys(pageErrors)}
             generatingPageIds={generatingPageIds}
+            comparisonPageIds={comparisonPageIds}
           />
         ) : null
       }
@@ -764,6 +768,7 @@ export function ProjectTabsContent({
             pageErrors={pageErrors}
             onPageErrorsChange={setPageErrors}
             onGeneratingPageIdsChange={setGeneratingPageIds}
+            onComparisonPageIdsChange={setComparisonPageIds}
           />
         </div >
       </div >
