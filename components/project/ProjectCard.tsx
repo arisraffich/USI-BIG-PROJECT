@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Trash2, Loader2 } from 'lucide-react'
+import { Trash2, Loader2, Clock } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   AlertDialog,
@@ -28,6 +28,7 @@ interface Project {
   author_email: string
   created_at: string
   status: string
+  status_changed_at?: string
   character_send_count?: number
   illustration_send_count?: number
 }
@@ -72,6 +73,27 @@ function getDefaultTabForStatus(status: string): string {
   
   // Default to pages (draft, or any unknown status)
   return 'pages'
+}
+
+function timeAgo(dateString: string): string {
+  const date = new Date(dateString)
+  if (isNaN(date.getTime())) return ''
+
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffHours < 1) return 'Just now'
+  if (diffDays < 1) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays} days ago`
+  if (diffDays === 7) return 'A week ago'
+  if (diffDays < 14) return 'Over a week ago'
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
+  const months = Math.floor(diffDays / 30)
+  if (months === 1) return 'A month ago'
+  return `${months} months ago`
 }
 
 export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }: ProjectCardProps) {
@@ -157,8 +179,8 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }:
             <p className="text-sm text-gray-600">
               By <span className="font-semibold text-blue-600">{project.author_firstname} {project.author_lastname}</span> | {pageCount} {pageCount === 1 ? 'Page' : 'Pages'} | Created: {formatDate(project.created_at)}
             </p>
-            {/* Status Badge - Line 3 */}
-            <div className="mt-1.5">
+            {/* Status Badge */}
+            <div className="mt-1.5 flex items-center gap-2">
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${badgeConfig.style}`}>
                 {badgeConfig.text}
                 {roundNumber && (
@@ -167,6 +189,11 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }:
                   </span>
                 )}
               </span>
+              {project.status_changed_at && project.status !== 'illustration_approved' && (
+                <span className="inline-flex items-center gap-1 text-sm font-semibold text-red-600">
+                  <Clock className="w-3.5 h-3.5" /> {timeAgo(project.status_changed_at)}
+                </span>
+              )}
             </div>
           </Link>
           <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>

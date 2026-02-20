@@ -1,7 +1,7 @@
 import { sendEmail } from './email'
 import { sendSlackNotification } from './slack'
-import { sendSMS } from './sms'
 import { getErrorMessage } from '@/lib/utils/error'
+import { renderTemplate } from '@/lib/email/renderer'
 
 export async function notifyCustomerSubmission(options: {
   projectId: string
@@ -36,7 +36,6 @@ export async function notifyCustomerSubmission(options: {
       },
     ]
 
-    // Add character details if provided
     if (characters && characters.length > 0) {
       for (const char of characters) {
         const charName = char.name || char.role || 'Character'
@@ -81,7 +80,6 @@ export async function notifyCustomerSubmission(options: {
     })
   } catch (slackError: unknown) {
     console.error('Slack notification failed:', slackError)
-    // Don't send email fallback - only notify via Slack
   }
 }
 
@@ -138,32 +136,26 @@ export async function notifyProjectSentToCustomer(options: {
   reviewUrl: string
   projectUrl: string
 }): Promise<void> {
-  const { projectTitle, authorName, authorEmail, authorPhone, reviewUrl, projectUrl } = options
-
-  // Extract first name only (for customer-facing messages)
-  // Split by space and take the first part, or use the full name if no space
+  const { projectTitle, authorName, authorEmail, reviewUrl, projectUrl } = options
   const authorFirstName = authorName.trim().split(/\s+/)[0] || authorName
 
-  // Send email to customer
   try {
-    await sendEmail({
-      to: authorEmail,
-      subject: `Defining Secondary Characters for ${projectTitle}`,
-      html: `
-        <div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
-          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">Stage 1: Defining Secondary Characters</h2>
-          <p style="margin-bottom: 16px;">Hi ${authorFirstName},</p>
-          <p style="margin-bottom: 16px;">With your Main Character ready, it is time to define the rest of the cast.</p>
-          <p style="margin-bottom: 16px;">Please click the link below to describe your secondary characters (age, style, clothing, etc.):</p>
-          <p style="margin: 24px 0;">
-            <a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Define Characters</a>
-          </p>
-          <p style="margin-bottom: 16px;">Once submitted, our artists will start illustrating them for your review.</p>
-          <p style="margin-bottom: 8px;">Best regards,</p>
-          <p style="font-weight: bold;">US Illustrations Team</p>
-        </div>
-      `,
+    const rendered = await renderTemplate('define_secondary_characters', {
+      authorFirstName,
+      projectTitle,
+      reviewUrl,
     })
+
+    if (rendered) {
+      await sendEmail({ to: authorEmail, subject: rendered.subject, html: rendered.html })
+    } else {
+      console.warn('[Notification] Template define_secondary_characters not found, using fallback')
+      await sendEmail({
+        to: authorEmail,
+        subject: `Defining Secondary Characters for Your Book`,
+        html: `<div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;"><h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">Stage 1: Defining Secondary Characters</h2><p style="margin-bottom: 16px;">Hi ${authorFirstName},</p><p style="margin-bottom: 16px;">With your Main Character ready, it is time to define the rest of the cast.</p><p style="margin-bottom: 16px;">Please click the link below to describe your secondary characters (age, style, clothing, etc.):</p><p style="margin: 24px 0;"><a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Define Characters</a></p><p style="margin-bottom: 16px;">Once submitted, our artists will start illustrating them for your review.</p><p style="margin-bottom: 8px;">Best regards,</p><p style="font-weight: bold;">US Illustrations Team</p></div>`,
+      })
+    }
   } catch (emailError: unknown) {
     console.error('[Notification] Failed to send customer notification email:', emailError)
     console.error('[Notification] Email error details:', {
@@ -172,27 +164,8 @@ export async function notifyProjectSentToCustomer(options: {
       response: emailError instanceof Error ? (emailError as any).response : undefined,
       stack: emailError instanceof Error ? emailError.stack : undefined,
     })
-    // Don't throw - we still want to send SMS and notify Slack even if email fails
   }
 
-  // Send SMS to customer if phone number is provided
-  if (false && authorPhone) { // Temporarily disabled request by user
-    try {
-      await sendSMS({
-        to: authorPhone as string,
-        message: `Hi ${authorFirstName}, your project "${projectTitle}" is ready for review! Check your email (including spam) for the review link: ${reviewUrl} - US Illustrations`,
-      })
-    } catch (smsError: unknown) {
-      console.error('[Notification] Failed to send customer SMS:', smsError)
-      console.error('[Notification] SMS error details:', {
-        message: getErrorMessage(smsError),
-        stack: smsError instanceof Error ? (smsError as Error).stack : undefined,
-      })
-      // Don't throw - we still want to notify Slack even if SMS fails
-    }
-  }
-
-  // Send Slack notification to PM
   try {
     await sendSlackNotification({
       text: `📧 Project "${projectTitle}" sent to customer for review`,
@@ -219,7 +192,6 @@ export async function notifyProjectSentToCustomer(options: {
     })
   } catch (slackError: unknown) {
     console.error('Failed to send Slack notification:', slackError)
-    // Don't send email fallback - only notify via Slack
   }
 }
 
@@ -233,31 +205,27 @@ export async function notifySecondaryCharactersReady(options: {
   const { projectTitle, authorName, authorEmail, reviewUrl, projectUrl } = options
   const authorFirstName = authorName.trim().split(/\s+/)[0] || authorName
 
-  // Send email to customer
   try {
-    await sendEmail({
-      to: authorEmail,
-      subject: `Review Secondary Characters for ${projectTitle}`,
-      html: `
-        <div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
-          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">Stage 2: Character Illustrations Approval</h2>
-          <p style="margin-bottom: 16px;">Hi ${authorFirstName},</p>
-          <p style="margin-bottom: 16px;">The illustrations for your secondary characters are complete and ready for review.</p>
-          <p style="margin-bottom: 16px;">Please access your project dashboard below to view them:</p>
-          <p style="margin: 24px 0;">
-            <a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">View Characters</a>
-          </p>
-          <p style="margin-bottom: 16px;">We will proceed to the next steps once all characters are approved.</p>
-          <p style="margin-bottom: 8px;">Best regards,</p>
-          <p style="font-weight: bold;">US Illustrations Team</p>
-        </div>
-      `,
+    const rendered = await renderTemplate('characters_ready_review', {
+      authorFirstName,
+      projectTitle,
+      reviewUrl,
     })
+
+    if (rendered) {
+      await sendEmail({ to: authorEmail, subject: rendered.subject, html: rendered.html })
+    } else {
+      console.warn('[Notification] Template characters_ready_review not found, using fallback')
+      await sendEmail({
+        to: authorEmail,
+        subject: `Review Your Secondary Characters`,
+        html: `<div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;"><h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">Stage 2: Character Illustrations Approval</h2><p style="margin-bottom: 16px;">Hi ${authorFirstName},</p><p style="margin-bottom: 16px;">The illustrations for your secondary characters are complete and ready for review.</p><p style="margin-bottom: 16px;">Please access your project dashboard below to view them:</p><p style="margin: 24px 0;"><a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">View Characters</a></p><p style="margin-bottom: 16px;">We will proceed to the next steps once all characters are approved.</p><p style="margin-bottom: 8px;">Best regards,</p><p style="font-weight: bold;">US Illustrations Team</p></div>`,
+      })
+    }
   } catch (emailError: unknown) {
     console.error('[Notification] Failed to send Stage 2 email:', emailError)
   }
 
-  // Send Slack notification to PM
   try {
     await sendSlackNotification({
       text: `📧 Secondary Characters sent for review: "${projectTitle}"`,
@@ -298,34 +266,28 @@ export async function notifyCharacterRevisions(options: {
   const { projectTitle, authorName, authorEmail, reviewUrl, projectUrl, revisionRound } = options
   const authorFirstName = authorName.trim().split(/\s+/)[0] || authorName
 
-  // Send email to customer
   try {
-    await sendEmail({
-      to: authorEmail,
-      subject: `Round ${revisionRound} Review: Secondary Characters for ${projectTitle}`,
-      html: `
-        <div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
-          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">Stage 2: Character Revisions | <span style="color: #2563eb;">Round ${revisionRound}</span></h2>
-          <p style="margin-bottom: 16px;">Hi ${authorFirstName},</p>
-          <p style="margin-bottom: 16px;">We have updated your secondary characters based on your recent feedback.</p>
-          <ul style="margin-bottom: 16px;">
-            <li style="margin-bottom: 8px;"><strong>Request Edits:</strong> If further adjustments are still needed.</li>
-            <li style="margin-bottom: 8px;"><strong>Approve:</strong> If the changes are correct.</li>
-          </ul>
-          <p style="margin-bottom: 16px;">We will finalize the characters once everything is approved.</p>
-          <p style="margin: 24px 0;">
-            <a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Review Characters</a>
-          </p>
-          <p style="margin-bottom: 8px;">Best regards,</p>
-          <p style="font-weight: bold;">US Illustrations Team</p>
-        </div>
-      `,
+    const rendered = await renderTemplate('character_revisions', {
+      authorFirstName,
+      projectTitle,
+      reviewUrl,
+      revisionRound: String(revisionRound),
     })
+
+    if (rendered) {
+      await sendEmail({ to: authorEmail, subject: rendered.subject, html: rendered.html })
+    } else {
+      console.warn('[Notification] Template character_revisions not found, using fallback')
+      await sendEmail({
+        to: authorEmail,
+        subject: `Round ${revisionRound} Review: Secondary Characters`,
+        html: `<div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;"><h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">Stage 2: Character Revisions | Round ${revisionRound}</h2><p style="margin-bottom: 16px;">Hi ${authorFirstName},</p><p style="margin-bottom: 16px;">We have updated your secondary characters based on your recent feedback.</p><ul style="margin-bottom: 16px;"><li style="margin-bottom: 8px;"><strong>Request Edits:</strong> If further adjustments are still needed.</li><li style="margin-bottom: 8px;"><strong>Approve:</strong> If the changes are correct.</li></ul><p style="margin-bottom: 16px;">We will finalize the characters once everything is approved.</p><p style="margin: 24px 0;"><a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Review Characters</a></p><p style="margin-bottom: 8px;">Best regards,</p><p style="font-weight: bold;">US Illustrations Team</p></div>`,
+      })
+    }
   } catch (emailError: unknown) {
     console.error('[Notification] Failed to send revision email:', emailError)
   }
 
-  // Send Slack notification to PM
   try {
     await sendSlackNotification({
       text: `🔄 Character Revisions (Round ${revisionRound}) sent: "${projectTitle}"`,
@@ -434,7 +396,6 @@ export async function notifyCharactersApproved(options: {
 // notifyIllustrationTrialSent REMOVED - trial phase no longer exists
 // All sketches are now sent at once using notifyAllSketchesSent
 
-// Called when ALL sketches are sent for the first time
 export async function notifyAllSketchesSent(options: {
   projectTitle: string
   authorName: string
@@ -444,35 +405,29 @@ export async function notifyAllSketchesSent(options: {
   projectUrl: string
 }): Promise<void> {
   const { projectTitle, authorName, authorEmail, reviewUrl, projectUrl } = options
-
   const authorFirstName = authorName.trim().split(/\s+/)[0] || authorName
 
-  // Send email to customer
   try {
-    await sendEmail({
-      to: authorEmail,
-      subject: `Stage 3: Your Sketches Are Ready for Review`,
-      html: `
-        <div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
-          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">All Sketches Ready</h2>
-          <p style="margin-bottom: 16px;">Hi ${authorFirstName},</p>
-          <p style="margin-bottom: 16px;">Great news – all your illustration sketches are ready for review!</p>
-          <p style="margin-bottom: 16px;">Please take your time going through each page. If anything needs adjusting, just click <strong style="color: #d66700;">Request Revisions</strong> and add your notes. Once everything looks good, click <strong style="color: #00a53d;">Approve Sketches</strong> and we'll move forward with the final coloring.</p>
-          <p style="margin-bottom: 16px;">Review them here:</p>
-          <p style="margin: 24px 0;">
-            <a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Review All Sketches</a>
-          </p>
-          <p style="margin-bottom: 16px;">Looking forward to hearing what you think!</p>
-          <p style="margin-bottom: 8px;">Best,</p>
-          <p style="font-weight: bold;">US Illustrations Team</p>
-        </div>
-      `,
+    const rendered = await renderTemplate('all_sketches_ready', {
+      authorFirstName,
+      projectTitle,
+      reviewUrl,
     })
+
+    if (rendered) {
+      await sendEmail({ to: authorEmail, subject: rendered.subject, html: rendered.html })
+    } else {
+      console.warn('[Notification] Template all_sketches_ready not found, using fallback')
+      await sendEmail({
+        to: authorEmail,
+        subject: `Stage 3: Your Sketches Are Ready for Review`,
+        html: `<div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;"><h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">All Sketches Ready</h2><p style="margin-bottom: 16px;">Hi ${authorFirstName},</p><p style="margin-bottom: 16px;">Great news – all your illustration sketches are ready for review!</p><p style="margin-bottom: 16px;">Please take your time going through each page. If anything needs adjusting, just click <strong>Request Revisions</strong> and add your notes. Once everything looks good, click <strong>Approve Sketches</strong> and we'll move forward with the final coloring.</p><p style="margin-bottom: 16px;">Review them here:</p><p style="margin: 24px 0;"><a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Review All Sketches</a></p><p style="margin-bottom: 16px;">Looking forward to hearing what you think!</p><p style="margin-bottom: 8px;">Best,</p><p style="font-weight: bold;">US Illustrations Team</p></div>`,
+      })
+    }
   } catch (emailError: unknown) {
     console.error('[Notification] Failed to send all sketches email:', emailError)
   }
 
-  // Send Slack notification
   try {
     await sendSlackNotification({
       text: `📚 All Sketches sent to customer for "${projectTitle}"`,
@@ -506,35 +461,31 @@ export async function notifyIllustrationsUpdate(options: {
   revisionRound?: number
 }): Promise<void> {
   const { projectTitle, authorName, authorEmail, reviewUrl, projectUrl, revisionRound } = options
-
   const authorFirstName = authorName.trim().split(/\s+/)[0] || authorName
   const roundText = revisionRound ? ` | Round ${revisionRound}` : ''
 
-  // Send email to customer
   try {
-    await sendEmail({
-      to: authorEmail,
-      subject: `Stage 3: Sketches Revised${roundText}`,
-      html: `
-        <div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
-          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">Sketches Revised${roundText}</h2>
-          <p style="margin-bottom: 16px;">Hi ${authorFirstName},</p>
-          <p style="margin-bottom: 16px;">We've made the changes you requested – take a look at the updated sketches and let us know what you think.</p>
-          <p style="margin-bottom: 16px;">If it still needs some tweaking, no problem – just click <strong style="color: #d66700;">Request Revisions</strong> and send over your notes. If everything looks good, click <strong style="color: #00a53d;">Approve Sketches</strong> and we'll move forward with the final coloring stage.</p>
-          <p style="margin-bottom: 16px;">You can review them here:</p>
-          <p style="margin: 24px 0;">
-            <a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Review Sketches</a>
-          </p>
-          <p style="margin-bottom: 8px;">Talk soon,</p>
-          <p style="font-weight: bold;">US Illustrations Team</p>
-        </div>
-      `,
+    const rendered = await renderTemplate('sketches_revised', {
+      authorFirstName,
+      projectTitle,
+      reviewUrl,
+      roundText,
     })
+
+    if (rendered) {
+      await sendEmail({ to: authorEmail, subject: rendered.subject, html: rendered.html })
+    } else {
+      console.warn('[Notification] Template sketches_revised not found, using fallback')
+      await sendEmail({
+        to: authorEmail,
+        subject: `Stage 3: Sketches Revised${roundText}`,
+        html: `<div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;"><h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">Sketches Revised${roundText}</h2><p style="margin-bottom: 16px;">Hi ${authorFirstName},</p><p style="margin-bottom: 16px;">We've made the changes you requested – take a look at the updated sketches and let us know what you think.</p><p style="margin-bottom: 16px;">If it still needs some tweaking, no problem – just click <strong>Request Revisions</strong> and send over your notes. If everything looks good, click <strong>Approve Sketches</strong> and we'll move forward with the final coloring stage.</p><p style="margin-bottom: 16px;">You can review them here:</p><p style="margin: 24px 0;"><a href="${reviewUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">Review Sketches</a></p><p style="margin-bottom: 8px;">Talk soon,</p><p style="font-weight: bold;">US Illustrations Team</p></div>`,
+      })
+    }
   } catch (emailError: unknown) {
     console.error('[Notification] Failed to send sketches revision email:', emailError)
   }
 
-  // Send Slack notification to PM
   try {
     await sendSlackNotification({
       text: `🔄 Sketches Revised${roundText} - sent to customer for "${projectTitle}"`,
@@ -572,7 +523,6 @@ export async function notifyIllustrationsApproved(options: {
 }): Promise<void> {
   const { projectId, projectTitle, authorName, projectUrl } = options
 
-  // Send Slack notification
   try {
     await sendSlackNotification({
       text: `✅ Sketches APPROVED for "${projectTitle}"`,
@@ -601,29 +551,26 @@ export async function notifyIllustrationsApproved(options: {
     console.error('Failed to send illustration approval notification:', error)
   }
 
-  // Send email with download link to info@usillustrations.com
   try {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
     const downloadUrl = `${baseUrl}/api/projects/${projectId}/download-illustrations`
 
-    await sendEmail({
-      to: 'info@usillustrations.com',
-      subject: `Download ${authorName} Sketches`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <p style="font-size: 16px; color: #333; margin-bottom: 20px;">
-            ${authorName} approved all sketches for "${projectTitle}".
-          </p>
-          <p style="font-size: 16px; color: #333; margin-bottom: 20px;">
-            Download below
-          </p>
-          <a href="${downloadUrl}" 
-             style="display: inline-block; background-color: #7c3aed; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-            Download Sketches
-          </a>
-        </div>
-      `,
+    const rendered = await renderTemplate('sketches_approved_download', {
+      authorName,
+      projectTitle,
+      downloadUrl,
     })
+
+    if (rendered) {
+      await sendEmail({ to: 'info@usillustrations.com', subject: rendered.subject, html: rendered.html })
+    } else {
+      console.warn('[Notification] Template sketches_approved_download not found, using fallback')
+      await sendEmail({
+        to: 'info@usillustrations.com',
+        subject: `Download ${authorName} Sketches`,
+        html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;"><p style="font-size: 16px; color: #333; margin-bottom: 20px;">${authorName} approved all sketches.</p><p style="font-size: 16px; color: #333; margin-bottom: 20px;">Download below</p><a href="${downloadUrl}" style="display: inline-block; background-color: #7c3aed; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Download Sketches</a></div>`,
+      })
+    }
     console.log(`[Email] Sketches approval email sent for project ${projectId}`)
   } catch (emailError: unknown) {
     console.error('Failed to send sketches approval email:', emailError)
@@ -757,7 +704,6 @@ export async function notifyCustomerCharacterReview(options: {
   }
 }
 
-// Customer accepted admin's illustrator note
 export async function notifyCustomerAcceptedReply(options: {
   projectTitle: string
   authorName: string
@@ -804,7 +750,6 @@ export async function notifyCustomerAcceptedReply(options: {
   }
 }
 
-// Customer replied to admin's illustrator note (follow-up)
 export async function notifyCustomerFollowUp(options: {
   projectTitle: string
   authorName: string

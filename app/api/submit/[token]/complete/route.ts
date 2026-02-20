@@ -274,15 +274,17 @@ export async function POST(
     // Email notification to info@
     try {
       const { sendEmail } = await import('@/lib/notifications/email')
+      const { renderTemplate } = await import('@/lib/email/renderer')
+      const rendered = await renderTemplate('submission_internal', {
+        authorName,
+        secondaryCharacterCount: String(secondaryCharacters.length),
+        status: newStatus,
+        projectAdminUrl: `${baseUrl}/admin/project/${project.id}`,
+      })
       await sendEmail({
         to: 'info@usillustrations.com',
-        subject: `${authorName}'s project submission is complete`,
-        html: `
-          <p><strong>${authorName}</strong> has completed their project submission.</p>
-          <p><strong>Secondary Characters:</strong> ${secondaryCharacters.length}</p>
-          <p><strong>Status:</strong> ${newStatus}</p>
-          <p><a href="${baseUrl}/admin/project/${project.id}">View Project</a></p>
-        `,
+        subject: rendered?.subject || `${authorName}'s project submission is complete`,
+        html: rendered?.html || `<p><strong>${authorName}</strong> has completed their project submission.</p><p><strong>Secondary Characters:</strong> ${secondaryCharacters.length}</p><p><strong>Status:</strong> ${newStatus}</p><p><a href="${baseUrl}/admin/project/${project.id}">View Project</a></p>`,
       })
     } catch (e) {
       console.error('[Submission Complete] Email notification failed:', e)
@@ -291,28 +293,14 @@ export async function POST(
     // Confirmation email to customer
     try {
       const { sendEmail } = await import('@/lib/notifications/email')
+      const { renderTemplate } = await import('@/lib/email/renderer')
+      const rendered = await renderTemplate('submission_confirmation', {
+        authorFirstName: project.author_firstname || 'there',
+      })
       await sendEmail({
         to: project.author_email,
-        subject: 'We received your submission!',
-        html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #1a1a1a;">Thank You, ${project.author_firstname}!</h2>
-            <p style="color: #555; font-size: 16px; line-height: 1.6;">
-              We've received your project submission and our illustrators are getting started!
-            </p>
-            <p style="color: #555; font-size: 16px; line-height: 1.6;">
-              Here's what happens next:
-            </p>
-            <ol style="color: #555; font-size: 16px; line-height: 1.8;">
-              <li>We'll create character illustrations based on your descriptions</li>
-              <li>You'll receive an email to review and approve the characters</li>
-              <li>Full scene illustrations will be created and sent for your review</li>
-            </ol>
-            <p style="color: #888; font-size: 14px; margin-top: 24px;">
-              You'll receive email updates at each step. No action needed from you right now!
-            </p>
-          </div>
-        `,
+        subject: rendered?.subject || 'We received your submission!',
+        html: rendered?.html || `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;"><h2 style="color: #1a1a1a;">Thank You, ${project.author_firstname}!</h2><p style="color: #555; font-size: 16px; line-height: 1.6;">We've received your project submission and our illustrators are getting started!</p><p style="color: #555; font-size: 16px; line-height: 1.6;">Here's what happens next:</p><ol style="color: #555; font-size: 16px; line-height: 1.8;"><li>We'll create character illustrations based on your descriptions</li><li>You'll receive an email to review and approve the characters</li><li>Full scene illustrations will be created and sent for your review</li></ol><p style="color: #888; font-size: 14px; margin-top: 24px;">You'll receive email updates at each step. No action needed from you right now!</p></div>`,
       })
     } catch (e) {
       console.error('[Submission Complete] Customer confirmation email failed:', e)

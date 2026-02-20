@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ProjectCard } from '@/components/project/ProjectCard'
 import { Button } from '@/components/ui/button'
 import { DashboardActions } from '@/components/admin/DashboardActions'
+import { Settings } from 'lucide-react'
 
 
 export const dynamic = 'force-dynamic'
@@ -22,7 +23,12 @@ export default async function DashboardPage() {
       return (
         <div className="p-8">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
+            <div className="flex items-center gap-2">
+              <Link href="/admin/settings" className="text-gray-400 hover:text-gray-600 transition-colors">
+                <Settings className="w-5 h-5" />
+              </Link>
+              <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
+            </div>
             <DashboardActions />
           </div>
           <div className="text-center py-12">
@@ -85,7 +91,12 @@ export default async function DashboardPage() {
     return (
       <div className="p-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
+          <div className="flex items-center gap-2">
+            <Link href="/admin/settings" className="text-gray-400 hover:text-gray-600 transition-colors">
+              <Settings className="w-5 h-5" />
+            </Link>
+            <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
+          </div>
           <DashboardActions />
         </div>
 
@@ -113,7 +124,12 @@ export default async function DashboardPage() {
     return (
       <div className="p-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
+          <div className="flex items-center gap-2">
+            <Link href="/admin/settings" className="text-gray-400 hover:text-gray-600 transition-colors">
+              <Settings className="w-5 h-5" />
+            </Link>
+            <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
+          </div>
           <DashboardActions />
         </div>
         <div className="text-center py-12">

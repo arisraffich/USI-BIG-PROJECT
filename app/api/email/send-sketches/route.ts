@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/notifications/email'
 import JSZip from 'jszip'
 import { getErrorMessage } from '@/lib/utils/error'
+import { renderTemplate } from '@/lib/email/renderer'
 
 export const maxDuration = 120
 
@@ -86,16 +87,15 @@ export async function POST(request: NextRequest) {
             .replace(/\s+/g, '_')
             .trim()
 
+        const rendered = await renderTemplate('send_sketches_internal', {
+            customerName,
+            bookTitle: project.book_title || 'Untitled',
+        })
+
         await sendEmail({
             to: 'info@usillustrations.com',
-            subject: `${customerName}'s project is ready for coloring`,
-            html: `
-                <div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
-                    <p style="margin-bottom: 16px;"><strong>${customerName}'s</strong> project is ready for coloring.</p>
-                    <p style="margin-bottom: 16px;">Please download Sketches and Colored illustrations from the attached ZIP file.</p>
-                    <p style="margin-bottom: 8px; color: #666; font-size: 14px;">Book: ${project.book_title || 'Untitled'}</p>
-                </div>
-            `,
+            subject: rendered?.subject || `${customerName}'s project is ready for coloring`,
+            html: rendered?.html || `<div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;"><p style="margin-bottom: 16px;"><strong>${customerName}'s</strong> project is ready for coloring.</p><p style="margin-bottom: 16px;">Please download Sketches and Colored illustrations from the attached ZIP file.</p><p style="margin-bottom: 8px; color: #666; font-size: 14px;">Book: ${project.book_title || 'Untitled'}</p></div>`,
             attachments: [{
                 filename: `${safeTitle}_Sketches.zip`,
                 content: zipBuffer,
