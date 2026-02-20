@@ -118,30 +118,41 @@ export async function POST(
       }
     }
 
-    // Update project status to character_generation
-    const { data: allCharacters } = await supabase
+    // Fetch characters to determine next status
+    const { data: allCharacters, error: charsError } = await supabase
       .from('characters')
       .select('id, name, role, is_main, image_url, age, gender, description, skin_color, hair_color, hair_style, eye_color, clothing, accessories, special_features')
       .eq('project_id', project.id)
 
-    const secondaryCharacters = allCharacters?.filter(c => !c.is_main) || []
+    if (charsError || !allCharacters) {
+      console.error('[Submission Complete] Failed to fetch characters:', charsError)
+      return NextResponse.json({ error: 'Failed to load character data. Please try again.' }, { status: 500 })
+    }
+
+    const secondaryCharacters = allCharacters.filter(c => !c.is_main)
     const pendingGeneration = secondaryCharacters.some(c => !c.image_url || c.image_url.trim() === '')
 
     let newStatus: string
     if (pendingGeneration && secondaryCharacters.length > 0) {
       newStatus = 'character_generation'
     } else if (secondaryCharacters.length === 0) {
-      // No secondary characters — skip to characters_approved
       newStatus = 'characters_approved'
     } else {
-      // All have images already (shouldn't happen for new projects, but just in case)
       newStatus = 'character_generation_complete'
     }
 
-    await supabase
+    // Optimistic lock: only update if status hasn't changed since we read it
+    const { data: statusUpdate, error: statusError } = await supabase
       .from('projects')
       .update({ status: newStatus })
       .eq('id', project.id)
+      .eq('status', project.status)
+      .select('id')
+
+    if (statusError || !statusUpdate?.length) {
+      console.error('[Submission Complete] Status race detected — another request already changed the status')
+      return NextResponse.json({ error: 'Project was already submitted' }, { status: 409 })
+    }
 
     console.log(`[Submission Complete] Project ${project.id} status → ${newStatus}`)
 
@@ -169,14 +180,14 @@ export async function POST(
           )
 
           const allSucceeded = results.every(r => r.success)
+          const supabaseAdmin = await createAdminClient()
+
           if (allSucceeded) {
-            const supabaseAdmin = await createAdminClient()
             await supabaseAdmin.from('projects').update({ status: 'character_generation_complete' }).eq('id', project.id)
 
             // Trigger sketch generation for all characters
             const { generateCharacterSketch } = await import('@/lib/ai/character-sketch-generator')
             
-            // Main character sketch
             if (mainChar?.image_url) {
               generateCharacterSketch(
                 mainChar.id,
@@ -186,7 +197,6 @@ export async function POST(
               ).catch(err => console.error('[Bg] Main char sketch failed:', err))
             }
 
-            // Secondary character sketches
             results.forEach((result) => {
               if (result.success && result.imageUrl) {
                 const character = charactersToGenerate.find(c => c.id === result.charId)
@@ -200,6 +210,10 @@ export async function POST(
                 }
               }
             })
+          } else {
+            const failedCount = results.filter(r => !r.success).length
+            console.error(`[Bg Generation] ${failedCount}/${results.length} characters failed — setting character_generation_failed`)
+            await supabaseAdmin.from('projects').update({ status: 'character_generation_failed' }).eq('id', project.id)
           }
 
           // Send completion notification
@@ -219,6 +233,10 @@ export async function POST(
           }
         } catch (err: unknown) {
           console.error('[Bg Generation] CRITICAL ERROR:', getErrorMessage(err))
+          try {
+            const supabaseAdmin = await createAdminClient()
+            await supabaseAdmin.from('projects').update({ status: 'character_generation_failed' }).eq('id', project.id)
+          } catch { /* last resort — status stays at character_generation */ }
         }
       })()
     }

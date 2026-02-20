@@ -389,6 +389,18 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
     }
 
+    // Character generation failed
+    if (status === 'character_generation_failed') {
+      return {
+        tag: 'Generation Failed',
+        tagStyle: 'bg-red-100 text-red-800 border-red-200',
+        buttonLabel: charSendCount > 0 ? 'Resend Characters' : 'Send Characters',
+        showCount: charSendCount > 0,
+        isResend: charSendCount > 0,
+        buttonDisabled: true
+      }
+    }
+
     // Characters generation complete
     if (status === 'character_generation_complete') {
       if (charSendCount > 0) {

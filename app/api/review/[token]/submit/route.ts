@@ -272,8 +272,18 @@ export async function POST(
     // DECISION TREE
     if (pendingGeneration) {
       // PATH A: GENERATION REQUIRED
-      // Update project status to generating
-      await supabase.from('projects').update({ status: 'character_generation' }).eq('id', project.id)
+      // Optimistic lock: only update if status hasn't changed since we read it
+      const { data: lockA, error: lockAErr } = await supabase
+        .from('projects')
+        .update({ status: 'character_generation' })
+        .eq('id', project.id)
+        .eq('status', project.status)
+        .select('id')
+
+      if (lockAErr || !lockA?.length) {
+        console.error('[Form Submit] Status race detected (PATH A) — another request already changed the status')
+        return NextResponse.json({ error: 'Project was already submitted' }, { status: 409 })
+      }
 
       // Send notification with character data (non-blocking)
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
@@ -310,7 +320,6 @@ export async function POST(
             const mainCharImage = mainChar?.image_url || ''
             console.log('[Bg Generation] Main character image:', mainCharImage ? 'EXISTS' : 'MISSING')
 
-            // Run in parallel with timeout logging
             console.log('[Bg Generation] Calling generateCharacterImage for each character...')
             const results = await Promise.all(
               charactersToGenerate.map((char, idx) => {
@@ -322,24 +331,20 @@ export async function POST(
                   })
                   .catch(err => {
                     console.error(`[Bg Generation] Character ${idx + 1} ERROR:`, err)
-                    throw err
+                    return { success: false, imageUrl: '' }
                   })
               })
             )
             console.log('[Bg Generation] All characters processed')
 
-            // If successful, update status to complete
             const allSucceeded = results.every(r => r.success)
+            const supabaseAdmin = await createAdminClient()
+
             if (allSucceeded) {
-              const supabaseAdmin = await createAdminClient()
               await supabaseAdmin.from('projects').update({ status: 'character_generation_complete' }).eq('id', project.id)
 
-              // Trigger sketch generation for main character (already has colored image)
               const mainChar = latestCharacters.find(c => c.is_main)
-              console.log('[Form Submit] Main character for sketch:', mainChar ? `ID: ${mainChar.id}, has image: ${!!mainChar.image_url}` : 'NOT FOUND')
               if (mainChar?.image_url) {
-                console.log('[Form Submit] Triggering main character sketch generation...')
-                // Call shared sketch generation function (async fire-and-forget)
                 ;(async () => {
                   const { generateCharacterSketch } = await import('@/lib/ai/character-sketch-generator')
                   await generateCharacterSketch(
@@ -348,19 +353,12 @@ export async function POST(
                     project.id,
                     mainChar.name || mainChar.role || 'Main Character'
                   )
-                })()
-              } else {
-                console.log('[Form Submit] Skipping main character sketch (no image_url)')
+                })().catch(err => console.error(`[Form Submit] Main char sketch failed:`, err))
               }
 
-              // Trigger sketch generation for secondary characters (newly generated colored images)
-              console.log('[Form Submit] Triggering sketch generation for', results.length, 'secondary characters...')
               results.forEach((result, idx) => {
                 if (result.success && result.imageUrl) {
                   const character = charactersToGenerate[idx]
-                  console.log(`[Form Submit] Starting sketch for secondary character ${idx + 1}: ${character.name || character.role}`)
-                  
-                  // Fire-and-forget async sketch generation
                   ;(async () => {
                     const { generateCharacterSketch } = await import('@/lib/ai/character-sketch-generator')
                     await generateCharacterSketch(
@@ -372,13 +370,15 @@ export async function POST(
                   })().catch(err => {
                     console.error(`[Form Submit] Secondary character sketch failed for ${character.name}:`, err)
                   })
-                } else {
-                  console.log(`[Form Submit] Skipping sketch for character ${idx + 1} (generation failed or no image)`)
                 }
               })
+            } else {
+              const failedCount = results.filter(r => !r.success).length
+              console.error(`[Bg Generation] ${failedCount}/${results.length} characters failed — setting character_generation_failed`)
+              await supabaseAdmin.from('projects').update({ status: 'character_generation_failed' }).eq('id', project.id)
             }
 
-            // Notification logic...
+            // Notification
             try {
               const { notifyCharacterGenerationComplete } = await import('@/lib/notifications')
               const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
@@ -396,8 +396,10 @@ export async function POST(
 
           } catch (err: unknown) { 
             console.error('[Bg Generation] CRITICAL ERROR:', err)
-            console.error('[Bg Generation] Error stack:', err instanceof Error ? err.stack : undefined)
-            console.error('[Bg Generation] Error message:', getErrorMessage(err))
+            try {
+              const supabaseAdmin = await createAdminClient()
+              await supabaseAdmin.from('projects').update({ status: 'character_generation_failed' }).eq('id', project.id)
+            } catch { /* last resort */ }
           }
         })().catch(err => {
           console.error('[Bg Generation] Unhandled rejection:', err)
@@ -420,7 +422,18 @@ export async function POST(
         message = 'Feedback submitted successfully'
       }
 
-      await supabase.from('projects').update({ status: newStatus }).eq('id', project.id)
+      // Optimistic lock: only update if status hasn't changed since we read it
+      const { data: lockB, error: lockBErr } = await supabase
+        .from('projects')
+        .update({ status: newStatus })
+        .eq('id', project.id)
+        .eq('status', project.status)
+        .select('id')
+
+      if (lockBErr || !lockB?.length) {
+        console.error('[Form Submit] Status race detected (PATH B) — another request already changed the status')
+        return NextResponse.json({ error: 'Project was already submitted' }, { status: 409 })
+      }
 
       // Notify Admin (non-blocking)
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'

@@ -178,6 +178,17 @@ export function CustomerProjectTabsContent({
           setLocalProjectStatus(newProject.status)
           latestProjectStatus.current = newProject.status
 
+          // Close the character forms popup if status moved to a non-interactive state
+          const interactiveStatuses = [
+            'character_review', 'character_revision_needed',
+            'trial_review', 'trial_revision',
+            'sketches_review', 'sketches_revision',
+            'illustration_review', 'illustration_revision_needed'
+          ]
+          if (!interactiveStatuses.includes(newProject.status)) {
+            setShowCompletionPopup(false)
+          }
+
           const wasHidden = ['character_generation', 'character_generation_complete'].includes(currentStatus)
           const isNowVisible = ['character_review', 'character_revision_needed', 'characters_approved'].includes(newProject.status)
 
@@ -377,7 +388,7 @@ export function CustomerProjectTabsContent({
   }, [sortedCharacters.secondary, isCharacterFormComplete])
 
   // Check modes (use localProjectStatus for realtime updates)
-  const isCharacterMode = ['character_generation', 'character_review', 'character_revision_needed', 'characters_approved'].includes(localProjectStatus)
+  const isCharacterMode = ['character_generation', 'character_generation_failed', 'character_review', 'character_revision_needed', 'characters_approved'].includes(localProjectStatus)
   const isIllustrationMode = [
     // Current statuses
     'characters_approved',
@@ -427,6 +438,9 @@ export function CustomerProjectTabsContent({
     // Skip if not in character review mode
     if (!isCharacterMode) return
 
+    // Skip if project is locked (status moved past interactive review states)
+    if (isLocked) return
+
     // Check if ALL secondary characters are SAVED (in database, not just form state)
     // A character is "ready" when it has all required fields saved to database
     const allReady = sortedCharacters.secondary.every(char => {
@@ -445,7 +459,14 @@ export function CustomerProjectTabsContent({
     if (allReady && !showCompletionPopup) {
       setShowCompletionPopup(true)
     }
-  }, [sortedCharacters.secondary, popupDismissedKey, showGallery, isCharacterMode, showCompletionPopup])
+  }, [sortedCharacters.secondary, popupDismissedKey, showGallery, isCharacterMode, isLocked, showCompletionPopup])
+
+  // Force-close the popup immediately when project becomes locked (e.g. another tab submitted)
+  useEffect(() => {
+    if (isLocked && showCompletionPopup) {
+      setShowCompletionPopup(false)
+    }
+  }, [isLocked, showCompletionPopup])
 
   const handleIllustrationFeedbackChange = useCallback(async (pageId: string, notes: string) => {
     // 1. Optimistic Update
@@ -701,7 +722,8 @@ export function CustomerProjectTabsContent({
 
   const isHiddenGenerationState =
     localProjectStatus === 'character_generation' ||
-    localProjectStatus === 'character_generation_complete'
+    localProjectStatus === 'character_generation_complete' ||
+    localProjectStatus === 'character_generation_failed'
 
   const isApproveDisabled = useMemo(() => {
     if (showIllustrationsTab) return false

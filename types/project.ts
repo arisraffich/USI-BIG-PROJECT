@@ -4,6 +4,7 @@ export type ProjectStatus =
   // Character Phase
   | 'character_review'
   | 'character_generation'
+  | 'character_generation_failed'
   | 'character_generation_complete'
   | 'character_revision_needed'
   | 'characters_approved'

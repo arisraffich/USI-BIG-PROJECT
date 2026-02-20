@@ -11,7 +11,7 @@ import { ManuscriptEditor } from '@/components/project/manuscript/ManuscriptEdit
 import { ProjectHeader } from '@/components/admin/ProjectHeader'
 import { UnifiedIllustrationSidebar } from '@/components/illustration/UnifiedIllustrationSidebar'
 import { UnifiedProjectLayout } from '@/components/layout/UnifiedProjectLayout'
-import { Loader2, Sparkles, Upload, Clock, ExternalLink } from 'lucide-react'
+import { Loader2, Sparkles, Upload, Clock, ExternalLink, AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IllustrationsTabContent } from '@/components/admin/IllustrationsTabContent'
 import { Page } from '@/types/page'
@@ -101,7 +101,7 @@ export function ProjectTabsContent({
   const prevStatusRef = useRef(localProjectStatus)
   useEffect(() => {
     const isApprovalTransition = prevStatusRef.current !== 'characters_approved' && localProjectStatus === 'characters_approved'
-    const isCharactersTab = searchParams?.get('tab') === 'characters' || (!searchParams?.get('tab') && (localProjectStatus === 'character_review' || localProjectStatus === 'character_generation'))
+    const isCharactersTab = searchParams?.get('tab') === 'characters' || (!searchParams?.get('tab') && (localProjectStatus === 'character_review' || localProjectStatus === 'character_generation' || localProjectStatus === 'character_generation_failed'))
 
     if (isApprovalTransition && isCharactersTab) {
       toast.success('Characters Approved! Switching to Illustrations...')
@@ -116,8 +116,7 @@ export function ProjectTabsContent({
   // Admin polling - ONLY when waiting for generation to complete
   // DO NOT poll during character_review (admin may be manually filling forms - polling would reset their input!)
   useEffect(() => {
-    // Poll ONLY when status is character_generation (waiting for AI to finish)
-    if (localProjectStatus !== 'character_generation') return
+    if (localProjectStatus !== 'character_generation' && localProjectStatus !== 'character_generation_failed') return
 
     const interval = setInterval(() => {
       router.refresh()
@@ -140,7 +139,7 @@ export function ProjectTabsContent({
     // Default tab logic based on status
     if (isIllustrationsUnlocked) return 'illustrations'
     // Only default to characters if there are secondary characters
-    if (hasSecondaryCharacters && (localProjectStatus === 'character_review' || localProjectStatus === 'character_generation' || localProjectStatus === 'draft')) return 'characters'
+    if (hasSecondaryCharacters && (localProjectStatus === 'character_review' || localProjectStatus === 'character_generation' || localProjectStatus === 'character_generation_failed' || localProjectStatus === 'draft')) return 'characters'
     return 'pages'
   }, [searchParams, isIllustrationsUnlocked, localProjectStatus, hasSecondaryCharacters])
 
@@ -153,7 +152,7 @@ export function ProjectTabsContent({
   const showIllustrationsSidebar = isIllustrationsActive
   const showSidebar = showPagesSidebar || showIllustrationsSidebar
 
-  const isGenerating = localProjectStatus === 'character_generation'
+  const isGenerating = localProjectStatus === 'character_generation' || localProjectStatus === 'character_generation_failed'
   const isSketchPhase = localProjectStatus === 'character_generation_complete'
   const isCharactersLoading = isGenerating
   // NOTE: isAnalyzing removed - illustration_status field no longer used
@@ -288,6 +287,29 @@ export function ProjectTabsContent({
     }
   }
 
+  // Retry failed character generation
+  const [isRetrying, setIsRetrying] = useState(false)
+  const handleRetryGeneration = async () => {
+    setIsRetrying(true)
+    try {
+      const response = await fetch(`/api/admin/projects/${projectId}/retry-generation`, {
+        method: 'POST',
+      })
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Failed to retry')
+      }
+      toast.success('Retrying character generation...')
+      setLocalProjectStatus('character_generation')
+      router.refresh()
+    } catch (e) {
+      console.error('Failed to retry generation:', e)
+      toast.error(getErrorMessage(e, 'Failed to retry generation'))
+    } finally {
+      setIsRetrying(false)
+    }
+  }
+
   // Push Characters to Customer (Silent Update)
   const handlePushCharactersToCustomer = async () => {
     setIsCharPushing(true)
@@ -379,7 +401,7 @@ export function ProjectTabsContent({
     // 1. Any secondary character has an image (normal case)
     // 2. OR we're generating (so we can show cards with loading spinners)
     const hasImages = sortedCharacters.secondary.some(c => c.image_url !== null && c.image_url !== '')
-    const isGeneratingOrComplete = localProjectStatus === 'character_generation' || localProjectStatus === 'character_generation_complete'
+    const isGeneratingOrComplete = localProjectStatus === 'character_generation' || localProjectStatus === 'character_generation_failed' || localProjectStatus === 'character_generation_complete'
     return hasImages || (isGeneratingOrComplete && sortedCharacters.secondary.length > 0)
   }, [sortedCharacters.secondary, localProjectStatus])
 
@@ -667,6 +689,28 @@ export function ProjectTabsContent({
 
         {/* Characters Tab Content */}
         <div className={activeTab === 'characters' ? 'block space-y-4' : 'hidden'}>
+          {localProjectStatus === 'character_generation_failed' && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-red-800">Character generation failed</p>
+                  <p className="text-sm text-red-600">Some characters could not be generated. You can retry the failed ones.</p>
+                </div>
+              </div>
+              <Button
+                onClick={handleRetryGeneration}
+                disabled={isRetrying}
+                className="bg-red-600 hover:bg-red-700 text-white flex-shrink-0"
+              >
+                {isRetrying ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Retrying...</>
+                ) : (
+                  <><RefreshCw className="w-4 h-4 mr-2" /> Retry Generation</>
+                )}
+              </Button>
+            </div>
+          )}
           {showGallery && localCharacters && !isManualMode ? (
             <AdminCharacterGallery
               characters={localCharacters}

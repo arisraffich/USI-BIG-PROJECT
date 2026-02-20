@@ -33,28 +33,35 @@ export async function POST(
             )
         }
 
-        // Verify status allows approval
-        // Allowed: character_review, characters_regenerated
-        // Blocked: character_generation, character_generation_complete, characters_approved (idempotent OK but nice to know)
         if (project.status === 'characters_approved') {
             return NextResponse.json({ success: true, message: 'Already approved' })
         }
 
-        // Update status
-        const { error: updateError } = await supabase
-            .from('projects')
-            .update({
-                status: 'characters_approved',
-                // We might want to clear any pending flags if needed, but for now just status
-            })
-            .eq('id', project.id)
-
-        if (updateError) {
-            console.error('Error approving characters:', updateError)
+        // Only allow approval from states where characters have been reviewed
+        const allowedStatuses = ['character_generation_complete', 'character_review', 'character_revision_needed']
+        if (!allowedStatuses.includes(project.status)) {
+            console.error(`[Approve] Rejected: project ${project.id} status is "${project.status}", not in allowed list`)
             return NextResponse.json(
-                { error: 'Failed to update project status' },
-                { status: 500 }
+                { error: 'Project is not in a state that allows character approval' },
+                { status: 403 }
             )
+        }
+
+        // Optimistic lock: only update if status hasn't changed since we read it
+        const { data: updated, error: updateError } = await supabase
+            .from('projects')
+            .update({ status: 'characters_approved' })
+            .eq('id', project.id)
+            .eq('status', project.status)
+            .select('id')
+
+        if (updateError || !updated?.length) {
+            if (updateError) {
+                console.error('[Approve] DB error:', updateError)
+                return NextResponse.json({ error: 'Failed to update project status' }, { status: 500 })
+            }
+            console.error('[Approve] Status race detected — status changed between read and write')
+            return NextResponse.json({ error: 'Status changed, please refresh and try again' }, { status: 409 })
         }
 
         // Notify Slack
