@@ -410,6 +410,15 @@ export function CustomerProjectTabsContent({
 
   const showIllustrationsTab = isIllustrationMode
 
+  const isLocked = ![
+    'character_review', 'character_revision_needed',
+    // New statuses
+    'trial_review', 'trial_revision',
+    'sketches_review', 'sketches_revision',
+    // Legacy statuses
+    'illustration_review', 'illustration_revision_needed'
+  ].includes(localProjectStatus)
+
   // Redirect Logic — only on initial page load (not after in-app navigation)
   const hasRedirected = useRef(false)
   useEffect(() => {
@@ -581,15 +590,6 @@ export function CustomerProjectTabsContent({
       throw error
     }
   }, [])
-
-  const isLocked = ![
-    'character_review', 'character_revision_needed',
-    // New statuses
-    'trial_review', 'trial_revision',
-    'sketches_review', 'sketches_revision',
-    // Legacy statuses
-    'illustration_review', 'illustration_revision_needed'
-  ].includes(localProjectStatus)
 
   // Find pages with pending admin replies (unresolved feedback WITH admin reply)
   const pagesWithPendingAdminReply = useMemo(() => {
