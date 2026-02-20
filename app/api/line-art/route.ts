@@ -35,9 +35,9 @@ export async function POST(request: NextRequest) {
         }
 
         const arrayBuffer = await file.arrayBuffer()
-        let buffer = Buffer.from(arrayBuffer)
+        const inputBuffer = Buffer.from(arrayBuffer)
 
-        buffer = await sharp(buffer)
+        const buffer = await sharp(inputBuffer)
             .resize(2048, 2048, { fit: 'inside', withoutEnlargement: true })
             .png()
             .toBuffer()
