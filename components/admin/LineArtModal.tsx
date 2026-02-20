@@ -11,7 +11,7 @@ interface FileEntry {
     file: File
     status: FileStatus
     error?: string
-    resultBase64?: string
+    blobUrl?: string
 }
 
 const MAX_CONCURRENT = 3
@@ -20,19 +20,23 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
     const [files, setFiles] = useState<FileEntry[]>([])
     const [isProcessing, setIsProcessing] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
-    const cancelledRef = useRef(false)
+    const abortControllerRef = useRef<AbortController | null>(null)
 
     const reset = useCallback(() => {
-        setFiles([])
+        // Revoke any object URLs to prevent memory leaks
+        setFiles(prev => {
+            prev.forEach(f => { if (f.blobUrl) URL.revokeObjectURL(f.blobUrl) })
+            return []
+        })
         setIsProcessing(false)
-        cancelledRef.current = false
+        abortControllerRef.current = null
     }, [])
 
     const handleClose = useCallback(() => {
         if (isProcessing) {
             const confirmed = window.confirm('Generation is in progress. Cancel and close?')
             if (!confirmed) return
-            cancelledRef.current = true
+            abortControllerRef.current?.abort()
         }
         reset()
         onOpenChange(false)
@@ -51,8 +55,8 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
         handleFileSelect(e.dataTransfer.files)
     }, [handleFileSelect])
 
-    const generateLineArt = useCallback(async (entry: FileEntry, index: number): Promise<void> => {
-        if (cancelledRef.current) return
+    const generateLineArt = useCallback(async (entry: FileEntry, index: number, signal: AbortSignal): Promise<void> => {
+        if (signal.aborted) return
 
         setFiles(prev => prev.map((f, i) => i === index ? { ...f, status: 'generating' } : f))
 
@@ -60,44 +64,47 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
             const formData = new FormData()
             formData.append('file', entry.file)
 
-            const response = await fetch('/api/line-art', { method: 'POST', body: formData })
-            const result = await response.json()
+            const response = await fetch('/api/line-art', { method: 'POST', body: formData, signal })
 
-            if (cancelledRef.current) return
+            if (signal.aborted) return
 
-            if (!response.ok || !result.success) {
-                setFiles(prev => prev.map((f, i) => i === index
-                    ? { ...f, status: 'error', error: result.error || 'Generation failed' }
-                    : f
-                ))
+            if (!response.ok) {
+                let errorMsg = 'Generation failed'
+                try {
+                    const errData = await response.json()
+                    errorMsg = errData.error || errorMsg
+                } catch { /* binary error response */ }
+                setFiles(prev => prev.map((f, i) => i === index ? { ...f, status: 'error', error: errorMsg } : f))
                 return
             }
 
-            setFiles(prev => prev.map((f, i) => i === index
-                ? { ...f, status: 'done', resultBase64: result.imageBase64 }
-                : f
-            ))
+            const blob = await response.blob()
+            if (signal.aborted) return
+
+            const blobUrl = URL.createObjectURL(blob)
+            setFiles(prev => prev.map((f, i) => i === index ? { ...f, status: 'done', blobUrl } : f))
         } catch (err) {
-            if (cancelledRef.current) return
-            setFiles(prev => prev.map((f, i) => i === index
-                ? { ...f, status: 'error', error: err instanceof Error ? err.message : 'Unknown error' }
-                : f
-            ))
+            if (signal.aborted) return
+            const msg = err instanceof Error ? err.message : 'Unknown error'
+            if (msg.includes('abort')) return
+            setFiles(prev => prev.map((f, i) => i === index ? { ...f, status: 'error', error: msg } : f))
         }
     }, [])
 
     const startGeneration = useCallback(async () => {
         if (files.length === 0) return
         setIsProcessing(true)
-        cancelledRef.current = false
+
+        const controller = new AbortController()
+        abortControllerRef.current = controller
 
         let nextIndex = 0
         const activePromises: Promise<void>[] = []
 
         async function processNext(): Promise<void> {
-            while (nextIndex < files.length && !cancelledRef.current) {
+            while (nextIndex < files.length && !controller.signal.aborted) {
                 const idx = nextIndex++
-                await generateLineArt(files[idx], idx)
+                await generateLineArt(files[idx], idx, controller.signal)
             }
         }
 
@@ -109,17 +116,17 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
         setIsProcessing(false)
     }, [files, generateLineArt])
 
-    const downloadOne = useCallback((base64: string, index: number) => {
+    const downloadOne = useCallback((blobUrl: string, index: number) => {
         const link = document.createElement('a')
-        link.href = `data:image/png;base64,${base64}`
+        link.href = blobUrl
         link.download = `LineArt${index + 1}.png`
         link.click()
     }, [])
 
     const downloadAll = useCallback(() => {
         files.forEach((f, i) => {
-            if (f.resultBase64) {
-                setTimeout(() => downloadOne(f.resultBase64!, i), i * 200)
+            if (f.blobUrl) {
+                setTimeout(() => downloadOne(f.blobUrl!, i), i * 200)
             }
         })
     }, [files, downloadOne])
@@ -141,7 +148,6 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
                 </DialogHeader>
 
                 <div className="flex-1 overflow-y-auto space-y-4">
-                    {/* File picker area */}
                     {files.length === 0 && (
                         <div
                             onDrop={handleDrop}
@@ -163,7 +169,6 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
                         </div>
                     )}
 
-                    {/* Progress bar */}
                     {totalCount > 0 && (
                         <div className="space-y-2">
                             <div className="flex justify-between text-sm text-gray-600">
@@ -179,7 +184,6 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
                         </div>
                     )}
 
-                    {/* File list */}
                     {files.length > 0 && (
                         <div className="space-y-1.5 max-h-64 overflow-y-auto">
                             {files.map((entry, i) => (
@@ -196,9 +200,9 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
                                     <span className="flex-shrink-0 text-xs text-gray-400 w-20 text-right">
                                         → LineArt{i + 1}.png
                                     </span>
-                                    {entry.status === 'done' && entry.resultBase64 && (
+                                    {entry.status === 'done' && entry.blobUrl && (
                                         <button
-                                            onClick={() => downloadOne(entry.resultBase64!, i)}
+                                            onClick={() => downloadOne(entry.blobUrl!, i)}
                                             className="flex-shrink-0 text-gray-500 hover:text-gray-800"
                                             title="Download"
                                         >
@@ -210,7 +214,6 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
                         </div>
                     )}
 
-                    {/* Error details */}
                     {files.some(f => f.error) && (
                         <div className="text-xs text-red-500 space-y-1">
                             {files.filter(f => f.error).map((f, i) => (
@@ -220,7 +223,6 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
                     )}
                 </div>
 
-                {/* Actions */}
                 <div className="flex gap-2 pt-4 border-t">
                     {files.length === 0 ? (
                         <Button variant="outline" className="flex-1" onClick={handleClose}>
@@ -237,7 +239,11 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
                             </Button>
                         </>
                     ) : isProcessing ? (
-                        <Button variant="outline" onClick={() => { cancelledRef.current = true }} className="flex-1">
+                        <Button
+                            variant="outline"
+                            onClick={() => abortControllerRef.current?.abort()}
+                            className="flex-1"
+                        >
                             Cancel Generation
                         </Button>
                     ) : (
