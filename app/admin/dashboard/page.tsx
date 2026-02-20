@@ -66,19 +66,18 @@ export default async function DashboardPage() {
         pageCount: pageCountsMap[project.id] || 0,
       }))
 
-      // Sort: Active projects first, then approved projects at bottom
-      // Both groups sorted by created_at descending (newest first)
+      // Sort: Active projects first (by most recent status change), approved at bottom
       projectsWithCounts.sort((a, b) => {
         const aApproved = a.status === 'illustration_approved'
         const bApproved = b.status === 'illustration_approved'
         
-        // If one is approved and other is not, non-approved comes first
         if (aApproved !== bApproved) {
           return aApproved ? 1 : -1
         }
         
-        // Within same group, sort by created_at descending (newest first)
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        const aTime = new Date(a.status_changed_at || a.created_at).getTime()
+        const bTime = new Date(b.status_changed_at || b.created_at).getTime()
+        return bTime - aTime
       })
     } catch (countError) {
       console.error('Error fetching page counts:', countError)
