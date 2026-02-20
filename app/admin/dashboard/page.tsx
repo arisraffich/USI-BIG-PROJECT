@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { ProjectCard } from '@/components/project/ProjectCard'
 import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
+import { DashboardActions } from '@/components/admin/DashboardActions'
 
 
 export const dynamic = 'force-dynamic'
@@ -23,12 +23,7 @@ export default async function DashboardPage() {
         <div className="p-8">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
-            <Link href="/admin/project/new">
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                New Project
-              </Button>
-            </Link>
+            <DashboardActions />
           </div>
           <div className="text-center py-12">
             <p className="text-gray-500 mb-4">Unable to load projects. Please try again later.</p>
@@ -91,12 +86,7 @@ export default async function DashboardPage() {
       <div className="p-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
-          <Link href="/admin/project/new">
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              New Project
-            </Button>
-          </Link>
+          <DashboardActions />
         </div>
 
         {!projectsWithCounts || projectsWithCounts.length === 0 ? (
@@ -124,12 +114,7 @@ export default async function DashboardPage() {
       <div className="p-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
-          <Link href="/admin/project/new">
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              New Project
-            </Button>
-          </Link>
+          <DashboardActions />
         </div>
         <div className="text-center py-12">
           <p className="text-gray-500 mb-4">An error occurred while loading projects. Please refresh the page.</p>
