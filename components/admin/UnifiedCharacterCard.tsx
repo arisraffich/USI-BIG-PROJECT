@@ -1,10 +1,22 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
-import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, Download, Upload, X, AlertTriangle } from 'lucide-react'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, Download, Upload, X, AlertTriangle, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Character } from '@/types/character'
 import { createClient } from '@/lib/supabase/client'
@@ -26,23 +38,61 @@ interface SubCardProps {
     onDownload?: (e: React.MouseEvent) => void
     onUpload?: (e: React.ChangeEvent<HTMLInputElement>) => void
     onRetry?: () => void
+    onFileDrop?: (file: File) => void
     showUpload?: boolean
     showDownload?: boolean
 }
 
-function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownload, onUpload, onRetry, showUpload = false, showDownload = true }: SubCardProps) {
-    // Check if imageUrl contains an error
+function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownload, onUpload, onRetry, onFileDrop, showUpload = false, showDownload = true }: SubCardProps) {
+    const [isDragOver, setIsDragOver] = useState(false)
+
     const isError = imageUrl?.startsWith('error:') ?? false
     const errorMessage = isError && imageUrl ? imageUrl.replace('error:', '') : null
     const actualImageUrl = isError ? null : imageUrl
 
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+        if (!onFileDrop) return
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDragOver(true)
+    }, [onFileDrop])
+
+    const handleDragLeave = useCallback((e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDragOver(false)
+    }, [])
+
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDragOver(false)
+        if (!onFileDrop) return
+
+        const file = Array.from(e.dataTransfer.files).find(f => f.type.startsWith('image/'))
+        if (file) {
+            onFileDrop(file)
+        } else {
+            toast.error('Please drop an image file')
+        }
+    }, [onFileDrop])
+
     return (
         <div className="relative w-full">
-            {/* Image Container */}
             <div 
-                className={`relative aspect-[9/16] rounded-lg cursor-pointer hover:opacity-95 transition-opacity overflow-hidden ${isError ? 'bg-red-50 border-2 border-red-200' : 'bg-gray-100'}`}
+                className={`relative aspect-[9/16] rounded-lg cursor-pointer hover:opacity-95 transition-all overflow-hidden ${isError ? 'bg-red-50 border-2 border-red-200' : isDragOver ? 'bg-blue-50 border-2 border-dashed border-blue-400' : 'bg-gray-100'}`}
                 onClick={actualImageUrl ? onClick : undefined}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
             >
+                {isDragOver && (
+                    <div className="absolute inset-0 bg-blue-100/70 backdrop-blur-sm flex flex-col items-center justify-center z-30 rounded-lg">
+                        <Upload className="w-8 h-8 text-blue-500 mb-2" />
+                        <span className="text-sm font-medium text-blue-700">Drop image here</span>
+                    </div>
+                )}
+
                 {isError ? (
                     <div className="flex flex-col items-center justify-center h-full text-red-600 p-3">
                         <AlertTriangle className="w-8 h-8 mb-2" />
@@ -83,7 +133,6 @@ function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownloa
                             className="w-full h-full object-cover"
                         />
                         
-                        {/* Upload Button Overlay - Inside image container */}
                         {showUpload && onUpload && (
                             <div className="absolute top-2 right-2 z-10">
                                 <label 
@@ -104,11 +153,10 @@ function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownloa
                     </>
                 ) : (
                     <div className="flex items-center justify-center h-full text-gray-400">
-                        <span className="text-sm">No Image</span>
+                        <span className="text-sm">{onFileDrop ? 'Drop, paste, or upload' : 'No Image'}</span>
                     </div>
                 )}
 
-                {/* Loading Overlay - Don't show if there's an error */}
                 {isLoading && !isError && (
                     <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center rounded-lg z-20">
                         <div className="flex flex-col items-center gap-3 bg-white p-4 rounded-lg shadow-lg border border-blue-200">
@@ -130,8 +178,10 @@ function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownloa
 }
 
 export function UnifiedCharacterCard({ character, projectId, isGenerating = false, isSketchPhase = false }: UnifiedCharacterCardProps) {
+    const router = useRouter()
     const [isRegenerating, setIsRegenerating] = useState(false)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
     const [customPrompt, setCustomPrompt] = useState(character.generation_prompt || '')
     const [showLightbox, setShowLightbox] = useState(false)
     const [lightboxImage, setLightboxImage] = useState<'sketch' | 'colored' | null>(null)
@@ -140,6 +190,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     const [localCharacter, setLocalCharacter] = useState(character)
     const [isSketchGenerating, setIsSketchGenerating] = useState(false)
     const [referenceImage, setReferenceImage] = useState<{ file: File; preview: string } | null>(null)
+    const [isCardHovered, setIsCardHovered] = useState(false)
     const referenceInputRef = useRef<HTMLInputElement>(null)
 
     // Update local character when prop changes
@@ -307,9 +358,11 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
         }
     }
 
-    const handleUploadColored = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (!file) return
+    const uploadColoredFile = useCallback(async (file: File) => {
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please select an image file')
+            return
+        }
 
         const formData = new FormData()
         formData.append('file', file)
@@ -331,7 +384,6 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             const data = await response.json()
             toast.success('Colored image uploaded successfully')
             
-            // Preload the new image and clear sketch state to show spinner
             if (data.imageUrl) {
                 await new Promise((resolve) => {
                     const img = new Image()
@@ -340,14 +392,11 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                     img.src = data.imageUrl
                 })
                 setOptimisticColoredImage(data.imageUrl)
-                // Clear sketch to show spinner while generating
                 setLocalCharacter(prev => ({ ...prev, sketch_url: null }))
             }
 
-            // Upload done — stop colored loading (finally block also handles this for error cases)
             setIsRegenerating(false)
 
-            // Trigger sketch generation
             if (data.imageUrl) {
                 setIsSketchGenerating(true)
                 try {
@@ -383,9 +432,14 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             toast.error(getErrorMessage(error, 'Failed to upload colored image'))
         } finally {
             setIsRegenerating(false)
-            // Reset file input
-            e.target.value = ''
         }
+    }, [character.id, projectId])
+
+    const handleUploadColored = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        await uploadColoredFile(file)
+        e.target.value = ''
     }
 
     const handleUploadSketch = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -477,6 +531,53 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
         }
     }
 
+    const handleDelete = async () => {
+        setIsDeleting(true)
+        try {
+            const response = await fetch(`/api/characters/${character.id}`, {
+                method: 'DELETE',
+            })
+
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(data.error || 'Failed to delete character')
+            }
+
+            toast.success(`${character.name || character.role || 'Character'} deleted`)
+            router.refresh()
+        } catch (error: unknown) {
+            console.error('Delete error:', error)
+            toast.error(getErrorMessage(error, 'Failed to delete character'))
+        } finally {
+            setIsDeleting(false)
+        }
+    }
+
+    // Clipboard paste: upload pasted image as colored when hovering over this card
+    useEffect(() => {
+        if (!isCardHovered) return
+
+        const handlePaste = (e: ClipboardEvent) => {
+            const items = e.clipboardData?.items
+            if (!items) return
+
+            for (const item of Array.from(items)) {
+                if (item.type.startsWith('image/')) {
+                    const file = item.getAsFile()
+                    if (file) {
+                        e.preventDefault()
+                        uploadColoredFile(file)
+                        toast.success('Image pasted — uploading colored image')
+                        return
+                    }
+                }
+            }
+        }
+
+        document.addEventListener('paste', handlePaste)
+        return () => document.removeEventListener('paste', handlePaste)
+    }, [isCardHovered, uploadColoredFile])
+
     const displayName = character.is_main
         ? 'Main Character'
         : (character.name || character.role || 'Unnamed Character')
@@ -498,12 +599,15 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     const lightboxImageUrl = lightboxImage === 'sketch' ? displaySketchImageUrl : displayColoredImageUrl
 
     return (
-        <div className="flex flex-col w-full gap-4">
+        <div
+            className="flex flex-col w-full gap-4"
+            onMouseEnter={() => setIsCardHovered(true)}
+            onMouseLeave={() => setIsCardHovered(false)}
+        >
             <Card className="flex flex-col w-full p-0 gap-0 border-0 shadow-[0_0_15px_rgba(0,0,0,0.12)]">
                 <CardContent className="flex-1 flex flex-col p-4 bg-white rounded-t-lg">
                     <div className="flex justify-between items-center gap-2 relative">
                         <div className="flex items-center gap-2">
-                            {/* Info Button - Left Side */}
                             {character.story_role && (
                                 <div
                                     className="relative flex-shrink-0"
@@ -527,7 +631,6 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                         </div>
 
                         <div className="flex items-center gap-2 flex-shrink-0">
-                            {/* Download Button - Back in header */}
                             <button
                                 onClick={(e) => handleDownload('colored', e)}
                                 disabled={!displayColoredImageUrl}
@@ -537,7 +640,6 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                                 <Download className="w-[18px] h-[18px] text-gray-700" />
                             </button>
 
-                            {/* Regenerate Dialog Trigger - Icon Only */}
                             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                                 <DialogTrigger asChild>
                                     <div
@@ -622,6 +724,40 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                                         </DialogFooter>
                                     </DialogContent>
                             </Dialog>
+
+                            {!character.is_main && (
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <button
+                                            className="transition-opacity hover:opacity-80"
+                                            title="Delete character"
+                                            disabled={isDeleting}
+                                        >
+                                            {isDeleting
+                                                ? <Loader2 className="w-[18px] h-[18px] text-red-500 animate-spin" />
+                                                : <Trash2 className="w-[18px] h-[18px] text-red-500" />
+                                            }
+                                        </button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Delete {displayName}?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This will permanently remove this character and unlink it from all pages. This action cannot be undone.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction
+                                                onClick={handleDelete}
+                                                className="bg-red-600 hover:bg-red-700"
+                                            >
+                                                Delete
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            )}
                         </div>
                     </div>
                 </CardContent>
@@ -649,6 +785,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                             onClick={() => handleOpenLightbox('colored')}
                             characterName={displayName}
                             onUpload={handleUploadColored}
+                            onFileDrop={uploadColoredFile}
                             showDownload={false}
                             showUpload={true}
                         />
