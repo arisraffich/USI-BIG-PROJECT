@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   compress: true,
   compiler: {
-    removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error", "warn"] } : false,
+    removeConsole: false,
   },
   images: {
     remotePatterns: [
