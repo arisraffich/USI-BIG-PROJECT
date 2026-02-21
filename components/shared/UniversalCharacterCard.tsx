@@ -1,14 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, memo } from 'react'
-import { toast } from 'sonner'
+import { useState, useEffect, memo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Save, Edit, Trash2, Loader2, User, Check, Lock, Camera, X } from 'lucide-react'
+import { Save, Edit, Trash2, Loader2, Check, Lock, Camera, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Character } from '@/types/character'
+import { useReferencePhoto } from '@/hooks/useReferencePhoto'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -43,10 +43,6 @@ interface InternalCharacterFormData {
     clothing_and_accessories: string
 }
 
-const MIN_PHOTO_DIMENSION = 300
-const MAX_PHOTO_SIZE = 10 * 1024 * 1024
-const ACCEPTED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/heic', 'image/heif', 'image/webp']
-
 const validateForm = (data: InternalCharacterFormData): boolean => {
     return !!(
         data.age?.trim() &&
@@ -57,40 +53,6 @@ const validateForm = (data: InternalCharacterFormData): boolean => {
         data.eye_color?.trim() &&
         data.clothing_and_accessories?.trim()
     )
-}
-
-function validatePhotoFile(file: File): Promise<{ valid: boolean; error?: string }> {
-    return new Promise((resolve) => {
-        if (!ACCEPTED_PHOTO_TYPES.includes(file.type)) {
-            resolve({ valid: false, error: 'Please upload a JPG, PNG, or HEIC image.' })
-            return
-        }
-        if (file.size > MAX_PHOTO_SIZE) {
-            const sizeMB = (file.size / (1024 * 1024)).toFixed(1)
-            resolve({ valid: false, error: `File is too large (${sizeMB}MB). Please upload an image under 10MB.` })
-            return
-        }
-        if (file.type === 'image/heic' || file.type === 'image/heif') {
-            resolve({ valid: true })
-            return
-        }
-        const img = new Image()
-        const url = URL.createObjectURL(file)
-        img.onload = () => {
-            URL.revokeObjectURL(url)
-            const shortest = Math.min(img.width, img.height)
-            if (shortest < MIN_PHOTO_DIMENSION) {
-                resolve({ valid: false, error: `Photo resolution is too low (${img.width}×${img.height}). Please upload a higher quality image.` })
-            } else {
-                resolve({ valid: true })
-            }
-        }
-        img.onerror = () => {
-            URL.revokeObjectURL(url)
-            resolve({ valid: false, error: 'Could not read this image. Please try a different file.' })
-        }
-        img.src = url
-    })
 }
 
 export interface UniversalCharacterCardProps {
@@ -105,8 +67,6 @@ export interface UniversalCharacterCardProps {
     onChange?: (data: CharacterFormData, isValid: boolean) => void
     isLocked?: boolean
     enablePhotoUpload?: boolean
-    onPhotoUploaded?: (characterId: string, url: string) => void
-    onPhotoRemoved?: (characterId: string) => void
 }
 
 export const UniversalCharacterCard = memo(function UniversalCharacterCard({
@@ -121,8 +81,6 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
     onChange,
     isLocked = false,
     enablePhotoUpload = false,
-    onPhotoUploaded,
-    onPhotoRemoved,
 }: UniversalCharacterCardProps) {
     const [isEditing, setIsEditing] = useState(alwaysEditing)
     const [saving, setSaving] = useState(false)
@@ -139,19 +97,35 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
     })
 
     const [initialData, setInitialData] = useState<InternalCharacterFormData | null>(null)
-    const [highlightMissing, setHighlightMissing] = useState(false)
     const [focusedField, setFocusedField] = useState<string | null>(null)
 
-    // Photo upload state
-    const [referencePhotoUrl, setReferencePhotoUrl] = useState<string | null>(character.reference_photo_url || null)
-    const [uploadingPhoto, setUploadingPhoto] = useState(false)
-    const photoInputRef = useRef<HTMLInputElement>(null)
-
-    const hasPhoto = !!referencePhotoUrl
-
-    useEffect(() => {
-        setReferencePhotoUrl(character.reference_photo_url || null)
-    }, [character.reference_photo_url])
+    const {
+        photoUrl: referencePhotoUrl,
+        hasPhoto,
+        uploading: uploadingPhoto,
+        inputRef: photoInputRef,
+        handleRemove: handleRemovePhoto,
+        handleInputChange: handlePhotoInputChange,
+        openFilePicker,
+    } = useReferencePhoto({
+        characterId: character.id,
+        initialUrl: character.reference_photo_url,
+        onValidityChange: (hasPhotoNow) => {
+            if (!onChange) return
+            const isValid = hasPhotoNow || validateForm(formData)
+            onChange({
+                age: formData.age || null,
+                gender: formData.gender || null,
+                skin_color: formData.skin_color || null,
+                hair_color: formData.hair_color || null,
+                hair_style: formData.hair_style || null,
+                eye_color: formData.eye_color || null,
+                clothing: formData.clothing_and_accessories || null,
+                accessories: null,
+                special_features: null,
+            }, isValid)
+        },
+    })
 
     useEffect(() => {
         const savedData = {
@@ -224,87 +198,6 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
         const newData = { ...formData, clothing_and_accessories: value }
         setFormData(newData)
         notifyChange(newData)
-    }
-
-    // Photo upload handlers
-    const handlePhotoSelect = useCallback(async (file: File) => {
-        setUploadingPhoto(true)
-        const result = await validatePhotoFile(file)
-        if (!result.valid) {
-            toast.error(result.error)
-            setUploadingPhoto(false)
-            return
-        }
-
-        try {
-            const fd = new FormData()
-            fd.append('file', file)
-            const response = await fetch(`/api/review/characters/${character.id}/reference-photo`, {
-                method: 'POST',
-                body: fd,
-            })
-
-            if (!response.ok) {
-                const data = await response.json()
-                throw new Error(data.error || 'Upload failed')
-            }
-
-            const { url } = await response.json()
-            setReferencePhotoUrl(url)
-            onPhotoUploaded?.(character.id, url)
-            toast.success('Photo uploaded — text fields are now optional')
-
-            if (onChange) {
-                onChange({
-                    age: formData.age || null,
-                    gender: formData.gender || null,
-                    skin_color: formData.skin_color || null,
-                    hair_color: formData.hair_color || null,
-                    hair_style: formData.hair_style || null,
-                    eye_color: formData.eye_color || null,
-                    clothing: formData.clothing_and_accessories || null,
-                    accessories: null,
-                    special_features: null,
-                }, true)
-            }
-        } catch (error: unknown) {
-            const msg = error instanceof Error ? error.message : 'Upload failed'
-            toast.error(msg)
-        } finally {
-            setUploadingPhoto(false)
-        }
-    }, [character.id, formData, onChange, onPhotoUploaded])
-
-    const handleRemovePhoto = useCallback(async () => {
-        try {
-            await fetch(`/api/review/characters/${character.id}/reference-photo`, { method: 'DELETE' })
-            setReferencePhotoUrl(null)
-            onPhotoRemoved?.(character.id)
-            toast('Photo removed')
-
-            if (onChange) {
-                const isValid = validateForm(formData)
-                onChange({
-                    age: formData.age || null,
-                    gender: formData.gender || null,
-                    skin_color: formData.skin_color || null,
-                    hair_color: formData.hair_color || null,
-                    hair_style: formData.hair_style || null,
-                    eye_color: formData.eye_color || null,
-                    clothing: formData.clothing_and_accessories || null,
-                    accessories: null,
-                    special_features: null,
-                }, isValid)
-            }
-        } catch {
-            toast.error('Failed to remove photo')
-        }
-    }, [character.id, formData, onChange, onPhotoRemoved])
-
-    const handlePhotoInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (file) handlePhotoSelect(file)
-        if (photoInputRef.current) photoInputRef.current.value = ''
     }
 
     const handleSaveWrapper = async () => {
@@ -546,7 +439,7 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
                                     </div>
                                 ) : (
                                     <button
-                                        onClick={() => photoInputRef.current?.click()}
+                                        onClick={openFilePicker}
                                         disabled={uploadingPhoto || isLocked}
                                         className={cn(
                                             "w-28 h-28 md:w-32 md:h-32 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer",

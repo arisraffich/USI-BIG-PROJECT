@@ -420,6 +420,22 @@ export function CustomerSubmissionWizard({
     } catch (error: unknown) {
       console.error('Submission error:', error)
       toast.error(getErrorMessage(error, 'Failed to submit. Please try again.'))
+
+      // Re-fetch characters from DB so cards show saved data instead of blank
+      try {
+        const res = await fetch(`/api/submit/${reviewToken}/identify-characters`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data.characters?.length > 0) {
+            setIdentifiedCharacters(data.characters)
+            const allIds = new Set<string>(data.characters.map((c: Character) => c.id))
+            setSavedCharacterIds(allIds)
+          }
+        }
+      } catch {
+        // Non-critical — cards will still show but may need re-filling
+      }
+
       setCurrentStep('character_forms')
     } finally {
       setIsLoading(false)

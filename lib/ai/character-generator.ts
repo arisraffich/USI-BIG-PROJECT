@@ -38,7 +38,8 @@ export async function generateCharacterImage(
     }
 
     try {
-        const hasVisualRef = !!(visualReferenceImage || character.reference_photo_url)
+        const isInitialGeneration = !character.image_url
+        const hasVisualRef = !!(visualReferenceImage || (character.reference_photo_url && isInitialGeneration))
         const prompt = customPrompt || buildCharacterPrompt(character, !!mainCharacterImageUrl, hasVisualRef)
 
         const parts: any[] = []
@@ -113,7 +114,9 @@ If the reference is 3D/Realistic: Match that realism level.`
                 }
             }
 
-            // ADD VISUAL REFERENCE IMAGE (explicit upload or customer reference photo)
+            // ADD VISUAL REFERENCE IMAGE
+            // Admin-uploaded visual reference always applies.
+            // Customer's reference photo only applies on initial generation (no existing image).
             let visualRefData: { mimeType: string, data: string } | null = null
 
             if (visualReferenceImage) {
@@ -121,7 +124,7 @@ If the reference is 3D/Realistic: Match that realism level.`
                 if (matches) {
                     visualRefData = { mimeType: matches[1], data: matches[2] }
                 }
-            } else if (character.reference_photo_url) {
+            } else if (character.reference_photo_url && !character.image_url) {
                 visualRefData = await fetchImageAsBase64(character.reference_photo_url)
             }
 

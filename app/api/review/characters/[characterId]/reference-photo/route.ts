@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import sharp from 'sharp'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getErrorMessage } from '@/lib/utils/error'
 import { removeMetadata, sanitizeFilename } from '@/lib/utils/metadata-cleaner'
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024
+const MIN_DIMENSION = 300
 
 export async function POST(
   request: NextRequest,
@@ -41,6 +43,22 @@ export async function POST(
 
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
+
+    try {
+      const meta = await sharp(buffer).metadata()
+      if (meta.width && meta.height) {
+        const shortest = Math.min(meta.width, meta.height)
+        if (shortest < MIN_DIMENSION) {
+          return NextResponse.json(
+            { error: `Photo resolution is too low (${meta.width}×${meta.height}). Please upload a higher quality image.` },
+            { status: 400 }
+          )
+        }
+      }
+    } catch {
+      // If sharp can't read metadata (rare), allow the upload to proceed
+    }
+
     const cleaned = await removeMetadata(buffer)
 
     const baseName = sanitizeFilename(character.name || character.role || `character-${character.id}`)
