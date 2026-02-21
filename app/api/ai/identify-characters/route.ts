@@ -64,77 +64,109 @@ async function runCharacterIdentification(project_id: string, supabase: any) {
     // Main character name is provided by admin - we just need to identify secondary characters
     const mainCharName = mainCharacter?.name || null
     
-    const prompt = `You are analyzing a children's book story to identify ALL characters that need to be illustrated.
+    const prompt = `You are an expert children's book story analyst for an illustration workflow.
 
-${mainCharName ? `MAIN CHARACTER (already provided - DO NOT include in your response): "${mainCharName}"` : ''}
+Your job: identify the KEY secondary characters who require unique character illustration forms.
+
+${mainCharName ? `MAIN CHARACTER (already provided — DO NOT include):\n"${mainCharName}"` : ''}
 
 STORY:
 ${fullStory}
 
-YOUR TASK: Identify all characters in this story that would need a character illustration form filled out.
+────────────────
+PHILOSOPHY
 
-CRITICAL RULES:
+Return ONLY characters a customer would reasonably need to design visually.
+Quality and correctness matter more than quantity.
+When uncertain, EXCLUDE — the admin can always add characters manually.
 
-1. EXCLUDE READER/SECOND-PERSON REFERENCES:
-   - DO NOT include "you" or "your" when it refers to the reader
-   - If "you" is addressing the reader of the book, it is NOT a character
-   - Only include "you" if it's a character's actual name in the story
+────────────────
+PROCESS (must follow)
 
-2. NUMBERED/LABELED CHARACTERS ARE VALID:
-   - Characters with numbers or labels (e.g., "Character 1", "Friend 2") are valid character names
-   - Each numbered character is a SEPARATE individual
-   - Treat these as proper character names
+PASS 1 — CANDIDATE EXTRACTION (internal only)
+Mentally identify every possible character candidate:
+- named individuals
+- titled roles (mother, teacher, donkey, fox, angel)
+- described individuals (the boy, a red fox, the old man)
+- disguised beings (predator disguised as hen, stranger in costume)
+- antagonists, mentors, helpers
+- animals, creatures, supernatural beings
 
-3. SINGULAR CHARACTERS ONLY:
-   - Each character must be a specific, identifiable individual
-   - Characters must be able to be illustrated as a single entity
+Do NOT output this list.
 
-4. EXCLUDE PLURAL/GROUP REFERENCES:
-   - DO NOT identify groups like "the kids", "children", "people"
-   - If a reference describes multiple entities, exclude it
+PASS 2 — SELECT KEY SECONDARY CHARACTERS
+From your candidate list, include a character ONLY if ALL four are true:
 
-5. INCLUDE SPECIFIC INDIVIDUALS:
-   - Characters with proper names (e.g., "Max", "Mom", "Zara")
-   - Characters with numbered labels (e.g., "Kid 1", "Kid 2")
-   - Characters with descriptive titles (e.g., "the boy", "the girl")
-   - If a character appears multiple times, they need a form
+1. VISUAL — appears on-page in at least one scene (not merely mentioned, remembered, or offscreen)
+2. INDIVIDUAL — a single identifiable being (not a group or crowd)
+3. NARRATIVE IMPORTANCE — at least one of:
+   - has dialogue
+   - drives plot or conflict
+   - directly interacts with the main character
+   - is central to conflict or resolution (mentor, villain, reveal, rescuer)
+4. DESIGN NEED — an illustrator would need a consistent, unique visual design for this character across scenes
 
-6. WRITER INTENT CHECK:
-   - Would the writer want to fill out a character form for this?
-   - INCLUDE: recurring characters, characters with physical descriptions
-   - EXCLUDE: background mentions, generic placeholders
+AND at least one of:
+- appears on 2+ pages
+- appears once but is pivotal (antagonist, mentor, key reveal, rescuer)
+- appears once but is a close relation to the main character (parent, sibling, best friend, pet companion) who is visually present on-page
 
-CHARACTER IDENTITY REASONING:
-- Multiple references may point to the SAME person 
-  (use context: "Mom", "Mother", "the woman" might all be one character)
-- Return each unique individual ONCE with their most descriptive name
-- The main character may appear under different names/descriptions - exclude ALL of them
-- Two characters can be RELATED but still DIFFERENT people 
-  (a character's mother is a separate person from that character)
-- Background crowds or unnamed groups are not individual characters
+────────────────
+EXCLUDE
 
-VISUAL PRESENCE CHECK:
-- Only include characters who APPEAR VISUALLY in scenes and need to be illustrated
-- Exclude characters who are only mentioned, remembered, or talked about but never shown
+- reader address ("you" / "your" addressing the reader)
+- groups / crowds ("kids", "people", "animals", "hens") — unless the story clearly singles out ONE individual who acts or speaks independently
+- background extras (shopkeeper seen once, random passerby, generic authority figure)
+- off-screen or narration-only mentions (remembered, talked about, past events)
+- characters drawable generically without a unique design
+- objects, places, abstractions ("the sun", "the forest", "courage")
+${mainCharName ? `- the MAIN CHARACTER "${mainCharName}" under any name, alias, or description` : ''}
 
-RESPONSE FORMAT:
-Return a JSON object:
+────────────────
+SPECIAL RULES
+
+DISGUISES / ALIASES:
+If a character appears in disguise or under multiple forms,
+treat as ONE character with aliases.
+Example: fox disguised as hen → one character.
+
+DEDUPLICATION:
+Merge references to the same individual.
+Mom = Mother = the woman → one character.
+
+NAMING:
+Use the most recognizable name from the story.
+If unnamed, use a clear role label ("The Fox", "The Donkey").
+
+NUMBERED CHARACTERS:
+Characters like "Student 1", "Kid 2" are valid ONLY if they individually
+meet ALL Pass 2 criteria. Do not include them just because they are numbered.
+
+────────────────
+OUTPUT — STRICT JSON ONLY
+
 {
   "characters": [
     {
-      "name": "Character name",
-      "role": "Brief role description",
-      "appears_in": [1, 2, 3, 5],
-      "description": "Brief physical description from the story"
+      "name": "Best display name",
+      "role": "Brief narrative role (1 sentence)",
+      "appears_in": [1, 3, 5],
+      "story_role": "Brief physical description from the story text"
     }
   ]
 }
 
-IMPORTANT:
-${mainCharName ? `- DO NOT include "${mainCharName}" - they are the main character (already handled)` : ''}
-- DO NOT include reader-addressed "you" - the reader is NOT a character
-- Each character must have a "name" field
-- "appears_in" must be page numbers (1 to ${maxPageNumber})`
+If NO valid secondary characters exist:
+{"characters": []}
+
+────────────────
+CONSTRAINTS
+
+- Do NOT include the MAIN CHARACTER under any name
+- Do NOT include groups or crowds
+- Do NOT output duplicates — merge synonyms, keep best display name
+- "appears_in" must be valid page numbers (1 to ${maxPageNumber})
+- Fewer correct characters is ALWAYS better than many minor ones`
 
     if (!openai) {
       throw new Error('OpenAI API key is not configured')
