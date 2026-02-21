@@ -141,16 +141,16 @@ export async function POST(
       newStatus = 'character_generation_complete'
     }
 
-    // Optimistic lock: only update if status hasn't changed since we read it
+    // Update status — only from valid starting states to prevent double-submission
     const { data: statusUpdate, error: statusError } = await supabase
       .from('projects')
       .update({ status: newStatus })
       .eq('id', project.id)
-      .eq('status', project.status)
+      .in('status', validStatuses)
       .select('id')
 
     if (statusError || !statusUpdate?.length) {
-      console.error('[Submission Complete] Status race detected — another request already changed the status')
+      console.error('[Submission Complete] Project already submitted or status changed')
       return NextResponse.json({ error: 'Project was already submitted' }, { status: 409 })
     }
 

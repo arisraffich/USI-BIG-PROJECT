@@ -272,16 +272,15 @@ export async function POST(
     // DECISION TREE
     if (pendingGeneration) {
       // PATH A: GENERATION REQUIRED
-      // Optimistic lock: only update if status hasn't changed since we read it
       const { data: lockA, error: lockAErr } = await supabase
         .from('projects')
         .update({ status: 'character_generation' })
         .eq('id', project.id)
-        .eq('status', project.status)
+        .in('status', allowedStatuses)
         .select('id')
 
       if (lockAErr || !lockA?.length) {
-        console.error('[Form Submit] Status race detected (PATH A) — another request already changed the status')
+        console.error('[Form Submit] Project already submitted (PATH A)')
         return NextResponse.json({ error: 'Project was already submitted' }, { status: 409 })
       }
 
@@ -422,16 +421,15 @@ export async function POST(
         message = 'Feedback submitted successfully'
       }
 
-      // Optimistic lock: only update if status hasn't changed since we read it
       const { data: lockB, error: lockBErr } = await supabase
         .from('projects')
         .update({ status: newStatus })
         .eq('id', project.id)
-        .eq('status', project.status)
+        .in('status', allowedStatuses)
         .select('id')
 
       if (lockBErr || !lockB?.length) {
-        console.error('[Form Submit] Status race detected (PATH B) — another request already changed the status')
+        console.error('[Form Submit] Project already submitted (PATH B)')
         return NextResponse.json({ error: 'Project was already submitted' }, { status: 409 })
       }
 
