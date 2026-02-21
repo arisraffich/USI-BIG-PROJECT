@@ -61,10 +61,11 @@ export const CustomerCharacterCard = memo(function CustomerCharacterCard({
       onDelete={handleDelete}
       isGenerating={isGenerating}
       readOnly={character.is_main}
-      alwaysEditing={false} // Enable Lock-on-Save behavior
+      alwaysEditing={false}
       hideSaveButton={false}
       onChange={handleChange}
       isLocked={isLocked}
+      enablePhotoUpload={!character.is_main}
     />
   )
 })

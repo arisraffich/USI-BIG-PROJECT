@@ -341,7 +341,9 @@ export function CustomerSubmissionWizard({
       })
 
       if (!saveResponse.ok) {
-        throw new Error('Failed to save pages')
+        const errorData = await saveResponse.json().catch(() => ({}))
+        console.error('[Wizard] Save pages failed:', saveResponse.status, errorData)
+        throw new Error(errorData.error || 'Failed to save pages')
       }
 
       // Step 2: Use background character identification result if available
@@ -408,7 +410,9 @@ export function CustomerSubmissionWizard({
       })
 
       if (!response.ok) {
-        throw new Error('Failed to submit project')
+        const errorData = await response.json().catch(() => ({}))
+        console.error('[Wizard] Submit failed:', response.status, errorData)
+        throw new Error(errorData.error || 'Failed to submit project')
       }
 
       clearSavedState(projectId)
@@ -439,8 +443,25 @@ export function CustomerSubmissionWizard({
   }, [])
 
   const handleCharacterSaved = useCallback((id: string) => {
-    setSavedCharacterIds(prev => new Set(prev).add(id))
-  }, [])
+    setSavedCharacterIds(prev => {
+      const next = new Set(prev).add(id)
+
+      // On mobile, scroll to the next unsaved card
+      if (window.innerWidth < 768) {
+        requestAnimationFrame(() => {
+          for (const char of identifiedCharacters) {
+            if (!next.has(char.id)) {
+              const el = document.getElementById(`character-${char.id}`)
+              el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              break
+            }
+          }
+        })
+      }
+
+      return next
+    })
+  }, [identifiedCharacters])
 
   // activeFormIndex based on SAVED state (not just filled)
   const { activeFormIndex, completedCount, totalForms } = useMemo(() => {
@@ -1014,7 +1035,7 @@ export function CustomerSubmissionWizard({
                 Character Details
               </h2>
               <p className="text-gray-500 text-sm">
-                Tell us about each character so our illustrators can bring them to life.
+                Describe each character below, or upload a photo and we&apos;ll use it as a reference for the illustration.
               </p>
             </div>
 

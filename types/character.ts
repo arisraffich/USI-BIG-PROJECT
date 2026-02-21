@@ -25,6 +25,7 @@ export interface Character {
   feedback_history?: Array<{ note: string; created_at: string; revision_round?: number }> | null
   is_resolved?: boolean
   form_pdf_url?: string | null
+  reference_photo_url?: string | null
   generation_prompt?: string | null
   generation_error?: string | null
   created_at: string

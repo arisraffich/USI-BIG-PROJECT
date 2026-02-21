@@ -2,7 +2,7 @@ import { Character } from '@/types/character'
 import { Page } from '@/types/page'
 import { Project } from '@/types/project'
 
-export function buildCharacterPrompt(character: Character, hasReferenceImage: boolean = false): string {
+export function buildCharacterPrompt(character: Character, hasReferenceImage: boolean = false, hasVisualReference: boolean = false): string {
   // Helper to build the character description details
   const details: string[] = []
 
@@ -24,16 +24,23 @@ export function buildCharacterPrompt(character: Character, hasReferenceImage: bo
     details.push(`Additional visual references: ${visualRefs.join(', ')}`)
   }
 
-  // Name/Role fallback (if used in description)
   const nameRef = character.name || character.role || 'Character'
 
   // SCENARIO 1: Style Reference is available (Secondary Characters)
-  // Style instructions are now in character-generator.ts label - keep this focused on character traits
   if (hasReferenceImage) {
-    const charDescription = details.join(', ')
+    const hasTextTraits = details.length > 0
+
+    let physicalLine: string
+    if (hasVisualReference && !hasTextTraits) {
+      physicalLine = 'Use the appearance reference photo for all physical traits.'
+    } else if (hasVisualReference && hasTextTraits) {
+      physicalLine = `Base appearance on the reference photo. Apply these overrides: ${details.join(', ')}`
+    } else {
+      physicalLine = `Physical traits: ${details.join(', ') || 'As described'}`
+    }
 
     return `TARGET CHARACTER: ${nameRef}
-Physical traits: ${charDescription || 'As described'}
+${physicalLine}
 
 OUTPUT REQUIREMENTS:
 - Full-body children's book character illustration

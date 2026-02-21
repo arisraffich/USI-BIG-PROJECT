@@ -16,7 +16,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, Download, Upload, X, AlertTriangle, Trash2 } from 'lucide-react'
+import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, Download, Upload, X, AlertTriangle, Trash2, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { Character } from '@/types/character'
 import { createClient } from '@/lib/supabase/client'
@@ -186,6 +186,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     const [showLightbox, setShowLightbox] = useState(false)
     const [lightboxImage, setLightboxImage] = useState<'sketch' | 'colored' | null>(null)
     const [showTooltip, setShowTooltip] = useState(false)
+    const [showRefPhoto, setShowRefPhoto] = useState(false)
     const [optimisticColoredImage, setOptimisticColoredImage] = useState<string | null>(null)
     const [localCharacter, setLocalCharacter] = useState(character)
     const [isSketchGenerating, setIsSketchGenerating] = useState(false)
@@ -631,6 +632,31 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                         </div>
 
                         <div className="flex items-center gap-2 flex-shrink-0">
+                            {character.reference_photo_url && (
+                                <Dialog open={showRefPhoto} onOpenChange={setShowRefPhoto}>
+                                    <DialogTrigger asChild>
+                                        <button
+                                            className="transition-opacity hover:opacity-80"
+                                            title="Customer reference photo"
+                                        >
+                                            <Camera className="w-[18px] h-[18px] text-indigo-600" />
+                                        </button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-[400px]">
+                                        <DialogHeader>
+                                            <DialogTitle>Customer Reference Photo — {displayName}</DialogTitle>
+                                        </DialogHeader>
+                                        <div className="flex justify-center py-4">
+                                            <img
+                                                src={character.reference_photo_url}
+                                                alt={`Reference photo for ${displayName}`}
+                                                className="max-h-[60vh] rounded-lg object-contain"
+                                            />
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
+                            )}
+
                             <button
                                 onClick={(e) => handleDownload('colored', e)}
                                 disabled={!displayColoredImageUrl}

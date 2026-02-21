@@ -38,7 +38,8 @@ export async function generateCharacterImage(
     }
 
     try {
-        const prompt = customPrompt || buildCharacterPrompt(character, !!mainCharacterImageUrl)
+        const hasVisualRef = !!(visualReferenceImage || character.reference_photo_url)
+        const prompt = customPrompt || buildCharacterPrompt(character, !!mainCharacterImageUrl, hasVisualRef)
 
         const parts: any[] = []
         const isMainCharRegen = character.is_main && customPrompt && mainCharacterImageUrl
@@ -112,24 +113,32 @@ If the reference is 3D/Realistic: Match that realism level.`
                 }
             }
 
-            // ADD VISUAL REFERENCE IMAGE (if provided)
+            // ADD VISUAL REFERENCE IMAGE (explicit upload or customer reference photo)
+            let visualRefData: { mimeType: string, data: string } | null = null
+
             if (visualReferenceImage) {
                 const matches = visualReferenceImage.match(/^data:(.+);base64,(.+)$/)
                 if (matches) {
-                    parts.push({
-                        text: `[APPEARANCE REFERENCE IMAGE]
+                    visualRefData = { mimeType: matches[1], data: matches[2] }
+                }
+            } else if (character.reference_photo_url) {
+                visualRefData = await fetchImageAsBase64(character.reference_photo_url)
+            }
+
+            if (visualRefData) {
+                parts.push({
+                    text: `[APPEARANCE REFERENCE IMAGE]
 This image shows what the character should look like physically.
 Use it to guide the character's physical appearance, proportions, and distinctive features.
 Do NOT copy the art style from this image — the style reference above defines the art style.`
-                    })
+                })
 
-                    parts.push({
-                        inlineData: {
-                            mimeType: matches[1],
-                            data: matches[2]
-                        }
-                    })
-                }
+                parts.push({
+                    inlineData: {
+                        mimeType: visualRefData.mimeType,
+                        data: visualRefData.data
+                    }
+                })
             }
 
             // ADD CHARACTER DESCRIPTION

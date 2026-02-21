@@ -121,7 +121,7 @@ export async function POST(
     // Fetch characters to determine next status
     const { data: allCharacters, error: charsError } = await supabase
       .from('characters')
-      .select('id, name, role, is_main, image_url, age, gender, description, skin_color, hair_color, hair_style, eye_color, clothing, accessories, special_features')
+      .select('id, name, role, is_main, image_url, age, gender, skin_color, hair_color, hair_style, eye_color, clothing, accessories, special_features, reference_photo_url')
       .eq('project_id', project.id)
 
     if (charsError || !allCharacters) {
@@ -257,7 +257,6 @@ export async function POST(
           role: c.role,
           age: c.age,
           gender: c.gender,
-          description: c.description,
           skin_color: c.skin_color,
           hair_color: c.hair_color,
           hair_style: c.hair_style,
