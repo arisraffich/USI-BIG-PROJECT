@@ -43,10 +43,12 @@ export async function POST(
     // Accept both awaiting_customer_input (initial) and character_review (after identify-characters ran)
     const validStatuses = ['awaiting_customer_input', 'character_review']
     if (!validStatuses.includes(project.status)) {
+      console.warn(`[Submission Complete] REJECTED — project ${project.id} status is "${project.status}", expected one of ${validStatuses.join(', ')}`)
       return NextResponse.json({ error: 'Project is not accepting submissions' }, { status: 403 })
     }
 
     const authorName = `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim()
+    console.log(`[Submission Complete] START — project ${project.id} "${project.book_title}" by ${authorName}, current status: ${project.status}`)
 
     // Save character form data if provided
     if (characterEdits && Object.keys(characterEdits).length > 0) {
@@ -305,12 +307,14 @@ export async function POST(
       console.error('[Submission Complete] Customer confirmation email failed:', e)
     }
 
+    console.log(`[Submission Complete] SUCCESS — project ${project.id} → ${newStatus}`)
+
     return NextResponse.json({
       success: true,
       status: newStatus,
     })
   } catch (error: unknown) {
-    console.error('[Submission Complete] Error:', error)
+    console.error('[Submission Complete] FAILED —', error)
     return NextResponse.json(
       { error: getErrorMessage(error, 'Failed to complete submission') },
       { status: 500 }

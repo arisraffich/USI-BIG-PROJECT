@@ -50,11 +50,15 @@ export async function POST(
     ]
 
     if (!allowedStatuses.includes(project.status)) {
+      console.warn(`[Form Submit] REJECTED — project ${project.id} status is "${project.status}"`)
       return NextResponse.json(
         { error: 'Project is not in a reviewable status' },
         { status: 403 }
       )
     }
+
+    const authorName = `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim()
+    console.log(`[Form Submit] START — project ${project.id} "${project.book_title}" by ${authorName}, status: ${project.status}`)
 
     // BRANCH 1: ILLUSTRATION/SKETCHES REVIEW SUBMISSION
     const isIllustrationStatus = [
@@ -165,6 +169,8 @@ export async function POST(
       } else {
         notifyIllustrationsApproved(notificationOptions).catch(e => console.error('Notification error:', e))
       }
+
+      console.log(`[Form Submit] SUCCESS — illustrations: project ${project.id} → ${newStatus}`)
 
       return NextResponse.json({
         success: true,
@@ -405,6 +411,8 @@ export async function POST(
         })
       }
 
+      console.log(`[Form Submit] SUCCESS — characters: project ${project.id} → character_generation`)
+
       return NextResponse.json({
         success: true,
         message: 'Changes submitted and generation started',
@@ -442,6 +450,8 @@ export async function POST(
         projectUrl: `${baseUrl}/admin/project/${project.id}`,
       }).catch(e => console.error('Notification error:', e))
 
+      console.log(`[Form Submit] SUCCESS — characters: project ${project.id} → ${newStatus}`)
+
       return NextResponse.json({
         success: true,
         message,
@@ -449,7 +459,7 @@ export async function POST(
       })
     }
   } catch (error: unknown) {
-    console.error('Error submitting changes:', error)
+    console.error('[Form Submit] FAILED —', error)
     return NextResponse.json(
       { error: getErrorMessage(error, 'Failed to submit changes') },
       { status: 500 }
