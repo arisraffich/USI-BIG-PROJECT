@@ -301,16 +301,16 @@ Story text: "${p.story_text}"${hasDesc ? `\nAuthor's scene description: "${p.sce
   const prompt = `You are a professional storyboard creator for children's book illustrations. Process the following pages.
 
 For each page, produce:
-1. **summary**: A concise 1-2 sentence scene description for the admin to read. Natural language, not a list.
+1. **summary**: A concise 1-2 sentence summary of what the illustration shows — the key action and who is involved. Written for a human to quickly scan.
 2. **character_actions**: Object with character names as keys and their actions/emotions as values. If no characters are named, use descriptive names like "young girl", "mother".
-3. **background_elements**: One sentence describing the environment, setting, props, and visual details.
-4. **atmosphere**: One sentence describing mood, lighting, weather, and emotional tone.
+3. **background_elements**: Describe the environment, setting, props, and visual details the illustrator should draw. Be specific — include spatial layout, key objects, and visual elements. As detailed as the scene requires.
+4. **atmosphere**: Describe the mood, lighting, weather, time of day, and emotional tone. Guide the scene's feel without specifying colors or art style.
 
 RULES:
-- If a page has an author's scene description, preserve their intent and descriptive words. Filter out meta-instructions like "This should emphasize..." or "Make sure to include...".
+- If a page has an author's scene description, treat it as the primary visual source. Only supplement with details from the story text that are missing from the description. Filter out meta-instructions like "This should emphasize..." or "Make sure to include...".
 - If a page has no scene description, create one from the story text.
 - Write as if describing what you SEE in the illustration.
-- Focus on: children's book illustration style, warm and inviting, child-friendly visuals.
+- Focus on: children's book illustration style, child-friendly visuals. Match the atmosphere to the tone of each page's text.
 - Keep all text concise. No verbose paragraphs.
 
 ${pagesBlock}
@@ -391,7 +391,7 @@ async function fallbackPerPage(
   const processPage = async (page: SceneDescriptionInput, mode: 'generate' | 'enhance') => {
     const input = mode === 'enhance'
       ? `You are restructuring a scene description for a children's book illustration.\n\nAuthor's description: "${page.scene_description}"\nStory text: "${page.story_text}"\n\nReturn JSON with: "summary" (concise 1-2 sentence scene description), "character_actions" (object), "background_elements" (string), "atmosphere" (string). Preserve the author's intent. Filter out meta-instructions.`
-      : `You are creating a scene description for a children's book illustration.\n\nStory text: "${page.story_text}"\n\nReturn JSON with: "summary" (concise 1-2 sentence scene description), "character_actions" (object with character names as keys), "background_elements" (string), "atmosphere" (string). Children's book style, warm and inviting.`
+      : `You are creating a scene description for a children's book illustration.\n\nStory text: "${page.story_text}"\n\nReturn JSON with: "summary" (concise 1-2 sentence scene description), "character_actions" (object with character names as keys), "background_elements" (string), "atmosphere" (string). Children's book style, child-friendly visuals. Match the atmosphere to the tone of the text.`
 
     try {
       const completion = await openai!.responses.create({
