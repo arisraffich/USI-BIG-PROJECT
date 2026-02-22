@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, memo } from 'react'
+import { useState, useRef, useCallback, memo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
@@ -161,95 +161,218 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }:
       year: 'numeric',
       timeZone: 'Asia/Yerevan',
     })
-    const timeStr = date.toLocaleTimeString('en-US', {
+    const timeStr12 = date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
       timeZone: 'Asia/Yerevan',
       hour12: true,
     })
-    return `${dateStr} ${timeStr}`
+    const timeStr24 = date.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Yerevan',
+      hour12: false,
+    })
+    return { full: `${dateStr} ${timeStr12}`, compact: `${dateStr} ${timeStr24}` }
   }
 
-  return (
-    <Card className="hover:shadow-lg transition-shadow">
-      <CardContent className="pt-0 pb-0">
-        <div className="flex justify-between items-start">
-          <Link href={`/admin/project/${project.id}?tab=${getDefaultTabForStatus(project.status)}`} className="flex-1 block cursor-pointer">
-            <h2 className="text-xl font-semibold mb-0">
-              <span className="text-blue-600">{project.author_firstname} {project.author_lastname}</span> {project.book_title.replace(`${project.author_firstname} ${project.author_lastname}`, '').replace(/^'s\s*/, '').replace(/\bBook\b/i, 'Project').trim()}
-            </h2>
-            <p className="text-sm text-gray-600">
-              {pageCount} {pageCount === 1 ? 'Page' : 'Pages'} | Created: {formatDate(project.created_at)}
-            </p>
-            {/* Status Badge */}
-            <div className="mt-1.5 flex items-center gap-2">
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${badgeConfig.style}`}>
-                {badgeConfig.text}
-                {roundNumber && (
-                  <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-white/50 text-[10px] font-bold">
-                    {roundNumber}
-                  </span>
-                )}
+  // Swipe-to-delete state (mobile only)
+  const [swipeOffset, setSwipeOffset] = useState(0)
+  const touchStartX = useRef(0)
+  const touchCurrentX = useRef(0)
+  const isSwiping = useRef(false)
+  const DELETE_THRESHOLD = 80
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+    touchCurrentX.current = e.touches[0].clientX
+    isSwiping.current = false
+  }, [])
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    touchCurrentX.current = e.touches[0].clientX
+    const diff = touchStartX.current - touchCurrentX.current
+    if (Math.abs(diff) > 10) isSwiping.current = true
+    if (isSwiping.current) {
+      setSwipeOffset(Math.max(0, Math.min(diff, DELETE_THRESHOLD)))
+    }
+  }, [])
+
+  const handleTouchEnd = useCallback(() => {
+    if (swipeOffset >= DELETE_THRESHOLD * 0.6) {
+      setSwipeOffset(DELETE_THRESHOLD)
+    } else {
+      setSwipeOffset(0)
+    }
+    isSwiping.current = false
+  }, [swipeOffset])
+
+  const resetSwipe = useCallback(() => setSwipeOffset(0), [])
+
+  const followUpBadge = isFollowUp(project.status)
+  const workingBadge = isWorking(project.status)
+
+  const cardContent = (
+    <>
+      <Link href={`/admin/project/${project.id}?tab=${getDefaultTabForStatus(project.status)}`} className="flex-1 block cursor-pointer min-w-0">
+        <h2 className="text-xl font-semibold mb-0">
+          <span className="text-blue-600">{project.author_firstname} {project.author_lastname}</span> {project.book_title.replace(`${project.author_firstname} ${project.author_lastname}`, '').replace(/^'s\s*/, '').replace(/\bBook\b/i, 'Project').trim()}
+        </h2>
+        <p className="text-sm text-gray-600">
+          <span className="hidden md:inline">{pageCount} {pageCount === 1 ? 'Page' : 'Pages'} | Created: {formatDate(project.created_at).full}</span>
+          <span className="md:hidden">{pageCount} {pageCount === 1 ? 'Page' : 'Pages'} | {formatDate(project.created_at).compact}</span>
+        </p>
+        {/* Status badges + follow up/working + time */}
+        <div className="mt-1.5 flex items-center gap-2">
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${badgeConfig.style}`}>
+            {badgeConfig.text}
+            {roundNumber && (
+              <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-white/50 text-[10px] font-bold">
+                {roundNumber}
               </span>
-              {isFollowUp(project.status) && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-900 text-white border border-gray-900">
-                  <UserRound className="w-3 h-3" />
-                  <span>Follow Up</span>
-                </span>
-              )}
-              {isWorking(project.status) && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600 border border-gray-300">
-                  <Wrench className="w-3 h-3" />
-                  Working
-                </span>
-              )}
-              {project.status_changed_at && project.status !== 'illustration_approved' && (
-                <span className="inline-flex items-center gap-1 text-sm font-semibold text-red-600">
-                  <Clock className="w-3.5 h-3.5" /> {timeAgo(project.status_changed_at)}
-                </span>
-              )}
-            </div>
-          </Link>
-          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-            <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="destructive"
-                  size="sm"
+            )}
+          </span>
+          {followUpBadge && (
+            <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-900 text-white border border-gray-900">
+              <UserRound className="w-3 h-3" />
+              <span>Follow Up</span>
+            </span>
+          )}
+          {workingBadge && (
+            <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600 border border-gray-300">
+              <Wrench className="w-3 h-3" />
+              Working
+            </span>
+          )}
+          {project.status_changed_at && project.status !== 'illustration_approved' && (
+            <span className="inline-flex items-center gap-1 text-sm font-semibold text-red-600">
+              <Clock className="w-3.5 h-3.5" /> {timeAgo(project.status_changed_at)}
+            </span>
+          )}
+        </div>
+      </Link>
+      {/* Desktop: delete button + mobile: follow up/working icon */}
+      <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+        {/* Mobile: follow up/working icon */}
+        {followUpBadge && (
+          <span className="md:hidden inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-900 text-white">
+            <UserRound className="w-4 h-4" />
+          </span>
+        )}
+        {workingBadge && (
+          <span className="md:hidden inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 text-gray-600 border border-gray-300">
+            <Wrench className="w-4 h-4" />
+          </span>
+        )}
+        {/* Desktop: delete button */}
+        <div className="hidden md:block">
+          <AlertDialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetSwipe() }}>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" disabled={isDeleting}>
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Project</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete &quot;{project.book_title}&quot;? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDelete}
                   disabled={isDeleting}
+                  className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Project</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete "{project.book_title}"? This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDelete}
-                    disabled={isDeleting}
-                    className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isDeleting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Deleting...
-                      </>
-                    ) : (
-                      'Delete'
-                    )}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete'
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </div>
+    </>
+  )
+
+  return (
+    <>
+      {/* Desktop card */}
+      <Card className="hidden md:block hover:shadow-lg transition-shadow">
+        <CardContent className="pt-0 pb-0">
+          <div className="flex justify-between items-start">
+            {cardContent}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Mobile card with swipe-to-delete */}
+      <div className="md:hidden relative overflow-hidden rounded-lg border bg-card shadow-sm">
+        {/* Delete button revealed behind card */}
+        <div className="absolute inset-y-0 right-0 flex items-center">
+          <button
+            onClick={() => setIsDialogOpen(true)}
+            className="h-full px-6 bg-red-600 text-white flex flex-col items-center justify-center gap-1 font-medium text-sm"
+          >
+            <Trash2 className="w-5 h-5" />
+            Delete
+          </button>
+        </div>
+
+        {/* Sliding card content */}
+        <div
+          className="relative bg-card z-10 px-4 py-3"
+          style={{
+            transform: `translateX(-${swipeOffset}px)`,
+            transition: isSwiping.current ? 'none' : 'transform 0.2s ease-out',
+          }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onClick={swipeOffset > 0 ? (e) => { e.preventDefault(); e.stopPropagation(); resetSwipe() } : undefined}
+        >
+          <div className="flex justify-between items-start">
+            {cardContent}
           </div>
         </div>
-      </CardContent>
-    </Card>
+
+        {/* Mobile delete confirmation dialog */}
+        <AlertDialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetSwipe() }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Project</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete &quot;{project.book_title}&quot;? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </>
   )
 })
