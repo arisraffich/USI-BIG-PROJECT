@@ -179,22 +179,21 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }:
   // Swipe-to-delete state (mobile only)
   const [swipeOffset, setSwipeOffset] = useState(0)
   const touchStartX = useRef(0)
-  const touchCurrentX = useRef(0)
+  const startOffset = useRef(0)
   const isSwiping = useRef(false)
   const DELETE_THRESHOLD = 80
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX
-    touchCurrentX.current = e.touches[0].clientX
+    startOffset.current = swipeOffset
     isSwiping.current = false
-  }, [])
+  }, [swipeOffset])
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    touchCurrentX.current = e.touches[0].clientX
-    const diff = touchStartX.current - touchCurrentX.current
+    const diff = touchStartX.current - e.touches[0].clientX
     if (Math.abs(diff) > 10) isSwiping.current = true
     if (isSwiping.current) {
-      setSwipeOffset(Math.max(0, Math.min(diff, DELETE_THRESHOLD)))
+      setSwipeOffset(Math.max(0, Math.min(startOffset.current + diff, DELETE_THRESHOLD)))
     }
   }, [])
 
