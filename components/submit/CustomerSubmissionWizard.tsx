@@ -300,8 +300,8 @@ export function CustomerSubmissionWizard({
       setCurrentStep('scene_description')
       setCurrentPageIndex(0)
     } else {
-      // Skip scene descriptions — use background result or wait for it
-      handleIdentifyCharacters()
+      // Skip scene descriptions — pass choice directly (React state is async)
+      handleIdentifyCharacters(choice)
     }
   }
 
@@ -313,16 +313,18 @@ export function CustomerSubmissionWizard({
       setCurrentPageIndex(pages.findIndex(p => !p.sceneDescription.trim()))
       return
     }
-    handleIdentifyCharacters()
+    handleIdentifyCharacters(sceneDescriptionChoice)
   }
 
   // ============================================================================
   // CHARACTER IDENTIFICATION
   // ============================================================================
 
-  const handleIdentifyCharacters = async () => {
+  const handleIdentifyCharacters = async (choiceOverride?: 'yes' | 'no' | null) => {
     setCurrentStep('loading_characters')
     setIsLoading(true)
+
+    const effectiveChoice = choiceOverride ?? sceneDescriptionChoice
 
     try {
       // Step 1: Re-save pages with scene descriptions (updates the initial save)
@@ -336,7 +338,7 @@ export function CustomerSubmissionWizard({
             story_text: p.storyText,
             scene_description: p.sceneDescription || null,
           })),
-          scene_description_choice: sceneDescriptionChoice,
+          scene_description_choice: effectiveChoice,
         }),
       })
 

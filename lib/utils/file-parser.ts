@@ -247,228 +247,190 @@ Example output format:
     throw new Error(`Failed to parse story with GPT-5.2: ${errorMessage}`)
   }
 
-  // STEP 2: Generate descriptions for pages that don't have them (sequential)
-  const pagesWithDescriptions = await Promise.all(
-    pages.map(async (page) => {
-      // If page already has a description from the file, enhance it to cover all 3 topics
-      if (page.scene_description && page.scene_description.trim().length > 0) {
-        const enhancePrompt = `You are restructuring a scene description for a children's book illustration into a structured format.
+  // STEP 2: Process scene descriptions using shared function
+  const pagesWithDescriptions = await processSceneDescriptions(pages)
+  return pagesWithDescriptions
+}
 
-ORIGINAL DESCRIPTION (by author):
-"${page.scene_description}"
+// ============================================================================
+// SHARED SCENE DESCRIPTION PROCESSING
+// Used by both Path A (admin upload) and Path B (customer submission)
+// ============================================================================
 
-STORY TEXT (for context):
-"${page.story_text}"
+interface SceneDescriptionInput {
+  page_number: number
+  story_text: string
+  scene_description: string | null
+  description_auto_generated: boolean
+}
 
-YOUR TASK:
-Extract and structure this description into 3 components:
+interface SceneDescriptionResult extends SceneDescriptionInput {
+  character_actions?: Record<string, string> | null
+  background_elements?: string | null
+  atmosphere?: string | null
+}
 
-1. **character_actions**: Object with character names as keys and their actions/emotions as values
-   - Format: {"CharacterName": "what they're doing and how they feel"}
-   - Only include characters visible in THIS scene
-   - If no specific characters, use general descriptions like {"child": "...", "parent": "..."}
+export async function processSceneDescriptions(
+  pages: SceneDescriptionInput[]
+): Promise<SceneDescriptionResult[]> {
+  if (!openai) {
+    console.error('[SceneDescriptions] OpenAI API key not configured — skipping')
+    return pages.map(p => ({ ...p }))
+  }
 
-2. **background_elements**: Text describing the environment/setting
-   - Where the scene takes place
-   - Objects, props, and visual details present
-   - Single descriptive text string
+  // Split pages by what they need
+  const toGenerate = pages.filter(p => (!p.scene_description || !p.scene_description.trim()) && p.story_text?.trim())
+  const toEnhance = pages.filter(p => p.scene_description && p.scene_description.trim().length > 0)
+  const skipped = pages.filter(p => (!p.scene_description || !p.scene_description.trim()) && !p.story_text?.trim())
 
-3. **atmosphere**: Text describing mood and emotional tone
-   - Lighting, weather, time of day
-   - Emotional feeling of the scene
-   - Single descriptive text string
+  if (toGenerate.length === 0 && toEnhance.length === 0) {
+    return pages.map(p => ({ ...p }))
+  }
 
-CRITICAL RULES:
-- IGNORE any meta-instructions like "This should emphasize...", "Make sure to include...", "The illustration should show...", etc.
-- These are author notes TO YOU, NOT part of the scene description
-- DO NOT include them in your output
-- Preserve the author's descriptive words and phrases, but filter out instructions
-- Keep the author's tone and style for actual scene elements
-- Add ONLY what's missing to complete all 3 aspects
+  console.log(`[SceneDescriptions] Processing ${toGenerate.length} to generate, ${toEnhance.length} to enhance, ${skipped.length} skipped`)
 
-Focus on: preserving author intent, minimal additions, children's book illustration style, hand-drawn aesthetic, warm and inviting.
+  // Build batched prompt for all pages that need processing
+  const allToProcess = [...toGenerate, ...toEnhance].sort((a, b) => a.page_number - b.page_number)
 
-Return ONLY valid JSON in this exact format:
+  const pagesBlock = allToProcess.map(p => {
+    const hasDesc = p.scene_description && p.scene_description.trim().length > 0
+    return `PAGE ${p.page_number}:
+Story text: "${p.story_text}"${hasDesc ? `\nAuthor's scene description: "${p.scene_description}"` : '\nNo scene description provided.'}`
+  }).join('\n\n')
+
+  const prompt = `You are a professional storyboard creator for children's book illustrations. Process the following pages.
+
+For each page, produce:
+1. **summary**: A concise 1-2 sentence scene description for the admin to read. Natural language, not a list.
+2. **character_actions**: Object with character names as keys and their actions/emotions as values. If no characters are named, use descriptive names like "young girl", "mother".
+3. **background_elements**: One sentence describing the environment, setting, props, and visual details.
+4. **atmosphere**: One sentence describing mood, lighting, weather, and emotional tone.
+
+RULES:
+- If a page has an author's scene description, preserve their intent and descriptive words. Filter out meta-instructions like "This should emphasize..." or "Make sure to include...".
+- If a page has no scene description, create one from the story text.
+- Write as if describing what you SEE in the illustration.
+- Focus on: children's book illustration style, warm and inviting, child-friendly visuals.
+- Keep all text concise. No verbose paragraphs.
+
+${pagesBlock}
+
+Return ONLY valid JSON:
 {
-  "character_actions": {"CharacterName": "action description"},
-  "background_elements": "environment description",
-  "atmosphere": "mood and lighting description"
+  "pages": [
+    {
+      "page_number": 1,
+      "summary": "concise scene description",
+      "character_actions": {"CharacterName": "action description"},
+      "background_elements": "environment description",
+      "atmosphere": "mood and lighting description"
+    }
+  ]
 }`
 
-        try {
-          if (!openai) throw new Error('OpenAI API key is not configured')
+  try {
+    console.log(`[SceneDescriptions] Sending batched request for ${allToProcess.length} pages...`)
+    const completion = await openai.responses.create({
+      model: 'gpt-5.2',
+      input: prompt,
+      text: {
+        format: { type: 'json_object' },
+        verbosity: 'low'
+      },
+      reasoning: { effort: 'low' },
+      max_output_tokens: 16000
+    })
 
-          const enhanceCompletion = await openai.responses.create({
-            model: 'gpt-5.2',
-            input: enhancePrompt,
-            text: {
-              format: { type: 'json_object' }
-            },
-            reasoning: {
-              effort: 'low' // Light reasoning to preserve author intent and balance topics
-            }
-          })
+    const msgOut = completion.output?.find((o: any) => o.type === 'message')
+    const jsonText = msgOut && 'content' in msgOut ? (msgOut as any).content?.[0]?.text?.trim() : null
+    if (!jsonText) throw new Error('Empty response from GPT-5.2')
 
-          // Find the message output (not reasoning)
-          const messageOutput = enhanceCompletion.output?.find((o: any) => o.type === 'message')
-          let enhancedJson = null
-          if (messageOutput && 'content' in messageOutput) {
-            const firstContent = messageOutput.content?.[0]
-            const jsonText = (firstContent && 'text' in firstContent ? firstContent.text?.trim() : null) || null
-            if (jsonText) {
-              try {
-                enhancedJson = JSON.parse(jsonText)
-              } catch (parseError) {
-                console.error(`Failed to parse JSON for page ${page.page_number}:`, parseError)
-                enhancedJson = null
-              }
-            }
-          }
+    const result = JSON.parse(jsonText)
+    if (!result.pages || !Array.isArray(result.pages)) throw new Error('Invalid response: missing pages array')
 
-          if (!enhancedJson || !enhancedJson.character_actions || !enhancedJson.background_elements || !enhancedJson.atmosphere) {
-            console.warn(`GPT-5.2 returned invalid structured description for page ${page.page_number}, using original`)
-            return {
-              ...page,
-              description_auto_generated: false,
-            }
-          }
+    console.log(`[SceneDescriptions] Batch success — ${result.pages.length} pages returned`)
 
-          // Create display paragraph from structured data
-          const characterParts = Object.entries(enhancedJson.character_actions)
-            .map(([name, action]) => `${name} ${action}`)
-            .join(', ')
-          const displayParagraph = `${characterParts}. ${enhancedJson.background_elements}. ${enhancedJson.atmosphere}`
-
-          console.log(`[Enhanced] Page ${page.page_number}: "${page.scene_description}" → Structured JSON`)
-
-          return {
-            ...page,
-            scene_description: displayParagraph, // For display/backward compatibility
-            character_actions: enhancedJson.character_actions,
-            background_elements: enhancedJson.background_elements,
-            atmosphere: enhancedJson.atmosphere,
-            description_auto_generated: false, // Still author-provided, just enhanced
-          }
-        } catch (error: unknown) {
-          const errorMessage = getErrorMessage(error)
-          console.error(`Error enhancing description for page ${page.page_number}:`, errorMessage)
-          // Fallback: use original description if enhancement fails
-          console.warn(`Using original description for page ${page.page_number} after enhancement error`)
-          return {
-            ...page,
-            description_auto_generated: false,
-          }
-        }
+    // Build lookup from AI results
+    const aiResults = new Map<number, any>()
+    for (const p of result.pages) {
+      if (p.page_number && p.character_actions && p.background_elements && p.atmosphere) {
+        aiResults.set(p.page_number, p)
       }
+    }
 
-      // If no description and no story text, skip generation
-      if (!page.story_text || page.story_text.trim().length === 0) {
-        return {
-          ...page,
-          description_auto_generated: false,
-        }
-      }
+    // Merge results back into all pages
+    return pages.map(page => {
+      const ai = aiResults.get(page.page_number)
+      if (!ai) return { ...page }
 
-      // Generate description using GPT-5.2 as professional storyboard creator
-      const descriptionPrompt = `You are a professional storyboard creator for children's books. Create a structured visual scene description for an illustration based on the story text.
-
-Story text: "${page.story_text}"
-
-Your task is to create a professional storyboard description structured into 3 components:
-
-1. **character_actions**: Object with character names as keys and their actions/emotions as values
-   - Format: {"CharacterName": "what they're doing and how they feel"}
-   - Only include characters visible in THIS scene
-   - If no specific characters named in text, use descriptive names like {"young girl": "...", "mother": "..."}
-   - Analyze the story text to identify who is present
-
-2. **background_elements**: Text describing the environment/setting
-   - Where the scene takes place
-   - Objects, props, and visual details present
-   - What the illustrator should draw in the background
-   - Single descriptive text string
-
-3. **atmosphere**: Text describing mood and emotional tone
-   - Lighting, weather, time of day
-   - Emotional feeling and composition style
-   - What mood should the illustration convey
-   - Single descriptive text string
-
-IMPORTANT:
-- Write ONLY the visual scene description
-- Do NOT include meta-instructions like "This should emphasize...", "Make sure to include...", etc.
-- Write as if describing what you SEE in the illustration, not instructions about what should be done
-- Analyze the story text carefully to determine which characters are present
-
-Focus on: storybook illustration style, hand-drawn aesthetic, warm and inviting atmosphere, child-friendly visuals.
-Avoid: photorealistic details, complex technical elements, adult themes, meta-instructions.
-
-Return ONLY valid JSON in this exact format:
-{
-  "character_actions": {"CharacterName": "action description"},
-  "background_elements": "environment description",
-  "atmosphere": "mood and lighting description"
-}`
-
-      try {
-        if (!openai) throw new Error('OpenAI API key is not configured')
-
-        const descriptionCompletion = await openai.responses.create({
-          model: 'gpt-5.2',
-          input: descriptionPrompt,
-          text: {
-            format: { type: 'json_object' }
-          },
-          reasoning: {
-            effort: 'low' // Light reasoning to analyze story and balance visual elements
-          }
-        })
-
-        // Find the message output (not reasoning)
-        const messageOutput = descriptionCompletion.output?.find((o: any) => o.type === 'message')
-        let generatedJson = null
-        if (messageOutput && 'content' in messageOutput) {
-          const firstContent = messageOutput.content?.[0]
-          const jsonText = (firstContent && 'text' in firstContent ? firstContent.text?.trim() : null) || null
-          if (jsonText) {
-            try {
-              generatedJson = JSON.parse(jsonText)
-            } catch (parseError) {
-              console.error(`Failed to parse generated JSON for page ${page.page_number}:`, parseError)
-              generatedJson = null
-            }
-          }
-        }
-
-        if (!generatedJson || !generatedJson.character_actions || !generatedJson.background_elements || !generatedJson.atmosphere) {
-          throw new Error('GPT-5.2 returned invalid structured description')
-        }
-
-        // Create display paragraph from structured data
-        const characterParts = Object.entries(generatedJson.character_actions)
-          .map(([name, action]) => `${name} ${action}`)
-          .join(', ')
-        const displayParagraph = `${characterParts}. ${generatedJson.background_elements}. ${generatedJson.atmosphere}`
-
-        console.log(`[Generated] Page ${page.page_number}: Structured JSON created`)
-
-        return {
-          ...page,
-          scene_description: displayParagraph, // For display/backward compatibility
-          character_actions: generatedJson.character_actions,
-          background_elements: generatedJson.background_elements,
-          atmosphere: generatedJson.atmosphere,
-          description_auto_generated: true,
-        }
-      } catch (error: unknown) {
-        const errorMessage = getErrorMessage(error)
-        console.error(`Error generating description for page ${page.page_number} with GPT-5.2:`, errorMessage)
-        throw new Error(`Failed to generate description for page ${page.page_number} with GPT-5.2: ${errorMessage}`)
+      const wasGenerated = !page.scene_description || !page.scene_description.trim()
+      return {
+        ...page,
+        scene_description: ai.summary || page.scene_description,
+        character_actions: ai.character_actions,
+        background_elements: ai.background_elements,
+        atmosphere: ai.atmosphere,
+        description_auto_generated: wasGenerated,
       }
     })
-  )
+  } catch (batchError: unknown) {
+    console.error('[SceneDescriptions] Batch failed, falling back to parallel per-page:', getErrorMessage(batchError))
+    return fallbackPerPage(pages, toGenerate, toEnhance)
+  }
+}
 
-  return pagesWithDescriptions
+async function fallbackPerPage(
+  allPages: SceneDescriptionInput[],
+  toGenerate: SceneDescriptionInput[],
+  toEnhance: SceneDescriptionInput[]
+): Promise<SceneDescriptionResult[]> {
+  if (!openai) return allPages.map(p => ({ ...p }))
+
+  const results = new Map<number, SceneDescriptionResult>()
+
+  const processPage = async (page: SceneDescriptionInput, mode: 'generate' | 'enhance') => {
+    const input = mode === 'enhance'
+      ? `You are restructuring a scene description for a children's book illustration.\n\nAuthor's description: "${page.scene_description}"\nStory text: "${page.story_text}"\n\nReturn JSON with: "summary" (concise 1-2 sentence scene description), "character_actions" (object), "background_elements" (string), "atmosphere" (string). Preserve the author's intent. Filter out meta-instructions.`
+      : `You are creating a scene description for a children's book illustration.\n\nStory text: "${page.story_text}"\n\nReturn JSON with: "summary" (concise 1-2 sentence scene description), "character_actions" (object with character names as keys), "background_elements" (string), "atmosphere" (string). Children's book style, warm and inviting.`
+
+    try {
+      const completion = await openai!.responses.create({
+        model: 'gpt-5.2',
+        input,
+        text: { format: { type: 'json_object' }, verbosity: 'low' },
+        reasoning: { effort: 'low' },
+        max_output_tokens: 1000
+      })
+      const msgOut = completion.output?.find((o: any) => o.type === 'message')
+      const jsonText = msgOut && 'content' in msgOut ? (msgOut as any).content?.[0]?.text?.trim() : null
+      const parsed = jsonText ? JSON.parse(jsonText) : null
+
+      if (parsed?.character_actions && parsed?.background_elements && parsed?.atmosphere) {
+        results.set(page.page_number, {
+          ...page,
+          scene_description: parsed.summary || page.scene_description,
+          character_actions: parsed.character_actions,
+          background_elements: parsed.background_elements,
+          atmosphere: parsed.atmosphere,
+          description_auto_generated: mode === 'generate',
+        })
+        console.log(`[SceneDescriptions] ${mode === 'generate' ? 'Generated' : 'Enhanced'} page ${page.page_number}`)
+      }
+    } catch (err: unknown) {
+      console.error(`[SceneDescriptions] Failed ${mode} for page ${page.page_number}:`, getErrorMessage(err))
+    }
+  }
+
+  // Process in parallel batches of 4
+  const allWork = [
+    ...toGenerate.map(p => () => processPage(p, 'generate')),
+    ...toEnhance.map(p => () => processPage(p, 'enhance')),
+  ]
+  for (let i = 0; i < allWork.length; i += 4) {
+    await Promise.all(allWork.slice(i, i + 4).map(fn => fn()))
+  }
+
+  return allPages.map(page => results.get(page.page_number) || { ...page })
 }
 
 

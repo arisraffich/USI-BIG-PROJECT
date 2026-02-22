@@ -79,44 +79,33 @@ export async function POST(
       )
     }
 
-    // Check if scene descriptions need to be generated
+    // Process scene descriptions: generate missing ones, enhance customer-provided ones
     const { data: pages } = await supabase
       .from('pages')
-      .select('id, story_text, scene_description, description_auto_generated')
+      .select('id, page_number, story_text, scene_description, description_auto_generated')
       .eq('project_id', project.id)
       .order('page_number', { ascending: true })
 
-    const needsSceneGeneration = pages?.some(p => p.description_auto_generated && !p.scene_description)
-
-    if (needsSceneGeneration && pages) {
-      console.log(`[Submission Complete] Generating scene descriptions for project ${project.id}`)
+    if (pages && pages.length > 0) {
       try {
-        // Use AI to generate scene descriptions from story text
-        const { parsePagesWithAI } = await import('@/lib/utils/file-parser')
-        const fullStoryText = pages.map(p => p.story_text || '').join('\n\n---PAGE BREAK---\n\n')
-        const aiPages = await parsePagesWithAI(fullStoryText)
+        const { processSceneDescriptions } = await import('@/lib/utils/file-parser')
+        const processed = await processSceneDescriptions(pages)
 
-        // Update pages with generated scene descriptions
-        for (const aiPage of aiPages) {
-          const pageIndex = aiPage.page_number - 1
-          if (pageIndex >= 0 && pageIndex < pages.length) {
-            const pageToUpdate = pages[pageIndex]
-            await supabase
-              .from('pages')
-              .update({
-                scene_description: aiPage.scene_description || null,
-                character_actions: aiPage.character_actions || null,
-                background_elements: aiPage.background_elements || null,
-                atmosphere: aiPage.atmosphere || null,
-                description_auto_generated: true,
-              })
-              .eq('id', pageToUpdate.id)
-          }
+        for (const page of processed) {
+          const original = pages.find(p => p.page_number === page.page_number)
+          const changed = page.character_actions || page.background_elements || page.atmosphere
+          if (!changed) continue
+
+          await supabase.from('pages').update({
+            scene_description: page.scene_description,
+            character_actions: page.character_actions || null,
+            background_elements: page.background_elements || null,
+            atmosphere: page.atmosphere || null,
+            description_auto_generated: page.description_auto_generated,
+          }).eq('id', original!.id)
         }
-        console.log(`[Submission Complete] Generated scene descriptions for ${aiPages.length} pages`)
       } catch (genError: unknown) {
-        console.error('[Submission Complete] Failed to generate scene descriptions:', getErrorMessage(genError))
-        // Continue anyway — admin can handle this
+        console.error('[Submission Complete] Failed to process scene descriptions:', getErrorMessage(genError))
       }
     }
 
