@@ -75,8 +75,14 @@ export async function PATCH(
       )
     }
 
-    // Send Slack notification if feedback was added (non-blocking)
+    // Update project status and notify when feedback is added
     if (body.feedback_notes && body.feedback_notes.trim()) {
+      await supabase
+        .from('projects')
+        .update({ status: 'character_revision_needed' })
+        .eq('id', character.project_id)
+        .eq('status', 'character_review')
+
       const { data: fullProject } = await supabase
         .from('projects')
         .select('book_title, author_firstname, author_lastname')

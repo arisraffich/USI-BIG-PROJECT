@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ProjectCard } from '@/components/project/ProjectCard'
+import { ProjectTabs } from '@/components/project/ProjectTabs'
 import { Button } from '@/components/ui/button'
 import { DashboardActions, MobileHeader } from '@/components/admin/DashboardActions'
 import { Settings } from 'lucide-react'
@@ -116,11 +116,7 @@ export default async function DashboardPage() {
               </Link>
             </div>
           ) : (
-            <div className="space-y-4">
-              {projectsWithCounts.map((project) => (
-                <ProjectCard key={project.id} project={project} pageCount={project.pageCount} />
-              ))}
-            </div>
+            <ProjectTabs projects={projectsWithCounts} />
           )}
         </main>
       </div>
