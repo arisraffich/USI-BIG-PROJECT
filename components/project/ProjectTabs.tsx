@@ -36,7 +36,7 @@ export function ProjectTabs({ projects }: ProjectTabsProps) {
 
   return (
     <div>
-      <div className="flex gap-1 mb-4 border-b border-gray-200">
+      <div className="grid grid-cols-3 md:flex md:gap-1 mb-4 border-b border-gray-200">
         {tabs.map(tab => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id
@@ -44,14 +44,14 @@ export function ProjectTabs({ projects }: ProjectTabsProps) {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              className={`flex items-center justify-center md:justify-start gap-1.5 px-2 md:px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                 isActive
                   ? 'border-gray-900 text-gray-900'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              <Icon className="w-4 h-4" />
-              <span className="hidden md:inline">{tab.label}</span>
+              <Icon className="hidden md:block w-4 h-4" />
+              <span>{tab.label}</span>
               <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full ${
                 isActive ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-600'
               }`}>
