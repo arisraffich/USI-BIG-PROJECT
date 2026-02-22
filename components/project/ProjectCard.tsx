@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Trash2, Loader2, Clock } from 'lucide-react'
+import { Trash2, Loader2, Clock, UserRound, Wrench } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   AlertDialog,
@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { getStatusBadgeConfig, getRoundNumber } from '@/lib/constants/statusBadgeConfig'
+import { getStatusBadgeConfig, getRoundNumber, isFollowUp, isWorking } from '@/lib/constants/statusBadgeConfig'
 
 interface Project {
   id: string
@@ -175,9 +175,11 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }:
       <CardContent className="pt-0 pb-0">
         <div className="flex justify-between items-start">
           <Link href={`/admin/project/${project.id}?tab=${getDefaultTabForStatus(project.status)}`} className="flex-1 block cursor-pointer">
-            <h2 className="text-xl font-semibold mb-0">{project.book_title}</h2>
+            <h2 className="text-xl font-semibold mb-0">
+              <span className="text-blue-600">{project.author_firstname} {project.author_lastname}</span> {project.book_title.replace(`${project.author_firstname} ${project.author_lastname}`, '').replace(/^'s\s*/, '').replace(/\bBook\b/i, 'Project').trim()}
+            </h2>
             <p className="text-sm text-gray-600">
-              By <span className="font-semibold text-blue-600">{project.author_firstname} {project.author_lastname}</span> | {pageCount} {pageCount === 1 ? 'Page' : 'Pages'} | Created: {formatDate(project.created_at)}
+              {pageCount} {pageCount === 1 ? 'Page' : 'Pages'} | Created: {formatDate(project.created_at)}
             </p>
             {/* Status Badge */}
             <div className="mt-1.5 flex items-center gap-2">
@@ -189,6 +191,18 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }:
                   </span>
                 )}
               </span>
+              {isFollowUp(project.status) && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-900 text-white border border-gray-900">
+                  <UserRound className="w-3 h-3" />
+                  <span>Follow Up</span>
+                </span>
+              )}
+              {isWorking(project.status) && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600 border border-gray-300">
+                  <Wrench className="w-3 h-3" />
+                  Working
+                </span>
+              )}
               {project.status_changed_at && project.status !== 'illustration_approved' && (
                 <span className="inline-flex items-center gap-1 text-sm font-semibold text-red-600">
                   <Clock className="w-3.5 h-3.5" /> {timeAgo(project.status_changed_at)}

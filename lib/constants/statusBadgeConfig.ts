@@ -231,6 +231,46 @@ export function getRoundNumber(
 // EXPORTS FOR DIRECT COLOR ACCESS (for ProjectHeader customization)
 // ============================================================================
 
+// ============================================================================
+// FOLLOW UP BADGE
+// ============================================================================
+
+/**
+ * Determine if a project is on the customer's side (needs follow up)
+ */
+export function isFollowUp(status: string): boolean {
+  const customerSideStatuses = [
+    'awaiting_customer_input',
+    'character_review',
+    'sketches_review',
+    // Legacy
+    'trial_review',
+    'illustration_review',
+  ]
+  return customerSideStatuses.includes(status)
+}
+
+/**
+ * Determine if a project is on our side (actively being worked on)
+ */
+export function isWorking(status: string): boolean {
+  const ourSideStatuses = [
+    'draft',
+    'character_generation',
+    'character_generation_complete',
+    'character_revision_needed',
+    'characters_regenerated',
+    'characters_approved',
+    'sketches_revision',
+    'illustrations_generating',
+    // Legacy
+    'trial_revision',
+    'illustration_revision_needed',
+    'trial_approved',
+  ]
+  return ourSideStatuses.includes(status)
+}
+
 export const BADGE_COLORS = {
   CYAN_20,
   CYAN_40,
