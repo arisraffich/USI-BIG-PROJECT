@@ -88,8 +88,7 @@ function timeAgo(dateString: string): string {
   if (diffDays < 1) return 'Today'
   if (diffDays === 1) return 'Yesterday'
   if (diffDays < 7) return `${diffDays} days ago`
-  if (diffDays === 7) return 'A week ago'
-  if (diffDays < 14) return 'Over a week ago'
+  if (diffDays < 14) return `${diffDays} days ago`
   if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
   const months = Math.floor(diffDays / 30)
   if (months === 1) return 'A month ago'
@@ -231,6 +230,11 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }:
               </span>
             )}
           </span>
+          {project.status_changed_at && project.status !== 'illustration_approved' && (
+            <span className="inline-flex items-center gap-1 text-sm font-semibold text-red-600">
+              <Clock className="w-3.5 h-3.5" /> {timeAgo(project.status_changed_at)}
+            </span>
+          )}
           {followUpBadge && (
             <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-900 text-white border border-gray-900">
               <UserRound className="w-3 h-3" />
@@ -241,11 +245,6 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }:
             <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600 border border-gray-300">
               <Wrench className="w-3 h-3" />
               Working
-            </span>
-          )}
-          {project.status_changed_at && project.status !== 'illustration_approved' && (
-            <span className="inline-flex items-center gap-1 text-sm font-semibold text-red-600">
-              <Clock className="w-3.5 h-3.5" /> {timeAgo(project.status_changed_at)}
             </span>
           )}
         </div>
