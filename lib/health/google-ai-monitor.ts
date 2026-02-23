@@ -12,7 +12,6 @@ interface MonitorState {
 
 const REQUIRED_SUCCESSES = 3
 const CHECK_INTERVAL_MS = 30_000 // 30 seconds
-const MAX_MONITOR_DURATION_MS = 30 * 60_000 // 30 minutes auto-timeout
 
 let state: MonitorState = {
     status: 'healthy',
@@ -23,7 +22,6 @@ let state: MonitorState = {
 }
 
 let intervalId: ReturnType<typeof setInterval> | null = null
-let timeoutId: ReturnType<typeof setTimeout> | null = null
 
 async function pingGoogleAI(): Promise<boolean> {
     const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
@@ -90,10 +88,6 @@ function stopMonitoring() {
         clearInterval(intervalId)
         intervalId = null
     }
-    if (timeoutId) {
-        clearTimeout(timeoutId)
-        timeoutId = null
-    }
     state.isMonitoring = false
     state.startedAt = null
     console.log('[AI Monitor] Monitoring stopped')
@@ -126,12 +120,6 @@ export function triggerMonitoring(): void {
     }
 
     intervalId = setInterval(checkAndUpdate, CHECK_INTERVAL_MS)
-
-    timeoutId = setTimeout(() => {
-        console.log('[AI Monitor] ⏰ Auto-timeout after 30 minutes')
-        stopMonitoring()
-        state.status = 'down'
-    }, MAX_MONITOR_DURATION_MS)
 }
 
 export function getMonitorStatus(): { status: MonitorStatus; isMonitoring: boolean; lastChecked: string | null } {
