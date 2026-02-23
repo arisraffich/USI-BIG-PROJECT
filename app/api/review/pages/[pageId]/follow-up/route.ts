@@ -75,6 +75,22 @@ export async function POST(
             )
         }
 
+        // Update project status when customer adds follow-up (sketches_review → sketches_revision)
+        const { data: project } = await supabase
+            .from('projects')
+            .select('status')
+            .eq('id', page.project_id)
+            .single()
+
+        if (project?.status === 'sketches_review') {
+            console.log(`[Follow-up] Transitioning project ${page.project_id} from sketches_review → sketches_revision`)
+            await supabase
+                .from('projects')
+                .update({ status: 'sketches_revision' })
+                .eq('id', page.project_id)
+                .eq('status', 'sketches_review')
+        }
+
         // --- NOTIFICATION Trigger (follow-up specific) ---
         try {
             const { data: projectDetails, error: projError } = await supabase

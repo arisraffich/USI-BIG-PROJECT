@@ -116,6 +116,7 @@ export async function PATCH(
 
         // Update project status when customer adds feedback (sketches_review → sketches_revision)
         if (body.feedback_notes && project.status === 'sketches_review') {
+            console.log(`[Page Feedback] Transitioning project ${page.project_id} from sketches_review → sketches_revision`)
             await supabase
                 .from('projects')
                 .update({ status: 'sketches_revision' })

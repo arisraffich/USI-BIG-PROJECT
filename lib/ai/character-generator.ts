@@ -253,23 +253,8 @@ Do NOT copy the art style from this image — the style reference above defines 
         const cleanedImage = await removeMetadata(imageBuffer)
 
         const baseName = sanitizeFilename(character.name || character.role || `character-${character.id}`)
-        let version = 1
-
-        if (character.image_url) {
-            // Try to extract version from existing URL
-            // Look for -Number.png at the end
-            const matches = character.image_url.match(/-(\d+)\.png$/)
-            if (matches && matches[1]) {
-                const currentVersion = parseInt(matches[1], 10)
-                // If version is a timestamp (large number like 1765...), reset to 1
-                // Otherwise increment
-                if (currentVersion < 1000000) {
-                    version = currentVersion + 1
-                }
-            }
-        }
-
-        const filename = `${projectId}/characters/${baseName}-${version}.png`
+        const timestamp = Date.now()
+        const filename = `${projectId}/characters/${baseName}-${timestamp}.png`
         const supabase = await createAdminClient()
         const { error: uploadError } = await supabase.storage
             .from('character-images')

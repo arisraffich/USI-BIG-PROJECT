@@ -863,13 +863,13 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
 
                 {/* COMPARISON MODE: OLD vs NEW side by side */}
                 {comparisonState ? (
-                    <div className="grid grid-cols-2 gap-0 divide-x divide-slate-200">
+                    <div className="grid grid-cols-2 gap-3 p-4">
                         {/* OLD (Left) */}
-                        <div className="relative">
+                        <div className="relative rounded-lg overflow-hidden border border-slate-200">
                             <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-2 bg-gradient-to-b from-black/60 to-transparent">
                                 <span className="text-xs font-bold tracking-wider text-white uppercase px-2 py-0.5 bg-slate-700/80 rounded">OLD</span>
                             </div>
-                            <div className="aspect-[3/4] cursor-pointer" onClick={() => { setComparisonLightboxUrl(comparisonState.oldUrl); setShowLightbox(true) }}>
+                            <div className="aspect-[9/16] bg-gray-100 cursor-pointer" onClick={() => { setComparisonLightboxUrl(comparisonState.oldUrl); setShowLightbox(true) }}>
                                 <img src={comparisonState.oldUrl} alt="Previous" className="w-full h-full object-cover" />
                             </div>
                             <div className="p-2">
@@ -884,11 +884,11 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                             </div>
                         </div>
                         {/* NEW (Right) */}
-                        <div className="relative">
+                        <div className="relative rounded-lg overflow-hidden border border-slate-200">
                             <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-2 bg-gradient-to-b from-black/60 to-transparent">
                                 <span className="text-xs font-bold tracking-wider text-white uppercase px-2 py-0.5 bg-green-600/90 rounded">NEW</span>
                             </div>
-                            <div className="aspect-[3/4] cursor-pointer" onClick={() => { setComparisonLightboxUrl(comparisonState.newUrl); setShowLightbox(true) }}>
+                            <div className="aspect-[9/16] bg-gray-100 cursor-pointer" onClick={() => { setComparisonLightboxUrl(comparisonState.newUrl); setShowLightbox(true) }}>
                                 <img src={comparisonState.newUrl} alt="New" className="w-full h-full object-cover" />
                             </div>
                             <div className="p-2">
