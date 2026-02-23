@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { ProjectCard } from './ProjectCard'
 import { isFollowUp, isWorking } from '@/lib/constants/statusBadgeConfig'
-import { UserRound, Wrench, CheckCircle2, Inbox, Users, Pencil } from 'lucide-react'
+import { UserRound, Wrench, CheckCircle2, FileText, Users, Palette } from 'lucide-react'
 
 type Tab = 'follow_up' | 'working' | 'finished'
 
@@ -27,10 +27,10 @@ function getProjectStage(status: string): Stage {
   return 'sketches'
 }
 
-const STAGE_CONFIG: Record<Stage, { label: string; icon: typeof Inbox }> = {
-  input: { label: 'Story Stage', icon: Inbox },
+const STAGE_CONFIG: Record<Stage, { label: string; icon: typeof FileText }> = {
+  input: { label: 'Story Stage', icon: FileText },
   characters: { label: 'Character Stage', icon: Users },
-  sketches: { label: 'Sketch Stage', icon: Pencil },
+  sketches: { label: 'Sketch Stage', icon: Palette },
 }
 
 const STAGE_ORDER: Stage[] = ['input', 'characters', 'sketches']
@@ -56,9 +56,9 @@ function GroupedProjectList({ projects }: { projects: Array<any> }) {
         const Icon = config.icon
         return (
           <div key={stage}>
-            <div className="flex items-center gap-2 px-3 py-2.5 mb-3 bg-gray-100 rounded-lg border border-gray-200">
+            <div className="flex items-center gap-2 px-3 py-2.5 mb-3 bg-gray-200 rounded-lg">
               <Icon className="w-4 h-4 text-gray-600" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-gray-800">{config.label}</h3>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700">{config.label}</h3>
               <span className="text-sm font-bold text-gray-900">{projects.length}</span>
             </div>
             <div className="space-y-4">
