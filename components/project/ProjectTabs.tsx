@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { ProjectCard } from './ProjectCard'
 import { isFollowUp, isWorking } from '@/lib/constants/statusBadgeConfig'
-import { UserRound, Wrench, CheckCircle2 } from 'lucide-react'
+import { UserRound, Wrench, CheckCircle2, Inbox, Users, Pencil } from 'lucide-react'
 
 type Tab = 'follow_up' | 'working' | 'finished'
 
@@ -13,6 +13,64 @@ interface ProjectTabsProps {
 
 function isFinished(status: string): boolean {
   return status === 'illustration_approved' || status === 'completed'
+}
+
+type Stage = 'input' | 'characters' | 'sketches'
+
+function getProjectStage(status: string): Stage {
+  if (status === 'awaiting_customer_input' || status === 'draft') return 'input'
+  if (
+    status.includes('character') ||
+    status === 'characters_approved' ||
+    status === 'characters_regenerated'
+  ) return 'characters'
+  return 'sketches'
+}
+
+const STAGE_CONFIG: Record<Stage, { label: string; icon: typeof Inbox }> = {
+  input: { label: 'Story Stage', icon: Inbox },
+  characters: { label: 'Character Stage', icon: Users },
+  sketches: { label: 'Sketch Stage', icon: Pencil },
+}
+
+const STAGE_ORDER: Stage[] = ['input', 'characters', 'sketches']
+
+function GroupedProjectList({ projects }: { projects: Array<any> }) {
+  const grouped = STAGE_ORDER.map(stage => ({
+    stage,
+    config: STAGE_CONFIG[stage],
+    projects: projects.filter(p => getProjectStage(p.status) === stage),
+  })).filter(g => g.projects.length > 0)
+
+  if (grouped.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-400 text-sm">No projects in this category.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-8">
+      {grouped.map(({ stage, config, projects }) => {
+        const Icon = config.icon
+        return (
+          <div key={stage}>
+            <div className="flex items-center gap-2 px-3 py-2.5 mb-3 bg-gray-100 rounded-lg border border-gray-200">
+              <Icon className="w-4 h-4 text-gray-600" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-gray-800">{config.label}</h3>
+              <span className="text-sm font-bold text-gray-900">{projects.length}</span>
+            </div>
+            <div className="space-y-4">
+              {projects.map((project) => (
+                <ProjectCard key={project.id} project={project} pageCount={project.pageCount} />
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 export function ProjectTabs({ projects }: ProjectTabsProps) {
@@ -62,16 +120,20 @@ export function ProjectTabs({ projects }: ProjectTabsProps) {
         })}
       </div>
 
-      {activeProjects.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-400 text-sm">No projects in this category.</p>
-        </div>
+      {activeTab === 'finished' ? (
+        activeProjects.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-400 text-sm">No projects in this category.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {activeProjects.map((project) => (
+              <ProjectCard key={project.id} project={project} pageCount={project.pageCount} />
+            ))}
+          </div>
+        )
       ) : (
-        <div className="space-y-4">
-          {activeProjects.map((project) => (
-            <ProjectCard key={project.id} project={project} pageCount={project.pageCount} />
-          ))}
-        </div>
+        <GroupedProjectList projects={activeProjects} />
       )}
     </div>
   )
