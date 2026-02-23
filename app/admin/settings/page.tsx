@@ -12,7 +12,6 @@ import type { EmailTemplate } from '@/lib/email/types'
 
 const INTERNAL_SLUGS = new Set([
   'submission_internal',
-  'sketches_approved_download',
   'send_lineart_internal',
   'send_sketches_internal',
 ])

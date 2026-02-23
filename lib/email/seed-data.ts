@@ -136,21 +136,6 @@ export const EMAIL_TEMPLATE_SEEDS = [
     sort_order: 7,
   },
   {
-    slug: 'sketches_approved_download',
-    name: 'Sketches Approved — Download',
-    description: 'Internal — Sent to info@ with a download link when sketches are approved.',
-    subject: 'Download {{authorName}} Sketches',
-    body_html: `<p>{{authorName}} approved all sketches.</p>
-<p>Download below</p>`,
-    closing_html: null,
-    has_button: true,
-    button_text: 'Download Sketches',
-    button_color: '#7c3aed',
-    button_url_variable: 'downloadUrl',
-    available_variables: ['authorName', 'downloadUrl'],
-    sort_order: 8,
-  },
-  {
     slug: 'send_lineart_internal',
     name: 'Send Line Art',
     description: 'Internal — Sent to info@ with line art ZIP attachment.',
