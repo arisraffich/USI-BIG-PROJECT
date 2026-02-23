@@ -81,22 +81,18 @@ interface GenerateOptions {
     hasCustomStyleRefs?: boolean // When true, style refs define style instead of main character
 }
 
-async function fetchImageAsBase64(input: string, highQuality: boolean = false): Promise<{ mimeType: string, data: string } | null> {
+async function fetchImageAsBase64(input: string): Promise<{ mimeType: string, data: string } | null> {
     try {
         let buffer: Buffer;
-        let mimeType: string;
 
-        // 1. Handle Data URI (Base64)
         if (input.startsWith('data:')) {
             const matches = input.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
             if (!matches || matches.length !== 3) {
                 console.warn('Invalid Data URI format');
                 return null;
             }
-            mimeType = matches[1];
             buffer = Buffer.from(matches[2], 'base64');
         } else {
-            // 2. Handle URL Fetch
             const response = await fetch(input)
             if (!response.ok) {
                 console.warn(`Failed to fetch image URL: ${input} (${response.status})`)
@@ -104,39 +100,22 @@ async function fetchImageAsBase64(input: string, highQuality: boolean = false): 
             }
             const arrayBuffer = await response.arrayBuffer()
             buffer = Buffer.from(arrayBuffer)
-            mimeType = response.headers.get('content-type') || 'image/jpeg'
         }
 
-        // 3. Resize to fit within max dimensions, preserving format quality
-        // - PNG inputs stay as PNG (lossless) to prevent quality degradation
-        // - JPEG inputs stay as high-quality JPEG
-        // - Max size: 2048px for all modes (was 1024px standard / 2048px high quality)
         try {
-            const maxSize = 2048
-            const isPng = mimeType === 'image/png'
-            
-            const sharpInstance = sharp(buffer)
-                .resize(maxSize, maxSize, { fit: 'inside', withoutEnlargement: true })
-            
-            if (isPng) {
-                // Keep PNG as PNG — no lossy conversion
-                buffer = await sharpInstance.png().toBuffer()
-                return {
-                    mimeType: 'image/png',
-                    data: buffer.toString('base64')
-                }
-            } else {
-                // JPEG/other: use high quality
-                buffer = await sharpInstance.jpeg({ quality: 95 }).toBuffer()
-                return {
-                    mimeType: 'image/jpeg',
-                    data: buffer.toString('base64')
-                }
+            buffer = await sharp(buffer)
+                .resize(2048, 2048, { fit: 'inside', withoutEnlargement: true })
+                .jpeg({ quality: 95 })
+                .toBuffer()
+
+            return {
+                mimeType: 'image/jpeg',
+                data: buffer.toString('base64')
             }
         } catch (resizeError) {
             console.warn('Image resize failed, using original:', resizeError)
             return {
-                mimeType,
+                mimeType: 'image/jpeg',
                 data: buffer.toString('base64')
             }
         }
@@ -200,15 +179,11 @@ export async function generateIllustration({
         }
 
         // 2. Anchor Image (Style Reference) - If provided (Page 2+ or custom style refs)
-        // ALWAYS use HIGH QUALITY for anchor images to prevent quality degradation cascade
-        // (Each generation uses previous page as reference - quality loss compounds)
-        
-        // Check if we have multiple style references (anchor + styleReferenceImages)
         const totalStyleRefs = (anchorImage ? 1 : 0) + styleReferenceImages.length
         const isCustomStyleMode = totalStyleRefs > 0 && !isSceneRecreation
         
         if (anchorImage) {
-            const anchorData = await fetchImageAsBase64(anchorImage, true) // Always high quality
+            const anchorData = await fetchImageAsBase64(anchorImage)
             if (anchorData) {
                 let anchorLabel: string
                 
@@ -237,7 +212,7 @@ Extract and match: Art medium, color palette, line quality, shading technique, t
         // 3. Additional Style References (e.g. from custom style uploads or Edit Mode)
         for (let i = 0; i < styleReferenceImages.length; i++) {
             const url = styleReferenceImages[i]
-            const imgData = await fetchImageAsBase64(url, true) // High quality for style refs
+            const imgData = await fetchImageAsBase64(url)
             if (imgData) {
                 let refLabel: string
                 
@@ -283,7 +258,7 @@ Apply the style uniformly to characters, backgrounds, props, and all scene eleme
                 responseModalities: ['IMAGE'],
                 imageConfig: {
                     aspectRatio: aspectRatio,
-                    imageSize: '2K'
+                    imageSize: '4K'
                 }
             },
             safetySettings: SAFETY_SETTINGS

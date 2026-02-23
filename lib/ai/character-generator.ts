@@ -3,21 +3,30 @@ import { buildCharacterPrompt } from '@/lib/utils/prompt-builder'
 import { removeMetadata, sanitizeFilename } from '@/lib/utils/metadata-cleaner'
 import { getErrorMessage } from '@/lib/utils/error'
 import { Character } from '@/types/character'
+import sharp from 'sharp'
 
 const GOOGLE_API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY
 const MODEL = 'gemini-3-pro-image-preview'
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
 
-// Helper to fetch image and convert to base64
 async function fetchImageAsBase64(url: string): Promise<{ mimeType: string, data: string } | null> {
     try {
         const response = await fetch(url)
         if (!response.ok) return null
         const arrayBuffer = await response.arrayBuffer()
-        const buffer = Buffer.from(arrayBuffer)
-        const mimeType = response.headers.get('content-type') || 'image/jpeg'
+        let buffer = Buffer.from(arrayBuffer)
+
+        try {
+            buffer = await sharp(buffer)
+                .resize(2048, 2048, { fit: 'inside', withoutEnlargement: true })
+                .jpeg({ quality: 95 })
+                .toBuffer()
+        } catch (resizeError) {
+            console.warn('Image resize failed, using original:', resizeError)
+        }
+
         return {
-            mimeType,
+            mimeType: 'image/jpeg',
             data: buffer.toString('base64')
         }
     } catch (e) {
@@ -154,7 +163,7 @@ Do NOT copy the art style from this image — the style reference above defines 
                 responseModalities: ['IMAGE'],
                 imageConfig: {
                     aspectRatio: "9:16",
-                    imageSize: "2K"
+                    imageSize: "4K"
                 }
             },
             safetySettings: [
