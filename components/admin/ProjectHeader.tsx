@@ -192,7 +192,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const handleOpenCustomerView = () => {
     if (projectInfo.review_token) {
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin
-      const customerUrl = `${baseUrl}/review/${projectInfo.review_token}?tab=illustrations`
+      const customerUrl = `${baseUrl}/review/${projectInfo.review_token}?tab=${currentTab}`
       window.open(customerUrl, '_blank')
     }
   }
