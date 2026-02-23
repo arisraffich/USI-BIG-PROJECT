@@ -192,7 +192,7 @@ export function SharedProjectHeader({
                 {/* CENTER SECTION (Desktop Only)                                 */}
                 {/* Custom Content (e.g. Approve Button)                          */}
                 {/* ------------------------------------------------------------- */}
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                <div className="hidden md:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
                     {centerContent}
                 </div>
 
@@ -202,7 +202,12 @@ export function SharedProjectHeader({
                 {/* RIGHT SECTION                                                */}
                 {/* Actions & Status                                             */}
                 {/* ------------------------------------------------------------- */}
-                <div className="flex items-center gap-2 md:gap-4">
+                <div className="flex items-center gap-3 md:gap-4">
+                    {centerContent && (
+                        <div className="md:hidden">
+                            {centerContent}
+                        </div>
+                    )}
                     {statusTag && (
                         <div className="hidden md:block">
                             {statusTag}

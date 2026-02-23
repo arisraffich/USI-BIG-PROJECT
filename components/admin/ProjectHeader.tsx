@@ -100,6 +100,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   // Push & Coloring Request state
   const [isPushDialogOpen, setIsPushDialogOpen] = useState(false)
   const [isPushing, setIsPushing] = useState(false)
+  const [isCharPushDialogOpen, setIsCharPushDialogOpen] = useState(false)
+  const [isCharPushing, setIsCharPushing] = useState(false)
   const [isSendingColoringRequest, setIsSendingColoringRequest] = useState(false)
   
   // Line Art Download state
@@ -216,6 +218,30 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       toast.error(getErrorMessage(e, 'Failed to push changes'))
     } finally {
       setIsPushing(false)
+    }
+  }
+
+  // Push to Customer (Silent Update) - Characters
+  const handlePushCharactersToCustomer = async () => {
+    setIsCharPushing(true)
+    try {
+      const response = await fetch(`/api/projects/${projectId}/push-characters-to-customer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Push failed')
+      }
+      
+      const result = await response.json()
+      toast.success(result.message || 'Characters pushed to customer')
+      setIsCharPushDialogOpen(false)
+    } catch (e: unknown) {
+      toast.error(getErrorMessage(e, 'Failed to push characters'))
+    } finally {
+      setIsCharPushing(false)
     }
   }
 
@@ -1087,9 +1113,56 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
           
           {/* Divider */}
           <div className="h-px bg-slate-100" />
+
+          {/* Push Characters Button - Characters tab only */}
+          {currentTab === 'characters' && (projectInfo.character_send_count || 0) > 0 && (
+            <div className="space-y-1.5">
+              <AlertDialog open={isCharPushDialogOpen} onOpenChange={setIsCharPushDialogOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start gap-2 h-9"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Push Changes
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Push Characters to Customer?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will silently update all character images on the customer&apos;s side without sending any notifications. The customer will see the latest versions when they refresh or revisit the page.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isCharPushing}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handlePushCharactersToCustomer}
+                      disabled={isCharPushing}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {isCharPushing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Pushing...
+                        </>
+                      ) : (
+                        'Push Characters'
+                      )}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              <p className="text-xs text-slate-500 flex items-start gap-1.5 px-1">
+                <Info className="w-3 h-3 mt-0.5 shrink-0" />
+                <span>Silently update customer&apos;s characters without email.</span>
+              </p>
+            </div>
+          )}
           
-          {/* Push Changes Button - Only show after illustrations sent */}
-          {(projectInfo.illustration_send_count || 0) > 0 && (
+          {/* Push Changes Button - Illustrations tab only */}
+          {currentTab === 'illustrations' && (projectInfo.illustration_send_count || 0) > 0 && (
             <div className="space-y-1.5">
               <AlertDialog open={isPushDialogOpen} onOpenChange={setIsPushDialogOpen}>
                 <AlertDialogTrigger asChild>
@@ -1135,8 +1208,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
             </div>
           )}
           
-          {/* Request Page 1 Coloring - Only show when illustrations exist */}
-          {generatedIllustrationCount > 0 && (
+          {/* Request Page 1 Coloring - Illustrations tab only */}
+          {currentTab === 'illustrations' && generatedIllustrationCount > 0 && (
             <div className="space-y-1.5">
               <Button
                 variant="outline"
@@ -1159,27 +1232,29 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
             </div>
           )}
           
-          {/* Divider before toggle */}
-          <div className="h-px bg-slate-100" />
-          
-          {/* Show Colored Images Toggle */}
-          <div className="space-y-2 px-1">
-            <div className="flex items-center justify-between">
-              <label htmlFor="show-colored" className="text-sm font-medium text-slate-700">
-                Show Colored Images
-              </label>
-              <Switch
-                id="show-colored"
-                checked={showColoredToCustomer}
-                onCheckedChange={handleToggleColoredImages}
-                disabled={isUpdatingSettings}
-              />
-            </div>
-            <p className="text-xs text-slate-500 flex items-start gap-1.5">
-              <Info className="w-3 h-3 mt-0.5 shrink-0" />
-              <span>Customers can see colored illustrations.</span>
-            </p>
-          </div>
+          {/* Show Colored Images Toggle - Illustrations tab only */}
+          {currentTab === 'illustrations' && (
+            <>
+              <div className="h-px bg-slate-100" />
+              <div className="space-y-2 px-1">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="show-colored" className="text-sm font-medium text-slate-700">
+                    Show Colored Images
+                  </label>
+                  <Switch
+                    id="show-colored"
+                    checked={showColoredToCustomer}
+                    onCheckedChange={handleToggleColoredImages}
+                    disabled={isUpdatingSettings}
+                  />
+                </div>
+                <p className="text-xs text-slate-500 flex items-start gap-1.5">
+                  <Info className="w-3 h-3 mt-0.5 shrink-0" />
+                  <span>Customers can see colored illustrations.</span>
+                </p>
+              </div>
+            </>
+          )}
 
           {/* Downloads & Email section - only after approval */}
           {stage.isDownload && (
