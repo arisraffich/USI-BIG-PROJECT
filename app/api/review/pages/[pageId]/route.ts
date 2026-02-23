@@ -114,6 +114,15 @@ export async function PATCH(
             )
         }
 
+        // Update project status when customer adds feedback (sketches_review → sketches_revision)
+        if (body.feedback_notes && project.status === 'sketches_review') {
+            await supabase
+                .from('projects')
+                .update({ status: 'sketches_revision' })
+                .eq('id', page.project_id)
+                .eq('status', 'sketches_review')
+        }
+
         // --- NOTIFICATION Trigger ---
         // Only notify if feedback_notes is set (not null/empty)
         if (body.feedback_notes) {
