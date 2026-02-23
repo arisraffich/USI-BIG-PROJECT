@@ -14,7 +14,7 @@ async function fetchImageAsBase64(url: string): Promise<{ mimeType: string, data
         const response = await fetch(url)
         if (!response.ok) return null
         const arrayBuffer = await response.arrayBuffer()
-        let buffer = Buffer.from(arrayBuffer)
+        let buffer: Buffer = Buffer.from(arrayBuffer)
 
         try {
             buffer = await sharp(buffer)
