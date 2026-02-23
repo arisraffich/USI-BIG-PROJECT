@@ -11,6 +11,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { UnifiedHeaderShell } from '@/components/layout/UnifiedHeaderShell'
+import { AIStatusDot } from '@/components/admin/AIStatusDot'
 
 export interface TabItem {
     id: string
@@ -44,6 +45,7 @@ interface SharedProjectHeaderProps {
         onClick?: () => void
     }
     showSettings?: boolean // Whether to show the Settings menu item
+    showAIStatus?: boolean // Show Google AI health dot (admin only)
 }
 
 export function SharedProjectHeader({
@@ -56,7 +58,8 @@ export function SharedProjectHeader({
     statusTag,
     settingsContent,
     dashboardLink,
-    showSettings = false
+    showSettings = false,
+    showAIStatus = false
 }: SharedProjectHeaderProps) {
     const [showSettingsPanel, setShowSettingsPanel] = useState(false)
     const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -169,10 +172,13 @@ export function SharedProjectHeader({
                         <div className="h-8 w-px bg-slate-200" />
 
 
-                        <div className="flex flex-col justify-center h-full">
-                            <h1 className="text-sm font-bold text-slate-900 leading-none">
-                                {authorName}
-                            </h1>
+                        <div className="flex items-center gap-1.5">
+                            <div className="flex flex-col justify-center h-full">
+                                <h1 className="text-sm font-bold text-slate-900 leading-none">
+                                    {authorName}
+                                </h1>
+                            </div>
+                            {showAIStatus && <AIStatusDot />}
                         </div>
 
                         {/* Separator */}

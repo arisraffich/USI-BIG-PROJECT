@@ -40,7 +40,8 @@ export async function generateCharacterImage(
     mainCharacterImageUrl: string | null | undefined,
     projectId: string,
     customPrompt?: string,
-    visualReferenceImage?: string // base64 data URL for appearance reference
+    visualReferenceImage?: string, // base64 data URL for appearance reference
+    skipDbUpdate?: boolean // When true, upload to storage but don't save to DB (comparison mode)
 ) {
     if (!GOOGLE_API_KEY) {
         throw new Error('Google Generative AI API Key not configured')
@@ -286,34 +287,34 @@ Do NOT copy the art style from this image — the style reference above defines 
             .getPublicUrl(filename)
         const publicUrl = urlData.publicUrl
 
-        const { error: updateError } = await supabase
-            .from('characters')
-            .update({
-                image_url: publicUrl,
-                generation_prompt: prompt,
-                is_resolved: true,
-                updated_at: new Date().toISOString(),
-            })
-            .eq('id', character.id)
+        if (!skipDbUpdate) {
+            const { error: updateError } = await supabase
+                .from('characters')
+                .update({
+                    image_url: publicUrl,
+                    generation_prompt: prompt,
+                    is_resolved: true,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', character.id)
 
-        if (updateError) {
-            throw new Error(`Failed to update character: ${updateError.message}`)
-        }
+            if (updateError) {
+                throw new Error(`Failed to update character: ${updateError.message}`)
+            }
 
-        // Cleanup old image to avoid storage clutter and ensure clean replacement
-        if (character.image_url) {
-            try {
-                // Extract path from public URL
-                // Format: .../storage/v1/object/public/character-images/PATH
-                const pathParts = character.image_url.split('/character-images/')
-                if (pathParts.length > 1) {
-                    const oldPath = pathParts[1]
-                    await supabase.storage
-                        .from('character-images')
-                        .remove([oldPath])
+            // Cleanup old image to avoid storage clutter and ensure clean replacement
+            if (character.image_url) {
+                try {
+                    const pathParts = character.image_url.split('/character-images/')
+                    if (pathParts.length > 1) {
+                        const oldPath = pathParts[1]
+                        await supabase.storage
+                            .from('character-images')
+                            .remove([oldPath])
+                    }
+                } catch (cleanupError) {
+                    console.warn('Failed to cleanup old character image:', cleanupError)
                 }
-            } catch (cleanupError) {
-                console.warn('Failed to cleanup old character image:', cleanupError)
             }
         }
 

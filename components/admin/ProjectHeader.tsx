@@ -1069,6 +1069,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         </span>
       }
       showSettings={true}
+      showAIStatus={true}
       settingsContent={
         <>
           {/* Customer View Button */}

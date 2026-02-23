@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Plus, Pencil, Menu, X, Settings } from 'lucide-react'
 import { LineArtModal } from './LineArtModal'
+import { AIStatusDot } from './AIStatusDot'
 
 export function DashboardActions() {
     const [lineArtOpen, setLineArtOpen] = useState(false)
@@ -39,6 +40,7 @@ export function MobileHeader() {
                     {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                 </button>
                 <h1 className="text-xl font-bold text-gray-900">Projects</h1>
+                <AIStatusDot />
             </header>
 
             {menuOpen && (

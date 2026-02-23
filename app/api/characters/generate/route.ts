@@ -7,7 +7,7 @@ import { getErrorMessage } from '@/lib/utils/error'
 
 export async function POST(request: NextRequest) {
   try {
-    const { project_id, character_id, custom_prompt, visual_reference_image } = await request.json()
+    const { project_id, character_id, custom_prompt, visual_reference_image, skipDbUpdate } = await request.json()
 
     if (!project_id) {
       return NextResponse.json(
@@ -87,14 +87,14 @@ export async function POST(request: NextRequest) {
     
     for (const character of charactersToGenerate) {
       console.log(`[Character Generate] Processing: ${character.name || character.role || character.id}`)
+      const previousImageUrl = character.image_url
+      const hasValidImage = previousImageUrl && !previousImageUrl.startsWith('error:')
+      const hasValidSketch = character.sketch_url && !character.sketch_url.startsWith('error:')
+      const isPreviewMode = !!(skipDbUpdate && hasValidImage)
+
       try {
-        // Save current image_url before generation so we can restore on failure
-        const previousImageUrl = character.image_url
-        
-        // Clear sketch_url for regeneration (if character already has valid images)
-        const hasValidImage = previousImageUrl && !previousImageUrl.startsWith('error:')
-        const hasValidSketch = character.sketch_url && !character.sketch_url.startsWith('error:')
-        if (hasValidImage && hasValidSketch) {
+        // Only clear sketch when not in preview mode
+        if (!isPreviewMode && hasValidImage && hasValidSketch) {
           console.log(`[Character Generate] 🧹 Clearing old sketch_url for regeneration: ${character.name || character.role}`)
           await supabase
             .from('characters')
@@ -112,15 +112,14 @@ export async function POST(request: NextRequest) {
         // Pass visual_reference_image only for single character regeneration
         const visualRef = character_id ? visual_reference_image : undefined
 
-        const result = await generateCharacterImage(character, referenceImage, project_id, custom_prompt, visualRef)
+        const result = await generateCharacterImage(character, referenceImage, project_id, custom_prompt, visualRef, isPreviewMode)
 
         console.log(`[Character Generate] Result for ${character.name || character.role}: ${result.success ? '✅ SUCCESS' : '❌ FAILED'}`)
         
-        // If generation failed, preserve existing images for regeneration
-        if (!result.success && result.error) {
+        // If generation failed and not in preview mode, handle DB state
+        if (!result.success && result.error && !isPreviewMode) {
           const hadValidImage = previousImageUrl && !previousImageUrl.startsWith('error:')
           if (hadValidImage) {
-            // Regeneration failed — restore sketch_url if we cleared it
             console.log(`[Character Generate] ⚠️ Generation failed for ${character.name || character.role}: ${result.error} (preserving existing image)`)
             if (hasValidSketch) {
               await supabase
@@ -129,7 +128,6 @@ export async function POST(request: NextRequest) {
                 .eq('id', character.id)
             }
           } else {
-            // Initial generation failed — save error state
             console.log(`[Character Generate] ⚠️ Saving error state for ${character.name || character.role}: ${result.error}`)
             await supabase
               .from('characters')
@@ -142,11 +140,12 @@ export async function POST(request: NextRequest) {
           character_id: character.id,
           success: result.success,
           image_url: result.imageUrl,
-          error: result.error
+          error: result.error,
+          isPreview: isPreviewMode,
         })
 
-        // Trigger sketch generation asynchronously after successful colored generation
-        if (result.success && result.imageUrl) {
+        // Skip sketch generation in preview mode (deferred until confirm)
+        if (result.success && result.imageUrl && !isPreviewMode) {
           console.log(`[Character Generate] ✅ Colored complete for ${character.name || character.role}, triggering sketch...`)
           ;(async () => {
             try {
@@ -165,18 +164,18 @@ export async function POST(request: NextRequest) {
           console.log(`[Character Generate] ⚠️ Skipping sketch for ${character.name || character.role} - colored generation failed or no image URL`)
         }
       } catch (error: unknown) {
-        // Should catch errors that escaped generateCharacterImage
         const errorMessage = getErrorMessage(error, 'Generation failed')
         console.error(`Error in loop for character ${character.id}:`, error)
 
-        // Persist error to database so UI knows to stop loading
-        try {
-          await supabase
-            .from('characters')
-            .update({ generation_error: errorMessage })
-            .eq('id', character.id)
-        } catch (dbError) {
-          console.error('Failed to save generation error to DB:', dbError)
+        if (!isPreviewMode) {
+          try {
+            await supabase
+              .from('characters')
+              .update({ generation_error: errorMessage })
+              .eq('id', character.id)
+          } catch (dbError) {
+            console.error('Failed to save generation error to DB:', dbError)
+          }
         }
 
         results.push({
@@ -187,11 +186,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Update project status if all succeeded
+    // Update project status if all succeeded (skip in preview mode)
+    const hasPreview = results.some((r: any) => r.isPreview)
     const allSucceeded = results.every((r) => r.success)
     console.log(`[Character Generate] 📊 Summary: ${results.filter(r => r.success).length}/${results.length} succeeded`)
     
-    if (allSucceeded && results.length > 0) {
+    if (allSucceeded && results.length > 0 && !hasPreview) {
       // Determine appropriate status based on whether this is first generation or regeneration
       const { data: project } = await supabase
         .from('projects')

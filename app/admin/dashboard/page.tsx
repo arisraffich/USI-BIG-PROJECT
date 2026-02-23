@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ProjectTabs } from '@/components/project/ProjectTabs'
 import { Button } from '@/components/ui/button'
 import { DashboardActions, MobileHeader } from '@/components/admin/DashboardActions'
+import { AIStatusDot } from '@/components/admin/AIStatusDot'
 import { Settings } from 'lucide-react'
 
 
@@ -94,7 +95,10 @@ export default async function DashboardPage() {
 
         {/* Desktop sidebar */}
         <aside className="hidden md:flex w-64 shrink-0 border-r border-gray-200 bg-gray-50 p-6 flex-col">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6">Projects</h1>
+          <div className="flex items-center gap-2 mb-6">
+            <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
+            <AIStatusDot />
+          </div>
           <nav className="flex flex-col gap-3">
             <DashboardActions />
           </nav>

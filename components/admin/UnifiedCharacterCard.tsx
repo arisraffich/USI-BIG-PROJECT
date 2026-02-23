@@ -16,11 +16,12 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, Download, Upload, X, AlertTriangle, Trash2, Camera } from 'lucide-react'
+import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, Download, Upload, X, AlertTriangle, Trash2, Camera, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Character } from '@/types/character'
 import { createClient } from '@/lib/supabase/client'
 import { getErrorMessage } from '@/lib/utils/error'
+import { mapErrorToUserMessage, MappedError } from '@/lib/utils/generation-errors'
 
 interface UnifiedCharacterCardProps {
     character: Character
@@ -193,6 +194,10 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     const [referenceImage, setReferenceImage] = useState<{ file: File; preview: string } | null>(null)
     const [isCardHovered, setIsCardHovered] = useState(false)
     const referenceInputRef = useRef<HTMLInputElement>(null)
+    const [comparisonState, setComparisonState] = useState<{ oldUrl: string; newUrl: string } | null>(null)
+    const [comparisonLightboxUrl, setComparisonLightboxUrl] = useState<string | null>(null)
+    const [generationError, setGenerationError] = useState<MappedError | null>(null)
+    const [showTechnicalDetails, setShowTechnicalDetails] = useState(false)
 
     // Update local character when prop changes
     useEffect(() => {
@@ -270,8 +275,8 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     const handleRegenerate = async () => {
         setIsDialogOpen(false)
         setIsRegenerating(true)
+        setGenerationError(null)
         try {
-            // Convert reference image to base64 if provided
             let visualReferenceImage: string | undefined
             if (referenceImage?.file) {
                 visualReferenceImage = await new Promise<string>((resolve, reject) => {
@@ -282,6 +287,8 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                 })
             }
 
+            const hasExistingImage = !!character.image_url && !character.image_url.startsWith('error:')
+
             const response = await fetch('/api/characters/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -289,7 +296,8 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                     project_id: projectId,
                     character_id: character.id,
                     custom_prompt: customPrompt.trim() || undefined,
-                    visual_reference_image: visualReferenceImage
+                    visual_reference_image: visualReferenceImage,
+                    skipDbUpdate: hasExistingImage,
                 }),
             })
 
@@ -312,18 +320,83 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                     img.onerror = resolve
                     img.src = result.image_url
                 })
-                setOptimisticColoredImage(result.image_url)
             }
 
-            toast.success('Character regenerated successfully')
-            // Clear reference image after successful regeneration
+            if (result?.isPreview && result?.image_url && hasExistingImage) {
+                setComparisonState({
+                    oldUrl: character.image_url!,
+                    newUrl: result.image_url,
+                })
+                toast.success('Compare and choose', { description: 'Select which version to keep' })
+            } else if (result?.image_url) {
+                setOptimisticColoredImage(result.image_url)
+                toast.success('Character regenerated successfully')
+            }
+
             removeReferenceImage()
         } catch (error: unknown) {
             console.error('Regeneration error:', error)
-            toast.error(getErrorMessage(error, 'Failed to regenerate'))
-            setIsDialogOpen(true)
+            const errorMessage = getErrorMessage(error, 'Failed to regenerate')
+            const mapped = mapErrorToUserMessage(errorMessage)
+            setGenerationError(mapped)
+            toast.error('Regeneration failed', { description: mapped.message })
         } finally {
             setIsRegenerating(false)
+        }
+    }
+
+    const handleComparisonDecision = async (decision: 'keep_new' | 'revert_old') => {
+        if (!comparisonState) return
+        const { oldUrl, newUrl } = comparisonState
+
+        setComparisonState(null)
+
+        if (decision === 'keep_new') {
+            setIsSketchGenerating(true)
+            setOptimisticColoredImage(newUrl)
+            setLocalCharacter(prev => ({ ...prev, sketch_url: null }))
+        }
+
+        try {
+            const response = await fetch('/api/characters/confirm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ decision, characterId: character.id, projectId, oldUrl, newUrl }),
+            })
+
+            if (!response.ok) throw new Error('Failed to confirm')
+
+            if (decision === 'keep_new') {
+                toast.success('New image confirmed', { description: 'Generating sketch...' })
+
+                try {
+                    const sketchRes = await fetch('/api/characters/generate-sketch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ characterId: character.id, imageUrl: newUrl }),
+                    })
+                    if (sketchRes.ok) {
+                        const sketchData = await sketchRes.json()
+                        if (sketchData.sketchUrl) {
+                            setLocalCharacter(prev => ({ ...prev, sketch_url: sketchData.sketchUrl }))
+                        }
+                        toast.success('Sketch updated')
+                    } else {
+                        toast.error('Sketch update failed')
+                    }
+                } catch {
+                    toast.error('Sketch update failed')
+                }
+            } else {
+                toast.success('Reverted to previous image')
+            }
+
+            router.refresh()
+        } catch (error: unknown) {
+            console.error('Confirm error:', error)
+            toast.error(getErrorMessage(error, 'Failed to confirm decision'))
+        } finally {
+            setIsSketchGenerating(false)
         }
     }
 
@@ -597,7 +670,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     // 3. Sketch phase (character_generation_complete) AND colored exists but sketch isn't ready yet
     const showSketchLoading = !!(isSketchGenerating || (isGenerating && displayColoredImageUrl && !sketchIsReady && !sketchHasError) || (isSketchPhase && displayColoredImageUrl && !sketchIsReady && !sketchHasError))
 
-    const lightboxImageUrl = lightboxImage === 'sketch' ? displaySketchImageUrl : displayColoredImageUrl
+    const lightboxImageUrl = comparisonLightboxUrl || (lightboxImage === 'sketch' ? displaySketchImageUrl : displayColoredImageUrl)
 
     return (
         <div
@@ -788,35 +861,106 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                     </div>
                 </CardContent>
 
-                {/* Inner Grid: Sketch + Colored */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4">
-                    <div className="order-2 sm:order-1">
-                        <SubCard
-                            title="Sketch"
-                            imageUrl={displaySketchImageUrl}
-                            isLoading={showSketchLoading}
-                            onClick={() => handleOpenLightbox('sketch')}
-                            characterName={displayName}
-                            onUpload={handleUploadSketch}
-                            onRetry={sketchHasError ? handleRetrySketch : undefined}
-                            showDownload={false}
-                            showUpload={true}
-                        />
+                {/* COMPARISON MODE: OLD vs NEW side by side */}
+                {comparisonState ? (
+                    <div className="grid grid-cols-2 gap-0 divide-x divide-slate-200">
+                        {/* OLD (Left) */}
+                        <div className="relative">
+                            <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-2 bg-gradient-to-b from-black/60 to-transparent">
+                                <span className="text-xs font-bold tracking-wider text-white uppercase px-2 py-0.5 bg-slate-700/80 rounded">OLD</span>
+                            </div>
+                            <div className="aspect-[3/4] cursor-pointer" onClick={() => { setComparisonLightboxUrl(comparisonState.oldUrl); setShowLightbox(true) }}>
+                                <img src={comparisonState.oldUrl} alt="Previous" className="w-full h-full object-cover" />
+                            </div>
+                            <div className="p-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full text-xs"
+                                    onClick={() => handleComparisonDecision('revert_old')}
+                                >
+                                    Keep Old
+                                </Button>
+                            </div>
+                        </div>
+                        {/* NEW (Right) */}
+                        <div className="relative">
+                            <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-2 bg-gradient-to-b from-black/60 to-transparent">
+                                <span className="text-xs font-bold tracking-wider text-white uppercase px-2 py-0.5 bg-green-600/90 rounded">NEW</span>
+                            </div>
+                            <div className="aspect-[3/4] cursor-pointer" onClick={() => { setComparisonLightboxUrl(comparisonState.newUrl); setShowLightbox(true) }}>
+                                <img src={comparisonState.newUrl} alt="New" className="w-full h-full object-cover" />
+                            </div>
+                            <div className="p-2">
+                                <Button
+                                    size="sm"
+                                    className="w-full text-xs bg-green-600 hover:bg-green-700 text-white"
+                                    onClick={() => handleComparisonDecision('keep_new')}
+                                >
+                                    Keep New
+                                </Button>
+                            </div>
+                        </div>
                     </div>
-                    <div className="order-1 sm:order-2">
-                        <SubCard
-                            title="Colored"
-                            imageUrl={displayColoredImageUrl}
-                            isLoading={showColoredLoading}
-                            onClick={() => handleOpenLightbox('colored')}
-                            characterName={displayName}
-                            onUpload={handleUploadColored}
-                            onFileDrop={uploadColoredFile}
-                            showDownload={false}
-                            showUpload={true}
-                        />
-                    </div>
-                </div>
+                ) : (
+                    <>
+                        {/* Error Display */}
+                        {generationError && (
+                            <div className="mx-4 mb-2">
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-left animate-in fade-in zoom-in-95 duration-200">
+                                    <div className="flex items-start gap-2">
+                                        <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                                        <div className="flex-1">
+                                            <p className="text-xs font-medium text-red-800">{generationError.message}</p>
+                                            <button
+                                                onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+                                                className="mt-1 flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
+                                            >
+                                                <ChevronRight className={`w-3 h-3 transition-transform ${showTechnicalDetails ? 'rotate-90' : ''}`} />
+                                                Details
+                                            </button>
+                                            {showTechnicalDetails && (
+                                                <pre className="mt-1 p-2 bg-red-100 rounded text-xs text-red-700 overflow-x-auto whitespace-pre-wrap">
+                                                    {generationError.technicalDetails}
+                                                </pre>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Inner Grid: Sketch + Colored */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4">
+                            <div className="order-2 sm:order-1">
+                                <SubCard
+                                    title="Sketch"
+                                    imageUrl={displaySketchImageUrl}
+                                    isLoading={showSketchLoading}
+                                    onClick={() => handleOpenLightbox('sketch')}
+                                    characterName={displayName}
+                                    onUpload={handleUploadSketch}
+                                    onRetry={sketchHasError ? handleRetrySketch : undefined}
+                                    showDownload={false}
+                                    showUpload={true}
+                                />
+                            </div>
+                            <div className="order-1 sm:order-2">
+                                <SubCard
+                                    title="Colored"
+                                    imageUrl={displayColoredImageUrl}
+                                    isLoading={showColoredLoading}
+                                    onClick={() => handleOpenLightbox('colored')}
+                                    characterName={displayName}
+                                    onUpload={handleUploadColored}
+                                    onFileDrop={uploadColoredFile}
+                                    showDownload={false}
+                                    showUpload={true}
+                                />
+                            </div>
+                        </div>
+                    </>
+                )}
             </Card>
 
             {/* Actions & Feedback Section - Outside Card */}
@@ -857,7 +1001,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             </div>
 
             {/* Full View Lightbox */}
-            <Dialog open={showLightbox} onOpenChange={setShowLightbox}>
+            <Dialog open={showLightbox} onOpenChange={(open) => { setShowLightbox(open); if (!open) setComparisonLightboxUrl(null) }}>
                 <DialogContent 
                     showCloseButton={false}
                     className="!max-w-none !w-screen !h-screen !p-0 !m-0 !translate-x-0 !translate-y-0 !top-0 !left-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none"
