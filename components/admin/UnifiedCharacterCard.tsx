@@ -134,21 +134,32 @@ function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownloa
                             className="w-full h-full object-cover"
                         />
                         
-                        {showUpload && onUpload && (
-                            <div className="absolute top-2 right-2 z-10">
-                                <label 
-                                    className="block cursor-pointer"
-                                    onClick={(e) => e.stopPropagation()}
-                                    title="Upload"
-                                >
-                                    <Upload className="w-5 h-5 text-orange-600 drop-shadow-lg" />
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        className="hidden"
-                                        onChange={onUpload}
-                                    />
-                                </label>
+                        {(showUpload || showDownload) && (
+                            <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
+                                {showDownload && onDownload && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onDownload(e) }}
+                                        className="block cursor-pointer"
+                                        title="Download"
+                                    >
+                                        <Download className="w-5 h-5 text-gray-700 drop-shadow-lg" />
+                                    </button>
+                                )}
+                                {showUpload && onUpload && (
+                                    <label 
+                                        className="block cursor-pointer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        title="Upload"
+                                    >
+                                        <Upload className="w-5 h-5 text-orange-600 drop-shadow-lg" />
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={onUpload}
+                                        />
+                                    </label>
+                                )}
                             </div>
                         )}
                     </>
@@ -192,7 +203,6 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     const [localCharacter, setLocalCharacter] = useState(character)
     const [isSketchGenerating, setIsSketchGenerating] = useState(false)
     const [referenceImage, setReferenceImage] = useState<{ file: File; preview: string } | null>(null)
-    const [isCardHovered, setIsCardHovered] = useState(false)
     const referenceInputRef = useRef<HTMLInputElement>(null)
     const [comparisonState, setComparisonState] = useState<{ oldUrl: string; newUrl: string } | null>(null)
     const [comparisonLightboxUrl, setComparisonLightboxUrl] = useState<string | null>(null)
@@ -240,30 +250,41 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
         setIsDialogOpen(true)
     }
 
-    const handleReferenceSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (!file) return
-        
-        // Validate file size (max 2MB)
-        if (file.size > 2 * 1024 * 1024) {
-            toast.error('Image must be less than 2MB')
-            return
-        }
-        
-        // Validate file type
+    const addReferenceFile = useCallback((file: File) => {
         if (!file.type.startsWith('image/')) {
             toast.error('Please select an image file')
             return
         }
-        
-        const preview = URL.createObjectURL(file)
-        setReferenceImage({ file, preview })
-        
-        // Reset input so same file can be selected again
+        if (file.size > 10 * 1024 * 1024) {
+            toast.error(`"${file.name}" is too large (max 10MB).`)
+            return
+        }
+        if (referenceImage) {
+            URL.revokeObjectURL(referenceImage.preview)
+        }
+        setReferenceImage({ file, preview: URL.createObjectURL(file) })
+    }, [referenceImage])
+
+    const handleReferenceSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        addReferenceFile(file)
         if (referenceInputRef.current) {
             referenceInputRef.current.value = ''
         }
     }
+
+    const handleRefDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        const file = e.dataTransfer.files?.[0]
+        if (file) addReferenceFile(file)
+    }, [addReferenceFile])
+
+    const handleRefDragOver = useCallback((e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+    }, [])
 
     const removeReferenceImage = () => {
         if (referenceImage?.preview) {
@@ -627,9 +648,9 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
         }
     }
 
-    // Clipboard paste: upload pasted image as colored when hovering over this card
+    // Clipboard paste: add pasted image as visual reference (only when regenerate dialog is open)
     useEffect(() => {
-        if (!isCardHovered) return
+        if (!isDialogOpen) return
 
         const handlePaste = (e: ClipboardEvent) => {
             const items = e.clipboardData?.items
@@ -640,8 +661,8 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                     const file = item.getAsFile()
                     if (file) {
                         e.preventDefault()
-                        uploadColoredFile(file)
-                        toast.success('Image pasted — uploading colored image')
+                        addReferenceFile(file)
+                        toast.success('Image pasted as reference')
                         return
                     }
                 }
@@ -650,7 +671,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
 
         document.addEventListener('paste', handlePaste)
         return () => document.removeEventListener('paste', handlePaste)
-    }, [isCardHovered, uploadColoredFile])
+    }, [isDialogOpen, addReferenceFile])
 
     const displayName = character.is_main
         ? 'Main Character'
@@ -675,8 +696,6 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     return (
         <div
             className="flex flex-col w-full gap-4"
-            onMouseEnter={() => setIsCardHovered(true)}
-            onMouseLeave={() => setIsCardHovered(false)}
         >
             <Card className="flex flex-col w-full p-0 gap-0 border-0 shadow-[0_0_15px_rgba(0,0,0,0.12)]">
                 <CardContent className="flex-1 flex flex-col p-4 bg-white rounded-t-lg">
@@ -730,15 +749,6 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                                 </Dialog>
                             )}
 
-                            <button
-                                onClick={(e) => handleDownload('colored', e)}
-                                disabled={!displayColoredImageUrl}
-                                className="transition-opacity disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
-                                title="Download Colored"
-                            >
-                                <Download className="w-[18px] h-[18px] text-gray-700" />
-                            </button>
-
                             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                                 <DialogTrigger asChild>
                                     <div
@@ -771,7 +781,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                                             <div className="space-y-3">
                                                 <div className="flex items-center justify-between">
                                                     <Label className="text-sm font-medium">Visual Reference (Optional)</Label>
-                                                    <span className="text-xs text-gray-400">Max 2MB</span>
+                                                    <span className="text-xs text-gray-400">Max 10MB</span>
                                                 </div>
 
                                                 <input
@@ -796,18 +806,19 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                                                             <X className="w-3 h-3" />
                                                         </button>
                                                     </div>
-                                                ) : (
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="w-full border-dashed border-gray-300 text-gray-500 hover:text-gray-700 hover:border-gray-400 hover:bg-gray-50 gap-2 h-16"
-                                                        onClick={() => referenceInputRef.current?.click()}
-                                                    >
+                                                ) : null}
+
+                                                <div
+                                                    onDragOver={handleRefDragOver}
+                                                    onDrop={handleRefDrop}
+                                                    onClick={() => referenceInputRef.current?.click()}
+                                                    className="w-full border-2 border-dashed border-slate-300 rounded-md flex flex-col items-center justify-center gap-1 h-16 text-slate-500 hover:text-slate-700 hover:border-slate-400 hover:bg-slate-50 cursor-pointer transition-colors"
+                                                >
+                                                    <div className="flex items-center gap-2 text-sm font-medium">
                                                         <Upload className="w-4 h-4" />
-                                                        Add Reference Image
-                                                    </Button>
-                                                )}
+                                                        Drop, paste, or click to add
+                                                    </div>
+                                                </div>
 
                                                 <p className="text-xs text-gray-500">
                                                     Upload an image to guide the character's appearance (e.g., a real hawk photo).
@@ -952,9 +963,10 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                                     isLoading={showColoredLoading}
                                     onClick={() => handleOpenLightbox('colored')}
                                     characterName={displayName}
+                                    onDownload={(e) => handleDownload('colored', e)}
                                     onUpload={handleUploadColored}
                                     onFileDrop={uploadColoredFile}
-                                    showDownload={false}
+                                    showDownload={true}
                                     showUpload={true}
                                 />
                             </div>
