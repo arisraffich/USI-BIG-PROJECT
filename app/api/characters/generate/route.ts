@@ -7,7 +7,7 @@ import { getErrorMessage } from '@/lib/utils/error'
 
 export async function POST(request: NextRequest) {
   try {
-    const { project_id, character_id, custom_prompt, visual_reference_image, skipDbUpdate } = await request.json()
+    const { project_id, character_id, custom_prompt, visual_reference_image, skipDbUpdate, skipStatusUpdate } = await request.json()
 
     if (!project_id) {
       return NextResponse.json(
@@ -211,9 +211,10 @@ export async function POST(request: NextRequest) {
           if (updateError) {
             console.error('Failed to update project status:', updateError)
           }
-        } else {
+        } else if (!skipStatusUpdate) {
           // Manual Regeneration / Revision Phase
-          // Always update to 'characters_regenerated' to enable the "Resend" flow
+          // Update to 'characters_regenerated' to enable the "Resend" flow
+          // Skipped when adding new characters via the Add Character flow
 
           const { error: updateError } = await supabase
             .from('projects')

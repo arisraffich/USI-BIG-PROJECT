@@ -83,6 +83,7 @@ export function NewCharacterFormCard({ character, projectId }: NewCharacterFormC
                 body: JSON.stringify({
                     project_id: projectId,
                     character_id: character.id,
+                    skipStatusUpdate: true,
                 }),
             })
 
