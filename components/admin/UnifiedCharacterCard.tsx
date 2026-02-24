@@ -685,11 +685,12 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     // Show loading on colored if regenerating OR if project generating and no image
     const showColoredLoading = !!(isRegenerating || (isGenerating && !displayColoredImageUrl))
     
-    // Show loading on sketch ONLY when:
+    // Show loading on sketch when:
     // 1. We explicitly started sketch generation (isSketchGenerating), OR
     // 2. Parent says project is generating AND colored exists but sketch isn't ready yet, OR
-    // 3. Sketch phase (character_generation_complete) AND colored exists but sketch isn't ready yet
-    const showSketchLoading = !!(isSketchGenerating || (isGenerating && displayColoredImageUrl && !sketchIsReady && !sketchHasError) || (isSketchPhase && displayColoredImageUrl && !sketchIsReady && !sketchHasError))
+    // 3. Sketch phase AND colored exists but sketch isn't ready yet, OR
+    // 4. Colored image exists but sketch hasn't arrived yet (e.g., after new character generation)
+    const showSketchLoading = !!(isSketchGenerating || (isGenerating && displayColoredImageUrl && !sketchIsReady && !sketchHasError) || (isSketchPhase && displayColoredImageUrl && !sketchIsReady && !sketchHasError) || (displayColoredImageUrl && !sketchIsReady && !sketchHasError))
 
     const lightboxImageUrl = comparisonLightboxUrl || (lightboxImage === 'sketch' ? displaySketchImageUrl : displayColoredImageUrl)
 
