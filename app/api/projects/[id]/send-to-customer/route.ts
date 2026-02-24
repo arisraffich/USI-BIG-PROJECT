@@ -104,6 +104,10 @@ export async function POST(
           }
           // If page has admin_reply, keep feedback_notes and is_resolved=false so customer can see the reply
 
+          if (page.is_resolved) {
+            updateData.is_resolved = false
+          }
+
           // Sync Images (Ensure customer sees latest generated versions)
           // We only sync if there is a URL.
           if (page.illustration_url) updateData.customer_illustration_url = page.illustration_url
@@ -217,6 +221,10 @@ export async function POST(
             ]
             updateData.feedback_history = newHistory
             updateData.feedback_notes = null
+            updateData.is_resolved = false
+          }
+
+          if (char.is_resolved) {
             updateData.is_resolved = false
           }
           
