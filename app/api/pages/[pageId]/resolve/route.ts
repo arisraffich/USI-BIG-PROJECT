@@ -82,24 +82,9 @@ export async function POST(
                 ]
             }
         } else {
-            // No admin reply - move feedback to history as normal
-            const conversationThread = Array.isArray(page.conversation_thread) ? page.conversation_thread : []
-            const currentHistory = Array.isArray(page.feedback_history) ? page.feedback_history : []
-            const currentRound = (project.illustration_send_count || 0)
-            
-            updateData.feedback_notes = null
-            updateData.feedback_history = [
-                ...currentHistory,
-                {
-                    note: page.feedback_notes,
-                    created_at: new Date().toISOString(),
-                    revision_round: currentRound,
-                    conversation_thread: conversationThread.length > 0 ? conversationThread : undefined
-                }
-            ]
-            updateData.admin_reply = null
-            updateData.admin_reply_at = null
-            updateData.admin_reply_type = null
+            // No admin reply — just mark resolved, keep feedback_notes visible.
+            // Archival to feedback_history happens later when admin Resends to customer,
+            // or when customer submits new feedback on this resolved page.
         }
 
         // Update page

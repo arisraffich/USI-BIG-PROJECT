@@ -100,7 +100,7 @@ export async function POST(
             ]
             updateData.feedback_history = newHistory
             updateData.feedback_notes = null
-            updateData.is_resolved = true
+            updateData.is_resolved = false
           }
           // If page has admin_reply, keep feedback_notes and is_resolved=false so customer can see the reply
 
@@ -217,7 +217,7 @@ export async function POST(
             ]
             updateData.feedback_history = newHistory
             updateData.feedback_notes = null
-            updateData.is_resolved = true
+            updateData.is_resolved = false
           }
           
           // Sync customer_image_url and customer_sketch_url (mirrors illustration approach)

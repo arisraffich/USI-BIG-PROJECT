@@ -496,8 +496,8 @@ export function ProjectTabsContent({
             localPages.some(p => p.feedback_notes && !p.is_resolved)
           }
           hasResolvedFeedback={
-            localCharacters.some(c => c.feedback_notes && c.is_resolved) ||
-            localPages.some(p => p.feedback_notes && p.is_resolved)
+            localCharacters.some(c => c.is_resolved) ||
+            localPages.some(p => p.is_resolved)
           }
           isTrialReady={isTrialReady}
           generatedIllustrationCount={localPages.filter(p => !!p.illustration_url).length}
