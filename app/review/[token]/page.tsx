@@ -50,7 +50,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ token: 
 
   const pages = pagesResult.data || null
   const allCharacters = charactersResult.data || null
-  const characters = allCharacters?.filter((c: any) => c.is_main || c.customer_image_url) || null
+  const characters = allCharacters?.filter((c: any) => c.is_main || c.customer_image_url || !c.image_url) || null
 
   return (
     <div className="min-h-screen bg-gray-50">

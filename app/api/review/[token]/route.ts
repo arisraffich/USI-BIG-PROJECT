@@ -71,7 +71,7 @@ export async function GET(
         status: project.status,
       },
       pages: pages || [],
-      characters: (characters || []).filter((c: any) => c.is_main || c.customer_image_url),
+      characters: (characters || []).filter((c: any) => c.is_main || c.customer_image_url || !c.image_url),
     })
   } catch (error: unknown) {
     console.error('Error fetching review project:', error)
