@@ -350,6 +350,9 @@ SAFETY & READABILITY RULES (STRICT):
 - NEVER place text-safe areas on busy or highly textured backgrounds.
 - ALWAYS ensure sufficient contrast for future readability.
 
+COMPOSITION INTEGRITY (CRITICAL):
+Do NOT create any vertical lines, dividers, panels, or splits in the image. The illustration must be ONE continuous scene with no visible boundaries or separators. Text-safe areas must blend naturally into the scene through soft transitions, not hard edges or lines.
+
 FINAL REQUIREMENT:
 The illustration must look intentionally composed to include text, following professional children's book layout standards, while containing NO drawn text at all.
 
