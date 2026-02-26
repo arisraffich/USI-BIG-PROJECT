@@ -3,9 +3,13 @@
 import { useState } from 'react'
 import { ProjectCard } from './ProjectCard'
 import { isFollowUp, isWorking } from '@/lib/constants/statusBadgeConfig'
-import { UserRound, Wrench, CheckCircle2, FileText, Users, Palette } from 'lucide-react'
+import { UserRound, Wrench, CheckCircle2, FileText, Users, Palette, FlaskConical } from 'lucide-react'
 
-type Tab = 'follow_up' | 'working' | 'finished'
+type Tab = 'follow_up' | 'working' | 'finished' | 'test'
+
+function isTestProject(project: any): boolean {
+  return (project.author_firstname || '').toLowerCase().includes('test')
+}
 
 interface ProjectTabsProps {
   projects: Array<any>
@@ -76,25 +80,31 @@ function GroupedProjectList({ projects }: { projects: Array<any> }) {
 export function ProjectTabs({ projects }: ProjectTabsProps) {
   const [activeTab, setActiveTab] = useState<Tab>('follow_up')
 
-  const followUpProjects = projects.filter(p => isFollowUp(p.status))
-  const workingProjects = projects.filter(p => isWorking(p.status))
-  const finishedProjects = projects.filter(p => isFinished(p.status))
+  const testProjects = projects.filter(p => isTestProject(p))
+  const realProjects = projects.filter(p => !isTestProject(p))
+
+  const followUpProjects = realProjects.filter(p => isFollowUp(p.status))
+  const workingProjects = realProjects.filter(p => isWorking(p.status))
+  const finishedProjects = realProjects.filter(p => isFinished(p.status))
 
   const tabs: { id: Tab; label: string; icon: typeof UserRound; count: number }[] = [
     { id: 'follow_up', label: 'Follow Up', icon: UserRound, count: followUpProjects.length },
     { id: 'working', label: 'Working', icon: Wrench, count: workingProjects.length },
     { id: 'finished', label: 'Finished', icon: CheckCircle2, count: finishedProjects.length },
+    { id: 'test', label: 'Test', icon: FlaskConical, count: testProjects.length },
   ]
 
   const activeProjects = activeTab === 'follow_up'
     ? followUpProjects
     : activeTab === 'working'
       ? workingProjects
-      : finishedProjects
+      : activeTab === 'test'
+        ? testProjects
+        : finishedProjects
 
   return (
     <div>
-      <div className="grid grid-cols-3 md:flex md:gap-1 mb-4 border-b border-gray-200">
+      <div className="grid grid-cols-4 md:flex md:gap-1 mb-4 border-b border-gray-200">
         {tabs.map(tab => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id
