@@ -40,9 +40,10 @@ export async function PATCH(
       )
     }
 
-    if (project.status !== 'character_review') {
+    const allowedStatuses = ['character_review', 'character_revision_needed', 'characters_regenerated']
+    if (!allowedStatuses.includes(project.status)) {
       return NextResponse.json(
-        { error: `Cannot edit characters. Project status is '${project.status}', expected 'character_review'.` },
+        { error: 'Characters cannot be edited at this time' },
         { status: 403 }
       )
     }

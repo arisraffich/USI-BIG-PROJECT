@@ -27,7 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { getErrorMessage } from '@/lib/utils/error'
+
 
 interface CustomerProjectTabsContentProps {
   projectId: string
@@ -676,7 +676,7 @@ export function CustomerProjectTabsContent({
 
     } catch (error: unknown) {
       console.error('Error submitting changes:', error)
-      toast.error(getErrorMessage(error, 'Failed to submit changes'))
+      toast.error('Failed to submit changes')
       setSubmissionStatus('idle')
       setIsSubmitting(false)
     }

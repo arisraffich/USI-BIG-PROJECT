@@ -6,7 +6,7 @@ import { ManuscriptSidebar } from '@/components/project/manuscript/ManuscriptSid
 import { ManuscriptToolbar } from '@/components/project/manuscript/ManuscriptToolbar'
 import { toast } from 'sonner'
 import { Page } from '@/types/page'
-import { getErrorMessage } from '@/lib/utils/error'
+
 
 interface CustomerManuscriptEditorProps {
   pages: Page[] | null
@@ -283,7 +283,7 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEd
       toast.success('Changes saved successfully')
     } catch (error: unknown) {
       console.error('Error saving changes:', error)
-      toast.error(getErrorMessage(error, 'Failed to save changes'))
+      toast.error('Failed to save changes')
     } finally {
       setIsSaving(false)
     }
