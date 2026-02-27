@@ -16,6 +16,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { Switch } from '@/components/ui/switch'
 import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, Download, Upload, X, AlertTriangle, Trash2, Camera, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Character } from '@/types/character'
@@ -203,6 +204,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     const [localCharacter, setLocalCharacter] = useState(character)
     const [isSketchGenerating, setIsSketchGenerating] = useState(false)
     const [referenceImage, setReferenceImage] = useState<{ file: File; preview: string } | null>(null)
+    const [useThinkingMode, setUseThinkingMode] = useState(false)
     const referenceInputRef = useRef<HTMLInputElement>(null)
     const [comparisonState, setComparisonState] = useState<{ oldUrl: string; newUrl: string } | null>(null)
     const [comparisonLightboxUrl, setComparisonLightboxUrl] = useState<string | null>(null)
@@ -319,6 +321,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                     custom_prompt: customPrompt.trim() || undefined,
                     visual_reference_image: visualReferenceImage,
                     skipDbUpdate: hasExistingImage,
+                    useThinking: useThinkingMode,
                 }),
             })
 
@@ -826,12 +829,25 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                                                 </p>
                                             </div>
                                         </div>
-                                        <DialogFooter>
-                                            <Button variant="outline" onClick={() => { setIsDialogOpen(false); removeReferenceImage(); }}>Cancel</Button>
-                                            <Button onClick={handleRegenerate} disabled={isRegenerating}>
-                                                {isRegenerating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                                Regenerate
-                                            </Button>
+                                        <DialogFooter className="flex items-center !justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Switch
+                                                    id="char-thinking-mode"
+                                                    checked={useThinkingMode}
+                                                    onCheckedChange={setUseThinkingMode}
+                                                    className="scale-90"
+                                                />
+                                                <label htmlFor="char-thinking-mode" className="text-xs text-slate-500 cursor-pointer select-none">
+                                                    Deep thinking
+                                                </label>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Button variant="outline" onClick={() => { setIsDialogOpen(false); removeReferenceImage(); setUseThinkingMode(false); }}>Cancel</Button>
+                                                <Button onClick={handleRegenerate} disabled={isRegenerating}>
+                                                    {isRegenerating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                                    Regenerate
+                                                </Button>
+                                            </div>
                                         </DialogFooter>
                                     </DialogContent>
                             </Dialog>

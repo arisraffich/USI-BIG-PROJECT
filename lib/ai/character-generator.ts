@@ -41,7 +41,8 @@ export async function generateCharacterImage(
     projectId: string,
     customPrompt?: string,
     visualReferenceImage?: string, // base64 data URL for appearance reference
-    skipDbUpdate?: boolean // When true, upload to storage but don't save to DB (comparison mode)
+    skipDbUpdate?: boolean, // When true, upload to storage but don't save to DB (comparison mode)
+    useThinking?: boolean // Override: enable thinking for regeneration
 ) {
     if (!GOOGLE_API_KEY) {
         throw new Error('Google Generative AI API Key not configured')
@@ -166,7 +167,7 @@ Do NOT copy the art style from this image — the style reference above defines 
                 imageSize: "4K"
             }
         }
-        if (!isRegeneration) {
+        if (!isRegeneration || useThinking) {
             generationConfig.thinkingConfig = { thinkingLevel: 'HIGH' }
         }
 

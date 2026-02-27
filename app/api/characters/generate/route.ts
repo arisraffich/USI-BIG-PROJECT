@@ -7,7 +7,7 @@ import { getErrorMessage } from '@/lib/utils/error'
 
 export async function POST(request: NextRequest) {
   try {
-    const { project_id, character_id, custom_prompt, visual_reference_image, skipDbUpdate, skipStatusUpdate } = await request.json()
+    const { project_id, character_id, custom_prompt, visual_reference_image, skipDbUpdate, skipStatusUpdate, useThinking } = await request.json()
 
     if (!project_id) {
       return NextResponse.json(
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
         // Pass visual_reference_image only for single character regeneration
         const visualRef = character_id ? visual_reference_image : undefined
 
-        const result = await generateCharacterImage(character, referenceImage, project_id, custom_prompt, visualRef, isPreviewMode)
+        const result = await generateCharacterImage(character, referenceImage, project_id, custom_prompt, visualRef, isPreviewMode, useThinking)
 
         console.log(`[Character Generate] Result for ${character.name || character.role}: ${result.success ? '✅ SUCCESS' : '❌ FAILED'}`)
         
