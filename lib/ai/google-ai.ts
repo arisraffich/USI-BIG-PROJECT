@@ -3,7 +3,7 @@ import { getErrorMessage } from '@/lib/utils/error'
 import sharp from 'sharp'
 
 const API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY
-const ILLUSTRATION_MODEL = 'gemini-3-pro-image-preview'
+const ILLUSTRATION_MODEL = 'gemini-3.1-flash-image-preview'
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 

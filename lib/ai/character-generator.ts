@@ -6,7 +6,7 @@ import { Character } from '@/types/character'
 import sharp from 'sharp'
 
 const GOOGLE_API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY
-const MODEL = 'gemini-3-pro-image-preview'
+const MODEL = 'gemini-3.1-flash-image-preview'
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
 
 async function fetchImageAsBase64(url: string): Promise<{ mimeType: string, data: string } | null> {

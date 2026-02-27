@@ -4,7 +4,7 @@ import { removeMetadata } from '@/lib/utils/metadata-cleaner'
 import { processLineArtToTransparentPng, LINE_ART_PROMPT } from '@/lib/line-art/processor'
 
 const API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY
-const ILLUSTRATION_MODEL = 'gemini-3-pro-image-preview'
+const ILLUSTRATION_MODEL = 'gemini-3.1-flash-image-preview'
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 
 const SAFETY_SETTINGS = [
