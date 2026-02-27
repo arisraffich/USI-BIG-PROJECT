@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/notifications/email'
 import { getLineArtUrls } from '@/lib/line-art/storage'
+import { uploadToR2 } from '@/lib/storage/r2'
 import JSZip from 'jszip'
 import { getErrorMessage } from '@/lib/utils/error'
 import { renderTemplate } from '@/lib/email/renderer'
@@ -91,7 +92,6 @@ export async function POST(request: NextRequest) {
 
         const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' })
 
-        // Build email
         const customerName = [project.author_firstname, project.author_lastname]
             .filter(Boolean)
             .join(' ') || 'Unknown Customer'
@@ -101,22 +101,48 @@ export async function POST(request: NextRequest) {
             .replace(/\s+/g, '_')
             .trim()
 
+        const zipFilename = `${safeTitle}_LineArt.zip`
+        const zipSizeMB = (zipBuffer.length / (1024 * 1024)).toFixed(1)
+
+        // Upload ZIP to Cloudflare R2 (auto-deleted after 3 days by lifecycle rule)
+        const r2Key = `${projectId}/${zipFilename}`
+        const downloadUrl = await uploadToR2(r2Key, zipBuffer)
+
+        console.log(`[Email] ZIP uploaded to R2: ${zipSizeMB}MB → ${downloadUrl}`)
+
+        // Build email with download link instead of attachment
         const rendered = await renderTemplate('send_lineart_internal', {
             customerName,
             bookTitle: project.book_title || 'Untitled',
         })
 
+        const downloadButtonHtml = `
+            <div style="margin: 24px 0;">
+                <a href="${downloadUrl}" 
+                   style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">
+                    Download Line Art (${zipSizeMB} MB)
+                </a>
+            </div>
+            <p style="font-size: 13px; color: #999;">This link expires in 3 days.</p>`
+
+        const fallbackHtml = `<div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
+            <p style="margin-bottom: 16px;"><strong>${customerName}'s</strong> project is ready for coloring.</p>
+            <p style="margin-bottom: 16px;">Download the LineArt and Colored illustrations below:</p>
+            ${downloadButtonHtml}
+            <p style="margin-bottom: 8px; color: #666; font-size: 14px;">Book: ${project.book_title || 'Untitled'}</p>
+        </div>`
+
+        const emailHtml = rendered?.html
+            ? rendered.html + downloadButtonHtml
+            : fallbackHtml
+
         await sendEmail({
             to: 'info@usillustrations.com',
             subject: rendered?.subject || `${customerName}'s project is ready for coloring`,
-            html: rendered?.html || `<div style="font-family: sans-serif; font-size: 16px; line-height: 1.6; color: #333;"><p style="margin-bottom: 16px;"><strong>${customerName}'s</strong> project is ready for coloring.</p><p style="margin-bottom: 16px;">Please download LineArt and Colored illustrations from the attached ZIP file.</p><p style="margin-bottom: 8px; color: #666; font-size: 14px;">Book: ${project.book_title || 'Untitled'}</p></div>`,
-            attachments: [{
-                filename: `${safeTitle}_LineArt.zip`,
-                content: zipBuffer,
-            }],
+            html: emailHtml,
         })
 
-        console.log(`[Email] LineArt email sent for ${customerName}'s project`)
+        console.log(`[Email] LineArt email sent for ${customerName}'s project (download link, ${zipSizeMB}MB)`)
 
         return NextResponse.json({ success: true, message: 'Email sent' })
 
