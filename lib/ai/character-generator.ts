@@ -158,15 +158,21 @@ Do NOT copy the art style from this image — the style reference above defines 
             parts.push({ text: `TARGET CHARACTER DESCRIPTION:\n${prompt}` })
         }
 
+        const isRegeneration = !!customPrompt
+        const generationConfig: Record<string, any> = {
+            responseModalities: ['IMAGE'],
+            imageConfig: {
+                aspectRatio: "9:16",
+                imageSize: "4K"
+            }
+        }
+        if (!isRegeneration) {
+            generationConfig.thinkingConfig = { thinkingLevel: 'HIGH' }
+        }
+
         const payload = {
             contents: [{ parts }],
-            generationConfig: {
-                responseModalities: ['IMAGE'],
-                imageConfig: {
-                    aspectRatio: "9:16",
-                    imageSize: "4K"
-                }
-            },
+            generationConfig,
             safetySettings: [
                 { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
                 { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },

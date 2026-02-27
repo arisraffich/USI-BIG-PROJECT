@@ -565,7 +565,8 @@ ${textPromptSection}`
             styleReferenceImages: styleReferenceImages,
             aspectRatio: mappedAspectRatio,
             isSceneRecreation: isSceneRecreationMode,
-            hasCustomStyleRefs: hasCustomStyleRefs
+            hasCustomStyleRefs: hasCustomStyleRefs,
+            useThinking: !isEditMode
         })
 
         if (!result.success || !result.imageBuffer) {

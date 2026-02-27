@@ -79,6 +79,7 @@ interface GenerateOptions {
     textIntegration?: string
     isSceneRecreation?: boolean // Scene Recreation mode - uses higher quality input/output
     hasCustomStyleRefs?: boolean // When true, style refs define style instead of main character
+    useThinking?: boolean // Enable thinking mode for complex scene composition
 }
 
 async function fetchImageAsBase64(input: string): Promise<{ mimeType: string, data: string } | null> {
@@ -132,7 +133,8 @@ export async function generateIllustration({
     styleReferenceImages = [],
     aspectRatio = "1:1",
     isSceneRecreation = false,
-    hasCustomStyleRefs = false
+    hasCustomStyleRefs = false,
+    useThinking = false
 }: GenerateOptions): Promise<{ success: boolean, imageBuffer: Buffer | null, error: string | null }> {
 
     if (!API_KEY) throw new Error('Google API Key missing')
@@ -247,20 +249,25 @@ Apply the style uniformly to characters, backgrounds, props, and all scene eleme
         // 4. Final Instruction Prompt (The Scene)
         parts.push({ text: prompt })
 
-        console.log('[GoogleAI] 📸 Generating illustration at 4K resolution')
+        console.log(`[GoogleAI] 📸 Generating illustration at 4K resolution${useThinking ? ' (with thinking)' : ''}`)
         if (isSceneRecreation) {
             console.log('[GoogleAI] 🎬 Scene Recreation Mode active')
         }
         
+        const generationConfig: Record<string, any> = {
+            responseModalities: ['IMAGE'],
+            imageConfig: {
+                aspectRatio: aspectRatio,
+                imageSize: '4K'
+            }
+        }
+        if (useThinking) {
+            generationConfig.thinkingConfig = { thinkingLevel: 'HIGH' }
+        }
+
         const payload = {
             contents: [{ parts }],
-            generationConfig: {
-                responseModalities: ['IMAGE'],
-                imageConfig: {
-                    aspectRatio: aspectRatio,
-                    imageSize: '4K'
-                }
-            },
+            generationConfig,
             safetySettings: SAFETY_SETTINGS
         }
 
