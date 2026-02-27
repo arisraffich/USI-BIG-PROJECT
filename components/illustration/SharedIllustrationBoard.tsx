@@ -69,7 +69,7 @@ export interface SharedIllustrationBoardProps {
     illustrationType?: 'spread' | 'spot' | null
     setIllustrationType?: (type: 'spread' | 'spot' | null) => void
     onGenerate?: () => void
-    onRegenerate?: (prompt: string, referenceImages?: string[], referenceImageUrl?: string, sceneCharacters?: SceneCharacter[]) => void
+    onRegenerate?: (prompt: string, referenceImages?: string[], referenceImageUrl?: string, sceneCharacters?: SceneCharacter[], useThinking?: boolean) => void
     onLayoutChange?: (newType: 'spread' | 'spot' | null) => void // For changing layout type (triggers regeneration)
     onUpload?: (type: 'sketch' | 'illustration', file: File) => Promise<void>
     illustratedPages?: Page[] // All pages with illustrations (for environment reference)
@@ -224,6 +224,7 @@ export function SharedIllustrationBoard({
     const [editAction, setEditAction] = useState('')
     const [editEmotion, setEditEmotion] = useState('')
     const [promptWasAutoPopulated, setPromptWasAutoPopulated] = useState(false)
+    const [useThinkingMode, setUseThinkingMode] = useState(false)
     
     const ENV_AUTO_PROMPT = 'Use the same environment as in the reference image. Keep all characters and composition the same.'
     
@@ -1847,6 +1848,7 @@ export function SharedIllustrationBoard({
                         setSceneCharacters([])
                         setEditingCharacterId(null)
                         setPromptWasAutoPopulated(false)
+                        setUseThinkingMode(false)
                     }
                 }}>
                     <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
@@ -2158,7 +2160,19 @@ export function SharedIllustrationBoard({
                             )}
                         </div>
 
-                        <DialogFooter>
+                        <DialogFooter className="flex items-center !justify-between">
+                            <div className="flex items-center gap-2">
+                                <Switch
+                                    id="thinking-mode"
+                                    checked={useThinkingMode}
+                                    onCheckedChange={setUseThinkingMode}
+                                    className="scale-90"
+                                />
+                                <label htmlFor="thinking-mode" className="text-xs text-slate-500 cursor-pointer select-none">
+                                    Deep thinking
+                                </label>
+                            </div>
+                            <div className="flex items-center gap-2">
                             <Button variant="ghost" onClick={() => setIsRegenerateDialogOpen(false)}>Cancel</Button>
                             
                             {/* Reset to Original button — only when original exists, not already showing it, and no custom input */}
@@ -2233,7 +2247,7 @@ export function SharedIllustrationBoard({
                                     }
                                     
                                     setIsRegenerateDialogOpen(false)
-                                    onRegenerate(regenerationPrompt, base64Images, refUrl, includedChars)
+                                    onRegenerate(regenerationPrompt, base64Images, refUrl, includedChars, useThinkingMode)
                                 }}
                                 disabled={isSceneRecreationMode && sceneCharacters.filter(c => c.isIncluded).length === 0}
                                 className={
@@ -2246,6 +2260,7 @@ export function SharedIllustrationBoard({
                                     ? "Recreate Scene"
                                     : "Regenerate"}
                             </Button>
+                            </div>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>

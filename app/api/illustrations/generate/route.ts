@@ -50,7 +50,8 @@ export async function POST(request: Request) {
             referenceImages: uploadedReferenceImages, 
             referenceImageUrl,
             sceneCharacters, // New: Character overrides for Scene Recreation mode
-            skipDbUpdate // New: For comparison mode - upload but don't save to DB
+            skipDbUpdate, // New: For comparison mode - upload but don't save to DB
+            useThinking // New: Enable thinking mode for regeneration
         } = body as {
             projectId: string
             pageId?: string
@@ -60,6 +61,7 @@ export async function POST(request: Request) {
             referenceImageUrl?: string
             sceneCharacters?: SceneCharacterInput[]
             skipDbUpdate?: boolean
+            useThinking?: boolean
         }
 
         // Debug: Log mode detection
@@ -566,7 +568,7 @@ ${textPromptSection}`
             aspectRatio: mappedAspectRatio,
             isSceneRecreation: isSceneRecreationMode,
             hasCustomStyleRefs: hasCustomStyleRefs,
-            useThinking: !isEditMode
+            useThinking: isEditMode ? (useThinking || false) : true
         })
 
         if (!result.success || !result.imageBuffer) {
