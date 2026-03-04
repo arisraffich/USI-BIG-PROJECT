@@ -84,6 +84,12 @@ interface UnifiedIllustrationFeedProps {
     onRemoveComment?: (pageId: string) => Promise<void>
     // Admin Manual Resolve Feature
     onManualResolve?: (pageId: string) => Promise<void>
+    // Page Delete Feature (Admin only)
+    onDeletePage?: (pageId: string) => void
+    isDeleteDisabled?: boolean
+    // Sketch/Story Toggle "All Pages" (Admin only)
+    globalSketchViewMode?: { mode: 'sketch' | 'text'; version: number }
+    onToggleAllSketchView?: (mode: 'sketch' | 'text') => void
 }
 
 export function UnifiedIllustrationFeed({
@@ -130,7 +136,13 @@ export function UnifiedIllustrationFeed({
     // Admin Manual Resolve Feature
     onManualResolve,
     // Customer Display Settings
-    showColoredToCustomer = false
+    showColoredToCustomer = false,
+    // Page Delete Feature
+    onDeletePage,
+    isDeleteDisabled = false,
+    // Sketch/Story Toggle "All Pages"
+    globalSketchViewMode,
+    onToggleAllSketchView
 }: UnifiedIllustrationFeedProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const isScrollingRef = useRef(false)
@@ -361,6 +373,12 @@ export function UnifiedIllustrationFeed({
                             onManualResolve={onManualResolve ? () => onManualResolve(page.id) : undefined}
                             // Customer Display Settings
                             showColoredToCustomer={showColoredToCustomer}
+                            // Page Delete Feature
+                            onDeletePage={onDeletePage ? () => onDeletePage(page.id) : undefined}
+                            isDeleteDisabled={isDeleteDisabled}
+                            // Sketch/Story Toggle "All Pages"
+                            globalSketchViewMode={globalSketchViewMode}
+                            onToggleAllSketchView={onToggleAllSketchView}
                         />
                     </div>
                 )

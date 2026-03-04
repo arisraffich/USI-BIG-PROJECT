@@ -3,7 +3,7 @@
 import { Page } from '@/types/page'
 import { ProjectStatus } from '@/types/project'
 import { useIllustrationLock } from '@/hooks/use-illustration-lock'
-import { MessageSquare, CheckCircle2, Check, Layers2 } from 'lucide-react'
+import { MessageSquare, CheckCircle2, Check, Layers2, Trash2 } from 'lucide-react'
 
 interface UnifiedIllustrationSidebarProps {
     pages: Page[]
@@ -17,7 +17,12 @@ interface UnifiedIllustrationSidebarProps {
     comparisonPageIds?: string[]
     sketchGeneratingPageIds?: string[]
     illustrationSendCount?: number
+    onDeletePage?: (pageId: string) => void
+    isDeleteDisabled?: boolean
 }
+
+// FUTURE: "Add Page" — add an onAddPage prop here and render a "+" button
+// at the bottom of the sidebar (or between page items) to insert a new page.
 
 export function UnifiedIllustrationSidebar({
     pages,
@@ -30,7 +35,9 @@ export function UnifiedIllustrationSidebar({
     generatingPageIds = [],
     comparisonPageIds = [],
     sketchGeneratingPageIds = [],
-    illustrationSendCount = 0
+    illustrationSendCount = 0,
+    onDeletePage,
+    isDeleteDisabled = false
 }: UnifiedIllustrationSidebarProps) {
     // Centralized lock logic from useIllustrationLock hook
     const { filterVisiblePages } = useIllustrationLock({
@@ -48,11 +55,13 @@ export function UnifiedIllustrationSidebar({
                         const isActive = activePageId === page.id
 
                         return (
-                            <button
+                            <div
                                 key={page.id}
-                                onClick={() => onPageClick(page.id)}
-                                disabled={disabled}
-                                className={`w-full text-left px-3 py-2.5 rounded-md text-sm transition-all flex items-center justify-between group ${isActive
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => !disabled && onPageClick(page.id)}
+                                onKeyDown={(e) => { if (e.key === 'Enter' && !disabled) onPageClick(page.id) }}
+                                className={`w-full text-left px-3 py-2.5 rounded-md text-sm transition-all flex items-center justify-between group cursor-pointer ${isActive
                                     ? 'bg-purple-50 text-purple-700 font-medium border-l-4 border-purple-600'
                                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'
                                     } ${disabled ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
@@ -101,18 +110,34 @@ export function UnifiedIllustrationSidebar({
                                     )}
                                 </span>
 
-                                <span className={`w-2 h-2 rounded-full ${
-                                    failedPageIds.includes(page.id) 
-                                        ? 'bg-red-500' 
-                                        : generatingPageIds.includes(page.id)
-                                            ? 'bg-orange-400 animate-pulse'
-                                            : sketchGeneratingPageIds.includes(page.id)
-                                                ? 'bg-gray-400 animate-pulse'
-                                                : page.illustration_url 
-                                                    ? 'bg-green-400' 
-                                                    : 'bg-gray-300'
-                                    }`} title={failedPageIds.includes(page.id) ? "Failed" : generatingPageIds.includes(page.id) ? "Generating illustration..." : sketchGeneratingPageIds.includes(page.id) ? "Generating sketch..." : page.illustration_url ? "Completed" : "Pending"}></span>
-                            </button>
+                                <span className="flex items-center gap-1.5">
+                                    {/* Delete button - admin only, appears on hover */}
+                                    {mode === 'admin' && onDeletePage && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                onDeletePage(page.id)
+                                            }}
+                                            disabled={isDeleteDisabled}
+                                            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-red-100 text-slate-400 hover:text-red-500 disabled:opacity-0"
+                                            title="Delete page"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+                                    <span className={`w-2 h-2 rounded-full ${
+                                        failedPageIds.includes(page.id) 
+                                            ? 'bg-red-500' 
+                                            : generatingPageIds.includes(page.id)
+                                                ? 'bg-orange-400 animate-pulse'
+                                                : sketchGeneratingPageIds.includes(page.id)
+                                                    ? 'bg-gray-400 animate-pulse'
+                                                    : page.illustration_url 
+                                                        ? 'bg-green-400' 
+                                                        : 'bg-gray-300'
+                                        }`} title={failedPageIds.includes(page.id) ? "Failed" : generatingPageIds.includes(page.id) ? "Generating illustration..." : sketchGeneratingPageIds.includes(page.id) ? "Generating sketch..." : page.illustration_url ? "Completed" : "Pending"}></span>
+                                </span>
+                            </div>
                         )
                     })}
                 </div>

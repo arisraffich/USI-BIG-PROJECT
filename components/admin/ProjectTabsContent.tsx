@@ -68,6 +68,10 @@ export function ProjectTabsContent({
   // Sketch generating page IDs state (shared between IllustrationsTabContent and sidebar for gray dots)
   const [sketchGeneratingPageIds, setSketchGeneratingPageIds] = useState<string[]>([])
 
+  // Page delete handler ref (set by IllustrationsTabContent, used by sidebar)
+  const deletePageHandlerRef = useRef<((pageId: string) => void) | null>(null)
+  const [isDeleteDisabled, setIsDeleteDisabled] = useState(false)
+
   // Sync local characters when server props update
   useEffect(() => {
     if (characters) {
@@ -457,6 +461,9 @@ export function ProjectTabsContent({
           }
         } else if (payload.eventType === 'INSERT' && payload.new) {
           setLocalPages(prev => [...prev, payload.new as Page])
+        } else if (payload.eventType === 'DELETE' && payload.old) {
+          const deletedId = (payload.old as any).id
+          setLocalPages(prev => prev.filter(p => p.id !== deletedId))
         }
       })
       .subscribe()
@@ -569,6 +576,8 @@ export function ProjectTabsContent({
             generatingPageIds={generatingPageIds}
             comparisonPageIds={comparisonPageIds}
             sketchGeneratingPageIds={sketchGeneratingPageIds}
+            onDeletePage={(pageId) => deletePageHandlerRef.current?.(pageId)}
+            isDeleteDisabled={isDeleteDisabled}
           />
         ) : null
       }
@@ -775,6 +784,8 @@ export function ProjectTabsContent({
             onGeneratingPageIdsChange={setGeneratingPageIds}
             onComparisonPageIdsChange={setComparisonPageIds}
             onSketchGeneratingPageIdsChange={setSketchGeneratingPageIds}
+            deletePageHandlerRef={deletePageHandlerRef}
+            onDeleteDisabledChange={setIsDeleteDisabled}
           />
         </div >
       </div >

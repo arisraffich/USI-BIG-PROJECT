@@ -5,6 +5,9 @@ import { createClient } from '@/lib/supabase/client'
 import { UnifiedIllustrationFeed } from '@/components/illustration/UnifiedIllustrationFeed'
 import { SceneCharacter } from '@/components/illustration/SharedIllustrationBoard'
 import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { AlertTriangle, Copy } from 'lucide-react'
 
 import { useRouter } from 'next/navigation'
 import { getErrorMessage } from '@/lib/utils/error'
@@ -48,6 +51,10 @@ interface IllustrationsTabContentProps {
     onGeneratingPageIdsChange?: (pageIds: string[]) => void
     onComparisonPageIdsChange?: (pageIds: string[]) => void
     onSketchGeneratingPageIdsChange?: (pageIds: string[]) => void
+    
+    // Page Delete Feature (ref shared with sidebar via parent)
+    deletePageHandlerRef?: React.MutableRefObject<((pageId: string) => void) | null>
+    onDeleteDisabledChange?: (disabled: boolean) => void
 }
 
 export function IllustrationsTabContent({
@@ -64,7 +71,9 @@ export function IllustrationsTabContent({
     onPageErrorsChange,
     onGeneratingPageIdsChange,
     onComparisonPageIdsChange,
-    onSketchGeneratingPageIdsChange
+    onSketchGeneratingPageIdsChange,
+    deletePageHandlerRef,
+    onDeleteDisabledChange
 }: IllustrationsTabContentProps) {
     const router = useRouter()
 
@@ -905,6 +914,111 @@ export function IllustrationsTabContent({
         router.refresh()
     }, [router])
 
+    // -----------------------------------------------------------------------
+    // PAGE DELETE FEATURE
+    // FUTURE: "Add Page" — mirror this pattern. Create handleAddPageRequest()
+    // that shows a dialog to choose insert position (before/after current page).
+    // Call a POST /api/pages endpoint that inserts a blank page and uses
+    // renumberPagesAfterInsert() to shift subsequent page_numbers up by 1.
+    // -----------------------------------------------------------------------
+    const [deleteTargetPage, setDeleteTargetPage] = useState<Page | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
+
+    const handleDeletePageRequest = useCallback((pageId: string) => {
+        const page = pages.find(p => p.id === pageId)
+        if (page) setDeleteTargetPage(page)
+    }, [pages])
+
+    const handleConfirmDelete = useCallback(async () => {
+        if (!deleteTargetPage) return
+        setIsDeleting(true)
+
+        try {
+            const response = await fetch(`/api/pages/${deleteTargetPage.id}`, { method: 'DELETE' })
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}))
+                throw new Error(data.error || 'Failed to delete page')
+            }
+
+            const result = await response.json()
+            const storyText = result.storyText || ''
+            const deletedNumber = result.deletedPageNumber
+
+            setDeleteTargetPage(null)
+
+            // Navigate to the previous page (or the new first page)
+            const remainingPages = pages.filter(p => p.id !== deleteTargetPage.id)
+            if (remainingPages.length > 0 && onPageChange) {
+                const prevPage = remainingPages.find(p => p.page_number < deletedNumber)
+                    ? [...remainingPages].reverse().find(p => p.page_number < deletedNumber)
+                    : remainingPages[0]
+                if (prevPage) onPageChange(prevPage.id)
+            }
+
+            // Show persistent toast with story text and copy button
+            const cleanText = storyText.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
+            if (cleanText) {
+                const truncated = cleanText.length > 120 ? cleanText.substring(0, 120) + '...' : cleanText
+                toast.success(`Page ${deletedNumber} deleted`, {
+                    duration: 15000,
+                    description: (
+                        <div className="mt-2">
+                            <p className="text-xs text-slate-500 bg-slate-50 p-2 rounded border border-slate-200 line-clamp-3 italic mb-2">
+                                &ldquo;{truncated}&rdquo;
+                            </p>
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(cleanText).then(() => {
+                                        toast.success('Story text copied to clipboard')
+                                    }).catch(() => {
+                                        toast.error('Failed to copy — select the text manually')
+                                    })
+                                }}
+                                className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                            >
+                                <Copy className="w-3 h-3" />
+                                Copy story text
+                            </button>
+                        </div>
+                    ) as any,
+                })
+            } else {
+                toast.success(`Page ${deletedNumber} deleted`)
+            }
+
+            router.refresh()
+        } catch (error: unknown) {
+            const errorMessage = getErrorMessage(error, 'Failed to delete page')
+            toast.error('Delete failed', { description: errorMessage })
+            console.error('[Page Delete]', error)
+        } finally {
+            setIsDeleting(false)
+        }
+    }, [deleteTargetPage, pages, onPageChange, router])
+
+    const isDeleteDisabled = batchState.isRunning || generatingPageIds.size > 0
+
+    // -----------------------------------------------------------------------
+    // SKETCH/STORY TOGGLE — "All Pages" broadcast
+    // -----------------------------------------------------------------------
+    const [globalSketchViewMode, setGlobalSketchViewMode] = useState<{ mode: 'sketch' | 'text'; version: number }>({ mode: 'sketch', version: 0 })
+
+    const handleToggleAllSketchView = useCallback((mode: 'sketch' | 'text') => {
+        setGlobalSketchViewMode(prev => ({ mode, version: prev.version + 1 }))
+    }, [])
+
+    // Sync delete handler and disabled state with parent (for sidebar access)
+    useEffect(() => {
+        if (deletePageHandlerRef) {
+            deletePageHandlerRef.current = handleDeletePageRequest
+        }
+    }, [handleDeletePageRequest, deletePageHandlerRef])
+
+    useEffect(() => {
+        onDeleteDisabledChange?.(isDeleteDisabled)
+    }, [isDeleteDisabled, onDeleteDisabledChange])
+
     // Handle manual resolve
     const handleManualResolve = useCallback(async (pageId: string) => {
         const response = await fetch(`/api/pages/${pageId}/resolve`, {
@@ -920,53 +1034,113 @@ export function IllustrationsTabContent({
     }, [router])
 
     return (
-        <UnifiedIllustrationFeed
-            mode="admin"
-            pages={visiblePages}
-            activePageId={activePageId}
-            onPageChange={onPageChange}
-            projectStatus={projectStatus}
-            isAnalyzing={isAnalyzing}
-            projectId={projectId}
-            characters={characters}
+        <>
+            <UnifiedIllustrationFeed
+                mode="admin"
+                pages={visiblePages}
+                activePageId={activePageId}
+                onPageChange={onPageChange}
+                projectStatus={projectStatus}
+                isAnalyzing={isAnalyzing}
+                projectId={projectId}
+                characters={characters}
 
-            // Handlers
-            onGenerate={handleGenerate}
-            onRegenerate={handleRegenerate}
-            onLayoutChange={handleLayoutChange}
-            onUpload={handleUpload}
+                // Handlers
+                onGenerate={handleGenerate}
+                onRegenerate={handleRegenerate}
+                onLayoutChange={handleLayoutChange}
+                onUpload={handleUpload}
 
-            // Wizard State
-            aspectRatio={aspectRatio}
-            setAspectRatio={setAspectRatio}
-            generatingPageIds={generatingPageIds}
-            loadingStateMap={loadingState}
-            
-            // Per-page settings
-            pageTextIntegration={pageTextIntegration}
-            setPageTextIntegration={handleSetPageTextIntegration}
-            pageIllustrationType={pageIllustrationType}
-            setPageIllustrationType={handleSetPageIllustrationType}
-            
-            // Batch Generation
-            allPages={pages}
-            onGenerateAllRemaining={handleGenerateAllRemaining}
-            onCancelBatch={handleCancelBatch}
-            batchState={batchState}
-            
-            // Error State
-            pageErrors={pageErrors}
-            
-            // Comparison Mode (Regeneration Preview)
-            comparisonStates={comparisonStates}
-            onComparisonDecision={handleComparisonDecision}
-            
-            // Admin Reply Feature
-            onSaveAdminReply={handleSaveAdminReply}
-            onEditAdminReply={handleEditAdminReply}
-            onAddComment={handleAddComment}
-            onRemoveComment={handleRemoveComment}
-            onManualResolve={handleManualResolve}
-        />
+                // Wizard State
+                aspectRatio={aspectRatio}
+                setAspectRatio={setAspectRatio}
+                generatingPageIds={generatingPageIds}
+                loadingStateMap={loadingState}
+                
+                // Per-page settings
+                pageTextIntegration={pageTextIntegration}
+                setPageTextIntegration={handleSetPageTextIntegration}
+                pageIllustrationType={pageIllustrationType}
+                setPageIllustrationType={handleSetPageIllustrationType}
+                
+                // Batch Generation
+                allPages={pages}
+                onGenerateAllRemaining={handleGenerateAllRemaining}
+                onCancelBatch={handleCancelBatch}
+                batchState={batchState}
+                
+                // Error State
+                pageErrors={pageErrors}
+                
+                // Comparison Mode (Regeneration Preview)
+                comparisonStates={comparisonStates}
+                onComparisonDecision={handleComparisonDecision}
+                
+                // Admin Reply Feature
+                onSaveAdminReply={handleSaveAdminReply}
+                onEditAdminReply={handleEditAdminReply}
+                onAddComment={handleAddComment}
+                onRemoveComment={handleRemoveComment}
+                onManualResolve={handleManualResolve}
+
+                // Page Delete Feature
+                onDeletePage={handleDeletePageRequest}
+                isDeleteDisabled={isDeleteDisabled}
+
+                // Sketch/Story Toggle "All Pages"
+                globalSketchViewMode={globalSketchViewMode}
+                onToggleAllSketchView={handleToggleAllSketchView}
+            />
+
+            {/* PAGE DELETE CONFIRMATION DIALOG */}
+            <Dialog open={!!deleteTargetPage} onOpenChange={(open) => { if (!open) setDeleteTargetPage(null) }}>
+                <DialogContent className="sm:max-w-[400px]">
+                    <DialogHeader>
+                        <DialogTitle>Delete Page {deleteTargetPage?.page_number}?</DialogTitle>
+                        <DialogDescription>
+                            This action cannot be undone. Remaining pages will be renumbered automatically.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-2 py-2">
+                        {/* Warning: has illustration */}
+                        {deleteTargetPage?.illustration_url && (
+                            <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2.5">
+                                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                                <span>This page has a generated illustration that will be permanently deleted.</span>
+                            </div>
+                        )}
+
+                        {/* Warning: has unresolved feedback */}
+                        {deleteTargetPage?.feedback_notes && !deleteTargetPage?.is_resolved && (
+                            <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2.5">
+                                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                                <span>This page has unresolved customer feedback.</span>
+                            </div>
+                        )}
+
+                        {/* Info: story text will be available */}
+                        {deleteTargetPage?.story_text?.trim() && (
+                            <p className="text-sm text-slate-500">
+                                The story text will be shown after deletion so you can copy it to an adjacent page if needed.
+                            </p>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setDeleteTargetPage(null)} disabled={isDeleting}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleConfirmDelete}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? 'Deleting...' : 'Delete'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     )
 }

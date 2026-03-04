@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
-import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, ChevronUp, AlignLeft, Users, Plus, Minus, Pencil, Check, Layers, CornerDownRight, AlertCircle, ChevronRight } from 'lucide-react'
+import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, ChevronUp, AlignLeft, Users, Plus, Minus, Pencil, Check, Layers, CornerDownRight, AlertCircle, ChevronRight, Trash2 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { getErrorMessage } from '@/lib/utils/error'
@@ -111,6 +111,12 @@ export interface SharedIllustrationBoardProps {
     onManualResolve?: () => Promise<void>
     // Customer Display Settings
     showColoredToCustomer?: boolean
+    // Page Delete Feature (Admin only)
+    onDeletePage?: () => void
+    isDeleteDisabled?: boolean
+    // Sketch/Story Toggle "All Pages" (Admin only)
+    globalSketchViewMode?: { mode: 'sketch' | 'text'; version: number }
+    onToggleAllSketchView?: (mode: 'sketch' | 'text') => void
 }
 
 export function SharedIllustrationBoard({
@@ -155,8 +161,22 @@ export function SharedIllustrationBoard({
     // Admin Manual Resolve Feature
     onManualResolve,
     // Customer Display Settings
-    showColoredToCustomer = false
+    showColoredToCustomer = false,
+    // Page Delete Feature
+    onDeletePage,
+    isDeleteDisabled = false,
+    // Sketch/Story Toggle "All Pages"
+    globalSketchViewMode,
+    onToggleAllSketchView
 }: SharedIllustrationBoardProps) {
+
+    // --------------------------------------------------------------------------
+    // HELPERS
+    // --------------------------------------------------------------------------
+    const stripHtml = (html: string) => {
+        if (!html) return ''
+        return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
+    }
 
     // --------------------------------------------------------------------------
     // LOCAL STATE
@@ -191,7 +211,31 @@ export function SharedIllustrationBoard({
 
     // NEW: View Mode for Sketch Card
     const [sketchViewMode, setSketchViewMode] = useState<'sketch' | 'text'>('sketch')
-    
+    const [sketchTogglePopoverOpen, setSketchTogglePopoverOpen] = useState(false)
+    const pendingSketchModeRef = useRef<'sketch' | 'text'>('sketch')
+    const sketchPopoverDesktopRef = useRef<HTMLDivElement>(null)
+    const sketchPopoverMobileRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        if (globalSketchViewMode && globalSketchViewMode.version > 0) {
+            setSketchViewMode(globalSketchViewMode.mode)
+        }
+    }, [globalSketchViewMode])
+
+    useEffect(() => {
+        if (!sketchTogglePopoverOpen) return
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as Node
+            const insideDesktop = sketchPopoverDesktopRef.current?.contains(target)
+            const insideMobile = sketchPopoverMobileRef.current?.contains(target)
+            if (!insideDesktop && !insideMobile) {
+                setSketchTogglePopoverOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [sketchTogglePopoverOpen])
+
     // Admin: Editable Scene Description
     const [editedSceneNotes, setEditedSceneNotes] = useState(page.scene_description || '')
     const [isSavingSceneNotes, setIsSavingSceneNotes] = useState(false)
@@ -293,6 +337,25 @@ export function SharedIllustrationBoard({
 
     const isAdmin = mode === 'admin'
     const isCustomer = mode === 'customer'
+
+    const handleSketchToggleClick = useCallback((newMode: 'sketch' | 'text') => {
+        if (!isAdmin || !onToggleAllSketchView) {
+            setSketchViewMode(newMode)
+            return
+        }
+        pendingSketchModeRef.current = newMode
+        setSketchTogglePopoverOpen(true)
+    }, [isAdmin, onToggleAllSketchView])
+
+    const handleSketchToggleChoice = useCallback((scope: 'this' | 'all') => {
+        const m = pendingSketchModeRef.current
+        if (scope === 'all' && onToggleAllSketchView) {
+            onToggleAllSketchView(m)
+        } else {
+            setSketchViewMode(m)
+        }
+        setSketchTogglePopoverOpen(false)
+    }, [onToggleAllSketchView])
 
     // Centralized lock logic from useIllustrationLock hook
     const { isCustomerLocked } = useIllustrationLock({
@@ -788,23 +851,39 @@ export function SharedIllustrationBoard({
                 <div className="hidden md:flex w-72 lg:w-80 flex-col shrink-0 border-r border-slate-100 bg-slate-50/50 h-full">
                     {/* Header 73px - Matches Backup */}
                     <div className="p-4 border-b border-slate-100 h-[73px] flex items-center justify-between shrink-0">
-                        {/* ADMIN ONLY: LAYOUT + REGEN BUTTONS */}
+                        {/* ADMIN ONLY: DELETE + LAYOUT + REGEN BUTTONS */}
                         {isAdmin && onRegenerate ? (
                             <>
-                                {/* Layout Button - Left */}
-                                {onLayoutChange && page.illustration_url ? (
-                                    <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        onClick={handleOpenLayoutDialog} 
-                                        disabled={isGenerating}
-                                        title="Change Layout"
-                                        className="text-slate-500 hover:text-slate-700 px-2"
-                                    >
-                                        <Layers className="w-4 h-4 mr-1.5" />
-                                        Layout
-                                    </Button>
-                                ) : <div />}
+                                {/* Left group: Delete + Layout */}
+                                <div className="flex items-center gap-1">
+                                    {/* Delete Button */}
+                                    {onDeletePage && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={onDeletePage}
+                                            disabled={isGenerating || isDeleteDisabled}
+                                            title="Delete page"
+                                            className="text-slate-400 hover:text-red-500 hover:bg-red-50 px-2"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    )}
+                                    {/* Layout Button */}
+                                    {onLayoutChange && page.illustration_url ? (
+                                        <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            onClick={handleOpenLayoutDialog} 
+                                            disabled={isGenerating}
+                                            title="Change Layout"
+                                            className="text-slate-500 hover:text-slate-700 px-2"
+                                        >
+                                            <Layers className="w-4 h-4 mr-1.5" />
+                                            Layout
+                                        </Button>
+                                    ) : null}
+                                </div>
                                 {/* Regenerate Button - Right */}
                                 <Button variant="outline" size="sm" onClick={handleOpenRegenerateDialog} disabled={isGenerating} title="Regenerate with Instructions">
                                     <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
@@ -1342,12 +1421,22 @@ export function SharedIllustrationBoard({
                         {/* Abstract Background Element (Subtle) */}
                         <div className="absolute top-0 right-16 w-64 h-full bg-white/5 skew-x-12"></div>
 
-                        {/* Left: Page Identity */}
+                        {/* Left: Page Identity + Delete */}
                         <div className="flex items-center gap-2 z-10">
                             <Bookmark className="w-5 h-5 text-white/90" fill="currentColor" />
                             <span className="text-white font-bold text-lg tracking-wide">
-                                Page {page.page_number}
+                                {page.page_number}
                             </span>
+                            {isAdmin && onDeletePage && (
+                                <button
+                                    onClick={onDeletePage}
+                                    disabled={isGenerating || isDeleteDisabled}
+                                    className="ml-1 p-1 rounded-full bg-white/10 hover:bg-red-500/80 text-white/70 hover:text-white transition-colors disabled:opacity-30"
+                                    title="Delete page"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            )}
                         </div>
 
                         {/* Center: Layout Button (Admin only, when illustration exists) */}
@@ -1413,7 +1502,6 @@ export function SharedIllustrationBoard({
                     <div className="hidden md:grid grid-cols-2 divide-x border-b border-slate-100 h-[73px] bg-white text-sm">
 
                         {/* SKETCH HEADER */}
-                        {/* SKETCH HEADER */}
                         <div className="flex items-center justify-between gap-2 px-3">
                             {/* LEFT: Badge */}
                             <div className="flex items-center gap-2 min-w-[80px]">
@@ -1421,24 +1509,42 @@ export function SharedIllustrationBoard({
 
                             {/* CENTER: Sketch/Story Toggle */}
                             {(isAdmin || showColoredToCustomer) ? (
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => setSketchViewMode('sketch')}
-                                        className={`text-xs font-bold tracking-wider uppercase transition-colors ${sketchViewMode === 'sketch' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600 cursor-pointer'}`}
-                                    >
-                                        Sketch
-                                    </button>
-                                    <Switch
-                                        checked={sketchViewMode === 'text'}
-                                        onCheckedChange={(checked) => setSketchViewMode(checked ? 'text' : 'sketch')}
-                                        className="!bg-slate-300"
-                                    />
-                                    <button
-                                        onClick={() => setSketchViewMode('text')}
-                                        className={`text-xs font-bold tracking-wider uppercase transition-colors ${sketchViewMode === 'text' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600 cursor-pointer'}`}
-                                    >
-                                        Story
-                                    </button>
+                                <div className="relative" ref={sketchPopoverDesktopRef}>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => handleSketchToggleClick('sketch')}
+                                            className={`text-xs font-bold tracking-wider uppercase transition-colors ${sketchViewMode === 'sketch' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600 cursor-pointer'}`}
+                                        >
+                                            Sketch
+                                        </button>
+                                        <Switch
+                                            checked={sketchViewMode === 'text'}
+                                            onCheckedChange={(checked) => handleSketchToggleClick(checked ? 'text' : 'sketch')}
+                                            className="!bg-slate-300"
+                                        />
+                                        <button
+                                            onClick={() => handleSketchToggleClick('text')}
+                                            className={`text-xs font-bold tracking-wider uppercase transition-colors ${sketchViewMode === 'text' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600 cursor-pointer'}`}
+                                        >
+                                            Story
+                                        </button>
+                                    </div>
+                                    {sketchTogglePopoverOpen && (
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 bg-white rounded-lg border shadow-md p-1 flex gap-1 animate-in fade-in zoom-in-95 duration-150">
+                                            <button
+                                                onClick={() => handleSketchToggleChoice('this')}
+                                                className="px-3 py-1.5 text-xs font-medium rounded-md hover:bg-slate-100 transition-colors whitespace-nowrap"
+                                            >
+                                                This page
+                                            </button>
+                                            <button
+                                                onClick={() => handleSketchToggleChoice('all')}
+                                                className="px-3 py-1.5 text-xs font-medium rounded-md hover:bg-purple-50 hover:text-purple-700 transition-colors whitespace-nowrap"
+                                            >
+                                                All pages
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase">
@@ -1571,29 +1677,46 @@ export function SharedIllustrationBoard({
                         {/* 1. SKETCH BLOCK */}
                         <div className="flex flex-col items-center md:space-y-0 bg-white relative min-h-[300px] md:min-h-0">
                             {/* MOBILE HEADER FOR SKETCH (Overlay) */}
-                            {/* MOBILE HEADER FOR SKETCH (Overlay) */}
                             <div className="absolute top-0 left-0 right-0 z-10 flex items-center gap-2 md:hidden pt-1.5 px-3 pb-3 bg-gradient-to-b from-black/40 to-transparent">
 
                                 {/* Sketch/Story Toggle - Mobile: Show for admin, or customer when colored images enabled */}
                                 {(isAdmin || showColoredToCustomer) ? (
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={() => setSketchViewMode('sketch')}
-                                            className={`text-xs font-bold tracking-wider uppercase transition-colors ${sketchViewMode === 'sketch' ? 'text-white' : 'text-white/50 active:text-white/70'}`}
-                                        >
-                                            Sketch
-                                        </button>
-                                        <Switch
-                                            checked={sketchViewMode === 'text'}
-                                            onCheckedChange={(checked) => setSketchViewMode(checked ? 'text' : 'sketch')}
-                                            className="!bg-slate-400"
-                                        />
-                                        <button
-                                            onClick={() => setSketchViewMode('text')}
-                                            className={`text-xs font-bold tracking-wider uppercase transition-colors ${sketchViewMode === 'text' ? 'text-white' : 'text-white/50 active:text-white/70'}`}
-                                        >
-                                            Story
-                                        </button>
+                                    <div className="relative" ref={sketchPopoverMobileRef}>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => handleSketchToggleClick('sketch')}
+                                                className={`text-xs font-bold tracking-wider uppercase transition-colors ${sketchViewMode === 'sketch' ? 'text-white' : 'text-white/50 active:text-white/70'}`}
+                                            >
+                                                Sketch
+                                            </button>
+                                            <Switch
+                                                checked={sketchViewMode === 'text'}
+                                                onCheckedChange={(checked) => handleSketchToggleClick(checked ? 'text' : 'sketch')}
+                                                className="!bg-slate-400"
+                                            />
+                                            <button
+                                                onClick={() => handleSketchToggleClick('text')}
+                                                className={`text-xs font-bold tracking-wider uppercase transition-colors ${sketchViewMode === 'text' ? 'text-white' : 'text-white/50 active:text-white/70'}`}
+                                            >
+                                                Story
+                                            </button>
+                                        </div>
+                                        {sketchTogglePopoverOpen && (
+                                            <div className="absolute top-full left-0 mt-2 z-50 bg-white rounded-lg border shadow-md p-1 flex gap-1 animate-in fade-in zoom-in-95 duration-150">
+                                                <button
+                                                    onClick={() => handleSketchToggleChoice('this')}
+                                                    className="px-3 py-1.5 text-xs font-medium rounded-md hover:bg-slate-100 transition-colors whitespace-nowrap text-slate-700"
+                                                >
+                                                    This page
+                                                </button>
+                                                <button
+                                                    onClick={() => handleSketchToggleChoice('all')}
+                                                    className="px-3 py-1.5 text-xs font-medium rounded-md hover:bg-purple-50 hover:text-purple-700 transition-colors whitespace-nowrap text-slate-700"
+                                                >
+                                                    All pages
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
                                     <span className="text-xs font-bold tracking-wider text-white/90 uppercase">
@@ -1645,50 +1768,48 @@ export function SharedIllustrationBoard({
                                 </div>
                             ) : (
                                 /* TEXT VIEW MODE */
-                                <div className="w-full p-8 bg-white text-slate-900 pointer-events-auto cursor-text text-left overflow-y-auto max-h-[60vh] md:max-h-none md:absolute md:inset-0 md:h-full">
+                                <div className="w-full p-8 bg-white text-slate-900 pointer-events-auto cursor-text text-left max-h-[60vh] md:max-h-none md:absolute md:inset-0 md:h-full flex flex-col">
                                     {/* 1. PAGE TEXT */}
-                                    <div className="mb-8">
+                                    <div className="shrink-0">
                                         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">Page {page.page_number}</span>
-                                        <div className="max-h-[500px] overflow-y-auto pr-4 custom-scrollbar space-y-8">
-                                            <p className="text-lg md:text-xl font-serif leading-relaxed text-slate-800">
-                                                {page.story_text || <span className="italic text-slate-300">No text content available.</span>}
-                                            </p>
-
-                                            {/* 2. SCENE DESCRIPTION (Admin Only) */}
-                                            {isAdmin && (
-                                                <div className="bg-amber-50/50 p-5 rounded-lg border border-amber-100/60">
-                                                    <span className="flex items-center gap-2 text-[10px] font-bold text-amber-600/80 uppercase tracking-widest mb-2">
-                                                        🎨 Scene Description
-                                                    </span>
-                                                    <div className="space-y-3">
-                                                        <Textarea
-                                                            value={editedSceneNotes}
-                                                            onChange={(e) => setEditedSceneNotes(e.target.value)}
-                                                            placeholder="Describe the scene for the illustrator..."
-                                                            className="min-h-[120px] text-sm resize-none bg-white border-amber-200 focus-visible:ring-amber-500"
-                                                        />
-                                                        {hasSceneNotesChanged && (
-                                                            <div className="flex justify-end">
-                                                                <Button
-                                                                    size="sm"
-                                                                    onClick={handleSaveSceneNotes}
-                                                                    disabled={isSavingSceneNotes}
-                                                                    className="bg-amber-600 hover:bg-amber-700 text-white"
-                                                                >
-                                                                    {isSavingSceneNotes ? (
-                                                                        <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                                                                    ) : (
-                                                                        <CheckCircle2 className="w-4 h-4 mr-1" />
-                                                                    )}
-                                                                    Save Notes
-                                                                </Button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
+                                        <p className="text-lg md:text-xl font-serif leading-relaxed text-slate-800 mb-6">
+                                            {stripHtml(page.story_text || '') || <span className="italic text-slate-300">No text content available.</span>}
+                                        </p>
                                     </div>
+
+                                    {/* 2. SCENE DESCRIPTION (Admin Only) — fills remaining space */}
+                                    {isAdmin && (
+                                        <div className="bg-amber-50/50 p-5 rounded-lg border border-amber-100/60 flex-1 flex flex-col min-h-0">
+                                            <span className="flex items-center gap-2 text-[10px] font-bold text-amber-600/80 uppercase tracking-widest mb-2 shrink-0">
+                                                🎨 Scene Description
+                                            </span>
+                                            <div className="flex-1 flex flex-col min-h-0 gap-3">
+                                                <Textarea
+                                                    value={editedSceneNotes}
+                                                    onChange={(e) => setEditedSceneNotes(e.target.value)}
+                                                    placeholder="Describe the scene for the illustrator..."
+                                                    className="flex-1 min-h-[80px] text-sm resize-none bg-white border-amber-200 focus-visible:ring-amber-500"
+                                                />
+                                                {hasSceneNotesChanged && (
+                                                    <div className="flex justify-end shrink-0">
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={handleSaveSceneNotes}
+                                                            disabled={isSavingSceneNotes}
+                                                            className="bg-amber-600 hover:bg-amber-700 text-white"
+                                                        >
+                                                            {isSavingSceneNotes ? (
+                                                                <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                                                            ) : (
+                                                                <CheckCircle2 className="w-4 h-4 mr-1" />
+                                                            )}
+                                                            Save Notes
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -1742,7 +1863,7 @@ export function SharedIllustrationBoard({
                                 <div className="w-full h-full p-8 bg-white text-slate-900 overflow-y-auto">
                                     <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">Page {page.page_number}</span>
                                     <p className="text-lg md:text-xl font-serif leading-relaxed text-slate-800">
-                                        {page.story_text || <span className="italic text-slate-300">No text content available.</span>}
+                                        {stripHtml(page.story_text || '') || <span className="italic text-slate-300">No text content available.</span>}
                                     </p>
                                 </div>
                             ) : (

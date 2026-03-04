@@ -148,6 +148,12 @@ export function CustomerProjectTabsContent({
             })
           } else if (payload.eventType === 'INSERT' && payload.new) {
             setLocalPages(prev => [...prev, payload.new as Page])
+          } else if (payload.eventType === 'DELETE' && payload.old) {
+            const deletedId = (payload.old as any).id
+            setLocalPages(prev => prev.filter(p => p.id !== deletedId))
+            toast.info('A page has been removed', {
+              description: 'The illustrator has updated the page structure.'
+            })
           }
         }
       )
