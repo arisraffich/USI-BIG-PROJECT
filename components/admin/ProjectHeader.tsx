@@ -4,7 +4,7 @@ import { SharedProjectHeader } from '@/components/layout/SharedProjectHeader'
 import { useTransition, useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Home, Loader2, Send, FileText, Sparkles, Download, ExternalLink, Info, Upload, Palette, Pencil, CheckCircle2, XCircle, AlertTriangle, RefreshCw, Mail } from 'lucide-react'
+import { Home, Loader2, Send, FileText, Sparkles, Download, ExternalLink, Info, Upload, Palette, Pencil, CheckCircle2, XCircle, AlertTriangle, RefreshCw, Mail, Clock, ChevronDown, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -134,6 +134,16 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const [isDownloadingExistingLineArt, setIsDownloadingExistingLineArt] = useState(false)
   const [hasLineArtInStorage, setHasLineArtInStorage] = useState(false)
 
+  // Schedule send state
+  const [scheduledSend, setScheduledSend] = useState<{ id: string; scheduled_at: string; action_type: string; status: string } | null>(null)
+  const [schedulePopoverOpen, setSchedulePopoverOpen] = useState(false)
+  const [scheduleHour, setScheduleHour] = useState(9)
+  const [scheduleDays, setScheduleDays] = useState(1)
+  const [isScheduling, setIsScheduling] = useState(false)
+  const [isCancellingSchedule, setIsCancellingSchedule] = useState(false)
+  const [lastFailedSend, setLastFailedSend] = useState<{ id: string; error_message: string } | null>(null)
+  const schedulePopoverRef = useRef<HTMLDivElement>(null)
+
   // Hydration fix
   useEffect(() => {
     setMounted(true)
@@ -154,6 +164,121 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     }
   }, [projectId, projectInfo.status])
   
+  // Fetch any pending scheduled send for this project
+  useEffect(() => {
+    fetch(`/api/scheduled-sends?projectId=${projectId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.scheduledSend) {
+          setScheduledSend(data.scheduledSend)
+          setLastFailedSend(null)
+        }
+      })
+      .catch(() => {})
+  }, [projectId])
+
+  // Also check for most recent failed send
+  useEffect(() => {
+    if (scheduledSend) return
+    const supabase = createClient()
+    supabase
+      .from('scheduled_sends')
+      .select('id, error_message')
+      .eq('project_id', projectId)
+      .eq('status', 'failed')
+      .order('completed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setLastFailedSend(data)
+      })
+  }, [projectId, scheduledSend])
+
+  // Click-outside to close schedule popover
+  useEffect(() => {
+    if (!schedulePopoverOpen) return
+    const handler = (e: MouseEvent) => {
+      if (schedulePopoverRef.current && !schedulePopoverRef.current.contains(e.target as Node)) {
+        setSchedulePopoverOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [schedulePopoverOpen])
+
+  const getActionType = useCallback((): 'send_characters' | 'send_sketches' => {
+    const status = projectInfo.status
+    if (isInIllustrationPhase(status)) return 'send_sketches'
+    return 'send_characters'
+  }, [projectInfo.status])
+
+  const handleScheduleSend = useCallback(async () => {
+    setIsScheduling(true)
+    try {
+      const now = new Date()
+      const target = new Date(now)
+      target.setDate(target.getDate() + scheduleDays)
+      target.setHours(scheduleHour, 0, 0, 0)
+      if (scheduleDays === 0 && target <= now) {
+        target.setDate(target.getDate() + 1)
+      }
+
+      const res = await fetch('/api/scheduled-sends', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          actionType: getActionType(),
+          scheduledAt: target.toISOString(),
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to schedule')
+      const data = await res.json()
+      setScheduledSend(data.scheduledSend)
+      setLastFailedSend(null)
+      setSchedulePopoverOpen(false)
+
+      const dateStr = target.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      const hourStr = target.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true })
+      toast.success(`Scheduled for ${dateStr} at ${hourStr}`)
+    } catch {
+      toast.error('Failed to schedule send')
+    } finally {
+      setIsScheduling(false)
+    }
+  }, [projectId, scheduleDays, scheduleHour, getActionType])
+
+  const handleCancelSchedule = useCallback(async () => {
+    if (!scheduledSend) return
+    setIsCancellingSchedule(true)
+    try {
+      const res = await fetch('/api/scheduled-sends', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: scheduledSend.id }),
+      })
+      if (!res.ok) throw new Error('Failed to cancel')
+      setScheduledSend(null)
+      toast.success('Scheduled send cancelled')
+    } catch {
+      toast.error('Failed to cancel')
+    } finally {
+      setIsCancellingSchedule(false)
+    }
+  }, [scheduledSend])
+
+  const handleDismissFailedSend = useCallback(() => {
+    if (!lastFailedSend) return
+    setLastFailedSend(null)
+  }, [lastFailedSend])
+
+  const formatScheduledTime = useCallback((isoString: string) => {
+    const d = new Date(isoString)
+    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const hourStr = d.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true })
+    return `${dateStr}, ${hourStr}`
+  }, [])
+
   // Handle toggle for showing colored images to customer
   const handleToggleColoredImages = async (checked: boolean) => {
     setIsUpdatingSettings(true)
@@ -1340,22 +1465,123 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
       actions={
         !stage.isDownload ? (
-          <Button
-            onClick={handleSendToCustomer}
-            disabled={isSendingToCustomer || isDownloading || stage.buttonDisabled}
-            size="sm"
-            className={`flex px-3 md:px-4 ${stage.buttonDisabled ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none' : 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg'} font-semibold transition-all duration-75 rounded-md whitespace-nowrap items-center justify-center h-9`}
-          >
-            <Send className="w-4 h-4 md:mr-2" />
-            <span className="hidden md:inline">{buttonDisplayLabel}</span>
-            <span className="md:hidden">Send</span>
+          scheduledSend ? (
+            /* SCHEDULED STATE: show scheduled time + cancel */
+            <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 px-3 h-9 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-sm font-medium">
+                <Clock className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">{formatScheduledTime(scheduledSend.scheduled_at)}</span>
+                <span className="md:hidden">Scheduled</span>
+              </div>
+              <button
+                onClick={handleCancelSchedule}
+                disabled={isCancellingSchedule}
+                className="flex items-center justify-center h-9 w-9 rounded-md border border-amber-200 bg-amber-50 text-amber-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors"
+                title="Cancel scheduled send"
+              >
+                {isCancellingSchedule ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          ) : lastFailedSend ? (
+            /* FAILED STATE: show error + retry */
+            <div className="flex items-center gap-1.5">
+              <Button
+                onClick={handleSendToCustomer}
+                disabled={isSendingToCustomer || stage.buttonDisabled}
+                size="sm"
+                className="flex px-3 md:px-4 bg-red-600 hover:bg-red-700 text-white shadow-md font-semibold transition-all duration-75 rounded-md whitespace-nowrap items-center justify-center h-9"
+                title={lastFailedSend.error_message}
+              >
+                <AlertTriangle className="w-4 h-4 md:mr-2" />
+                <span className="hidden md:inline">{isSendingToCustomer ? 'Sending...' : 'Retry Send'}</span>
+                <span className="md:hidden">Retry</span>
+              </Button>
+              <button
+                onClick={handleDismissFailedSend}
+                className="flex items-center justify-center h-9 w-9 rounded-md border border-red-200 bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                title="Dismiss"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            /* NORMAL STATE: split button — Send now | ▾ Schedule */
+            <div className="relative flex items-center" ref={schedulePopoverRef}>
+              <Button
+                onClick={handleSendToCustomer}
+                disabled={isSendingToCustomer || isDownloading || stage.buttonDisabled}
+                size="sm"
+                className={`flex px-3 md:px-4 ${stage.buttonDisabled ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none' : 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg'} font-semibold transition-all duration-75 rounded-l-md rounded-r-none whitespace-nowrap items-center justify-center h-9`}
+              >
+                <Send className="w-4 h-4 md:mr-2" />
+                <span className="hidden md:inline">{buttonDisplayLabel}</span>
+                <span className="md:hidden">Send</span>
+                {stage.showCount && !isSendingToCustomer && displayCount > 0 && (
+                  <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
+                    {displayCount}
+                  </span>
+                )}
+              </Button>
+              <button
+                onClick={() => setSchedulePopoverOpen(!schedulePopoverOpen)}
+                disabled={stage.buttonDisabled}
+                className={`flex items-center justify-center h-9 w-8 rounded-r-md border-l border-green-700/30 ${stage.buttonDisabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'} transition-colors`}
+              >
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
 
-            {stage.showCount && !isSendingToCustomer && displayCount > 0 && (
-              <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-green-700">
-                {displayCount}
-              </span>
-            )}
-          </Button>
+              {/* Schedule Popover */}
+              {schedulePopoverOpen && (
+                <div className="absolute top-full right-0 mt-2 z-50 bg-white rounded-lg border shadow-lg p-4 w-[240px] animate-in fade-in zoom-in-95 duration-150">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Schedule Send</p>
+
+                  {/* Hour Picker */}
+                  <div className="mb-3">
+                    <label className="text-xs text-slate-600 mb-1 block">Time</label>
+                    <select
+                      value={scheduleHour}
+                      onChange={(e) => setScheduleHour(Number(e.target.value))}
+                      className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                      {Array.from({ length: 24 }, (_, i) => {
+                        const label = i === 0 ? '12:00 AM' : i < 12 ? `${i}:00 AM` : i === 12 ? '12:00 PM' : `${i - 12}:00 PM`
+                        return <option key={i} value={i}>{label}</option>
+                      })}
+                    </select>
+                  </div>
+
+                  {/* Day Picker */}
+                  <div className="mb-4">
+                    <label className="text-xs text-slate-600 mb-1 block">Day</label>
+                    <select
+                      value={scheduleDays}
+                      onChange={(e) => setScheduleDays(Number(e.target.value))}
+                      className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value={0}>Today</option>
+                      {Array.from({ length: 7 }, (_, i) => (
+                        <option key={i + 1} value={i + 1}>After {i + 1} day{i + 1 > 1 ? 's' : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <Button
+                    onClick={handleScheduleSend}
+                    disabled={isScheduling}
+                    size="sm"
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold"
+                  >
+                    {isScheduling ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Clock className="w-4 h-4 mr-2" />
+                    )}
+                    Schedule
+                  </Button>
+                </div>
+              )}
+            </div>
+          )
         ) : (
           <Button
             onClick={handleDownloadLineArt}
