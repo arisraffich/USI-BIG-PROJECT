@@ -118,7 +118,28 @@ After approval, the admin has multiple delivery paths:
 - Download sketches + colored illustrations as a ZIP
 - Download line art + colored illustrations as a ZIP
 - Generate and download line art in bulk with progress tracking
-- Email any package directly to the studio's email
+- Email any package directly to the studio's email (large files >40MB auto-upload to Cloudflare R2 with expiring download links)
+
+---
+
+## Scheduled Sends
+
+Admins can schedule character review sends and sketch sends to execute at a future time rather than sending immediately. This is useful for coordinating delivery across timezones (team members in Canada, Armenia, and Australia).
+
+### How It Works
+
+- Every send button ("Send Sketches," "Resend Sketches," "Send Characters," "Resend Characters") is a split button: clicking the main area sends immediately, clicking the `▾` dropdown opens a schedule popover.
+- The schedule popover lets the admin pick an hour (00:00–23:00 in 24-hour format) and a day (Today, After 1–7 days), all in the admin's local timezone.
+- The local time is automatically converted to UTC for storage.
+- Once scheduled, the button displays the scheduled time (e.g., `🕐 Mar 6, 14:00`) with a cancel `✕` button.
+- If a send fails, the button shows `⚠️ Send Failed — Retry ▾` with options to retry immediately or reschedule.
+
+### Technical Implementation
+
+- **Database:** `scheduled_sends` table stores pending/completed/failed/cancelled sends.
+- **Execution:** Supabase `pg_cron` runs every minute and calls the `/api/scheduled-sends/execute` endpoint (authenticated with `CRON_SECRET`).
+- **Content:** Always sends the *latest* version of content at execution time — if illustrations are regenerated between scheduling and sending, the new versions are delivered.
+- **Status:** Scheduling does *not* change project status; status changes only when the send actually executes.
 
 ---
 
@@ -128,8 +149,12 @@ The admin side provides a complete project management interface:
 
 - **Project dashboard** with all active projects, author names, and status indicators
 - **Manuscript editor** with inline editing, scroll-spy navigation, and bulk page editing
-- **Character management** with generation, regeneration, manual upload, and side-by-side sketch/colored views
+- **Character management** with generation, regeneration (with optional deep thinking toggle), manual upload, and side-by-side sketch/colored views
 - **Illustration management** with comparison mode, batch generation, layout controls (single page, spread, spot illustrations), and the AI Director for character action/emotion control
+- **Page management** with delete functionality (automatic renumbering and storage cleanup) and story text clipboard copy
+- **Sketch/Story toggle** on illustration cards with "This page" / "All pages" scope selector (admin-only popover)
+- **Adaptive text layout** — story text and editable scene descriptions share the card space dynamically; story text takes what it needs, scene description fills the rest
+- **Scheduled sends** — split buttons for all send/resend actions with schedule popover, scheduled state display, and failed state with retry
 - **Settings panel** for toggling customer visibility of colored images, managing downloads, and controlling email delivery
 - **Real-time updates** via Supabase subscriptions — changes appear instantly across all connected views
 
@@ -138,10 +163,11 @@ The admin side provides a complete project management interface:
 ## Technical Foundation
 
 - **Framework:** Next.js 16 with TypeScript (strict mode)
-- **AI:** OpenAI GPT-5.2 (story analysis, AI Director) + Google Gemini 3 Pro (all image generation)
-- **Database & Storage:** Supabase (PostgreSQL + Storage buckets for all assets)
+- **AI:** OpenAI GPT-5.2 (story analysis, AI Director) + Google Gemini 3.1 Flash Image Preview "Nano Banana 2" (all image generation, with thinking mode support)
+- **Database & Storage:** Supabase (PostgreSQL + Storage buckets for all assets) with `pg_cron` + `pg_net` for scheduled job execution
+- **Cloud Storage:** Cloudflare R2 for temporary large file hosting (email attachments >40MB)
 - **Image Processing:** Potrace (vectorization) + Sharp (PNG rendering)
-- **Communication:** Resend (email), Slack webhooks, Quo.com (SMS)
+- **Communication:** Resend (email with R2 download links for large files), Slack webhooks, Quo.com (SMS)
 - **UI:** Tailwind CSS + shadcn/ui, fully mobile-responsive
 - **Deployment:** Railway with auto-deploy from GitHub
 - **Reliability:** Environment variable validation on startup, structured error handling throughout, automatic retries for AI generation

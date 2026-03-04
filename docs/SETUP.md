@@ -38,6 +38,16 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 QUO_API_KEY=your-quo-api-key
 QUO_PHONE_NUMBER=+1234567890
 
+# Scheduled Sends (pg_cron authentication)
+CRON_SECRET=your-cron-secret
+
+# Cloudflare R2 (for large email attachments)
+R2_ACCOUNT_ID=...
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET_NAME=...
+R2_PUBLIC_URL=https://your-r2-domain.com
+
 # Optional: Direct DB access (for migration scripts only)
 DATABASE_URL=postgresql://...
 ```
@@ -56,10 +66,16 @@ DATABASE_URL=postgresql://...
 | `ADMIN_USERNAME` | Yes | Admin login |
 | `ADMIN_PASSWORD` | Yes | Admin login |
 | `RESEND_API_KEY` | Yes | Email delivery |
+| `CRON_SECRET` | Yes | Authenticates pg_cron calls to scheduled-sends endpoint |
 | `NEXT_PUBLIC_BASE_URL` | No | Defaults to `http://localhost:3000` |
 | `SLACK_WEBHOOK_URL` | No | Slack notifications |
 | `QUO_API_KEY` | No | SMS notifications |
 | `QUO_PHONE_NUMBER` | No | SMS sender number |
+| `R2_ACCOUNT_ID` | No | Cloudflare R2 for large email attachments |
+| `R2_ACCESS_KEY_ID` | No | R2 access credentials |
+| `R2_SECRET_ACCESS_KEY` | No | R2 secret credentials |
+| `R2_BUCKET_NAME` | No | R2 bucket name |
+| `R2_PUBLIC_URL` | No | R2 public URL for download links |
 | `DATABASE_URL` | No | Only for migration scripts |
 
 ## 2. Install Dependencies

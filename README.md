@@ -6,13 +6,14 @@ A full-stack platform for managing children's book illustration projects. Handle
 
 - **Framework:** Next.js 16 (App Router, Turbopack)
 - **Language:** TypeScript (strict, `unknown` catch blocks)
-- **Database:** Supabase (PostgreSQL)
-- **Storage:** Supabase Storage (illustrations, sketches, character images, line art)
+- **Database:** Supabase (PostgreSQL) with `pg_cron` + `pg_net` extensions
+- **Storage:** Supabase Storage (illustrations, sketches, character images, line art) + Cloudflare R2 (temporary line art ZIPs)
 - **AI Generation:**
   - OpenAI GPT-5.2 (story analysis, character identification, scene descriptions)
-  - Google Gemini 3 Pro (image generation: characters, illustrations, sketches, line art)
+  - Google Gemini 3.1 Flash Image Preview "Nano Banana 2" (image generation: characters, illustrations, sketches, line art)
+  - Thinking mode: HIGH for initial generation, optional toggle for regeneration
 - **Image Processing:** Potrace (vectorization) + Sharp (PNG rendering)
-- **Email:** Resend
+- **Email:** Resend (with R2 download links for large attachments >40MB)
 - **Notifications:** Slack Webhooks, SMS (Quo.com)
 - **Styling:** Tailwind CSS v4 + shadcn/ui
 - **Deployment:** Railway (auto-deploy from GitHub)
@@ -26,10 +27,14 @@ A full-stack platform for managing children's book illustration projects. Handle
 - **Sketch Generation:** Automatic B&W sketch conversion for customer preview
 - **Line Art Generation:** AI-powered line art + Potrace vectorization for production-ready transparent PNGs (admin-only)
 - **Regeneration with Comparison:** Side-by-side old vs new comparison before committing changes
+- **Deep Thinking Toggle:** Optional "heavy thinking" mode for regeneration (characters + illustrations)
 - **Batch Generation:** Generate all remaining illustrations in parallel (3 concurrent)
 - **Bulk Downloads:** ZIP download of sketches + illustrations, or line art + illustrations
-- **Email Delivery:** Send ZIP packages to info@usillustrations.com for sketches or line art
+- **Email Delivery:** Send ZIP packages to info@usillustrations.com (large files auto-upload to R2 with download link)
+- **Scheduled Sends:** Schedule character/sketch sends for a specific hour and day (up to 7 days ahead), with pg_cron executing at the scheduled time
 - **Push Updates:** Silently sync changes to customer without notifications
+- **Page Management:** Delete pages with automatic renumbering, storage cleanup, and story text clipboard copy
+- **Sketch/Story Toggle:** View sketch or story text per card, with "This page" / "All pages" scope selector
 - **Settings Panel:** Toggle colored image visibility, request coloring, manage downloads
 
 ### Customer Side
@@ -51,9 +56,10 @@ A full-stack platform for managing children's book illustration projects. Handle
 1. Project Creation
    └─> Upload manuscript (PDF/DOCX/TXT)
    └─> AI analyzes story, identifies characters, splits into pages
+   └─> Admin can delete/renumber pages as needed
 
 2. Character Stage
-   └─> Admin sends character forms to customer
+   └─> Admin sends character forms to customer (immediately or scheduled)
    └─> Customer fills out character details (age, hair, clothing, etc.)
    └─> AI generates character images using form data
    └─> Customer reviews and approves (or requests revisions)
@@ -62,12 +68,12 @@ A full-stack platform for managing children's book illustration projects. Handle
    └─> Admin generates Page 1 illustration first
    └─> Remaining pages unlock for batch generation
    └─> AI creates colored illustrations + B&W sketches for each page
-   └─> Admin sends sketches to customer for review
+   └─> Admin sends sketches to customer for review (immediately or scheduled)
 
 4. Review Stage
    └─> Customer reviews each page's sketch
    └─> Can request revisions with notes (per-page feedback)
-   └─> Admin replies, regenerates as needed
+   └─> Admin replies, regenerates as needed (with optional deep thinking)
    └─> Conversation threads for back-and-forth discussion
 
 5. Approval & Delivery
@@ -75,7 +81,7 @@ A full-stack platform for managing children's book illustration projects. Handle
    └─> Admin can download sketches + illustrations as ZIP
    └─> Admin can generate line art (AI + Potrace vectorization → transparent PNGs)
    └─> Admin can download or email line art + illustrations as ZIP
-   └─> Email delivery to info@usillustrations.com
+   └─> Email delivery to info@usillustrations.com (R2 links for large files)
 ```
 
 ## Getting Started
@@ -120,6 +126,16 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 # SMS (optional)
 QUO_API_KEY=...
 QUO_PHONE_NUMBER=...
+
+# Scheduled Sends (pg_cron authentication)
+CRON_SECRET=your-cron-secret
+
+# Cloudflare R2 (for large email attachments)
+R2_ACCOUNT_ID=...
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET_NAME=...
+R2_PUBLIC_URL=https://your-r2-domain.com
 
 # Direct DB access - for migration scripts only (optional)
 DATABASE_URL=postgresql://...
@@ -172,9 +188,10 @@ usi-platform/
 │   │   ├── email/           # Email delivery (send-sketches, send-lineart)
 │   │   ├── illustrations/   # Illustration generation, confirmation
 │   │   ├── line-art/        # Line art generation and status
-│   │   ├── pages/           # Page CRUD, feedback, admin replies
+│   │   ├── pages/           # Page CRUD, feedback, admin replies, delete with renumber
 │   │   ├── projects/        # Project CRUD, settings, downloads, send-to-customer
-│   │   └── review/          # Customer review endpoints (token-based)
+│   │   ├── review/          # Customer review endpoints (token-based)
+│   │   └── scheduled-sends/ # Scheduled send management + pg_cron execution endpoint
 │   ├── login/               # Admin login page
 │   └── review/              # Customer review portal
 ├── components/
@@ -204,11 +221,12 @@ usi-platform/
 
 ## Key Components
 
-- **SharedIllustrationBoard:** Core component for displaying illustrations with sketch/colored toggle, feedback, and line art generation
-- **ProjectHeader:** Admin project header with stage management, bulk downloads, line art modal, email delivery, and settings
-- **IllustrationsTabContent:** Admin illustration management with comparison mode and batch generation
+- **SharedIllustrationBoard:** Core component for displaying illustrations with sketch/story text toggle (with "This page"/"All pages" scope), colored toggle, feedback, adaptive text layout, and line art generation
+- **ProjectHeader:** Admin project header with stage management, bulk downloads, line art modal, email delivery, scheduled sends (split button with schedule popover, scheduled/failed states), and settings
+- **IllustrationsTabContent:** Admin illustration management with comparison mode, batch generation, and global sketch view mode propagation
+- **UnifiedIllustrationFeed:** Feed wrapper that bridges IllustrationsTabContent and SharedIllustrationBoard, forwarding global view mode and toggle callbacks
 - **CustomerProjectTabsContent:** Main customer review interface with character forms and illustration feedback
-- **UnifiedCharacterCard:** Reusable character card for admin (with regeneration) and customer views
+- **UnifiedCharacterCard:** Reusable character card for admin (with regeneration, deep thinking toggle) and customer views
 
 ## Database Schema
 
@@ -216,6 +234,11 @@ Main tables:
 - `projects` - Project metadata, status, send counts, settings
 - `pages` - Manuscript pages with story text, illustrations, sketches, feedback history
 - `characters` - Character definitions, generated images, form data
+- `scheduled_sends` - Scheduled send jobs (project_id, action_type, scheduled_at, status, error_message)
+
+Database extensions:
+- `pg_cron` - Runs every minute to check for due scheduled sends
+- `pg_net` - Makes HTTP calls from Postgres to the execute endpoint
 
 Storage buckets:
 - `character-images` - Generated character illustrations
@@ -236,6 +259,26 @@ The line art feature (admin-only) converts colored illustrations into production
 4. **Storage:** Uploaded to Supabase Storage (`lineart` bucket)
 
 Single pages can be generated individually via the "Create LineArt" button, or all pages can be batch-processed via "Download Line Art" in settings (with progress modal, retry for failures, and auto-ZIP download).
+
+## Scheduled Sends
+
+The platform supports scheduling sends for a future time instead of sending immediately. Every send/resend button is a split button:
+
+- **Main area:** Sends immediately (same as before)
+- **▾ dropdown:** Opens a schedule popover with hour (00–23) and day (Today, After 1–7 days) pickers
+
+### Architecture
+
+1. Admin picks a time → local time converted to UTC → stored in `scheduled_sends` table
+2. Supabase `pg_cron` runs every minute → calls `pg_net` to POST to `/api/scheduled-sends/execute`
+3. Execute endpoint (authenticated via `CRON_SECRET`) finds due sends → calls the existing send-to-customer API
+4. Send marked as `completed` or `failed` with error message
+
+### Button States
+
+- **Normal:** `[Send Sketches ▾]` — split button
+- **Scheduled:** `[🕐 Mar 6, 14:00 ✕]` — shows scheduled time with cancel
+- **Failed:** `[⚠️ Send Failed — Retry ▾]` — click to retry immediately, ▾ to reschedule
 
 ## License
 

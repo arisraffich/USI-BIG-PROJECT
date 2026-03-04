@@ -9,12 +9,16 @@
 
 ### Key differences from this original spec:
 > - **Framework:** Next.js 16 (was 14)
-> - **AI Models:** OpenAI GPT-5.2 + Google Gemini 3 Pro (was GPT-4o + Replicate)
-> - **Email:** Resend (was Gmail SMTP)
+> - **AI Models:** OpenAI GPT-5.2 + Google Gemini 3.1 Flash Image Preview (was GPT-4o + Replicate)
+> - **Email:** Resend with R2 large-file support (was Gmail SMTP)
 > - **Deployment:** Railway (was Cloudflare Pages)
 > - **Colored Illustrations:** Fully implemented (was "Phase 2 - not included")
 > - **Line Art:** AI generation + Potrace vectorization (not in original spec)
 > - **Sketch Workflow:** Implemented with customer review, feedback threads, approval
+> - **Scheduled Sends:** pg_cron-based scheduling for all send/resend actions (not in original spec)
+> - **Page Management:** Delete pages with auto-renumbering (not in original spec)
+> - **Sketch/Story Toggle:** Per-card view toggle with admin "This page"/"All pages" scope (not in original spec)
+> - **Deep Thinking:** Optional heavy thinking mode for regeneration (not in original spec)
 > - **All phases:** Complete and in production
 
 ---
