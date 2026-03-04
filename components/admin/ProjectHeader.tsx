@@ -137,7 +137,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   // Schedule send state
   const [scheduledSend, setScheduledSend] = useState<{ id: string; scheduled_at: string; action_type: string; status: string } | null>(null)
   const [schedulePopoverOpen, setSchedulePopoverOpen] = useState(false)
-  const [scheduleHour, setScheduleHour] = useState(9)
+  const [scheduleHour, setScheduleHour] = useState(() => (new Date().getHours() + 1) % 24)
   const [scheduleDays, setScheduleDays] = useState(1)
   const [isScheduling, setIsScheduling] = useState(false)
   const [isCancellingSchedule, setIsCancellingSchedule] = useState(false)
@@ -239,7 +239,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       setSchedulePopoverOpen(false)
 
       const dateStr = target.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      const hourStr = target.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true })
+      const hourStr = `${target.getHours().toString().padStart(2, '0')}:00`
       toast.success(`Scheduled for ${dateStr} at ${hourStr}`)
     } catch {
       toast.error('Failed to schedule send')
@@ -275,7 +275,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const formatScheduledTime = useCallback((isoString: string) => {
     const d = new Date(isoString)
     const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    const hourStr = d.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true })
+    const hourStr = `${d.getHours().toString().padStart(2, '0')}:00`
     return `${dateStr}, ${hourStr}`
   }, [])
 
@@ -1544,7 +1544,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
                       className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                     >
                       {Array.from({ length: 24 }, (_, i) => {
-                        const label = i === 0 ? '12:00 AM' : i < 12 ? `${i}:00 AM` : i === 12 ? '12:00 PM' : `${i - 12}:00 PM`
+                        const label = `${i.toString().padStart(2, '0')}:00`
                         return <option key={i} value={i}>{label}</option>
                       })}
                     </select>
