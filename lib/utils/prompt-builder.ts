@@ -43,9 +43,9 @@ export function buildCharacterPrompt(character: Character, hasReferenceImage: bo
 ${physicalLine}
 
 OUTPUT REQUIREMENTS:
-- Full-body children's book character illustration
-- Show character from head to toes
-- Standing on clean, plain white background
+- Full-body children's book illustration showing the complete character
+- Posed naturally (humans standing, animals on all fours unless specified otherwise)
+- Clean, plain white background
 - No scenery, no additional objects, no background colors
 - Must feel like it belongs in the same book series, drawn by the same artist`
   }

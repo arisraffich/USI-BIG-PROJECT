@@ -1,6 +1,6 @@
-
 import { OpenAI } from 'openai'
 import { createAdminClient } from '@/lib/supabase/server'
+import { DirectorSchema, zodToResponsesFormat, extractResponseContent, actionsArrayToObject } from '@/lib/ai/schemas'
 
 
 
@@ -24,60 +24,49 @@ export async function analyzeScene(
             `${c.name}: ${c.description} (Appearance: ${c.appearance_notes || 'N/A'})`
         ).join('\n')
 
-        const prompt = `
-        You are the "AI Director" for a children's book.
-        Analyze the following scene and determine the actions and positioning for each character present.
-        Also write a detailed visual description (illustration prompt) for the scene.
+        const prompt = `You are the "AI Director" for a children's book.
+Analyze the following scene and determine the actions and positioning for each character present.
+Also write a detailed visual description (illustration prompt) for the scene.
 
-        Characters available:
-        ${characterContext}
+Characters available:
+${characterContext}
 
-        Story Text for this Page:
-        "${storyText}"
+Story Text for this Page:
+"${storyText}"
 
-        Scene Description:
-        "${sceneDescription}"
+Scene Description:
+"${sceneDescription}"
 
-        Response Format (JSON):
-        {
-            "character_actions": {
-                "CharacterName": "Describe specifically what they are doing, wearing, and their emotion."
-            },
-            "illustration_prompt": "A complete, detailed image generation prompt describing the scene, style, lighting, and composition. Do NOT include technical parameters."
-        }
-        
-        Only include characters that should be visible in the scene.
-        `
+Return character_actions as an array of objects with "character_name" and "action" fields.
+Only include characters that should be visible in the scene.`
 
         const completion = await openai.responses.create({
-            model: "gpt-5.2",
-            input: `You are a helpful AI Director outputting valid JSON.\n\n${prompt}`,
+            model: "gpt-5.4",
+            input: prompt,
             text: {
-                format: { type: "json_object" }
+                format: zodToResponsesFormat(DirectorSchema, 'director_analysis')
             },
             reasoning: {
-                effort: "medium" // Complex multi-character coordination and spatial reasoning
+                effort: "medium"
             }
         })
 
-        // Find the message output (not reasoning)
-        const messageOutput = completion.output?.find((o: any) => o.type === 'message')
-        let content = null
-        if (messageOutput && 'content' in messageOutput) {
-            const firstContent = messageOutput.content?.[0]
-            content = firstContent && 'text' in firstContent ? firstContent.text : null
-        }
+        const { text: content, refusal } = extractResponseContent(completion)
+        if (refusal) throw new Error(`Model refused: ${refusal}`)
         if (!content) throw new Error('No content from OpenAI')
 
-        const result = JSON.parse(content)
+        const parsed = JSON.parse(content)
+        const result = {
+            character_actions: actionsArrayToObject(parsed.character_actions),
+            illustration_prompt: parsed.illustration_prompt,
+        }
 
-        // Update Database
         const { error } = await supabase
             .from('pages')
             .update({
                 character_actions: result.character_actions,
                 illustration_prompt: result.illustration_prompt,
-                illustration_status: 'analyzed', // Custom status to signal readiness
+                illustration_status: 'analyzed',
                 updated_at: new Date().toISOString()
             })
             .eq('id', pageId)

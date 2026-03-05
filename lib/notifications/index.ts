@@ -725,6 +725,52 @@ export async function notifyCustomerAcceptedReply(options: {
   }
 }
 
+export async function notifyBackgroundTaskFailure(options: {
+  projectId: string
+  projectTitle: string
+  authorName: string
+  projectUrl: string
+  task: string
+  error: string
+}): Promise<void> {
+  const { projectTitle, authorName, projectUrl, task, error } = options
+
+  try {
+    await sendSlackNotification({
+      text: `🚨 Background task failed for "${projectTitle}"`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*🚨 Background Task Failed*\nCustomer: *${authorName}*\nProject: "${projectTitle}"\nTask: *${task}*`,
+          },
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Error:*\n\`\`\`${error.substring(0, 500)}${error.length > 500 ? '...' : ''}\`\`\``,
+          },
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'View Project' },
+              url: projectUrl,
+              style: 'danger',
+            },
+          ],
+        },
+      ],
+    })
+  } catch (slackError: unknown) {
+    console.error('[Notification] Failed to send background task failure Slack:', slackError)
+  }
+}
+
 export async function notifyCustomerFollowUp(options: {
   projectTitle: string
   authorName: string

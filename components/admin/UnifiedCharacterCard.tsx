@@ -843,10 +843,17 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <Button variant="outline" onClick={() => { setIsDialogOpen(false); removeReferenceImage(); setUseThinkingMode(false); }}>Cancel</Button>
-                                                <Button onClick={handleRegenerate} disabled={isRegenerating}>
-                                                    {isRegenerating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                                    Regenerate
-                                                </Button>
+                                                {!character.is_main && character.image_url && !customPrompt.trim() && !referenceImage ? (
+                                                    <Button onClick={handleRegenerate} disabled={isRegenerating} className="bg-red-600 hover:bg-red-700 text-white">
+                                                        {isRegenerating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                                        Reset
+                                                    </Button>
+                                                ) : (
+                                                    <Button onClick={handleRegenerate} disabled={isRegenerating}>
+                                                        {isRegenerating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                                        Regenerate
+                                                    </Button>
+                                                )}
                                             </div>
                                         </DialogFooter>
                                     </DialogContent>

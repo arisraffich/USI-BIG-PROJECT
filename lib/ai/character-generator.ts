@@ -54,11 +54,13 @@ export async function generateCharacterImage(
         const prompt = customPrompt || buildCharacterPrompt(character, !!mainCharacterImageUrl, hasVisualRef)
 
         const parts: any[] = []
-        const isMainCharRegen = character.is_main && customPrompt && mainCharacterImageUrl
 
-        if (isMainCharRegen) {
-            // MAIN CHARACTER REGENERATION: Simple modification prompt
-            // Send the current image as the source to modify, with a concise instruction
+        // Edit mode: character has an existing image AND a custom prompt (edit instructions).
+        // The caller passes the character's own image as mainCharacterImageUrl for edits.
+        const isEditMode = !!(customPrompt && character.image_url && mainCharacterImageUrl)
+
+        if (isEditMode) {
+            // EDIT: Send the current character image with modification instructions
             const refImage = await fetchImageAsBase64(mainCharacterImageUrl)
             if (refImage) {
                 parts.push({
@@ -75,7 +77,6 @@ Modification: ${prompt}`
                 })
             }
 
-            // Add visual reference if provided
             if (visualReferenceImage) {
                 const matches = visualReferenceImage.match(/^data:(.+);base64,(.+)$/)
                 if (matches) {
@@ -99,18 +100,20 @@ Modification: ${prompt}`
                     parts.push({
                         text: `[STYLE REFERENCE IMAGE]
 
-Analyze this image and extract its complete visual style and drawing technique.
-Identify and replicate the medium used (e.g., watercolor, digital watercolor, gouache, soft digital painting).
+This is a character from a children's book. You MUST create the new character in an identical artistic style to this reference. If placed side by side, they must look like they belong on the same page of the same book.
 
-MATCH FROM THIS REFERENCE:
+The reference shows a different character — create a new character but replicate the exact same visual technique.
+
+MATCH ALL OF THESE FROM THE REFERENCE:
+- Medium and rendering technique (e.g., watercolor, gouache, soft digital painting)
 - Stroke style, texture, shading softness, edge quality
-- Color blending method and rendering technique
-- Color palette and saturation levels
-- Line quality and proportions
-- Facial style and overall aesthetic
-
-The new character must look like it was created by the same illustrator using the same tools and method.
-Do NOT copy the reference character's identity — only its stylistic technique.
+- Color blending method and saturation levels
+- Color palette warmth and tone
+- Line quality and weight
+- Eye drawing technique (shape style, highlights, expression style)
+- Hair/fur rendering technique (strand/texture method, shading approach)
+- Facial feature drawing style (nose, mouth, expression technique)
+- Overall drawing complexity and detail level
 
 If the reference is 2D/Stylized/Flat: Do NOT render fur, feathers, or scales realistically. No 3D shading, no photorealism.
 If the reference is 3D/Realistic: Match that realism level.`
@@ -135,7 +138,7 @@ If the reference is 3D/Realistic: Match that realism level.`
                 if (matches) {
                     visualRefData = { mimeType: matches[1], data: matches[2] }
                 }
-            } else if (character.reference_photo_url && !character.image_url) {
+            } else if (character.reference_photo_url) {
                 visualRefData = await fetchImageAsBase64(character.reference_photo_url)
             }
 

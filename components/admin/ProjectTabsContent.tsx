@@ -187,6 +187,9 @@ export function ProjectTabsContent({
   const [isSubmitting, setIsSubmitting] = useState(false)
   
   
+  // Scene Generation State
+  const [isGeneratingScenes, setIsGeneratingScenes] = useState(false)
+
   // Push Characters to Customer State
   const [isCharPushDialogOpen, setIsCharPushDialogOpen] = useState(false)
   const [isCharPushing, setIsCharPushing] = useState(false)
@@ -263,6 +266,25 @@ export function ProjectTabsContent({
       toast.error('Failed to approve')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleGenerateScenes = async (mode: 'missing_only' | 'all') => {
+    setIsGeneratingScenes(true)
+    try {
+      const response = await fetch(`/api/admin/projects/${projectId}/generate-scenes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to generate scenes')
+      toast.success(`Updated ${data.updated_pages}/${data.total_pages} scenes`)
+      router.refresh()
+    } catch (e) {
+      toast.error(getErrorMessage(e, 'Scene generation failed'))
+    } finally {
+      setIsGeneratingScenes(false)
     }
   }
 
@@ -476,6 +498,13 @@ export function ProjectTabsContent({
     return !!(page1?.illustration_url && page1?.sketch_url)
   }, [localPages])
 
+  const hasMissingScenes = useMemo(() => {
+    if (localPages.length === 0) return false
+    return localPages.some(p => p.story_text?.trim() && (!p.scene_description?.trim() || !p.character_actions || !p.atmosphere))
+  }, [localPages])
+
+  const hasAnyPages = localPages.length > 0 && localPages.some(p => p.story_text?.trim())
+
   // No full-page loading - show character gallery with individual card spinners instead
 
 
@@ -557,6 +586,51 @@ export function ProjectTabsContent({
                     </div>
                   )}
                 </div>
+              )}
+
+              {activeTab === 'pages' && hasAnyPages && (
+                hasMissingScenes ? (
+                  <Button
+                    size="sm"
+                    onClick={() => handleGenerateScenes('missing_only')}
+                    disabled={isGeneratingScenes}
+                    className="bg-orange-500 hover:bg-orange-600 text-white h-9 text-sm px-3 shadow-sm font-semibold"
+                  >
+                    {isGeneratingScenes ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
+                    Gen Scenes
+                  </Button>
+                ) : (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isGeneratingScenes}
+                        className="h-9 text-sm px-3 shadow-sm font-semibold border-slate-300"
+                      >
+                        {isGeneratingScenes ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
+                        Regen Scenes
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Regenerate all scenes?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          All pages already have scene descriptions. This will regenerate them from scratch, overwriting any manual edits.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleGenerateScenes('all')}
+                          className="bg-orange-500 hover:bg-orange-600"
+                        >
+                          Regenerate All
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )
               )}
               
             </>

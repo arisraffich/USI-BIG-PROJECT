@@ -327,7 +327,49 @@ export function CustomerSubmissionWizard({
     const effectiveChoice = choiceOverride ?? sceneDescriptionChoice
 
     try {
-      // Step 1: Re-save pages with scene descriptions (updates the initial save)
+      // Step 1: Ensure background save + character identification is complete
+      // before we re-save pages, so our save is guaranteed to be the last write.
+      let characters: Character[] = []
+      const bg = bgCharIdRef.current
+
+      if (bg.result) {
+        console.log('[CharId] Using background result (instant)')
+        characters = bg.result.characters || []
+      } else if (bg.promise) {
+        setLoadingMessage('Preparing character forms...')
+        const data = await bg.promise
+        characters = data.characters || []
+      } else {
+        // Background never started — save pages first so identify can read them
+        setLoadingMessage('Saving your pages...')
+        const prelimSave = await fetch(`/api/submit/${reviewToken}/save-pages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pages: pages.map(p => ({
+              page_number: p.pageNumber,
+              story_text: p.storyText,
+              scene_description: p.sceneDescription || null,
+            })),
+            scene_description_choice: effectiveChoice,
+          }),
+        })
+        if (!prelimSave.ok) {
+          const errorData = await prelimSave.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Failed to save pages')
+        }
+        setLoadingMessage('Analyzing your story for characters...')
+        const identifyResponse = await fetch(`/api/submit/${reviewToken}/identify-characters`, {
+          method: 'POST',
+        })
+        if (!identifyResponse.ok) throw new Error('Failed to identify characters')
+        const data = await identifyResponse.json()
+        characters = data.characters || []
+      }
+
+      // Step 2: Re-save pages with final scene description choice.
+      // Background save is done, so this is the last write — page IDs are stable
+      // for the complete endpoint that follows.
       setLoadingMessage('Saving your pages...')
       const saveResponse = await fetch(`/api/submit/${reviewToken}/save-pages`, {
         method: 'POST',
@@ -346,30 +388,6 @@ export function CustomerSubmissionWizard({
         const errorData = await saveResponse.json().catch(() => ({}))
         console.error('[Wizard] Save pages failed:', saveResponse.status, errorData)
         throw new Error(errorData.error || 'Failed to save pages')
-      }
-
-      // Step 2: Use background character identification result if available
-      let characters: Character[] = []
-      const bg = bgCharIdRef.current
-
-      if (bg.result) {
-        // Background already finished — use cached result instantly
-        console.log('[CharId] Using background result (instant)')
-        characters = bg.result.characters || []
-      } else if (bg.promise) {
-        // Background still running — wait for it
-        setLoadingMessage('Preparing character forms...')
-        const data = await bg.promise
-        characters = data.characters || []
-      } else {
-        // Background never started (shouldn't happen, but fallback)
-        setLoadingMessage('Analyzing your story for characters...')
-        const identifyResponse = await fetch(`/api/submit/${reviewToken}/identify-characters`, {
-          method: 'POST',
-        })
-        if (!identifyResponse.ok) throw new Error('Failed to identify characters')
-        const data = await identifyResponse.json()
-        characters = data.characters || []
       }
 
       if (bg.error && characters.length === 0) {

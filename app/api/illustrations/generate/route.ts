@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { generateIllustration } from '@/lib/ai/google-ai'
-import { sanitizeFilename } from '@/lib/utils/metadata-cleaner'
 import { getErrorMessage } from '@/lib/utils/error'
 
 // Allow max duration for AI generation
@@ -265,13 +264,16 @@ IMAGE CONTEXT:
                 })
                 console.log(`[Illustration Generate] 📝 Using custom character actions from UI`)
             } else {
-                // Use AI Director's character actions from the page
                 const characterActions = pageData.character_actions || {}
                 if (characterActions) {
                     Object.entries(characterActions).forEach(([charName, action]: [string, any]) => {
-                        if (action.action) actionDescription += `${charName} Action: ${action.action}. `
-                        if (action.pose) actionDescription += `${charName} Pose: ${action.pose}. `
-                        if (action.emotion) actionDescription += `${charName} Emotion: ${action.emotion}. `
+                        if (typeof action === 'string') {
+                            actionDescription += `${charName}: ${action}. `
+                        } else if (typeof action === 'object' && action) {
+                            if (action.action) actionDescription += `${charName} Action: ${action.action}. `
+                            if (action.pose) actionDescription += `${charName} Pose: ${action.pose}. `
+                            if (action.emotion) actionDescription += `${charName} Emotion: ${action.emotion}. `
+                        }
                     })
                 }
             }
@@ -554,11 +556,7 @@ ${textPromptSection}`
         // (referenceImageUrl indicates manual page selection = Scene Recreation mode)
         // Pass hasCustomStyleRefs to disable main character style anchoring when custom style refs exist
         
-        // DEBUG: Log the full prompt being sent
-        console.log('\n========== FULL PROMPT TO GEMINI ==========')
-        console.log(fullPrompt)
-        console.log('============================================\n')
-        console.log('[Illustration Generate] Character references:', characterReferences.map(c => c.name))
+        console.log(`[Illustration Generate] Prompt: ${fullPrompt.length} chars, ${characterReferences.length} character refs, page ${pageData.page_number}, anchor: ${!!anchorImage}`)
         
         const result = await generateIllustration({
             prompt: fullPrompt,

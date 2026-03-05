@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { openai } from '@/lib/ai/openai'
 import { getErrorMessage } from '@/lib/utils/error'
+import { CharacterIdentificationSchema, zodToResponsesFormat, extractResponseContent } from '@/lib/ai/schemas'
 
 export const maxDuration = 30
 
@@ -111,27 +112,21 @@ CONSTRAINTS:
         }
 
         const completion = await openai.responses.create({
-            model: 'gpt-5.2',
+            model: 'gpt-5.4',
             input: prompt,
-            text: { format: { type: 'json_object' } },
+            text: { format: zodToResponsesFormat(CharacterIdentificationSchema, 'character_suggestions') },
             reasoning: { effort: 'medium' }
         })
 
-        const messageOutput = completion.output?.find((o: any) => o.type === 'message')
-        let responseContent = '{}'
-        if (messageOutput && 'content' in messageOutput) {
-            const firstContent = messageOutput.content?.[0]
-            responseContent = (firstContent && 'text' in firstContent ? firstContent.text : null) || '{}'
+        const { text: responseContent, refusal } = extractResponseContent(completion)
+        if (refusal || !responseContent) {
+            return NextResponse.json({ suggestions: [] })
         }
 
         let parsed
         try {
             parsed = JSON.parse(responseContent)
         } catch {
-            return NextResponse.json({ suggestions: [] })
-        }
-
-        if (!parsed.characters || !Array.isArray(parsed.characters)) {
             return NextResponse.json({ suggestions: [] })
         }
 

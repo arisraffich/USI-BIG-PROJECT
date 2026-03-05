@@ -102,12 +102,13 @@ export async function POST(request: NextRequest) {
             .eq('id', character.id)
         }
 
-        // Pass custom_prompt only if generating a single character (implied by this loop structure if simple)
-        // But logical safety: if bulk, we probably don't want same prompt for all.
-        // But for single character (character_id present), custom_prompt is valid.
-        // Use character's image as reference, but skip if it's an error state
         const hasValidCharacterImage = character.image_url && !character.image_url.startsWith('error:')
-        const referenceImage = hasValidCharacterImage ? character.image_url : mainCharacter.image_url
+        const isEdit = !!(custom_prompt && hasValidCharacterImage)
+        const isReset = !custom_prompt && hasValidCharacterImage
+
+        // Edit: pass the character's own image so the AI can modify it
+        // Reset / initial: pass the main character image as style reference
+        const referenceImage = isEdit ? character.image_url : mainCharacter.image_url
 
         // Pass visual_reference_image only for single character regeneration
         const visualRef = character_id ? visual_reference_image : undefined

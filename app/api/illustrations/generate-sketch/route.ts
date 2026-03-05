@@ -1,11 +1,8 @@
-
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { generateSketch } from '@/lib/ai/google-ai'
-import { buildSketchPrompt } from '@/lib/utils/prompt-builder'
 import { getErrorMessage } from '@/lib/utils/error'
 
-// Allow max duration
 export const maxDuration = 60
 
 export async function POST(request: Request) {
@@ -18,21 +15,7 @@ export async function POST(request: Request) {
 
         const supabase = await createAdminClient()
 
-        // 1. Fetch Page Data for Prompt Context
-        // We need page data to build a good sketch prompt context if needed, 
-        // though the visual conversion is primary.
-        // We already have prompt-builder logic for this.
-        // Fetch characters too?
-        // Let's optimize: Just use a standard sketch conversion prompt + illustrationUrl.
-        // But `buildSketchPrompt` from lib might expect page/project objects.
-        // Let's fetch them to be safe and use the dedicated builder if useful.
-        // Actually, `generateSketch` in google-ai.ts uses input image + prompt.
-        // The visual input is the most important. The prompt guides the style.
-
-        // Fetch Page & Project
-        const { data: page } = await supabase.from('pages').select('*').eq('id', pageId).single()
-        const { data: project } = await supabase.from('projects').select('*').eq('id', projectId).single()
-        const { data: characters } = await supabase.from('characters').select('*').eq('project_id', projectId)
+        const { data: page } = await supabase.from('pages').select('id, page_number').eq('id', pageId).single()
 
         // Use builder or fallback
         // Use strict fidelity prompt (restored from backup)

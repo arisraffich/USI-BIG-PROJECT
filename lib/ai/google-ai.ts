@@ -82,7 +82,13 @@ interface GenerateOptions {
     useThinking?: boolean // Enable thinking mode for complex scene composition
 }
 
-async function fetchImageAsBase64(input: string): Promise<{ mimeType: string, data: string } | null> {
+async function fetchImageAsBase64(
+    input: string,
+    opts?: { format?: 'jpeg' | 'png', maxSize?: number }
+): Promise<{ mimeType: string, data: string } | null> {
+    const format = opts?.format ?? 'jpeg'
+    const maxSize = opts?.maxSize ?? 2048
+
     try {
         let buffer: Buffer;
 
@@ -104,13 +110,15 @@ async function fetchImageAsBase64(input: string): Promise<{ mimeType: string, da
         }
 
         try {
-            buffer = await sharp(buffer)
-                .resize(2048, 2048, { fit: 'inside', withoutEnlargement: true })
-                .jpeg({ quality: 95 })
-                .toBuffer()
+            const pipeline = sharp(buffer).resize(maxSize, maxSize, { fit: 'inside', withoutEnlargement: true })
+            if (format === 'png') {
+                buffer = await pipeline.png({ compressionLevel: 6 }).toBuffer()
+            } else {
+                buffer = await pipeline.jpeg({ quality: 95 }).toBuffer()
+            }
 
             return {
-                mimeType: 'image/jpeg',
+                mimeType: format === 'png' ? 'image/png' : 'image/jpeg',
                 data: buffer.toString('base64')
             }
         } catch (resizeError) {
@@ -144,24 +152,42 @@ export async function generateIllustration({
     try {
         const parts: any[] = []
 
+        // Fetch all images in parallel for speed
+        const charFetches = characterReferences.map(c =>
+            fetchImageAsBase64(c.imageUrl, { format: 'png', maxSize: 1536 })
+        )
+        const anchorFetch = anchorImage
+            ? fetchImageAsBase64(anchorImage)
+            : Promise.resolve(null)
+        const styleFetches = styleReferenceImages.map(url =>
+            fetchImageAsBase64(url)
+        )
+        const allResults = await Promise.allSettled([
+            ...charFetches,
+            anchorFetch,
+            ...styleFetches,
+        ])
+        const charImages = allResults.slice(0, characterReferences.length)
+            .map(r => r.status === 'fulfilled' ? r.value : null)
+        const anchorData = allResults[characterReferences.length]
+        const anchorResult = anchorData.status === 'fulfilled' ? anchorData.value : null
+        const styleImages = allResults.slice(characterReferences.length + 1)
+            .map(r => r.status === 'fulfilled' ? r.value : null)
+
         // 1. Interleaved Character References (Text -> Image)
-        // This binds the "Name/Identity" to the specific "Image" in the model's context.
-        for (const char of characterReferences) {
-            const imgData = await fetchImageAsBase64(char.imageUrl)
+        for (let i = 0; i < characterReferences.length; i++) {
+            const char = characterReferences[i]
+            const imgData = charImages[i]
             if (imgData) {
-                // A. Label
                 let label = `Reference image for character named "${char.name}"`
                 if (char.role) label += ` (Role: ${char.role})`
                 
-                // Only label main character as STYLE REFERENCE if NO custom style refs uploaded
-                // When custom style refs exist, they define the style - main char is just for identity
                 if (char.isMain && !hasCustomStyleRefs) {
                     label += ` [MAIN CHARACTER - MASTER STYLE REFERENCE]`
                     label += `\nINSTRUCTION: This image determines the VISUAL STYLE for the ENTIRE ILLUSTRATION.`
                     label += `\n- Apply the Art Style (Medium, Flatness, Texture) of this character to the BACKGROUND, TREES, and PROPS.`
                     label += `\n- The whole scene must look like it belongs in the same universe as this character.`
                 } else if (char.isMain && hasCustomStyleRefs) {
-                    // When custom style refs exist, main char is identity-only
                     label += ` [MAIN CHARACTER - IDENTITY REFERENCE]`
                     label += `\nIMPORTANT: This image defines the CHARACTER'S APPEARANCE (face, body, clothing) only.`
                     label += `\nThe artistic STYLE will be determined by the STYLE REFERENCE IMAGES provided separately.`
@@ -169,8 +195,6 @@ export async function generateIllustration({
                 label += ":"
 
                 parts.push({ text: label })
-
-                // B. Image
                 parts.push({
                     inline_data: {
                         mime_type: imgData.mimeType,
@@ -180,50 +204,42 @@ export async function generateIllustration({
             }
         }
 
-        // 2. Anchor Image (Style Reference) - If provided (Page 2+ or custom style refs)
+        // 2. Anchor Image (Style Reference)
         const totalStyleRefs = (anchorImage ? 1 : 0) + styleReferenceImages.length
         const isCustomStyleMode = totalStyleRefs > 0 && !isSceneRecreation
         
-        if (anchorImage) {
-            const anchorData = await fetchImageAsBase64(anchorImage)
-            if (anchorData) {
-                let anchorLabel: string
-                
-                if (isSceneRecreation) {
-                    anchorLabel = "SCENE BASE IMAGE (Edit this scene - preserve environment, change characters):"
-                } else if (totalStyleRefs > 1) {
-                    // Multiple style references mode
-                    anchorLabel = `STYLE REFERENCE IMAGE 1 of ${totalStyleRefs}:
+        if (anchorResult) {
+            let anchorLabel: string
+            
+            if (isSceneRecreation) {
+                anchorLabel = "SCENE BASE IMAGE (Edit this scene - preserve environment, change characters):"
+            } else if (totalStyleRefs > 1) {
+                anchorLabel = `STYLE REFERENCE IMAGE 1 of ${totalStyleRefs}:
 This image (along with the other style reference(s)) defines the TARGET ARTISTIC STYLE for the illustration.
 Extract and match: Art medium, color palette, line quality, shading technique, texture, and overall aesthetic.`
-                } else {
-                    // Single anchor (default mode - main character or page 1)
-                    anchorLabel = "STYLE REFERENCE (Maintain the art style, lighting, and rendering of this reference):"
-                }
-                
-                parts.push({ text: anchorLabel })
-                parts.push({
-                    inline_data: {
-                        mime_type: anchorData.mimeType,
-                        data: anchorData.data
-                    }
-                })
+            } else {
+                anchorLabel = "STYLE REFERENCE (Maintain the art style, lighting, and rendering of this reference):"
             }
+            
+            parts.push({ text: anchorLabel })
+            parts.push({
+                inline_data: {
+                    mime_type: anchorResult.mimeType,
+                    data: anchorResult.data
+                }
+            })
         }
 
-        // 3. Additional Style References (e.g. from custom style uploads or Edit Mode)
+        // 3. Additional Style References
         for (let i = 0; i < styleReferenceImages.length; i++) {
-            const url = styleReferenceImages[i]
-            const imgData = await fetchImageAsBase64(url)
+            const imgData = styleImages[i]
             if (imgData) {
                 let refLabel: string
                 
                 if (totalStyleRefs > 1) {
-                    // Part of multiple style references
                     refLabel = `STYLE REFERENCE IMAGE ${i + 2} of ${totalStyleRefs}:
 This image contributes to the TARGET ARTISTIC STYLE. Match its stylistic qualities along with the other reference(s).`
                 } else {
-                    // Edit mode additional reference
                     refLabel = "Additional Visual Reference:"
                 }
                 

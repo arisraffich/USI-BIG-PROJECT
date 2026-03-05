@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import { getErrorMessage } from '@/lib/utils/error'
+import { CharacterFormSchema, zodToResponsesFormat, extractResponseContent } from '@/lib/ai/schemas'
 
 export const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({
@@ -92,18 +93,28 @@ Return valid JSON only with this structure:
   try {
     console.log('[parseCharacterForm] Sending request to OpenAI...')
     const completion = await openai.responses.create({
-      model: 'gpt-5.2',
+      model: 'gpt-5.4',
       input: prompt,
       text: {
-        format: { type: 'json_object' }
+        format: zodToResponsesFormat(CharacterFormSchema, 'character_form')
       },
       reasoning: {
-        effort: 'none' // Pure data extraction, no reasoning needed
+        effort: 'none'
       }
     })
 
     console.log('[parseCharacterForm] OpenAI response received')
-    const result = await processCompletion(completion)
+    const { text, refusal } = extractResponseContent(completion)
+    if (refusal) {
+      console.error('[parseCharacterForm] Model refused:', refusal)
+      return createEmptyCharacterData()
+    }
+    if (!text) {
+      console.error('[parseCharacterForm] Empty response from model')
+      return createEmptyCharacterData()
+    }
+
+    const result = JSON.parse(text)
     console.log('[parseCharacterForm] Extraction result:', JSON.stringify(result, null, 2))
     return result
   } catch (error: unknown) {
@@ -130,47 +141,5 @@ function createEmptyCharacterData() {
   }
 }
 
-async function processCompletion(completion: any) {
-  // Find the message output (not reasoning)
-  const messageOutput = completion.output?.find((o: any) => o.type === 'message')
-  let content = '{}'
-  if (messageOutput && 'content' in messageOutput) {
-    const firstContent = messageOutput.content?.[0]
-    content = (firstContent && 'text' in firstContent ? firstContent.text : null) || '{}'
-  }
-
-  let result
-  try {
-    result = JSON.parse(content)
-  } catch (parseError: unknown) {
-    console.error('Failed to parse OpenAI JSON response:', getErrorMessage(parseError))
-    // Return empty on parse error
-    return createEmptyCharacterData()
-  }
-
-  // Validate required structure
-  const requiredFields = [
-    'name',
-    'biography',
-    'age',
-    'ethnicity',
-    'skin_color',
-    'hair_color',
-    'hair_style',
-    'eye_color',
-    'clothing',
-    'accessories',
-    'special_features',
-    'gender',
-  ]
-
-  for (const field of requiredFields) {
-    if (!(field in result)) {
-      result[field] = null
-    }
-  }
-
-  return result
-}
 
 

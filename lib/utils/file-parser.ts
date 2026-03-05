@@ -1,6 +1,14 @@
 import mammoth from 'mammoth'
 import { openai } from '@/lib/ai/openai'
 import { getErrorMessage } from '@/lib/utils/error'
+import {
+  PageParsingSchema,
+  SceneDescriptionBatchSchema,
+  SceneDescriptionSingleSchema,
+  zodToResponsesFormat,
+  extractResponseContent,
+  actionsArrayToObject,
+} from '@/lib/ai/schemas'
 
 export async function parseStoryFile(
   fileBuffer: Buffer,
@@ -117,7 +125,7 @@ export function parsePages(text: string) {
   return pages
 }
 
-// AI-powered story parsing using GPT-5.2
+// AI-powered story parsing using GPT-5.4 with structured outputs
 export async function parsePagesWithAI(storyText: string): Promise<Array<{
   page_number: number
   story_text: string
@@ -202,49 +210,39 @@ Example output format:
   }>
 
   try {
-    console.log('[parsePagesWithAI] Starting story parsing with GPT-5.2...')
+    console.log('[parsePagesWithAI] Starting story parsing with GPT-5.4...')
     const completion = await openai.responses.create({
-      model: 'gpt-5.2',
+      model: 'gpt-5.4',
       input: parsingPrompt,
       text: {
-        format: { type: 'json_object' }
+        format: zodToResponsesFormat(PageParsingSchema, 'story_pages')
       },
       reasoning: {
-        effort: 'none' // Fast parsing, no complex reasoning needed
+        effort: 'medium'
       }
     })
 
-    // Find the message output (not reasoning)
-    const messageOutput = completion.output?.find((o: any) => o.type === 'message')
-    let content = '{"pages": []}'
-    if (messageOutput && 'content' in messageOutput) {
-      const firstContent = messageOutput.content?.[0]
-      content = (firstContent && 'text' in firstContent ? firstContent.text : null) || '{"pages": []}'
-    }
+    const { text: content, refusal } = extractResponseContent(completion)
+    if (refusal) throw new Error(`Model refused to parse story: ${refusal}`)
+    if (!content) throw new Error('Empty response from GPT-5.4')
+
     console.log('[parsePagesWithAI] Raw AI response length:', content.length)
     const result = JSON.parse(content)
-
-    if (!result.pages || !Array.isArray(result.pages)) {
-      console.error('[parsePagesWithAI] Invalid JSON structure:', JSON.stringify(result).substring(0, 200))
-      throw new Error('Invalid response format from AI: missing or invalid pages array')
-    }
-
     console.log(`[parsePagesWithAI] Successfully parsed ${result.pages.length} pages.`)
 
-    // Sort pages by page_number
     result.pages.sort((a: any, b: any) => a.page_number - b.page_number)
 
     pages = result.pages.map((page: any) => ({
       page_number: page.page_number,
-      story_text: page.story_text || '',
-      scene_description: page.scene_description || null,
-      description_auto_generated: page.description_auto_generated || false,
+      story_text: page.story_text,
+      scene_description: page.scene_description,
+      description_auto_generated: page.description_auto_generated,
     }))
   } catch (error: unknown) {
     const errorMessage = getErrorMessage(error)
-    console.error('Error parsing story with GPT-5.2:', errorMessage)
+    console.error('Error parsing story with GPT-5.4:', errorMessage)
     console.error('Full parsing error details:', error)
-    throw new Error(`Failed to parse story with GPT-5.2: ${errorMessage}`)
+    throw new Error(`Failed to parse story with GPT-5.4: ${errorMessage}`)
   }
 
   // STEP 2: Process scene descriptions using shared function
@@ -302,7 +300,7 @@ Story text: "${p.story_text}"${hasDesc ? `\nAuthor's scene description: "${p.sce
 
 For each page, produce:
 1. **summary**: A concise 1-2 sentence summary of what the illustration shows — the key action and who is involved. Written for a human to quickly scan.
-2. **character_actions**: Object with character names as keys and their actions/emotions as values. If no characters are named, use descriptive names like "young girl", "mother".
+2. **character_actions**: Array of objects, each with "character_name" and "action" describing what that character is doing/feeling. If no characters are named, use descriptive names like "young girl", "mother".
 3. **background_elements**: Describe the environment, setting, props, and visual details the illustrator should draw. Be specific — include spatial layout, key objects, and visual elements. As detailed as the scene requires.
 4. **atmosphere**: Describe the mood, lighting, weather, time of day, and emotional tone. Guide the scene's feel without specifying colors or art style.
 
@@ -313,49 +311,34 @@ RULES:
 - Focus on: children's book illustration style, child-friendly visuals. Match the atmosphere to the tone of each page's text.
 - Keep all text concise. No verbose paragraphs.
 
-${pagesBlock}
-
-Return ONLY valid JSON:
-{
-  "pages": [
-    {
-      "page_number": 1,
-      "summary": "concise scene description",
-      "character_actions": {"CharacterName": "action description"},
-      "background_elements": "environment description",
-      "atmosphere": "mood and lighting description"
-    }
-  ]
-}`
+${pagesBlock}`
 
   try {
     console.log(`[SceneDescriptions] Sending batched request for ${allToProcess.length} pages...`)
     const completion = await openai.responses.create({
-      model: 'gpt-5.2',
+      model: 'gpt-5.4',
       input: prompt,
       text: {
-        format: { type: 'json_object' },
-        verbosity: 'low'
+        format: zodToResponsesFormat(SceneDescriptionBatchSchema, 'scene_descriptions'),
       },
-      reasoning: { effort: 'low' },
+      reasoning: { effort: 'high' },
       max_output_tokens: 16000
     })
 
-    const msgOut = completion.output?.find((o: any) => o.type === 'message')
-    const jsonText = msgOut && 'content' in msgOut ? (msgOut as any).content?.[0]?.text?.trim() : null
-    if (!jsonText) throw new Error('Empty response from GPT-5.2')
+    const { text: jsonText, refusal } = extractResponseContent(completion)
+    if (refusal) throw new Error(`Model refused: ${refusal}`)
+    if (!jsonText) throw new Error('Empty response from GPT-5.4')
 
     const result = JSON.parse(jsonText)
-    if (!result.pages || !Array.isArray(result.pages)) throw new Error('Invalid response: missing pages array')
-
     console.log(`[SceneDescriptions] Batch success — ${result.pages.length} pages returned`)
 
-    // Build lookup from AI results
+    // Build lookup from AI results, converting array character_actions to object
     const aiResults = new Map<number, any>()
     for (const p of result.pages) {
-      if (p.page_number && p.character_actions && p.background_elements && p.atmosphere) {
-        aiResults.set(p.page_number, p)
-      }
+      aiResults.set(p.page_number, {
+        ...p,
+        character_actions: actionsArrayToObject(p.character_actions),
+      })
     }
 
     // Merge results back into all pages
@@ -390,32 +373,32 @@ async function fallbackPerPage(
 
   const processPage = async (page: SceneDescriptionInput, mode: 'generate' | 'enhance') => {
     const input = mode === 'enhance'
-      ? `You are restructuring a scene description for a children's book illustration.\n\nAuthor's description: "${page.scene_description}"\nStory text: "${page.story_text}"\n\nReturn JSON with: "summary" (concise 1-2 sentence scene description), "character_actions" (object), "background_elements" (string), "atmosphere" (string). Preserve the author's intent. Filter out meta-instructions.`
-      : `You are creating a scene description for a children's book illustration.\n\nStory text: "${page.story_text}"\n\nReturn JSON with: "summary" (concise 1-2 sentence scene description), "character_actions" (object with character names as keys), "background_elements" (string), "atmosphere" (string). Children's book style, child-friendly visuals. Match the atmosphere to the tone of the text.`
+      ? `You are restructuring a scene description for a children's book illustration.\n\nAuthor's description: "${page.scene_description}"\nStory text: "${page.story_text}"\n\nReturn JSON with: "summary" (1-2 sentence scene description), "character_actions" (array of {character_name, action}), "background_elements" (string), "atmosphere" (string). Preserve the author's intent. Filter out meta-instructions.`
+      : `You are creating a scene description for a children's book illustration.\n\nStory text: "${page.story_text}"\n\nReturn JSON with: "summary" (1-2 sentence scene description), "character_actions" (array of {character_name, action}), "background_elements" (string), "atmosphere" (string). Children's book style, child-friendly visuals. Match the atmosphere to the tone of the text.`
 
     try {
       const completion = await openai!.responses.create({
-        model: 'gpt-5.2',
+        model: 'gpt-5.4',
         input,
-        text: { format: { type: 'json_object' }, verbosity: 'low' },
-        reasoning: { effort: 'low' },
+        text: {
+          format: zodToResponsesFormat(SceneDescriptionSingleSchema, 'scene_description_single'),
+        },
+        reasoning: { effort: 'high' },
         max_output_tokens: 1000
       })
-      const msgOut = completion.output?.find((o: any) => o.type === 'message')
-      const jsonText = msgOut && 'content' in msgOut ? (msgOut as any).content?.[0]?.text?.trim() : null
-      const parsed = jsonText ? JSON.parse(jsonText) : null
+      const { text: jsonText, refusal } = extractResponseContent(completion)
+      if (refusal || !jsonText) return
 
-      if (parsed?.character_actions && parsed?.background_elements && parsed?.atmosphere) {
-        results.set(page.page_number, {
-          ...page,
-          scene_description: parsed.summary || page.scene_description,
-          character_actions: parsed.character_actions,
-          background_elements: parsed.background_elements,
-          atmosphere: parsed.atmosphere,
-          description_auto_generated: mode === 'generate',
-        })
-        console.log(`[SceneDescriptions] ${mode === 'generate' ? 'Generated' : 'Enhanced'} page ${page.page_number}`)
-      }
+      const parsed = JSON.parse(jsonText)
+      results.set(page.page_number, {
+        ...page,
+        scene_description: parsed.summary || page.scene_description,
+        character_actions: actionsArrayToObject(parsed.character_actions),
+        background_elements: parsed.background_elements,
+        atmosphere: parsed.atmosphere,
+        description_auto_generated: mode === 'generate',
+      })
+      console.log(`[SceneDescriptions] ${mode === 'generate' ? 'Generated' : 'Enhanced'} page ${page.page_number}`)
     } catch (err: unknown) {
       console.error(`[SceneDescriptions] Failed ${mode} for page ${page.page_number}:`, getErrorMessage(err))
     }

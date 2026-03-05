@@ -8,11 +8,10 @@ export const dynamic = 'force-dynamic'
 
 /**
  * Complete the customer submission wizard.
- * - Saves character form data
- * - If no scene descriptions provided, generates them via AI
- * - Changes project status to character_generation
- * - Triggers character image generation (fire-and-forget)
- * - Sends notifications
+ * Synchronous (before response): save character edits, update project status.
+ * Background (after response): scene descriptions, character image generation, notifications.
+ * Customer sees success instantly (~1-2s). If background tasks fail, admin can
+ * retry scene descriptions via POST /api/admin/projects/[id]/generate-scenes.
  */
 export async function POST(
   request: NextRequest,
@@ -79,36 +78,6 @@ export async function POST(
       )
     }
 
-    // Process scene descriptions: generate missing ones, enhance customer-provided ones
-    const { data: pages } = await supabase
-      .from('pages')
-      .select('id, page_number, story_text, scene_description, description_auto_generated')
-      .eq('project_id', project.id)
-      .order('page_number', { ascending: true })
-
-    if (pages && pages.length > 0) {
-      try {
-        const { processSceneDescriptions } = await import('@/lib/utils/file-parser')
-        const processed = await processSceneDescriptions(pages)
-
-        for (const page of processed) {
-          const original = pages.find(p => p.page_number === page.page_number)
-          const changed = page.character_actions || page.background_elements || page.atmosphere
-          if (!changed) continue
-
-          await supabase.from('pages').update({
-            scene_description: page.scene_description,
-            character_actions: page.character_actions || null,
-            background_elements: page.background_elements || null,
-            atmosphere: page.atmosphere || null,
-            description_auto_generated: page.description_auto_generated,
-          }).eq('id', original!.id)
-        }
-      } catch (genError: unknown) {
-        console.error('[Submission Complete] Failed to process scene descriptions:', getErrorMessage(genError))
-      }
-    }
-
     // Fetch characters to determine next status
     const { data: allCharacters, error: charsError } = await supabase
       .from('characters')
@@ -147,21 +116,72 @@ export async function POST(
 
     console.log(`[Submission Complete] Project ${project.id} status → ${newStatus}`)
 
-    // Trigger character generation if needed (fire-and-forget)
-    if (newStatus === 'character_generation' && pendingGeneration) {
-      const charactersToGenerate = secondaryCharacters.filter(c => !c.image_url || c.image_url.trim() === '')
-      const mainChar = allCharacters?.find(c => c.is_main)
-      const mainCharImage = mainChar?.image_url || ''
+    // ========================================================================
+    // BACKGROUND PROCESSING (fire-and-forget)
+    // Scene descriptions, character generation, and notifications all run
+    // after the response is sent. Admin can retry scene descriptions via
+    // POST /api/admin/projects/[id]/generate-scenes if anything fails.
+    // ========================================================================
+    const projectSnapshot = { ...project }
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 
-      console.log(`[Submission Complete] Triggering generation for ${charactersToGenerate.length} characters`)
+    ;(async () => {
+      try {
+        // 1. Generate scene descriptions
+        const { data: pages } = await supabase
+          .from('pages')
+          .select('id, page_number, story_text, scene_description, description_auto_generated')
+          .eq('project_id', projectSnapshot.id)
+          .order('page_number', { ascending: true })
 
-      ;(async () => {
-        try {
+        if (pages && pages.length > 0) {
+          try {
+            const { processSceneDescriptions } = await import('@/lib/utils/file-parser')
+            const processed = await processSceneDescriptions(pages)
+
+            for (const page of processed) {
+              const original = pages.find(p => p.page_number === page.page_number)
+              const changed = page.character_actions || page.background_elements || page.atmosphere
+              if (!changed) continue
+
+              await supabase.from('pages').update({
+                scene_description: page.scene_description,
+                character_actions: page.character_actions || null,
+                background_elements: page.background_elements || null,
+                atmosphere: page.atmosphere || null,
+                description_auto_generated: page.description_auto_generated,
+              }).eq('id', original!.id)
+            }
+            console.log(`[Bg] Scene descriptions generated for ${projectSnapshot.id}`)
+          } catch (genError: unknown) {
+            console.error('[Bg] Failed to process scene descriptions:', getErrorMessage(genError))
+            try {
+              const { notifyBackgroundTaskFailure } = await import('@/lib/notifications')
+              await notifyBackgroundTaskFailure({
+                projectId: projectSnapshot.id,
+                projectTitle: projectSnapshot.book_title,
+                authorName,
+                projectUrl: `${baseUrl}/admin/project/${projectSnapshot.id}?tab=pages`,
+                task: 'Scene Description Generation',
+                error: getErrorMessage(genError),
+              })
+            } catch { /* don't let notification failure cascade */ }
+          }
+        }
+
+        // 2. Character image generation
+        if (newStatus === 'character_generation' && pendingGeneration) {
+          const charactersToGenerate = secondaryCharacters.filter(c => !c.image_url || c.image_url.trim() === '')
+          const mainChar = allCharacters?.find(c => c.is_main)
+          const mainCharImage = mainChar?.image_url || ''
+
+          console.log(`[Bg] Triggering generation for ${charactersToGenerate.length} characters`)
+
           const { generateCharacterImage } = await import('@/lib/ai/character-generator')
-          
+
           const results = await Promise.all(
             charactersToGenerate.map((char) =>
-              generateCharacterImage(char as any, mainCharImage, project.id)
+              generateCharacterImage(char as any, mainCharImage, projectSnapshot.id)
                 .then(result => ({ ...result, charId: char.id, charName: char.name }))
                 .catch(err => {
                   console.error(`[Bg Generation] Character ${char.name} ERROR:`, err)
@@ -174,16 +194,15 @@ export async function POST(
           const supabaseAdmin = await createAdminClient()
 
           if (allSucceeded) {
-            await supabaseAdmin.from('projects').update({ status: 'character_generation_complete' }).eq('id', project.id)
+            await supabaseAdmin.from('projects').update({ status: 'character_generation_complete' }).eq('id', projectSnapshot.id)
 
-            // Trigger sketch generation for all characters
             const { generateCharacterSketch } = await import('@/lib/ai/character-sketch-generator')
-            
+
             if (mainChar?.image_url) {
               generateCharacterSketch(
                 mainChar.id,
                 mainChar.image_url,
-                project.id,
+                projectSnapshot.id,
                 mainChar.name || mainChar.role || 'Main Character'
               ).catch(err => console.error('[Bg] Main char sketch failed:', err))
             }
@@ -195,108 +214,127 @@ export async function POST(
                   generateCharacterSketch(
                     character.id,
                     result.imageUrl,
-                    project.id,
+                    projectSnapshot.id,
                     character.name || character.role || 'Character'
                   ).catch(err => console.error(`[Bg] Sketch failed for ${character.name}:`, err))
                 }
               }
             })
           } else {
+            const failedNames = results.filter(r => !r.success).map(r => r.charName).join(', ')
             const failedCount = results.filter(r => !r.success).length
             console.error(`[Bg Generation] ${failedCount}/${results.length} characters failed — setting character_generation_failed`)
-            await supabaseAdmin.from('projects').update({ status: 'character_generation_failed' }).eq('id', project.id)
+            await supabaseAdmin.from('projects').update({ status: 'character_generation_failed' }).eq('id', projectSnapshot.id)
+
+            try {
+              const { notifyBackgroundTaskFailure } = await import('@/lib/notifications')
+              await notifyBackgroundTaskFailure({
+                projectId: projectSnapshot.id,
+                projectTitle: projectSnapshot.book_title,
+                authorName,
+                projectUrl: `${baseUrl}/admin/project/${projectSnapshot.id}`,
+                task: 'Character Image Generation',
+                error: `${failedCount}/${results.length} characters failed: ${failedNames}`,
+              })
+            } catch { /* don't let notification failure cascade */ }
           }
 
-          // Send completion notification
           try {
             const { notifyCharacterGenerationComplete } = await import('@/lib/notifications')
-            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
             await notifyCharacterGenerationComplete({
-              projectId: project.id,
-              projectTitle: project.book_title,
+              projectId: projectSnapshot.id,
+              projectTitle: projectSnapshot.book_title,
               authorName,
-              projectUrl: `${baseUrl}/admin/project/${project.id}`,
+              projectUrl: `${baseUrl}/admin/project/${projectSnapshot.id}`,
               generatedCount: results.filter(r => r.success).length,
               failedCount: results.filter(r => !r.success).length,
             })
           } catch (e) {
-            console.error('[Bg] Notification error:', e)
+            console.error('[Bg] Generation notification error:', e)
           }
-        } catch (err: unknown) {
-          console.error('[Bg Generation] CRITICAL ERROR:', getErrorMessage(err))
-          try {
-            const supabaseAdmin = await createAdminClient()
-            await supabaseAdmin.from('projects').update({ status: 'character_generation_failed' }).eq('id', project.id)
-          } catch { /* last resort — status stays at character_generation */ }
         }
-      })()
-    }
 
-    // Send notifications
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+        // 3. Send notifications
+        try {
+          const { notifyCustomerSubmission } = await import('@/lib/notifications')
+          await notifyCustomerSubmission({
+            projectId: projectSnapshot.id,
+            projectTitle: projectSnapshot.book_title,
+            authorName,
+            projectUrl: `${baseUrl}/admin/project/${projectSnapshot.id}`,
+            characters: secondaryCharacters.map(c => ({
+              name: c.name,
+              role: c.role,
+              age: c.age,
+              gender: c.gender,
+              skin_color: c.skin_color,
+              hair_color: c.hair_color,
+              hair_style: c.hair_style,
+              eye_color: c.eye_color,
+              clothing: c.clothing,
+              accessories: c.accessories,
+              special_features: c.special_features,
+            })),
+          })
+        } catch (e) {
+          console.error('[Bg] Slack notification failed:', e)
+        }
 
-    // Slack notification to admin (with character form data, same as legacy path)
-    try {
-      const { notifyCustomerSubmission } = await import('@/lib/notifications')
-      await notifyCustomerSubmission({
-        projectId: project.id,
-        projectTitle: project.book_title,
-        authorName,
-        projectUrl: `${baseUrl}/admin/project/${project.id}`,
-        characters: secondaryCharacters.map(c => ({
-          name: c.name,
-          role: c.role,
-          age: c.age,
-          gender: c.gender,
-          skin_color: c.skin_color,
-          hair_color: c.hair_color,
-          hair_style: c.hair_style,
-          eye_color: c.eye_color,
-          clothing: c.clothing,
-          accessories: c.accessories,
-          special_features: c.special_features,
-        })),
-      })
-    } catch (e) {
-      console.error('[Submission Complete] Slack notification failed:', e)
-    }
+        try {
+          const { sendEmail } = await import('@/lib/notifications/email')
+          const { renderTemplate } = await import('@/lib/email/renderer')
+          const rendered = await renderTemplate('submission_internal', {
+            authorName,
+            secondaryCharacterCount: String(secondaryCharacters.length),
+            status: newStatus,
+            projectAdminUrl: `${baseUrl}/admin/project/${projectSnapshot.id}`,
+          })
+          await sendEmail({
+            to: 'info@usillustrations.com',
+            subject: rendered?.subject || `${authorName}'s project submission is complete`,
+            html: rendered?.html || `<p><strong>${authorName}</strong> has completed their project submission.</p><p><strong>Secondary Characters:</strong> ${secondaryCharacters.length}</p><p><strong>Status:</strong> ${newStatus}</p><p><a href="${baseUrl}/admin/project/${projectSnapshot.id}">View Project</a></p>`,
+          })
+        } catch (e) {
+          console.error('[Bg] Email notification failed:', e)
+        }
 
-    // Email notification to info@
-    try {
-      const { sendEmail } = await import('@/lib/notifications/email')
-      const { renderTemplate } = await import('@/lib/email/renderer')
-      const rendered = await renderTemplate('submission_internal', {
-        authorName,
-        secondaryCharacterCount: String(secondaryCharacters.length),
-        status: newStatus,
-        projectAdminUrl: `${baseUrl}/admin/project/${project.id}`,
-      })
-      await sendEmail({
-        to: 'info@usillustrations.com',
-        subject: rendered?.subject || `${authorName}'s project submission is complete`,
-        html: rendered?.html || `<p><strong>${authorName}</strong> has completed their project submission.</p><p><strong>Secondary Characters:</strong> ${secondaryCharacters.length}</p><p><strong>Status:</strong> ${newStatus}</p><p><a href="${baseUrl}/admin/project/${project.id}">View Project</a></p>`,
-      })
-    } catch (e) {
-      console.error('[Submission Complete] Email notification failed:', e)
-    }
+        try {
+          const { sendEmail } = await import('@/lib/notifications/email')
+          const { renderTemplate } = await import('@/lib/email/renderer')
+          const rendered = await renderTemplate('submission_confirmation', {
+            authorFirstName: projectSnapshot.author_firstname || 'there',
+          })
+          await sendEmail({
+            to: projectSnapshot.author_email,
+            subject: rendered?.subject || 'We received your submission!',
+            html: rendered?.html || `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;"><h2 style="color: #1a1a1a;">Thank You, ${projectSnapshot.author_firstname}!</h2><p style="color: #555; font-size: 16px; line-height: 1.6;">We've received your project submission and our illustrators are getting started!</p><p style="color: #555; font-size: 16px; line-height: 1.6;">Here's what happens next:</p><ol style="color: #555; font-size: 16px; line-height: 1.8;"><li>We'll create character illustrations based on your descriptions</li><li>You'll receive an email to review and approve the characters</li><li>Full scene illustrations will be created and sent for your review</li></ol><p style="color: #888; font-size: 14px; margin-top: 24px;">You'll receive email updates at each step. No action needed from you right now!</p></div>`,
+          })
+        } catch (e) {
+          console.error('[Bg] Customer confirmation email failed:', e)
+        }
 
-    // Confirmation email to customer
-    try {
-      const { sendEmail } = await import('@/lib/notifications/email')
-      const { renderTemplate } = await import('@/lib/email/renderer')
-      const rendered = await renderTemplate('submission_confirmation', {
-        authorFirstName: project.author_firstname || 'there',
-      })
-      await sendEmail({
-        to: project.author_email,
-        subject: rendered?.subject || 'We received your submission!',
-        html: rendered?.html || `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;"><h2 style="color: #1a1a1a;">Thank You, ${project.author_firstname}!</h2><p style="color: #555; font-size: 16px; line-height: 1.6;">We've received your project submission and our illustrators are getting started!</p><p style="color: #555; font-size: 16px; line-height: 1.6;">Here's what happens next:</p><ol style="color: #555; font-size: 16px; line-height: 1.8;"><li>We'll create character illustrations based on your descriptions</li><li>You'll receive an email to review and approve the characters</li><li>Full scene illustrations will be created and sent for your review</li></ol><p style="color: #888; font-size: 14px; margin-top: 24px;">You'll receive email updates at each step. No action needed from you right now!</p></div>`,
-      })
-    } catch (e) {
-      console.error('[Submission Complete] Customer confirmation email failed:', e)
-    }
+        console.log(`[Bg] All background tasks completed for project ${projectSnapshot.id}`)
+      } catch (err: unknown) {
+        console.error('[Bg] CRITICAL ERROR in background processing:', getErrorMessage(err))
+        try {
+          const supabaseAdmin = await createAdminClient()
+          await supabaseAdmin.from('projects').update({ status: 'character_generation_failed' }).eq('id', projectSnapshot.id)
+        } catch { /* last resort */ }
+        try {
+          const { notifyBackgroundTaskFailure } = await import('@/lib/notifications')
+          await notifyBackgroundTaskFailure({
+            projectId: projectSnapshot.id,
+            projectTitle: projectSnapshot.book_title,
+            authorName,
+            projectUrl: `${baseUrl}/admin/project/${projectSnapshot.id}`,
+            task: 'Background Processing (critical)',
+            error: getErrorMessage(err),
+          })
+        } catch { /* absolute last resort */ }
+      }
+    })()
 
-    console.log(`[Submission Complete] SUCCESS — project ${project.id} → ${newStatus}`)
+    console.log(`[Submission Complete] SUCCESS — project ${project.id} → ${newStatus} (background tasks started)`)
 
     return NextResponse.json({
       success: true,

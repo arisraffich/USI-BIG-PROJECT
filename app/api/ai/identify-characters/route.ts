@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { openai } from '@/lib/ai/openai'
 import { getErrorMessage } from '@/lib/utils/error'
+import { CharacterIdentificationSchema, zodToResponsesFormat, extractResponseContent } from '@/lib/ai/schemas'
 
 // Exported function for direct calls (e.g., from project creation)
 export async function identifyCharactersForProject(project_id: string) {
@@ -172,54 +173,32 @@ CONSTRAINTS
       throw new Error('OpenAI API key is not configured')
     }
 
-    // STEP 4: Call AI with GPT-5.2 (best model for reasoning)
-    let completion
+    // STEP 4: Call AI with GPT-5.4 (structured outputs for guaranteed schema)
+    let identified
     try {
-      console.log('[Character ID] Calling GPT-5.2 for analysis...')
-      completion = await openai.responses.create({
-        model: 'gpt-5.2',
+      console.log('[Character ID] Calling GPT-5.4 for analysis...')
+      const completion = await openai.responses.create({
+        model: 'gpt-5.4',
         input: prompt,
         text: {
-          format: { type: 'json_object' }
+          format: zodToResponsesFormat(CharacterIdentificationSchema, 'character_identification')
         },
         reasoning: {
           effort: 'high'
         }
       })
+
+      const { text: responseContent, refusal } = extractResponseContent(completion)
+      if (refusal) throw new Error(`Model refused: ${refusal}`)
+      if (!responseContent) throw new Error('Empty response from GPT-5.4')
+
+      console.log('[Character ID] Raw AI response length:', responseContent.length)
+      identified = JSON.parse(responseContent)
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error)
       console.error('OpenAI API Error in identify-characters:', errorMessage)
       console.error('Full API Error:', error)
-      throw new Error(`Failed to identify characters with GPT-5.2: ${errorMessage}`)
-    }
-
-    // Find the message output (not reasoning)
-    const messageOutput = completion.output?.find((o: any) => o.type === 'message')
-    let responseContent = '{}'
-    if (messageOutput && 'content' in messageOutput) {
-      const firstContent = messageOutput.content?.[0]
-      responseContent = (firstContent && 'text' in firstContent ? firstContent.text : null) || '{}'
-    }
-    console.log('[Character ID] Raw AI response length:', responseContent.length)
-    console.log('[Character ID] Full completion object:', JSON.stringify(completion, null, 2))
-    console.log('[Character ID] Response content:', responseContent)
-    let identified
-
-    try {
-      identified = JSON.parse(responseContent)
-    } catch (parseError) {
-      console.error('[Character ID] Failed to parse AI response:', parseError)
-      console.error('[Character ID] Response content:', responseContent.substring(0, 500))
-      return NextResponse.json(
-        { error: 'Invalid JSON response from AI', details: responseContent.substring(0, 200) },
-        { status: 500 }
-      )
-    }
-
-    // STEP 5: Validate response structure
-    if (!identified.characters || !Array.isArray(identified.characters)) {
-      console.error('[Character ID] Invalid response structure - missing characters array')
-      throw new Error('Invalid response format from AI - missing characters array')
+      throw new Error(`Failed to identify characters with GPT-5.4: ${errorMessage}`)
     }
 
     console.log(`[Character ID] AI identified ${identified.characters.length} characters`)
