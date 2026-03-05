@@ -13,8 +13,8 @@ export function zodToResponsesFormat(zodSchema: z.ZodType, name: string) {
   return {
     type: 'json_schema' as const,
     name: chatFormat.json_schema.name,
-    strict: chatFormat.json_schema.strict,
-    schema: chatFormat.json_schema.schema,
+    strict: chatFormat.json_schema.strict ?? true,
+    schema: chatFormat.json_schema.schema!,
   }
 }
 
