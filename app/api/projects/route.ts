@@ -201,14 +201,16 @@ export async function POST(request: NextRequest) {
         // Don't fail — project is created, admin can manually share the link
       }
 
-      // Send Slack notification to admin
-      try {
-        const { sendSlackNotification } = await import('@/lib/notifications/slack')
-        await sendSlackNotification({
-          text: `New project created (Path B — Customer Submission)\n*Author:* ${firstName} ${lastName}\n*Email:* ${authorEmail}\n*Project:* <${baseUrl}/admin/project/${projectId}|View Project>`,
-        })
-      } catch (slackError: unknown) {
-        console.error('[Project Creation] Slack notification failed:', getErrorMessage(slackError))
+      // Send Slack notification to admin (skip for test projects)
+      if (!firstName.toLowerCase().includes('test')) {
+        try {
+          const { sendSlackNotification } = await import('@/lib/notifications/slack')
+          await sendSlackNotification({
+            text: `New project created (Path B — Customer Submission)\n*Author:* ${firstName} ${lastName}\n*Email:* ${authorEmail}\n*Project:* <${baseUrl}/admin/project/${projectId}|View Project>`,
+          })
+        } catch (slackError: unknown) {
+          console.error('[Project Creation] Slack notification failed:', getErrorMessage(slackError))
+        }
       }
 
       // Send notification email to info@usillustrations.com

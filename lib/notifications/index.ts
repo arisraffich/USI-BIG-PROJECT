@@ -3,6 +3,18 @@ import { sendSlackNotification } from './slack'
 import { getErrorMessage } from '@/lib/utils/error'
 import { renderTemplate } from '@/lib/email/renderer'
 
+function isTestAuthor(name: string): boolean {
+  return name.toLowerCase().includes('test')
+}
+
+async function sendSlackIfNotTest(
+  authorName: string,
+  options: Parameters<typeof sendSlackNotification>[0]
+): Promise<void> {
+  if (isTestAuthor(authorName)) return
+  return sendSlackNotification(options)
+}
+
 export async function notifyCustomerSubmission(options: {
   projectId: string
   projectTitle: string
@@ -74,7 +86,7 @@ export async function notifyCustomerSubmission(options: {
       ],
     })
 
-    await sendSlackNotification({
+    await sendSlackIfNotTest(authorName, {
       text: `📝 Customer submitted character forms for "${projectTitle}"`,
       blocks,
     })
@@ -93,7 +105,7 @@ export async function notifyCharacterReview(options: {
   const { projectTitle, authorName, characterName, feedbackText, projectUrl } = options
 
   try {
-    await sendSlackNotification({
+    await sendSlackIfNotTest(authorName, {
       text: `📝 New Character Review: ${authorName} added feedback for ${characterName}`,
       blocks: [
         {
@@ -167,7 +179,7 @@ export async function notifyProjectSentToCustomer(options: {
   }
 
   try {
-    await sendSlackNotification({
+    await sendSlackIfNotTest(authorName, {
       text: `📧 Project "${projectTitle}" sent to customer for review`,
       blocks: [
         {
@@ -227,7 +239,7 @@ export async function notifySecondaryCharactersReady(options: {
   }
 
   try {
-    await sendSlackNotification({
+    await sendSlackIfNotTest(authorName, {
       text: `📧 Secondary Characters sent for review: "${projectTitle}"`,
       blocks: [
         {
@@ -289,7 +301,7 @@ export async function notifyCharacterRevisions(options: {
   }
 
   try {
-    await sendSlackNotification({
+    await sendSlackIfNotTest(authorName, {
       text: `🔄 Character Revisions (Round ${revisionRound}) sent: "${projectTitle}"`,
       blocks: [
         {
@@ -328,7 +340,7 @@ export async function notifyCharacterGenerationComplete(options: {
   const { projectTitle, authorName, projectUrl, generatedCount, failedCount } = options
 
   try {
-    await sendSlackNotification({
+    await sendSlackIfNotTest(authorName, {
       text: `✅ Characters Generated for "${projectTitle}"`,
       blocks: [
         {
@@ -365,7 +377,7 @@ export async function notifyCharactersApproved(options: {
   const { projectTitle, authorName, projectUrl } = options
 
   try {
-    await sendSlackNotification({
+    await sendSlackIfNotTest(authorName, {
       text: `🎉 Characters APPROVED for "${projectTitle}"`,
       blocks: [
         {
@@ -429,7 +441,7 @@ export async function notifyAllSketchesSent(options: {
   }
 
   try {
-    await sendSlackNotification({
+    await sendSlackIfNotTest(authorName, {
       text: `📚 All Sketches sent to customer for "${projectTitle}"`,
       blocks: [
         {
@@ -487,7 +499,7 @@ export async function notifyIllustrationsUpdate(options: {
   }
 
   try {
-    await sendSlackNotification({
+    await sendSlackIfNotTest(authorName, {
       text: `🔄 Sketches Revised${roundText} - sent to customer for "${projectTitle}"`,
       blocks: [
         {
@@ -524,7 +536,7 @@ export async function notifyIllustrationsApproved(options: {
   const { projectId, projectTitle, authorName, projectUrl } = options
 
   try {
-    await sendSlackNotification({
+    await sendSlackIfNotTest(authorName, {
       text: `✅ Sketches APPROVED for "${projectTitle}"`,
       blocks: [
         {
@@ -561,7 +573,7 @@ export async function notifyIllustrationFeedback(options: {
   const { projectTitle, authorName, projectUrl } = options
 
   try {
-    await sendSlackNotification({
+    await sendSlackIfNotTest(authorName, {
       text: `📝 Illustration feedback submitted for "${projectTitle}"`,
       blocks: [
         {
@@ -599,7 +611,7 @@ export async function notifyCustomerReview(options: {
   const { projectTitle, authorName, pageNumber, feedbackText, projectUrl } = options
 
   try {
-    await sendSlackNotification({
+    await sendSlackIfNotTest(authorName, {
       text: `📝 New Customer Review for "${projectTitle}"`,
       blocks: [
         {
@@ -644,7 +656,7 @@ export async function notifyCustomerCharacterReview(options: {
   const { projectTitle, authorName, characterName, feedbackText, projectUrl } = options
 
   try {
-    await sendSlackNotification({
+    await sendSlackIfNotTest(authorName, {
       text: `📝 New Character Review for "${projectTitle}"`,
       blocks: [
         {
@@ -688,7 +700,7 @@ export async function notifyCustomerAcceptedReply(options: {
   const { projectTitle, authorName, pageNumber, projectUrl } = options
 
   try {
-    await sendSlackNotification({
+    await sendSlackIfNotTest(authorName, {
       text: `✅ Customer Accepted Illustrator Note for "${projectTitle}"`,
       blocks: [
         {
@@ -736,7 +748,7 @@ export async function notifyBackgroundTaskFailure(options: {
   const { projectTitle, authorName, projectUrl, task, error } = options
 
   try {
-    await sendSlackNotification({
+    await sendSlackIfNotTest(authorName, {
       text: `🚨 Background task failed for "${projectTitle}"`,
       blocks: [
         {
@@ -781,7 +793,7 @@ export async function notifyCustomerFollowUp(options: {
   const { projectTitle, authorName, pageNumber, followUpText, projectUrl } = options
 
   try {
-    await sendSlackNotification({
+    await sendSlackIfNotTest(authorName, {
       text: `💬 Customer Follow-up for "${projectTitle}"`,
       blocks: [
         {
