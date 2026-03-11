@@ -34,7 +34,7 @@
     "lucide-react": "^0.555.0",
     "mammoth": "^1.11.0",
     "next": "^16.0.10",
-    "openai": "^6.9.1",
+    "openai": "^6.27.0",
     "pdf-parse": "^1.1.1",
     "potrace": "^2.1.8",
     "react": "^19.2.3",

@@ -575,6 +575,8 @@ export function IllustrationsTabContent({
             if (decision === 'keep_new') {
                 toast.success('New illustration confirmed', { description: 'Generating sketch...' })
                 
+                router.refresh()
+                
                 // Clear admin reply since we're regenerating (addressing feedback with action)
                 try {
                     await fetch(`/api/pages/${pageId}/admin-reply`, { method: 'DELETE' })
