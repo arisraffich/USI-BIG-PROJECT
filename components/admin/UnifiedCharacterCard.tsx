@@ -212,6 +212,8 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     const [comparisonLightboxUrl, setComparisonLightboxUrl] = useState<string | null>(null)
     const [generationError, setGenerationError] = useState<MappedError | null>(null)
     const [showTechnicalDetails, setShowTechnicalDetails] = useState(false)
+    const [showResolveDialog, setShowResolveDialog] = useState(false)
+    const [isResolving, setIsResolving] = useState(false)
 
     // Update local character when prop changes
     useEffect(() => {
@@ -243,6 +245,26 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             supabase.removeChannel(channel)
         }
     }, [character.id])
+
+    const handleManualResolve = async () => {
+        setIsResolving(true)
+        try {
+            const response = await fetch(`/api/characters/${character.id}/resolve`, { method: 'POST' })
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(data.error || 'Failed to resolve')
+            }
+            toast.success('Feedback resolved')
+            setShowResolveDialog(false)
+            router.refresh()
+        } catch (error: unknown) {
+            toast.error('Failed to resolve feedback', {
+                description: getErrorMessage(error, 'An error occurred'),
+            })
+        } finally {
+            setIsResolving(false)
+        }
+    }
 
     const handleOpenRegenerate = () => {
         // Pre-populate with customer feedback if unresolved, otherwise empty
@@ -1035,13 +1057,42 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                     <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 text-sm text-yellow-900 relative animate-in fade-in">
                         <div className="flex items-start gap-2">
                             <MessageSquare className="w-4 h-4 text-yellow-600 mt-0.5" />
-                            <div>
-                                <span className="text-xs font-semibold text-yellow-800 uppercase block mb-1">Customer Feedback</span>
+                            <div className="flex-1">
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs font-semibold text-yellow-800 uppercase">Customer Feedback</span>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-5 px-1.5 text-[10px] text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                                        onClick={() => setShowResolveDialog(true)}
+                                    >
+                                        Resolve
+                                    </Button>
+                                </div>
                                 <p>{character.feedback_notes}</p>
                             </div>
                         </div>
                     </div>
                 )}
+
+                {/* Manual Resolve Confirmation */}
+                <AlertDialog open={showResolveDialog} onOpenChange={setShowResolveDialog}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Resolve without regenerating?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This will mark the feedback as resolved without generating a new image. Use this when the feedback doesn&apos;t require changes.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isResolving}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleManualResolve} disabled={isResolving}>
+                                {isResolving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                                Resolve
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
 
                 {/* Resolved History */}
                 {character.feedback_history?.map((item, index) => (
