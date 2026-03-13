@@ -26,8 +26,8 @@ function buildButtonHtml(text: string, color: string, url: string): string {
 
 function buildPersonalNoteHtml(note: string): string {
   const escaped = note.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
-  return `<div style="background-color: #f8f9fa; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 6px 6px 0;">
-  <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">A note from our team:</p>
+  return `<div style="background-color: #fef3c7; border-left: 4px solid #d97706; padding: 14px 18px; margin: 20px 0; border-radius: 0 6px 6px 0;">
+  <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 600; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px;">Note from your illustrator:</p>
   <p style="margin: 0; color: #333; font-size: 15px; line-height: 1.6;">${escaped}</p>
 </div>`
 }
@@ -41,9 +41,13 @@ export function injectPersonalNote(html: string, note?: string): string {
   if (!note?.trim()) return html
   const noteBlock = buildPersonalNoteHtml(note.trim())
 
-  const buttonIndex = html.indexOf('<p style="margin: 24px 0;">\n  <a href=')
-  if (buttonIndex !== -1) {
-    return html.slice(0, buttonIndex) + noteBlock + html.slice(buttonIndex)
+  const buttonStart = html.indexOf('<p style="margin: 24px 0;">\n  <a href=')
+  if (buttonStart !== -1) {
+    const buttonEnd = html.indexOf('</p>', buttonStart)
+    if (buttonEnd !== -1) {
+      const insertAt = buttonEnd + 4
+      return html.slice(0, insertAt) + noteBlock + html.slice(insertAt)
+    }
   }
 
   const sigIndex = html.indexOf('<table width="100%" border="0"')

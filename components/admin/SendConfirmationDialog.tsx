@@ -46,7 +46,7 @@ export function SendConfirmationDialog({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Add a message for the customer..."
-            className="min-h-[120px] resize-none"
+            className="min-h-[180px] resize-none"
             disabled={isLoading}
           />
           <p className="text-[11px] text-slate-400 mt-1.5">

@@ -1731,7 +1731,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
                       value={scheduleNote}
                       onChange={(e) => setScheduleNote(e.target.value)}
                       placeholder="Add a message for the customer..."
-                      className="w-full h-20 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full h-32 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                   </div>
 
