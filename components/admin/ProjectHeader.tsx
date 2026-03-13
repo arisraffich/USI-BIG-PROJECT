@@ -134,6 +134,11 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const [isDownloadingExistingLineArt, setIsDownloadingExistingLineArt] = useState(false)
   const [hasLineArtInStorage, setHasLineArtInStorage] = useState(false)
 
+  // Download Characters & Story state
+  const [isDownloadingCharacters, setIsDownloadingCharacters] = useState(false)
+  const [isDownloadingStory, setIsDownloadingStory] = useState(false)
+  const [includeSceneDescriptions, setIncludeSceneDescriptions] = useState(true)
+
   // Schedule send state
   const [scheduledSend, setScheduledSend] = useState<{ id: string; scheduled_at: string; action_type: string; status: string } | null>(null)
   const [schedulePopoverOpen, setSchedulePopoverOpen] = useState(false)
@@ -690,6 +695,75 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     })
   }
 
+  const handleDownloadCharacters = async () => {
+    if (isDownloadingCharacters) return
+    setIsDownloadingCharacters(true)
+    try {
+      const response = await fetch(`/api/projects/${projectId}/download-characters`)
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to download characters')
+      }
+      const blob = await response.blob()
+      const contentDisposition = response.headers.get('Content-Disposition')
+      let filename = 'characters.zip'
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/)
+        if (match) filename = match[1]
+      }
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      toast.success('Characters downloaded!')
+    } catch (error: unknown) {
+      toast.error('Failed to download characters', {
+        description: getErrorMessage(error, 'An error occurred'),
+      })
+    } finally {
+      setIsDownloadingCharacters(false)
+    }
+  }
+
+  const handleDownloadStory = async () => {
+    if (isDownloadingStory) return
+    setIsDownloadingStory(true)
+    try {
+      const scenesParam = includeSceneDescriptions ? 'true' : 'false'
+      const response = await fetch(`/api/projects/${projectId}/download-story?scenes=${scenesParam}`)
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to download story')
+      }
+      const blob = await response.blob()
+      const contentDisposition = response.headers.get('Content-Disposition')
+      let filename = 'story.pdf'
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/)
+        if (match) filename = match[1]
+      }
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      toast.success('Story PDF downloaded!')
+    } catch (error: unknown) {
+      toast.error('Failed to download story', {
+        description: getErrorMessage(error, 'An error occurred'),
+      })
+    } finally {
+      setIsDownloadingStory(false)
+    }
+  }
+
   const handleDownloadIllustrations = async () => {
     if (isDownloading) return
 
@@ -767,6 +841,32 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         .fill(null)
         .map(() => fetchIllustration())
       await Promise.all(illWorkers)
+
+      // Fetch characters and add to Characters/ folder
+      const supabaseForChars = createClient()
+      const { data: chars } = await supabaseForChars
+        .from('characters')
+        .select('name, is_main, image_url')
+        .eq('project_id', projectId)
+        .not('image_url', 'is', null)
+        .order('is_main', { ascending: false })
+        .order('created_at', { ascending: true })
+
+      if (chars && chars.length > 0) {
+        const charsFolder = zip.folder('Characters')!
+        await Promise.all(chars.map(async (char) => {
+          try {
+            if (!char.image_url) return
+            const res = await fetch(char.image_url)
+            if (!res.ok) return
+            const blob = await res.blob()
+            const safeName = (char.name || (char.is_main ? 'Main Character' : 'Character'))
+              .replace(/[^a-zA-Z0-9\s-]/g, '').trim()
+            const prefix = char.is_main ? '00_' : ''
+            charsFolder.file(`${prefix}${safeName}.png`, blob)
+          } catch { /* skip */ }
+        }))
+      }
 
       // Generate and download ZIP
       const zipBlob = await zip.generateAsync({ type: 'blob' })
@@ -1377,6 +1477,55 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
                   <Info className="w-3 h-3 mt-0.5 shrink-0" />
                   <span>Customers can see colored illustrations.</span>
                 </p>
+              </div>
+            </>
+          )}
+
+          {/* Project Downloads - available once characters exist */}
+          {hasImages && (
+            <>
+              <div className="h-px bg-slate-100" />
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1">Project Downloads</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start gap-2 h-9"
+                  onClick={handleDownloadCharacters}
+                  disabled={isDownloadingCharacters}
+                >
+                  {isDownloadingCharacters ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 text-indigo-600" />
+                  )}
+                  Download Characters
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start gap-2 h-9"
+                  onClick={handleDownloadStory}
+                  disabled={isDownloadingStory}
+                >
+                  {isDownloadingStory ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <FileText className="w-4 h-4 text-emerald-600" />
+                  )}
+                  Download Story PDF
+                </Button>
+                <div className="flex items-center justify-between px-1">
+                  <label htmlFor="include-scenes" className="text-[11px] text-slate-500 cursor-pointer select-none">
+                    Include scene descriptions
+                  </label>
+                  <Switch
+                    id="include-scenes"
+                    checked={includeSceneDescriptions}
+                    onCheckedChange={setIncludeSceneDescriptions}
+                    className="scale-75"
+                  />
+                </div>
               </div>
             </>
           )}

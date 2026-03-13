@@ -4,6 +4,7 @@ import { sendEmail } from '@/lib/notifications/email'
 import { getLineArtUrls } from '@/lib/line-art/storage'
 import { uploadToR2 } from '@/lib/storage/r2'
 import JSZip from 'jszip'
+import { addCharactersToZip } from '@/lib/utils/zip-helpers'
 import { getErrorMessage } from '@/lib/utils/error'
 import { renderTemplate } from '@/lib/email/renderer'
 
@@ -89,6 +90,19 @@ export async function POST(request: NextRequest) {
         }
 
         await Promise.all(downloadPromises)
+
+        // Add characters
+        const { data: characters } = await supabase
+            .from('characters')
+            .select('name, is_main, image_url')
+            .eq('project_id', projectId)
+            .not('image_url', 'is', null)
+            .order('is_main', { ascending: false })
+            .order('created_at', { ascending: true })
+
+        if (characters && characters.length > 0) {
+            await addCharactersToZip(zip, characters)
+        }
 
         const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' })
 

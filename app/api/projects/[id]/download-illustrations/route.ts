@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import JSZip from 'jszip'
+import { addCharactersToZip } from '@/lib/utils/zip-helpers'
 import { getErrorMessage } from '@/lib/utils/error'
 
 export async function GET(
@@ -98,6 +99,19 @@ export async function GET(
 
     // Wait for all downloads to complete
     await Promise.all(downloadPromises)
+
+    // Add characters
+    const { data: characters } = await supabase
+      .from('characters')
+      .select('name, is_main, image_url')
+      .eq('project_id', id)
+      .not('image_url', 'is', null)
+      .order('is_main', { ascending: false })
+      .order('created_at', { ascending: true })
+
+    if (characters && characters.length > 0) {
+      await addCharactersToZip(zip, characters)
+    }
 
     // Generate ZIP file
     const zipBuffer = await zip.generateAsync({ type: 'arraybuffer' })
