@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { generateIllustration } from '@/lib/ai/google-ai'
 import { getErrorMessage } from '@/lib/utils/error'
+import sharp from 'sharp'
 import { isFollowUp } from '@/lib/constants/statusBadgeConfig'
 
 // Allow max duration for AI generation
@@ -577,14 +578,15 @@ ${textPromptSection}`
             throw new Error(result.error || 'Failed to generate illustration')
         }
 
-        // 6. Upload to Storage
+        // 6. Convert to JPEG and upload to Storage
+        const jpegBuffer = await sharp(result.imageBuffer).jpeg({ quality: 95 }).toBuffer()
         const timestamp = Date.now()
-        const filename = `${projectId}/illustrations/page-${pageData.page_number}-${timestamp}.png`
+        const filename = `${projectId}/illustrations/page-${pageData.page_number}-${timestamp}.jpg`
 
         const { error: uploadError } = await supabase.storage
-            .from('illustrations') // Ensure this bucket exists or use 'project-assets'
-            .upload(filename, result.imageBuffer, {
-                contentType: 'image/png',
+            .from('illustrations')
+            .upload(filename, jpegBuffer, {
+                contentType: 'image/jpeg',
                 upsert: true
             })
 

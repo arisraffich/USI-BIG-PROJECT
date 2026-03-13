@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { generateSketch } from '@/lib/ai/google-ai'
 import { getErrorMessage } from '@/lib/utils/error'
+import sharp from 'sharp'
 
 export const maxDuration = 60
 
@@ -54,14 +55,15 @@ The result must look like a faithful pencil-line tracing of the original image â
             throw new Error(result.error || 'Failed to generate sketch')
         }
 
-        // 3. Upload to Storage
+        // 3. Convert to JPEG and upload to Storage
+        const jpegBuffer = await sharp(result.imageBuffer).jpeg({ quality: 95 }).toBuffer()
         const timestamp = Date.now()
-        const filename = `${projectId}/sketches/page-${page?.page_number || 'unknown'}-${timestamp}.png`
+        const filename = `${projectId}/sketches/page-${page?.page_number || 'unknown'}-${timestamp}.jpg`
 
         const { error: uploadError } = await supabase.storage
-            .from('sketches') // Ensure bucket exists
-            .upload(filename, result.imageBuffer, {
-                contentType: 'image/png',
+            .from('sketches')
+            .upload(filename, jpegBuffer, {
+                contentType: 'image/jpeg',
                 upsert: true
             })
 

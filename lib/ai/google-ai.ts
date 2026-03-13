@@ -142,6 +142,14 @@ async function fetchImageAsBase64(
         }
 
         try {
+            const meta = await sharp(buffer).metadata()
+            const isJpeg = meta.format === 'jpeg'
+            const fitsSize = (meta.width ?? 0) <= maxSize && (meta.height ?? 0) <= maxSize
+
+            if (isJpeg && fitsSize && format !== 'png') {
+                return { mimeType: 'image/jpeg', data: buffer.toString('base64') }
+            }
+
             const pipeline = sharp(buffer).resize(maxSize, maxSize, { fit: 'inside', withoutEnlargement: true })
             if (format === 'png') {
                 buffer = await pipeline.png({ compressionLevel: 6 }).toBuffer()

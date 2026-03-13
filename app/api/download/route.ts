@@ -14,12 +14,13 @@ export async function GET(req: NextRequest) {
         const response = await fetch(url)
         if (!response.ok) throw new Error('Failed to fetch image')
 
-        const blob = await response.blob()
         const headers = new Headers()
-        headers.set('Content-Type', blob.type)
+        headers.set('Content-Type', response.headers.get('Content-Type') || 'application/octet-stream')
         headers.set('Content-Disposition', `attachment; filename="${filename}"`)
+        const contentLength = response.headers.get('Content-Length')
+        if (contentLength) headers.set('Content-Length', contentLength)
 
-        return new NextResponse(blob, { status: 200, headers })
+        return new NextResponse(response.body, { status: 200, headers })
     } catch (error) {
         console.error('Download proxy error:', error)
         return new NextResponse('Failed to download image', { status: 500 })
