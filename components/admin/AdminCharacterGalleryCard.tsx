@@ -236,7 +236,7 @@ export function AdminCharacterGalleryCard({ character, projectId, isGenerating =
                 )}
 
                 {/* Resolved History */}
-                {character.feedback_history?.map((item, index) => (
+                {character.feedback_history?.slice().reverse().map((item, index) => (
                     <div key={index} className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-900 relative">
                         <div className="flex items-center gap-1.5 mb-1">
                             <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
