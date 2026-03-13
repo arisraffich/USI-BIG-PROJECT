@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getErrorMessage } from '@/lib/utils/error'
+import { isFollowUp } from '@/lib/constants/statusBadgeConfig'
 
 /**
  * Reset illustration to its original (first-ever) version.
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
         const sendCount = project?.illustration_send_count || 0
         const currentStatus = project?.status
 
-        if (sendCount > 0 && currentStatus !== 'illustration_approved') {
+        if (sendCount > 0 && currentStatus !== 'illustration_approved' && !isFollowUp(currentStatus)) {
             await supabase.from('projects')
                 .update({ status: 'illustration_revision_needed' })
                 .eq('id', projectId)

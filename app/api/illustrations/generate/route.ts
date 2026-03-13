@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { generateIllustration } from '@/lib/ai/google-ai'
 import { getErrorMessage } from '@/lib/utils/error'
+import { isFollowUp } from '@/lib/constants/statusBadgeConfig'
 
 // Allow max duration for AI generation
 export const maxDuration = 60
@@ -615,7 +616,7 @@ ${textPromptSection}`
             const sendCount = project?.illustration_send_count || 0
             const currentStatus = project?.status
 
-            if (sendCount > 0 && currentStatus !== 'illustration_approved') {
+            if (sendCount > 0 && currentStatus !== 'illustration_approved' && !isFollowUp(currentStatus)) {
                 await supabase.from('projects')
                     .update({
                         status: 'illustration_revision_needed',

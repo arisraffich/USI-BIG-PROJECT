@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { buildCharacterPrompt } from '@/lib/utils/prompt-builder'
 import { removeMetadata, sanitizeFilename } from '@/lib/utils/metadata-cleaner'
 import { getErrorMessage } from '@/lib/utils/error'
+import { isFollowUp } from '@/lib/constants/statusBadgeConfig'
 
 export async function POST(request: NextRequest) {
   try {
@@ -212,7 +213,7 @@ export async function POST(request: NextRequest) {
           if (updateError) {
             console.error('Failed to update project status:', updateError)
           }
-        } else if (!skipStatusUpdate) {
+        } else if (!skipStatusUpdate && !isFollowUp(project.status)) {
           // Manual Regeneration / Revision Phase
           // Update to 'characters_regenerated' to enable the "Resend" flow
           // Skipped when adding new characters via the Add Character flow
