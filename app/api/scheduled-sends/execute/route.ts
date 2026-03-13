@@ -39,10 +39,10 @@ export async function POST(request: NextRequest) {
           .eq('id', send.id)
           .eq('status', 'pending')
 
-        // Call the existing send-to-customer endpoint
         const res = await fetch(`${baseUrl}/api/projects/${send.project_id}/send-to-customer`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ personalNote: send.personal_note || undefined }),
         })
 
         if (!res.ok) {

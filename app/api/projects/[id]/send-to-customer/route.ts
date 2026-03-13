@@ -11,6 +11,14 @@ export async function POST(
   try {
     const { id } = await params
 
+    let personalNote: string | undefined
+    try {
+      const body = await request.json()
+      personalNote = body.personalNote || undefined
+    } catch {
+      // No body or invalid JSON — that's fine, note is optional
+    }
+
     if (!id) {
       return NextResponse.json(
         { error: 'Project ID is required' },
@@ -156,6 +164,7 @@ export async function POST(
             authorPhone: project.author_phone || undefined,
             reviewUrl,
             projectUrl,
+            personalNote,
           }).catch(err => console.error('Notification error:', err))
         } else {
           // Subsequent sends: Revisions
@@ -167,7 +176,8 @@ export async function POST(
             authorPhone: project.author_phone || undefined,
             reviewUrl,
             projectUrl,
-            revisionRound: currentCount, // Revision round (currentCount=1 means 1st revision)
+            revisionRound: currentCount,
+            personalNote,
           }).catch(err => console.error('Notification error:', err))
         }
       }
@@ -319,6 +329,7 @@ export async function POST(
             reviewUrl,
             projectUrl,
             revisionRound,
+            personalNote,
           }).catch((error) => console.error('[Send to Customer] ❌ Error sending Stage 3 notifications:', error))
         } else if (newCount === 1) {
           // Stage 2: First-time characters ready
@@ -329,6 +340,7 @@ export async function POST(
             authorEmail: project.author_email,
             reviewUrl,
             projectUrl,
+            personalNote,
           }).catch((error) => console.error('[Send to Customer] ❌ Error sending Stage 2 notifications:', error))
         } else {
           // Stage 1: Initial Definition (Count remains 0)
@@ -339,6 +351,7 @@ export async function POST(
             authorPhone: project.author_phone || undefined,
             reviewUrl,
             projectUrl,
+            personalNote,
           }).catch((error) => console.error('[Send to Customer] ❌ Error sending Stage 1 notifications:', error))
         }
       } else {

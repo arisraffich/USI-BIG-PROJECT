@@ -24,6 +24,36 @@ function buildButtonHtml(text: string, color: string, url: string): string {
 </p>`
 }
 
+function buildPersonalNoteHtml(note: string): string {
+  const escaped = note.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
+  return `<div style="background-color: #f8f9fa; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 6px 6px 0;">
+  <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">A note from our team:</p>
+  <p style="margin: 0; color: #333; font-size: 15px; line-height: 1.6;">${escaped}</p>
+</div>`
+}
+
+/**
+ * Injects a styled personal note block into rendered email HTML.
+ * Inserts before the CTA button if present, otherwise appends before the signature.
+ * Returns the HTML unchanged if note is empty/undefined.
+ */
+export function injectPersonalNote(html: string, note?: string): string {
+  if (!note?.trim()) return html
+  const noteBlock = buildPersonalNoteHtml(note.trim())
+
+  const buttonIndex = html.indexOf('<p style="margin: 24px 0;">\n  <a href=')
+  if (buttonIndex !== -1) {
+    return html.slice(0, buttonIndex) + noteBlock + html.slice(buttonIndex)
+  }
+
+  const sigIndex = html.indexOf('<table width="100%" border="0"')
+  if (sigIndex !== -1) {
+    return html.slice(0, sigIndex) + noteBlock + html.slice(sigIndex)
+  }
+
+  return html + noteBlock
+}
+
 const LOGO_URL = 'https://vwzzfbpjzjbhejqizmqh.supabase.co/storage/v1/object/public/assets/email/usi-logo.png'
 
 const EMAIL_SIGNATURE = `

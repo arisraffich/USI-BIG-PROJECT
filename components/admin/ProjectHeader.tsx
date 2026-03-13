@@ -32,6 +32,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { BADGE_COLORS } from '@/lib/constants/statusBadgeConfig'
 import { getErrorMessage } from '@/lib/utils/error'
+import { SendConfirmationDialog } from './SendConfirmationDialog'
 
 interface ProjectInfo {
   id: string
@@ -147,6 +148,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const [isScheduling, setIsScheduling] = useState(false)
   const [isCancellingSchedule, setIsCancellingSchedule] = useState(false)
   const [lastFailedSend, setLastFailedSend] = useState<{ id: string; error_message: string } | null>(null)
+  const [sendDialogOpen, setSendDialogOpen] = useState(false)
+  const [scheduleNote, setScheduleNote] = useState('')
   const schedulePopoverRef = useRef<HTMLDivElement>(null)
 
   // Hydration fix
@@ -235,6 +238,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
           projectId,
           actionType: getActionType(),
           scheduledAt: target.toISOString(),
+          personalNote: scheduleNote.trim() || undefined,
         }),
       })
       if (!res.ok) throw new Error('Failed to schedule')
@@ -242,6 +246,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       setScheduledSend(data.scheduledSend)
       setLastFailedSend(null)
       setSchedulePopoverOpen(false)
+      setScheduleNote('')
 
       const dateStr = target.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       const hourStr = `${target.getHours().toString().padStart(2, '0')}:00`
@@ -251,7 +256,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     } finally {
       setIsScheduling(false)
     }
-  }, [projectId, scheduleDays, scheduleHour, getActionType])
+  }, [projectId, scheduleDays, scheduleHour, scheduleNote, getActionType])
 
   const handleCancelSchedule = useCallback(async () => {
     if (!scheduledSend) return
@@ -1216,7 +1221,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     }
   }
 
-  const handleSendToCustomer = async () => {
+  const handleSendToCustomer = () => {
     if (stage.buttonDisabled || isSendingToCustomer) return
 
     if (stage.buttonLabel === 'Create Illustrations') {
@@ -1228,11 +1233,16 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       return
     }
 
+    setSendDialogOpen(true)
+  }
+
+  const handleConfirmSend = async (personalNote?: string) => {
     setIsSendingToCustomer(true)
     try {
       const response = await fetch(`/api/projects/${projectId}/send-to-customer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ personalNote }),
       })
 
       if (!response.ok) {
@@ -1244,7 +1254,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       toast.success(stage.isResend ? 'Project resent to customer' : 'Project sent to customer review', {
         description: `Review URL: ${data.reviewUrl}`,
       })
-      
+      setSendDialogOpen(false)
       router.refresh()
     } catch (error: unknown) {
       toast.error('Failed to send project to customer', {
@@ -1700,7 +1710,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
                   </div>
 
                   {/* Day Picker */}
-                  <div className="mb-4">
+                  <div className="mb-3">
                     <label className="text-xs text-slate-600 mb-1 block">Day</label>
                     <select
                       value={scheduleDays}
@@ -1712,6 +1722,17 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
                         <option key={i + 1} value={i + 1}>After {i + 1} day{i + 1 > 1 ? 's' : ''}</option>
                       ))}
                     </select>
+                  </div>
+
+                  {/* Personal Note */}
+                  <div className="mb-4">
+                    <label className="text-xs text-slate-600 mb-1 block">Personal note <span className="text-slate-400">(optional)</span></label>
+                    <textarea
+                      value={scheduleNote}
+                      onChange={(e) => setScheduleNote(e.target.value)}
+                      placeholder="Add a message for the customer..."
+                      className="w-full h-16 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
                   </div>
 
                   <Button
@@ -1926,6 +1947,14 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         </div>
       </DialogContent>
     </Dialog>
+
+    <SendConfirmationDialog
+      open={sendDialogOpen}
+      onOpenChange={setSendDialogOpen}
+      title={stage.isResend ? 'Resend to Customer' : 'Send to Customer'}
+      onConfirm={handleConfirmSend}
+      isLoading={isSendingToCustomer}
+    />
 
     </>
   )

@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 // POST: Create a new scheduled send
 export async function POST(request: NextRequest) {
   try {
-    const { projectId, actionType, scheduledAt } = await request.json()
+    const { projectId, actionType, scheduledAt, personalNote } = await request.json()
 
     if (!projectId || !actionType || !scheduledAt) {
       return NextResponse.json(
@@ -54,13 +54,16 @@ export async function POST(request: NextRequest) {
       .eq('action_type', actionType)
       .eq('status', 'pending')
 
+    const insertData: Record<string, unknown> = {
+      project_id: projectId,
+      action_type: actionType,
+      scheduled_at: scheduledAt,
+    }
+    if (personalNote?.trim()) insertData.personal_note = personalNote.trim()
+
     const { data, error } = await supabase
       .from('scheduled_sends')
-      .insert({
-        project_id: projectId,
-        action_type: actionType,
-        scheduled_at: scheduledAt,
-      })
+      .insert(insertData)
       .select()
       .single()
 
