@@ -335,7 +335,8 @@ export function IllustrationsTabContent({
         referenceImages?: string[], 
         referenceImageUrl?: string, 
         sceneCharacters?: SceneCharacter[],
-        useThinking?: boolean
+        useThinking?: boolean,
+        modelId?: string
     ) => {
         const hasExistingIllustration = !!page.illustration_url
         
@@ -366,7 +367,8 @@ export function IllustrationsTabContent({
                     referenceImageUrl, // Scene Recreation mode (Mode 3/4)
                     sceneCharacters: isSceneRecreation ? sceneCharacters : undefined, // Character overrides (Mode 3/4)
                     skipDbUpdate: hasExistingIllustration, // Don't save to DB if regenerating (comparison mode)
-                    useThinking: useThinking || false
+                    useThinking: useThinking || false,
+                    modelId
                 })
             })
 

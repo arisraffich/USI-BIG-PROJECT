@@ -11,6 +11,7 @@ interface Page {
   description_auto_generated: boolean
   is_customer_edited_story_text?: boolean
   is_customer_edited_scene_description?: boolean
+  character_actions?: Record<string, string> | null
 }
 
 interface ManuscriptPageProps {
@@ -120,6 +121,19 @@ export function ManuscriptPage({
             ) : (
               <p className="text-gray-400">[No illustration instructions]</p>
             )}
+          </div>
+        )}
+
+        {page.character_actions && Object.keys(page.character_actions).length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-gray-200/60">
+            {Object.keys(page.character_actions).map((name) => (
+              <span
+                key={name}
+                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100"
+              >
+                {name}
+              </span>
+            ))}
           </div>
         )}
       </div>

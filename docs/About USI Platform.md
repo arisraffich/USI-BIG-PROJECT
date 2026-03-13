@@ -30,9 +30,15 @@ The platform supports three tiers of style control:
 - **Custom project-level style references** — up to 3 uploaded reference images for sequels or specific artistic directions, which override the main character as the style source
 - **Page-to-page anchoring** — automatic consistency propagation from page to page using previously generated illustrations
 
-### The AI Director
+### Multi-Model Character Generation
 
-Every illustration generation is guided by an AI Director — an OpenAI-powered analysis layer that reads each page's story text and scene description, then generates structured directives for each character: what they're doing, their body pose, their emotional state, and where they're positioned in the scene. These directives are stored as structured data and fed into the image generation prompt, ensuring that characters aren't just visually consistent but are also acting and emoting appropriately for each scene.
+The platform supports multiple AI image generation engines for character creation, selectable from a dropdown in the regeneration dialog:
+
+- **NB2** (Nano Banana 2 — Gemini 3.1 Flash Image Preview) — the default engine, optimized for speed and volume with controllable thinking mode
+- **NB Pro** (Nano Banana Pro — Gemini 3 Pro Image Preview) — higher quality engine with always-on advanced reasoning ("thinking") for complex prompts
+- **GPT** (GPT Image 1.5 via OpenAI Responses API) — alternative engine with different artistic characteristics
+
+All engines share the same orchestration pipeline: reference images are fetched once as raw buffers, the prompt is built once, and post-generation tasks (upload, database update, cleanup) are handled identically. The modular engine architecture (`lib/ai/engines/`) makes it trivial to add or remove models — each engine is a single function conforming to a shared interface.
 
 ### Regeneration with Full Creative Control
 
@@ -149,7 +155,7 @@ The admin side provides a complete project management interface:
 
 - **Project dashboard** with all active projects, author names, and status indicators
 - **Manuscript editor** with inline editing, scroll-spy navigation, and bulk page editing
-- **Character management** with generation, regeneration (with optional deep thinking toggle), manual upload, and side-by-side sketch/colored views
+- **Character management** with generation, regeneration (with AI model dropdown and optional deep thinking toggle), manual upload, and side-by-side sketch/colored views
 - **Illustration management** with comparison mode, batch generation, layout controls (single page, spread, spot illustrations), and the AI Director for character action/emotion control
 - **Page management** with delete functionality (automatic renumbering and storage cleanup) and story text clipboard copy
 - **Sketch/Story toggle** on illustration cards with "This page" / "All pages" scope selector (admin-only popover)
@@ -163,7 +169,8 @@ The admin side provides a complete project management interface:
 ## Technical Foundation
 
 - **Framework:** Next.js 16 with TypeScript (strict mode)
-- **AI:** OpenAI GPT-5.2 (story analysis, AI Director) + Google Gemini 3.1 Flash Image Preview "Nano Banana 2" (all image generation, with thinking mode support)
+- **AI Text:** OpenAI GPT-5.4 (story analysis, character identification, scene descriptions — Structured Outputs with reasoning)
+- **AI Image:** Google Gemini 3.1 Flash Image Preview "NB2" (default) + Gemini 3 Pro Image Preview "NB Pro" + OpenAI GPT Image 1.5 — modular engine architecture for easy model addition/removal
 - **Database & Storage:** Supabase (PostgreSQL + Storage buckets for all assets) with `pg_cron` + `pg_net` for scheduled job execution
 - **Cloud Storage:** Cloudflare R2 for temporary large file hosting (email attachments >40MB)
 - **Image Processing:** Potrace (vectorization) + Sharp (PNG rendering)

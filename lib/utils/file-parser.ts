@@ -109,7 +109,7 @@ export function parsePages(text: string) {
     // Only add text if we have a current page (content before any Illustration marker is ignored)
     if (currentPage) {
       currentPage.story_text +=
-        (currentPage.story_text ? ' ' : '') + line
+        (currentPage.story_text ? '\n' : '') + line
     }
     i++
   }
@@ -174,9 +174,10 @@ CRITICAL RULES:
 
 5. TEXT CLEANUP:
    - Remove any leading/trailing whitespace
-   - Preserve paragraph breaks within story text
+   - Preserve line breaks and paragraph breaks within story text using newline characters (\n)
    - Keep dialogue and narrative exactly as written
    - Do NOT add or modify any story content
+   - Do NOT join separate lines into a single line
 
 6. HANDLE EDGE CASES:
    - If story text appears on the same line as "Illustration X", include it
@@ -186,7 +187,7 @@ CRITICAL RULES:
 
 Return a JSON object with a "pages" array. Each page should have:
 - page_number: integer (from Illustration marker)
-- story_text: string (the actual story narrative for this illustration, cleaned)
+- story_text: string (the actual story narrative for this illustration, with original line breaks preserved as \n)
 - scene_description: string | null (if "Description:" was found, otherwise null)
 - description_auto_generated: boolean (false if description was in file, true if description needs to be generated)
 

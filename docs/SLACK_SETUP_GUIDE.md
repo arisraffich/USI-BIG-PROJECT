@@ -54,10 +54,16 @@ After adding the webhook URL, we'll test by sending a test notification to your 
 ## What Notifications Will Be Sent
 
 Once configured, Slack will receive:
-- ✅ Project status updates
+- ✅ New project created
+- ✅ Character submissions and approvals
 - ✅ Character generation complete notifications
-- ✅ Sketch generation complete notifications
+- ✅ Illustration generation and sketch notifications
+- ✅ Customer feedback and follow-ups
+- ✅ Project approval
+- ✅ Background task failure alerts
 - ⚠️ Error alerts
+
+**Note:** Notifications are automatically skipped for test projects (author name contains "test").
 
 ---
 

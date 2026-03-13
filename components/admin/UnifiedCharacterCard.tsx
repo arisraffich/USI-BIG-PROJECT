@@ -17,6 +17,7 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Switch } from '@/components/ui/switch'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, Download, Upload, X, AlertTriangle, Trash2, Camera, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Character } from '@/types/character'
@@ -205,6 +206,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     const [isSketchGenerating, setIsSketchGenerating] = useState(false)
     const [referenceImage, setReferenceImage] = useState<{ file: File; preview: string } | null>(null)
     const [useThinkingMode, setUseThinkingMode] = useState(false)
+    const [aiModel, setAiModel] = useState<'gemini' | 'gemini-pro' | 'gpt'>('gemini')
     const referenceInputRef = useRef<HTMLInputElement>(null)
     const [comparisonState, setComparisonState] = useState<{ oldUrl: string; newUrl: string } | null>(null)
     const [comparisonLightboxUrl, setComparisonLightboxUrl] = useState<string | null>(null)
@@ -322,6 +324,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                     visual_reference_image: visualReferenceImage,
                     skipDbUpdate: hasExistingImage,
                     useThinking: useThinkingMode,
+                    aiModel,
                 }),
             })
 
@@ -765,7 +768,19 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                                 </DialogTrigger>
                                     <DialogContent className="sm:max-w-[500px]">
                                         <DialogHeader>
-                                            <DialogTitle>Regenerate {displayName}</DialogTitle>
+                                            <DialogTitle className="flex items-center gap-1.5">
+                                                <span>Regenerate with</span>
+                                                <Select value={aiModel} onValueChange={(v) => { setAiModel(v as 'gemini' | 'gemini-pro' | 'gpt'); if (v !== 'gemini') setUseThinkingMode(false) }}>
+                                                    <SelectTrigger className="w-[100px] h-7 text-sm font-semibold">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="gemini">NB2</SelectItem>
+                                                        <SelectItem value="gemini-pro">NB Pro</SelectItem>
+                                                        <SelectItem value="gpt">GPT</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </DialogTitle>
                                         </DialogHeader>
                                         <div className="py-4 space-y-4">
                                             <div className="space-y-2">
@@ -830,19 +845,23 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                                             </div>
                                         </div>
                                         <DialogFooter className="flex items-center !justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <Switch
-                                                    id="char-thinking-mode"
-                                                    checked={useThinkingMode}
-                                                    onCheckedChange={setUseThinkingMode}
-                                                    className="scale-90"
-                                                />
-                                                <label htmlFor="char-thinking-mode" className="text-xs text-slate-500 cursor-pointer select-none">
-                                                    Deep thinking
-                                                </label>
+                                            <div className="flex items-center">
+                                                {aiModel === 'gemini' && (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Switch
+                                                            id="char-thinking-mode"
+                                                            checked={useThinkingMode}
+                                                            onCheckedChange={setUseThinkingMode}
+                                                            className="scale-75"
+                                                        />
+                                                        <label htmlFor="char-thinking-mode" className="text-xs text-slate-500 cursor-pointer select-none">
+                                                            Deep thinking
+                                                        </label>
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <Button variant="outline" onClick={() => { setIsDialogOpen(false); removeReferenceImage(); setUseThinkingMode(false); }}>Cancel</Button>
+                                                <Button variant="outline" onClick={() => { setIsDialogOpen(false); removeReferenceImage(); setUseThinkingMode(false); setAiModel('gemini'); }}>Cancel</Button>
                                                 {!character.is_main && character.image_url && !customPrompt.trim() && !referenceImage ? (
                                                     <Button onClick={handleRegenerate} disabled={isRegenerating} className="bg-red-600 hover:bg-red-700 text-white">
                                                         {isRegenerating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}

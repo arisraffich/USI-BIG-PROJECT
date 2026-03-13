@@ -4,318 +4,151 @@ import { removeMetadata, sanitizeFilename } from '@/lib/utils/metadata-cleaner'
 import { getErrorMessage } from '@/lib/utils/error'
 import { Character } from '@/types/character'
 import sharp from 'sharp'
+import { geminiEngine, geminiProEngine, gptEngine } from './engines'
+import type { AIModel, CharacterEngine, EngineInput, ImageRef } from './engines'
 
-const GOOGLE_API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY
-const MODEL = 'gemini-3.1-flash-image-preview'
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
+const ENGINES: Record<AIModel, CharacterEngine> = {
+  gemini: geminiEngine,
+  'gemini-pro': geminiProEngine,
+  gpt: gptEngine,
+}
 
-async function fetchImageAsBase64(url: string): Promise<{ mimeType: string, data: string } | null> {
+const ENGINE_LABELS: Record<AIModel, string> = {
+  gemini: 'Gemini',
+  'gemini-pro': 'Gemini Pro',
+  gpt: 'GPT',
+}
+
+async function fetchImageAsBuffer(url: string): Promise<ImageRef | null> {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) return null
+    const arrayBuffer = await response.arrayBuffer()
+    const raw = Buffer.from(arrayBuffer)
+
+    let finalBuffer: Buffer = raw
     try {
-        const response = await fetch(url)
-        if (!response.ok) return null
-        const arrayBuffer = await response.arrayBuffer()
-        let buffer: Buffer = Buffer.from(arrayBuffer)
-
-        try {
-            buffer = await sharp(buffer)
-                .resize(2048, 2048, { fit: 'inside', withoutEnlargement: true })
-                .jpeg({ quality: 95 })
-                .toBuffer()
-        } catch (resizeError) {
-            console.warn('Image resize failed, using original:', resizeError)
-        }
-
-        return {
-            mimeType: 'image/jpeg',
-            data: buffer.toString('base64')
-        }
-    } catch (e) {
-        console.error('Failed to fetch reference image:', e)
-        return null
+      const resized = await sharp(raw)
+        .resize(2048, 2048, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 95 })
+        .toBuffer()
+      finalBuffer = Buffer.from(resized)
+    } catch (resizeError) {
+      console.warn('Image resize failed, using original:', resizeError)
     }
+
+    return { buffer: finalBuffer, mimeType: 'image/jpeg' }
+  } catch (e) {
+    console.error('Failed to fetch reference image:', e)
+    return null
+  }
+}
+
+function parseDataUrl(dataUrl: string): ImageRef | null {
+  const matches = dataUrl.match(/^data:(.+);base64,(.+)$/)
+  if (!matches) return null
+  return { buffer: Buffer.from(matches[2], 'base64'), mimeType: matches[1] }
 }
 
 export async function generateCharacterImage(
-    character: Character,
-    mainCharacterImageUrl: string | null | undefined,
-    projectId: string,
-    customPrompt?: string,
-    visualReferenceImage?: string, // base64 data URL for appearance reference
-    skipDbUpdate?: boolean, // When true, upload to storage but don't save to DB (comparison mode)
-    useThinking?: boolean // Override: enable thinking for regeneration
+  character: Character,
+  mainCharacterImageUrl: string | null | undefined,
+  projectId: string,
+  customPrompt?: string,
+  visualReferenceImage?: string,
+  skipDbUpdate?: boolean,
+  useThinking?: boolean,
+  aiModel: AIModel = 'gemini'
 ) {
-    if (!GOOGLE_API_KEY) {
-        throw new Error('Google Generative AI API Key not configured')
+  const engine = ENGINES[aiModel]
+  if (!engine) {
+    return { success: false, imageUrl: null, error: `Unknown AI model: ${aiModel}` }
+  }
+
+  try {
+    const isInitialGeneration = !character.image_url
+    const isEditMode = !!(customPrompt && character.image_url && mainCharacterImageUrl)
+    const hasVisualRef = !!(visualReferenceImage || (character.reference_photo_url && isInitialGeneration))
+    const prompt = customPrompt || buildCharacterPrompt(character, !!mainCharacterImageUrl, hasVisualRef)
+
+    // --- Fetch images in parallel as raw buffers ---
+    const [styleReference, visualReference] = await Promise.all([
+      mainCharacterImageUrl ? fetchImageAsBuffer(mainCharacterImageUrl) : null,
+      visualReferenceImage
+        ? Promise.resolve(parseDataUrl(visualReferenceImage))
+        : (character.reference_photo_url && isInitialGeneration)
+          ? fetchImageAsBuffer(character.reference_photo_url)
+          : null,
+    ])
+
+    // --- Run the selected engine ---
+    const label = ENGINE_LABELS[aiModel] ?? aiModel
+    console.log(`[Character Generate] Using ${label} engine for ${character.name || character.role}`)
+
+    const engineInput: EngineInput = {
+      prompt,
+      isEditMode,
+      styleReference,
+      visualReference,
+      useThinking,
     }
 
-    try {
-        const isInitialGeneration = !character.image_url
-        const hasVisualRef = !!(visualReferenceImage || (character.reference_photo_url && isInitialGeneration))
-        const prompt = customPrompt || buildCharacterPrompt(character, !!mainCharacterImageUrl, hasVisualRef)
+    const result = await engine(engineInput)
 
-        const parts: any[] = []
+    // --- Shared post-processing: upload, DB update, cleanup ---
+    const imageBuffer = Buffer.from(result.base64, 'base64')
+    const cleanedImage = await removeMetadata(imageBuffer)
 
-        // Edit mode: character has an existing image AND a custom prompt (edit instructions).
-        // The caller passes the character's own image as mainCharacterImageUrl for edits.
-        const isEditMode = !!(customPrompt && character.image_url && mainCharacterImageUrl)
+    const baseName = sanitizeFilename(character.name || character.role || `character-${character.id}`)
+    const timestamp = Date.now()
+    const filename = `${projectId}/characters/${baseName}-${timestamp}.png`
+    const supabase = await createAdminClient()
 
-        if (isEditMode) {
-            // EDIT: Send the current character image with modification instructions
-            const refImage = await fetchImageAsBase64(mainCharacterImageUrl)
-            if (refImage) {
-                parts.push({
-                    text: `Here is the current illustration of a character. Modify this character based on the following instruction while keeping the same art style, proportions, pose, background, and all other visual details unchanged.
+    const { error: uploadError } = await supabase.storage
+      .from('character-images')
+      .upload(filename, cleanedImage, { contentType: 'image/png', upsert: true })
 
-Modification: ${prompt}`
-                })
-
-                parts.push({
-                    inlineData: {
-                        mimeType: refImage.mimeType,
-                        data: refImage.data
-                    }
-                })
-            }
-
-            if (visualReferenceImage) {
-                const matches = visualReferenceImage.match(/^data:(.+);base64,(.+)$/)
-                if (matches) {
-                    parts.push({
-                        text: `Use this additional reference image to guide the modification:`
-                    })
-                    parts.push({
-                        inlineData: {
-                            mimeType: matches[1],
-                            data: matches[2]
-                        }
-                    })
-                }
-            }
-        } else {
-            // SECONDARY CHARACTER GENERATION: Full style reference approach
-            // Show the style reference BEFORE the character description to prevent semantic bias
-            if (mainCharacterImageUrl) {
-                const refImage = await fetchImageAsBase64(mainCharacterImageUrl)
-                if (refImage) {
-                    parts.push({
-                        text: `[STYLE REFERENCE IMAGE]
-
-This is a character from a children's book. You MUST create the new character in an identical artistic style to this reference. If placed side by side, they must look like they belong on the same page of the same book.
-
-The reference shows a different character — create a new character but replicate the exact same visual technique.
-
-MATCH ALL OF THESE FROM THE REFERENCE:
-- Medium and rendering technique (e.g., watercolor, gouache, soft digital painting)
-- Stroke style, texture, shading softness, edge quality
-- Color blending method and saturation levels
-- Color palette warmth and tone
-- Line quality and weight
-- Eye drawing technique (shape style, highlights, expression style)
-- Hair/fur rendering technique (strand/texture method, shading approach)
-- Facial feature drawing style (nose, mouth, expression technique)
-- Overall drawing complexity and detail level
-
-If the reference is 2D/Stylized/Flat: Do NOT render fur, feathers, or scales realistically. No 3D shading, no photorealism.
-If the reference is 3D/Realistic: Match that realism level.`
-                    })
-
-                    parts.push({
-                        inlineData: {
-                            mimeType: refImage.mimeType,
-                            data: refImage.data
-                        }
-                    })
-                }
-            }
-
-            // ADD VISUAL REFERENCE IMAGE
-            // Admin-uploaded visual reference always applies.
-            // Customer's reference photo only applies on initial generation (no existing image).
-            let visualRefData: { mimeType: string, data: string } | null = null
-
-            if (visualReferenceImage) {
-                const matches = visualReferenceImage.match(/^data:(.+);base64,(.+)$/)
-                if (matches) {
-                    visualRefData = { mimeType: matches[1], data: matches[2] }
-                }
-            } else if (character.reference_photo_url) {
-                visualRefData = await fetchImageAsBase64(character.reference_photo_url)
-            }
-
-            if (visualRefData) {
-                parts.push({
-                    text: `[APPEARANCE REFERENCE IMAGE]
-This image shows what the character should look like physically.
-Use it to guide the character's physical appearance, proportions, and distinctive features.
-Do NOT copy the art style from this image — the style reference above defines the art style.`
-                })
-
-                parts.push({
-                    inlineData: {
-                        mimeType: visualRefData.mimeType,
-                        data: visualRefData.data
-                    }
-                })
-            }
-
-            // ADD CHARACTER DESCRIPTION
-            parts.push({ text: `TARGET CHARACTER DESCRIPTION:\n${prompt}` })
-        }
-
-        const isRegeneration = !!customPrompt
-        const generationConfig: Record<string, any> = {
-            responseModalities: ['IMAGE'],
-            imageConfig: {
-                aspectRatio: "9:16",
-                imageSize: "4K"
-            }
-        }
-        if (!isRegeneration || useThinking) {
-            generationConfig.thinkingConfig = { thinkingLevel: 'HIGH' }
-        }
-
-        const payload = {
-            contents: [{ parts }],
-            generationConfig,
-            safetySettings: [
-                { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-                { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-                { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-                { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-                { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
-            ]
-        }
-
-        // Retry up to 3 times for intermittent blocks (blockReason: OTHER, IMAGE_SAFETY)
-        const MAX_ATTEMPTS = 3
-        let base64Image: string | null = null
-        let lastError = 'No image found in Google API response'
-        
-        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-            console.log(`[Character Generate] API attempt ${attempt}/${MAX_ATTEMPTS} for ${character.name || character.role}...`)
-            
-            const response = await fetch(`${API_URL}?key=${GOOGLE_API_KEY}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            })
-
-            if (!response.ok) {
-                const errorText = await response.text()
-                const isRetryable = response.status === 503 || response.status === 429
-                lastError = `Google API ${response.status}: ${errorText.substring(0, 200)}`
-                
-                if (!isRetryable || attempt === MAX_ATTEMPTS) {
-                    throw new Error(lastError)
-                }
-                console.log(`[Character Generate] ⚠️ HTTP ${response.status}, retrying in ${attempt * 3}s...`)
-                await new Promise(r => setTimeout(r, attempt * 3000))
-                continue
-            }
-
-            const result = await response.json()
-            
-            // Search for image in response
-            if (result.candidates?.[0]?.content?.parts) {
-                for (const part of result.candidates[0].content.parts) {
-                    if (part.inlineData?.data) {
-                        base64Image = part.inlineData.data
-                        break
-                    }
-                }
-            }
-
-            if (base64Image) {
-                console.log(`[Character Generate] ✅ Image received on attempt ${attempt}`)
-                break
-            }
-            
-            // No image — log and determine if retryable
-            const finishReason = result.candidates?.[0]?.finishReason
-            const blockReason = result.promptFeedback?.blockReason
-            
-            console.error(`[Character Generate] ⚠️ No image on attempt ${attempt}:`, JSON.stringify({
-                finishReason, blockReason, 
-                finishMessage: result.candidates?.[0]?.finishMessage?.substring(0, 100)
-            }))
-            
-            if (blockReason) {
-                lastError = `Content blocked: ${blockReason} (attempt ${attempt}/${MAX_ATTEMPTS})`
-            } else if (finishReason === 'IMAGE_SAFETY') {
-                lastError = `Image blocked by safety filter (attempt ${attempt}/${MAX_ATTEMPTS})`
-            } else {
-                lastError = `No image generated (finishReason: ${finishReason || 'unknown'}, attempt ${attempt}/${MAX_ATTEMPTS})`
-            }
-            
-            if (attempt < MAX_ATTEMPTS) {
-                const delay = blockReason === 'OTHER' ? 6000 + (attempt * 3000) : 3000 + (attempt * 2000)
-                console.log(`[Character Generate] Retrying in ${delay / 1000}s...`)
-                await new Promise(r => setTimeout(r, delay))
-            }
-        }
-
-        if (!base64Image) {
-            throw new Error(lastError)
-        }
-
-        // Convert base64 back to buffer for upload
-        const imageBuffer = Buffer.from(base64Image, 'base64')
-        const cleanedImage = await removeMetadata(imageBuffer)
-
-        const baseName = sanitizeFilename(character.name || character.role || `character-${character.id}`)
-        const timestamp = Date.now()
-        const filename = `${projectId}/characters/${baseName}-${timestamp}.png`
-        const supabase = await createAdminClient()
-        const { error: uploadError } = await supabase.storage
-            .from('character-images')
-            .upload(filename, cleanedImage, {
-                contentType: 'image/png',
-                upsert: true,
-            })
-
-        if (uploadError) {
-            throw new Error(`Failed to upload image: ${uploadError.message}`)
-        }
-
-        const { data: urlData } = supabase.storage
-            .from('character-images')
-            .getPublicUrl(filename)
-        const publicUrl = urlData.publicUrl
-
-        if (!skipDbUpdate) {
-            const { error: updateError } = await supabase
-                .from('characters')
-                .update({
-                    image_url: publicUrl,
-                    generation_prompt: prompt,
-                    is_resolved: true,
-                    updated_at: new Date().toISOString(),
-                })
-                .eq('id', character.id)
-
-            if (updateError) {
-                throw new Error(`Failed to update character: ${updateError.message}`)
-            }
-
-            // Cleanup old image to avoid storage clutter and ensure clean replacement
-            if (character.image_url) {
-                try {
-                    const pathParts = character.image_url.split('/character-images/')
-                    if (pathParts.length > 1) {
-                        const oldPath = pathParts[1]
-                        await supabase.storage
-                            .from('character-images')
-                            .remove([oldPath])
-                    }
-                } catch (cleanupError) {
-                    console.warn('Failed to cleanup old character image:', cleanupError)
-                }
-            }
-        }
-
-        return { success: true, imageUrl: publicUrl, error: null }
-    } catch (error: unknown) {
-        console.error(`Error generating image for character ${character.id}:`, error)
-        return { success: false, imageUrl: null, error: getErrorMessage(error, 'Generation failed') }
+    if (uploadError) {
+      throw new Error(`Failed to upload image: ${uploadError.message}`)
     }
+
+    const { data: urlData } = supabase.storage
+      .from('character-images')
+      .getPublicUrl(filename)
+    const publicUrl = urlData.publicUrl
+
+    if (!skipDbUpdate) {
+      const { error: updateError } = await supabase
+        .from('characters')
+        .update({
+          image_url: publicUrl,
+          generation_prompt: prompt,
+          is_resolved: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', character.id)
+
+      if (updateError) {
+        throw new Error(`Failed to update character: ${updateError.message}`)
+      }
+
+      if (character.image_url) {
+        try {
+          const pathParts = character.image_url.split('/character-images/')
+          if (pathParts.length > 1) {
+            await supabase.storage
+              .from('character-images')
+              .remove([pathParts[1]])
+          }
+        } catch (cleanupError) {
+          console.warn('Failed to cleanup old character image:', cleanupError)
+        }
+      }
+    }
+
+    return { success: true, imageUrl: publicUrl, error: null }
+  } catch (error: unknown) {
+    console.error(`Error generating image for character ${character.id}:`, error)
+    return { success: false, imageUrl: null, error: getErrorMessage(error, 'Generation failed') }
+  }
 }

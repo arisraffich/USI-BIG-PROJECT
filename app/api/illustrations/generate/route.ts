@@ -50,7 +50,8 @@ export async function POST(request: Request) {
             referenceImageUrl,
             sceneCharacters, // New: Character overrides for Scene Recreation mode
             skipDbUpdate, // New: For comparison mode - upload but don't save to DB
-            useThinking // New: Enable thinking mode for regeneration
+            useThinking, // New: Enable thinking mode for regeneration
+            modelId // Optional: Override Gemini model (e.g. gemini-3-pro-image-preview)
         } = body as {
             projectId: string
             pageId?: string
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
             sceneCharacters?: SceneCharacterInput[]
             skipDbUpdate?: boolean
             useThinking?: boolean
+            modelId?: string
         }
 
         // Debug: Log mode detection
@@ -566,7 +568,8 @@ ${textPromptSection}`
             aspectRatio: mappedAspectRatio,
             isSceneRecreation: isSceneRecreationMode,
             hasCustomStyleRefs: hasCustomStyleRefs,
-            useThinking: isEditMode ? (useThinking || false) : true
+            useThinking: isEditMode ? (useThinking || false) : true,
+            modelId
         })
 
         if (!result.success || !result.imageBuffer) {

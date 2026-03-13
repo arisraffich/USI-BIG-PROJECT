@@ -3,7 +3,7 @@ import { getErrorMessage } from '@/lib/utils/error'
 import sharp from 'sharp'
 
 const API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY
-const ILLUSTRATION_MODEL = 'gemini-3.1-flash-image-preview'
+const DEFAULT_MODEL = 'gemini-3.1-flash-image-preview'
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 
@@ -63,6 +63,37 @@ async function retryWithBackoff<T>(
   throw lastError || new Error('All retries failed')
 }
 
+/**
+ * Extracts the generated image from a Gemini API response, handling
+ * both camelCase and snake_case field names. Throws descriptive errors
+ * for safety blocks and empty responses.
+ */
+function extractImageFromResponse(result: any, context: string): Buffer {
+    const parts = result.candidates?.[0]?.content?.parts || []
+    const imagePart = parts.find((p: Record<string, unknown>) => p.inline_data || p.inlineData)
+    const base64 = imagePart?.inline_data?.data || imagePart?.inlineData?.data
+
+    if (base64) return Buffer.from(base64, 'base64')
+
+    const blockReason = result.promptFeedback?.blockReason
+    const finishReason = result.candidates?.[0]?.finishReason
+
+    if (blockReason) throw new Error(`[${context}] Content blocked: ${blockReason}`)
+    if (finishReason === 'SAFETY' || finishReason === 'IMAGE_SAFETY') {
+        throw new Error(`[${context}] Image blocked by safety filters`)
+    }
+    if (finishReason === 'RECITATION') {
+        throw new Error(`[${context}] Content blocked due to recitation policy`)
+    }
+
+    console.error(`[${context}] No image in response:`, JSON.stringify({
+        promptFeedback: result.promptFeedback,
+        finishReason,
+        partsCount: parts.length,
+    }))
+    throw new Error(`[${context}] No image generated — API returned empty response`)
+}
+
 interface CharacterReference {
     name: string
     imageUrl: string
@@ -80,6 +111,7 @@ interface GenerateOptions {
     isSceneRecreation?: boolean // Scene Recreation mode - uses higher quality input/output
     hasCustomStyleRefs?: boolean // When true, style refs define style instead of main character
     useThinking?: boolean // Enable thinking mode for complex scene composition
+    modelId?: string // Override Gemini model (default: gemini-3.1-flash-image-preview)
 }
 
 async function fetchImageAsBase64(
@@ -142,8 +174,11 @@ export async function generateIllustration({
     aspectRatio = "1:1",
     isSceneRecreation = false,
     hasCustomStyleRefs = false,
-    useThinking = false
+    useThinking = false,
+    modelId
 }: GenerateOptions): Promise<{ success: boolean, imageBuffer: Buffer | null, error: string | null }> {
+    const activeModel = modelId || DEFAULT_MODEL
+    const isPro = activeModel.includes('-pro-')
 
     if (!API_KEY) throw new Error('Google API Key missing')
 
@@ -277,7 +312,7 @@ Apply the style uniformly to characters, backgrounds, props, and all scene eleme
                 imageSize: '4K'
             }
         }
-        if (useThinking) {
+        if (useThinking && !isPro) {
             generationConfig.thinkingConfig = { thinkingLevel: 'HIGH' }
         }
 
@@ -287,60 +322,48 @@ Apply the style uniformly to characters, backgrounds, props, and all scene eleme
             safetySettings: SAFETY_SETTINGS
         }
 
-        // Wrap API call in retry logic
-        const result = await retryWithBackoff(async () => {
-            const response = await fetch(`${BASE_URL}/${ILLUSTRATION_MODEL}:generateContent?key=${API_KEY}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            })
+        console.log(`[GoogleAI] Using model: ${activeModel}${isPro ? ' (Pro — thinking always on)' : ''}`)
 
-            if (!response.ok) {
-                const txt = await response.text()
-                throw new Error(`Google API Error: ${response.status} - ${txt}`)
-            }
+        // Soft-failure retry: retries both HTTP errors and empty responses
+        const MAX_ATTEMPTS = 3
+        let lastError = 'No image generated'
 
-            return await response.json()
-        }, 'Generate Illustration')
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                console.log(`[GoogleAI] Illustration attempt ${attempt}/${MAX_ATTEMPTS}...`)
 
-        // Search all response parts for the image
-        const allIllustrationParts = result.candidates?.[0]?.content?.parts || []
-        const illustrationImagePart = allIllustrationParts.find((p: Record<string, unknown>) => p.inline_data || p.inlineData)
-        const base64Image = illustrationImagePart?.inline_data?.data || illustrationImagePart?.inlineData?.data
+                const response = await fetch(`${BASE_URL}/${activeModel}:generateContent?key=${API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                })
 
-        if (!base64Image) {
-            // Log the full response to understand why no image was generated
-            console.error('[GoogleAI] No image in response. Full result:', JSON.stringify({
-                promptFeedback: result.promptFeedback,
-                candidates: result.candidates?.map((c: any) => ({
-                    finishReason: c.finishReason,
-                    safetyRatings: c.safetyRatings,
-                    contentPresent: !!c.content
-                })),
-                modelVersion: result.modelVersion
-            }, null, 2))
-            
-            // Check for specific block reasons
-            const blockReason = result.promptFeedback?.blockReason
-            const finishReason = result.candidates?.[0]?.finishReason
-            
-            if (blockReason) {
-                throw new Error(`Content blocked: ${blockReason}`)
+                if (!response.ok) {
+                    const txt = await response.text()
+                    const isRetryable = response.status === 503 || response.status === 429
+                    lastError = `Google API ${response.status}: ${txt.substring(0, 200)}`
+
+                    if (!isRetryable || attempt === MAX_ATTEMPTS) throw new Error(lastError)
+                    const delay = INITIAL_DELAY_MS * attempt
+                    console.log(`[GoogleAI] ⚠️ Retrying in ${delay / 1000}s...`)
+                    await new Promise(r => setTimeout(r, delay))
+                    continue
+                }
+
+                const result = await response.json()
+                const rawBuffer = extractImageFromResponse(result, 'Illustration')
+                const cleanBuffer = await removeMetadata(rawBuffer)
+                return { success: true, imageBuffer: cleanBuffer, error: null }
+            } catch (err: unknown) {
+                lastError = getErrorMessage(err)
+                const isSafetyBlock = lastError.includes('safety') || lastError.includes('blocked')
+                if (isSafetyBlock || attempt === MAX_ATTEMPTS) throw err
+                const delay = INITIAL_DELAY_MS * attempt
+                console.log(`[GoogleAI] ⚠️ Attempt ${attempt} empty — retrying in ${delay / 1000}s...`)
+                await new Promise(r => setTimeout(r, delay))
             }
-            if (finishReason === 'SAFETY' || finishReason === 'IMAGE_SAFETY') {
-                throw new Error('Image blocked by safety filters - try simplifying or revising the scene description')
-            }
-            if (finishReason === 'RECITATION') {
-                throw new Error('Content blocked due to recitation policy')
-            }
-            
-            throw new Error('No image generated - API returned empty response')
         }
-
-        const rawBuffer = Buffer.from(base64Image, 'base64')
-        const cleanBuffer = await removeMetadata(rawBuffer)
-
-        return { success: true, imageBuffer: cleanBuffer, error: null }
+        throw new Error(lastError)
 
     } catch (error: unknown) {
         console.error('generateIllustration error:', error)
@@ -390,7 +413,7 @@ export async function generateSketch(
             console.log(`[generateSketch] Attempt ${attempt}/${MAX_ATTEMPTS}...`)
             const callStart = Date.now()
             
-            const response = await fetch(`${BASE_URL}/${ILLUSTRATION_MODEL}:generateContent?key=${API_KEY}`, {
+            const response = await fetch(`${BASE_URL}/${DEFAULT_MODEL}:generateContent?key=${API_KEY}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -412,42 +435,23 @@ export async function generateSketch(
             }
 
             const result = await response.json()
-            
-            // Search all parts for the image
-            const allParts = result.candidates?.[0]?.content?.parts || []
-            const imagePart = allParts.find((p: Record<string, unknown>) => p.inline_data || p.inlineData)
-            const base64Image = imagePart?.inline_data?.data || imagePart?.inlineData?.data
-            
-            if (base64Image) {
+
+            try {
+                const rawBuffer = extractImageFromResponse(result, 'Sketch')
                 console.log(`[generateSketch] ✅ Image received on attempt ${attempt} (${callElapsed}s)`)
-                const rawBuffer = Buffer.from(base64Image, 'base64')
                 const cleanBuffer = await removeMetadata(rawBuffer)
                 return { success: true, imageBuffer: cleanBuffer, error: null }
-            }
-            
-            // No image — log diagnostics
-            const finishReason = result.candidates?.[0]?.finishReason
-            const blockReason = result.promptFeedback?.blockReason
-            
-            console.error(`[generateSketch] ⚠️ No image on attempt ${attempt} (${callElapsed}s):`, JSON.stringify({
-                finishReason, blockReason,
-                safetyRatings: result.candidates?.[0]?.safetyRatings,
-                partsCount: allParts.length,
-            }, null, 2))
-            
-            // Hard safety blocks — don't retry
-            if (finishReason === 'SAFETY' || finishReason === 'IMAGE_SAFETY') {
-                throw new Error(`Image blocked by safety filter (${finishReason})`)
-            }
-            
-            lastError = blockReason
-                ? `Content blocked: ${blockReason} (attempt ${attempt}/${MAX_ATTEMPTS})`
-                : `No image generated (finishReason: ${finishReason || 'unknown'}, attempt ${attempt}/${MAX_ATTEMPTS})`
-            
-            if (attempt < MAX_ATTEMPTS) {
-                const delay = 3000 + (attempt * 2000)
-                console.log(`[generateSketch] Retrying in ${delay / 1000}s...`)
-                await new Promise(r => setTimeout(r, delay))
+            } catch (extractErr: unknown) {
+                lastError = getErrorMessage(extractErr)
+                const isSafetyBlock = lastError.includes('safety') || lastError.includes('blocked')
+                if (isSafetyBlock) throw extractErr
+
+                console.error(`[generateSketch] ⚠️ No image on attempt ${attempt} (${callElapsed}s): ${lastError}`)
+                if (attempt < MAX_ATTEMPTS) {
+                    const delay = 3000 + (attempt * 2000)
+                    console.log(`[generateSketch] Retrying in ${delay / 1000}s...`)
+                    await new Promise(r => setTimeout(r, delay))
+                }
             }
         }
         
@@ -498,7 +502,7 @@ export async function generateLineArt(
 
         // Wrap API call in retry logic
         const result = await retryWithBackoff(async () => {
-            const response = await fetch(`${BASE_URL}/${ILLUSTRATION_MODEL}:generateContent?key=${API_KEY}`, {
+            const response = await fetch(`${BASE_URL}/${DEFAULT_MODEL}:generateContent?key=${API_KEY}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -512,26 +516,7 @@ export async function generateLineArt(
             return await response.json()
         }, 'Generate Line Art')
 
-        // Search all response parts for the image
-        const allLineArtParts = result.candidates?.[0]?.content?.parts || []
-        const lineArtImagePart = allLineArtParts.find((p: Record<string, unknown>) => p.inline_data || p.inlineData)
-        const base64Image = lineArtImagePart?.inline_data?.data || lineArtImagePart?.inlineData?.data
-        
-        if (!base64Image) {
-            const blockReason = result.promptFeedback?.blockReason
-            const finishReason = result.candidates?.[0]?.finishReason
-            
-            if (blockReason) {
-                throw new Error(`Content blocked: ${blockReason}`)
-            }
-            if (finishReason === 'SAFETY' || finishReason === 'IMAGE_SAFETY') {
-                throw new Error('Image blocked by safety filters')
-            }
-            
-            throw new Error('No image generated')
-        }
-
-        const rawBuffer = Buffer.from(base64Image, 'base64')
+        const rawBuffer = extractImageFromResponse(result, 'Line Art')
         const cleanBuffer = await removeMetadata(rawBuffer)
 
         return { success: true, imageBuffer: cleanBuffer, error: null }

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, ChevronUp, AlignLeft, Users, Plus, Minus, Pencil, Check, Layers, CornerDownRight, AlertCircle, ChevronRight, Trash2 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -69,7 +70,7 @@ export interface SharedIllustrationBoardProps {
     illustrationType?: 'spread' | 'spot' | null
     setIllustrationType?: (type: 'spread' | 'spot' | null) => void
     onGenerate?: () => void
-    onRegenerate?: (prompt: string, referenceImages?: string[], referenceImageUrl?: string, sceneCharacters?: SceneCharacter[], useThinking?: boolean) => void
+    onRegenerate?: (prompt: string, referenceImages?: string[], referenceImageUrl?: string, sceneCharacters?: SceneCharacter[], useThinking?: boolean, modelId?: string) => void
     onLayoutChange?: (newType: 'spread' | 'spot' | null) => void // For changing layout type (triggers regeneration)
     onUpload?: (type: 'sketch' | 'illustration', file: File) => Promise<void>
     illustratedPages?: Page[] // All pages with illustrations (for environment reference)
@@ -269,6 +270,7 @@ export function SharedIllustrationBoard({
     const [editEmotion, setEditEmotion] = useState('')
     const [promptWasAutoPopulated, setPromptWasAutoPopulated] = useState(false)
     const [useThinkingMode, setUseThinkingMode] = useState(false)
+    const [illustrationModel, setIllustrationModel] = useState<'nb2' | 'nb-pro'>('nb2')
     
     const ENV_AUTO_PROMPT = 'Use the same environment as in the reference image. Keep all characters and composition the same.'
     
@@ -1970,11 +1972,23 @@ export function SharedIllustrationBoard({
                         setEditingCharacterId(null)
                         setPromptWasAutoPopulated(false)
                         setUseThinkingMode(false)
+                        setIllustrationModel('nb2')
                     }
                 }}>
                     <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
-                            <DialogTitle>Regenerate Illustration</DialogTitle>
+                            <DialogTitle className="flex items-center gap-1.5">
+                                <span>Regenerate with</span>
+                                <Select value={illustrationModel} onValueChange={(v) => { setIllustrationModel(v as 'nb2' | 'nb-pro'); if (v === 'nb-pro') setUseThinkingMode(false) }}>
+                                    <SelectTrigger className="w-[100px] h-7 text-sm font-semibold">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="nb2">NB2</SelectItem>
+                                        <SelectItem value="nb-pro">NB Pro</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </DialogTitle>
                             <DialogDescription>
                                 {isSceneRecreationMode 
                                     ? 'Recreate scene with a different environment and customize characters.'
@@ -2282,16 +2296,20 @@ export function SharedIllustrationBoard({
                         </div>
 
                         <DialogFooter className="flex items-center !justify-between">
-                            <div className="flex items-center gap-2">
-                                <Switch
-                                    id="thinking-mode"
-                                    checked={useThinkingMode}
-                                    onCheckedChange={setUseThinkingMode}
-                                    className="scale-90"
-                                />
-                                <label htmlFor="thinking-mode" className="text-xs text-slate-500 cursor-pointer select-none">
-                                    Deep thinking
-                                </label>
+                            <div className="flex items-center">
+                                {illustrationModel === 'nb2' && (
+                                    <div className="flex items-center gap-2">
+                                        <Switch
+                                            id="thinking-mode"
+                                            checked={useThinkingMode}
+                                            onCheckedChange={setUseThinkingMode}
+                                            className="scale-90"
+                                        />
+                                        <label htmlFor="thinking-mode" className="text-xs text-slate-500 cursor-pointer select-none">
+                                            Deep thinking
+                                        </label>
+                                    </div>
+                                )}
                             </div>
                             <div className="flex items-center gap-2">
                             <Button variant="ghost" onClick={() => setIsRegenerateDialogOpen(false)}>Cancel</Button>
@@ -2367,8 +2385,9 @@ export function SharedIllustrationBoard({
                                         }))
                                     }
                                     
+                                    const geminiModelId = illustrationModel === 'nb-pro' ? 'gemini-3-pro-image-preview' : undefined
                                     setIsRegenerateDialogOpen(false)
-                                    onRegenerate(regenerationPrompt, base64Images, refUrl, includedChars, useThinkingMode)
+                                    onRegenerate(regenerationPrompt, base64Images, refUrl, includedChars, useThinkingMode, geminiModelId)
                                 }}
                                 disabled={isSceneRecreationMode && sceneCharacters.filter(c => c.isIncluded).length === 0}
                                 className={

@@ -9,9 +9,12 @@ A full-stack platform for managing children's book illustration projects. Handle
 - **Database:** Supabase (PostgreSQL) with `pg_cron` + `pg_net` extensions
 - **Storage:** Supabase Storage (illustrations, sketches, character images, line art) + Cloudflare R2 (temporary line art ZIPs)
 - **AI Generation:**
-  - OpenAI GPT-5.2 (story analysis, character identification, scene descriptions)
-  - Google Gemini 3.1 Flash Image Preview "Nano Banana 2" (image generation: characters, illustrations, sketches, line art)
-  - Thinking mode: HIGH for initial generation, optional toggle for regeneration
+  - OpenAI GPT-5.4 (story analysis, character identification, scene descriptions — Structured Outputs with reasoning)
+  - Google Gemini 3.1 Flash Image Preview "Nano Banana 2" (default image generation: characters, illustrations, sketches, line art)
+  - Google Gemini 3 Pro Image Preview "Nano Banana Pro" (higher quality character generation with always-on thinking)
+  - OpenAI GPT Image 1.5 via Responses API (alternative character generation engine)
+  - Modular engine architecture (`lib/ai/engines/`) — easy to add/remove AI image models
+  - Thinking mode: HIGH for initial generation, optional toggle for NB2 regeneration
 - **Image Processing:** Potrace (vectorization) + Sharp (PNG rendering)
 - **Email:** Resend (with R2 download links for large attachments >40MB)
 - **Notifications:** Slack Webhooks, SMS (Quo.com)
@@ -27,7 +30,8 @@ A full-stack platform for managing children's book illustration projects. Handle
 - **Sketch Generation:** Automatic B&W sketch conversion for customer preview
 - **Line Art Generation:** AI-powered line art + Potrace vectorization for production-ready transparent PNGs (admin-only)
 - **Regeneration with Comparison:** Side-by-side old vs new comparison before committing changes
-- **Deep Thinking Toggle:** Optional "heavy thinking" mode for regeneration (characters + illustrations)
+- **Multi-Model Selection:** Dropdown to choose AI engine for character regeneration (NB2, NB Pro, GPT)
+- **Deep Thinking Toggle:** Optional "heavy thinking" mode for NB2 regeneration (characters + illustrations)
 - **Batch Generation:** Generate all remaining illustrations in parallel (3 concurrent)
 - **Bulk Downloads:** ZIP download of sketches + illustrations, or line art + illustrations
 - **Email Delivery:** Send ZIP packages to info@usillustrations.com (large files auto-upload to R2 with download link)
@@ -46,9 +50,10 @@ A full-stack platform for managing children's book illustration projects. Handle
 - **One-Click Approval:** Approve all sketches to proceed to production
 
 ### Notifications
-- Slack notifications for all project events (character submissions, approvals, feedback)
+- Slack notifications for all project events (character submissions, approvals, feedback) — auto-skipped for test projects
 - Email notifications via Resend (review links, approval confirmations, ZIP delivery)
 - SMS support via Quo.com (optional, customer notifications)
+- Background processing for heavy tasks on customer submission (non-blocking)
 
 ## Project Workflow
 
@@ -92,7 +97,7 @@ A full-stack platform for managing children's book illustration projects. Handle
 - npm
 - Supabase project (with Storage buckets)
 - OpenAI API key
-- Google AI API key (Gemini 3 Pro)
+- Google AI API key (Gemini 3.1 Flash / 3 Pro Image)
 - Resend account (for emails)
 - Slack webhook (for notifications, optional)
 
@@ -204,6 +209,7 @@ usi-platform/
 │   └── ui/                  # shadcn/ui components
 ├── lib/
 │   ├── ai/                  # AI integrations (OpenAI, Google Gemini, character/sketch gen)
+│   │   └── engines/         # Modular AI image engines (Gemini, GPT, types, README)
 │   ├── constants/           # Status configs, badge colors
 │   ├── line-art/            # Potrace processor + Supabase storage
 │   ├── notifications/       # Email (Resend), Slack, SMS orchestration
@@ -226,7 +232,7 @@ usi-platform/
 - **IllustrationsTabContent:** Admin illustration management with comparison mode, batch generation, and global sketch view mode propagation
 - **UnifiedIllustrationFeed:** Feed wrapper that bridges IllustrationsTabContent and SharedIllustrationBoard, forwarding global view mode and toggle callbacks
 - **CustomerProjectTabsContent:** Main customer review interface with character forms and illustration feedback
-- **UnifiedCharacterCard:** Reusable character card for admin (with regeneration, deep thinking toggle) and customer views
+- **UnifiedCharacterCard:** Reusable character card for admin (with regeneration, AI model dropdown, deep thinking toggle) and customer views
 
 ## Database Schema
 

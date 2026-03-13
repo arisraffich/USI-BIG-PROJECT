@@ -63,6 +63,10 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 
 See `docs/SLACK_SETUP_GUIDE.md` for detailed Slack setup instructions.
 
+## Test Project Skipping
+
+Slack notifications are automatically skipped for test projects — any project whose author name contains "test" (case-insensitive) will not trigger Slack messages. This prevents noise during development and QA.
+
 ## Verification
 
 All notification services fail gracefully - if one service is not configured or fails, the others still work. Check server logs for `[Notification]` prefixed messages to debug issues.

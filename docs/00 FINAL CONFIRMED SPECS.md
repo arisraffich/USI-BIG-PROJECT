@@ -9,7 +9,9 @@
 
 ### Key differences from this original spec:
 > - **Framework:** Next.js 16 (was 14)
-> - **AI Models:** OpenAI GPT-5.2 + Google Gemini 3.1 Flash Image Preview (was GPT-4o + Replicate)
+> - **AI Text:** OpenAI GPT-5.4 with Structured Outputs + reasoning (was GPT-4o)
+> - **AI Image:** Multi-engine architecture — NB2 (Gemini 3.1 Flash), NB Pro (Gemini 3 Pro), GPT Image 1.5 (was Replicate)
+> - **Engine Architecture:** Modular engine pattern (`lib/ai/engines/`) for easy model addition/removal
 > - **Email:** Resend with R2 large-file support (was Gmail SMTP)
 > - **Deployment:** Railway (was Cloudflare Pages)
 > - **Colored Illustrations:** Fully implemented (was "Phase 2 - not included")
@@ -18,7 +20,10 @@
 > - **Scheduled Sends:** pg_cron-based scheduling for all send/resend actions (not in original spec)
 > - **Page Management:** Delete pages with auto-renumbering (not in original spec)
 > - **Sketch/Story Toggle:** Per-card view toggle with admin "This page"/"All pages" scope (not in original spec)
-> - **Deep Thinking:** Optional heavy thinking mode for regeneration (not in original spec)
+> - **Multi-Model Selection:** Dropdown for choosing AI engine per character regeneration (not in original spec)
+> - **Deep Thinking:** Optional heavy thinking mode for NB2 regeneration (not in original spec)
+> - **Background Processing:** Heavy tasks run asynchronously after customer submission (not in original spec)
+> - **Smart Notifications:** Auto-skip Slack for test projects (not in original spec)
 > - **All phases:** Complete and in production
 
 ---
