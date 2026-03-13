@@ -2015,7 +2015,7 @@ export function SharedIllustrationBoard({
                                                 <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
                                             </Button>
                                         </DropdownMenuTrigger>
-                                        <DropdownMenuContent className="w-[calc(550px-3rem)]" align="start">
+                                        <DropdownMenuContent className="w-[calc(550px-3rem)] max-h-[300px] overflow-y-auto" align="start">
                                             <DropdownMenuItem 
                                                 onClick={() => handleEnvSelect(null)} 
                                                 className="cursor-pointer"

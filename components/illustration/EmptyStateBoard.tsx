@@ -479,7 +479,7 @@ export function EmptyStateBoard({
                                         <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent className="w-56" align="start">
+                                <DropdownMenuContent className="w-56 max-h-[300px] overflow-y-auto" align="start">
                                     <DropdownMenuItem onClick={() => setSelectedRefPageId(null)} className="cursor-pointer font-medium">
                                         <Sparkles className="w-4 h-4 mr-2 text-purple-500" />
                                         Page 1 (Default Style)
