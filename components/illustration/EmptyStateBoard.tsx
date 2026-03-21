@@ -608,7 +608,7 @@ export function EmptyStateBoard({
                         {/* Story Text */}
                         <div className="prose prose-lg prose-slate text-center md:text-left">
                             <p className="font-serif text-xl leading-normal text-slate-800">
-                                {page.story_text || <span className="italic text-slate-300">No story text available.</span>}
+                                {(page.story_text ? page.story_text.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() : '') || <span className="italic text-slate-300">No story text available.</span>}
                             </p>
                         </div>
 

@@ -104,12 +104,14 @@ export async function PATCH(
       is_customer_edited_scene_description?: boolean
     } = {}
 
+    const sanitize = (s: string) => s.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ')
+
     if (story_text !== undefined) {
-      updateData.story_text = story_text
+      updateData.story_text = sanitize(story_text)
     }
 
     if (scene_description !== undefined) {
-      updateData.scene_description = scene_description || null
+      updateData.scene_description = scene_description ? sanitize(scene_description) : null
       // If user edits the description, mark it as not auto-generated
       if (scene_description) {
         updateData.description_auto_generated = false

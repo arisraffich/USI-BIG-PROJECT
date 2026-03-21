@@ -28,7 +28,7 @@ usi-platform/
 │   ├── illustration/    # SharedIllustrationBoard, UnifiedIllustrationFeed
 │   ├── project/         # ManuscriptEditor, page/character cards
 │   ├── review/          # Customer-facing review components
-│   ├── shared/          # RichTextEditor, UniversalCharacterCard
+│   ├── shared/          # UniversalCharacterCard, SendConfirmationDialog
 │   └── ui/              # shadcn/ui primitives
 ├── lib/
 │   ├── ai/              # AI integrations (OpenAI, Gemini, director, generators)

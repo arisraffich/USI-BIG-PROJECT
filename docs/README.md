@@ -205,7 +205,7 @@ usi-platform/
 │   ├── layout/              # Header shells, project layout
 │   ├── project/             # Manuscript editor, page cards, character cards
 │   ├── review/              # Customer-facing components
-│   ├── shared/              # Shared utilities (RichTextEditor, UniversalCharacterCard)
+│   ├── shared/              # Shared utilities (UniversalCharacterCard, SendConfirmationDialog)
 │   └── ui/                  # shadcn/ui components
 ├── lib/
 │   ├── ai/                  # AI integrations (OpenAI, Google Gemini, character/sketch gen)

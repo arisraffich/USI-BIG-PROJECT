@@ -58,6 +58,8 @@ export async function PATCH(
 
     // Perform atomic updates using a transaction-like approach
     // Update each page individually, but if any fails, we'll rollback
+    const sanitize = (s: string) => s.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ')
+
     const updatePromises = updates.map(async (update: any) => {
       const updateData: {
         story_text?: string
@@ -70,13 +72,12 @@ export async function PATCH(
       } = {}
 
       if (update.story_text !== undefined) {
-        updateData.story_text = update.story_text
-        // Admin edit overrides customer edit flag -> turns Blue
+        updateData.story_text = sanitize(update.story_text)
         updateData.is_customer_edited_story_text = false
       }
 
       if (update.scene_description !== undefined) {
-        updateData.scene_description = update.scene_description || null
+        updateData.scene_description = update.scene_description ? sanitize(update.scene_description) : null
         // If user edits the description, mark it as not auto-generated
         if (update.scene_description) {
           updateData.description_auto_generated = false

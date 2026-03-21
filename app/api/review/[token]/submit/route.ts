@@ -189,10 +189,11 @@ export async function POST(
 
     // Update pages with customer edits (Shared)
     if (pageEdits && Object.keys(pageEdits).length > 0) {
+      const sanitize = (s: string | undefined) => s ? s.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ') : s
       const pageUpdates = Object.entries(pageEdits).map(([pageId, edits]: [string, any]) => ({
         id: pageId,
-        story_text: edits.story_text,
-        scene_description: edits.scene_description,
+        story_text: sanitize(edits.story_text),
+        scene_description: sanitize(edits.scene_description),
         is_customer_edited_story_text: !!edits.story_text && edits.story_text !== '',
         is_customer_edited_scene_description: !!edits.scene_description && edits.scene_description !== '',
       }))
