@@ -607,7 +607,7 @@ export function EmptyStateBoard({
                     <div className="max-h-[500px] overflow-y-auto pr-4 custom-scrollbar space-y-8">
                         {/* Story Text */}
                         <div className="prose prose-lg prose-slate text-center md:text-left">
-                            <p className="font-serif text-xl leading-normal text-slate-800">
+                            <p className="font-serif text-xl leading-normal text-slate-800" style={{ whiteSpace: 'pre-wrap' }}>
                                 {(page.story_text ? page.story_text.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() : '') || <span className="italic text-slate-300">No story text available.</span>}
                             </p>
                         </div>

@@ -1774,7 +1774,7 @@ export function SharedIllustrationBoard({
                                     {/* 1. PAGE TEXT */}
                                     <div className="shrink-0">
                                         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">Page {page.page_number}</span>
-                                        <p className="text-lg md:text-xl font-serif leading-relaxed text-slate-800 mb-6">
+                                        <p className="text-lg md:text-xl font-serif leading-relaxed text-slate-800 mb-6" style={{ whiteSpace: 'pre-wrap' }}>
                                             {stripHtml(page.story_text || '') || <span className="italic text-slate-300">No text content available.</span>}
                                         </p>
                                     </div>
@@ -1864,7 +1864,7 @@ export function SharedIllustrationBoard({
                                 /* PAGE TEXT VIEW for customer pages 2+ */
                                 <div className="w-full h-full p-8 bg-white text-slate-900 overflow-y-auto">
                                     <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">Page {page.page_number}</span>
-                                    <p className="text-lg md:text-xl font-serif leading-relaxed text-slate-800">
+                                    <p className="text-lg md:text-xl font-serif leading-relaxed text-slate-800" style={{ whiteSpace: 'pre-wrap' }}>
                                         {stripHtml(page.story_text || '') || <span className="italic text-slate-300">No text content available.</span>}
                                     </p>
                                 </div>
