@@ -379,7 +379,11 @@ export function IllustrationsTabContent({
                 })
             })
 
-            if (!response.ok) throw new Error('Regeneration failed')
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}))
+                const serverMsg = errData?.error || 'Regeneration failed'
+                throw new Error(serverMsg)
+            }
 
             const data = await response.json()
 
