@@ -921,7 +921,6 @@ export function SharedIllustrationBoard({
                                         title="Regenerate with Instructions"
                                         className="rounded-r-none border-r-0"
                                     >
-                                        <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
                                         Regenerate
                                     </Button>
                                     <DropdownMenu>
