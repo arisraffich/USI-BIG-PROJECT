@@ -937,10 +937,10 @@ export function SharedIllustrationBoard({
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent
                                             align="end"
-                                            style={regenerateSplitWidth ? { width: regenerateSplitWidth } : undefined}
+                                            style={regenerateSplitWidth ? { minWidth: Math.max(regenerateSplitWidth, 180) } : { minWidth: 180 }}
                                         >
-                                            <DropdownMenuLabel className="flex items-center text-sm font-semibold text-slate-700 py-1.5">
-                                                <Sparkles className="w-4 h-4 mr-2 text-purple-500" />
+                                            <DropdownMenuLabel className="flex items-center whitespace-nowrap text-sm font-semibold text-slate-700 py-1.5">
+                                                <Sparkles className="w-4 h-4 mr-2 shrink-0 text-purple-500" />
                                                 Refresh quality
                                             </DropdownMenuLabel>
                                             <DropdownMenuSeparator />
