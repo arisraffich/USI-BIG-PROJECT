@@ -305,6 +305,19 @@ export function SharedIllustrationBoard({
         return () => ro.disconnect()
     }, [])
 
+    // Same measurement for the mobile split-button (lives in the purple header)
+    const regenerateSplitMobileRef = useRef<HTMLDivElement>(null)
+    const [regenerateSplitMobileWidth, setRegenerateSplitMobileWidth] = useState<number | null>(null)
+    useEffect(() => {
+        if (!regenerateSplitMobileRef.current) return
+        const el = regenerateSplitMobileRef.current
+        const update = () => setRegenerateSplitMobileWidth(el.offsetWidth)
+        update()
+        const ro = new ResizeObserver(update)
+        ro.observe(el)
+        return () => ro.disconnect()
+    }, [])
+
     // Handler for quality refresh — bypasses modal, skips prompt/refs/instructions.
     // User picks the engine directly from the submenu at click time.
     const handleRefreshQuality = (engine: 'nb2' | 'nb-pro' | 'gpt-2') => {
@@ -937,11 +950,11 @@ export function SharedIllustrationBoard({
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent
                                             align="end"
-                                            style={regenerateSplitWidth ? { minWidth: Math.max(regenerateSplitWidth, 180) } : { minWidth: 180 }}
+                                            style={regenerateSplitWidth ? { width: regenerateSplitWidth } : undefined}
                                         >
                                             <DropdownMenuLabel className="flex items-center whitespace-nowrap text-sm font-semibold text-slate-700 py-1.5">
                                                 <Sparkles className="w-4 h-4 mr-2 shrink-0 text-purple-500" />
-                                                Refresh quality
+                                                Remaster
                                             </DropdownMenuLabel>
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem onClick={() => handleRefreshQuality('nb2')} className="cursor-pointer pl-8">
@@ -1488,46 +1501,90 @@ export function SharedIllustrationBoard({
                         {/* Abstract Background Element (Subtle) */}
                         <div className="absolute top-0 right-16 w-64 h-full bg-white/5 skew-x-12"></div>
 
-                        {/* Left: Page Identity + Delete */}
-                        <div className="flex items-center gap-2 z-10">
-                            <Bookmark className="w-5 h-5 text-white/90" fill="currentColor" />
-                            <span className="text-white font-bold text-lg tracking-wide">
-                                {page.page_number}
-                            </span>
-                            {isAdmin && onDeletePage && (
-                                <button
-                                    onClick={onDeletePage}
-                                    disabled={isGenerating || isDeleteDisabled}
-                                    className="ml-1 p-1 rounded-full bg-white/10 hover:bg-red-500/80 text-white/70 hover:text-white transition-colors disabled:opacity-30"
-                                    title="Delete page"
-                                >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                            )}
-                        </div>
+                        {/* Page Identity — page number */}
+                        <span
+                            className="text-white text-sm font-bold z-10 shrink-0"
+                            title={`Page ${page.page_number}`}
+                        >
+                            {page.page_number}
+                        </span>
 
-                        {/* Center: Layout Button (Admin only, when illustration exists) */}
-                        {isAdmin && onLayoutChange && page.illustration_url && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleOpenLayoutDialog}
-                                disabled={isGenerating}
-                                className="bg-white/20 hover:bg-white/30 text-white border-transparent font-medium px-3 h-8 gap-1.5 rounded-full z-10 transition-colors"
+                        {isAdmin && onDeletePage && (
+                            <button
+                                onClick={onDeletePage}
+                                disabled={isGenerating || isDeleteDisabled}
+                                className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-red-500/80 text-white/70 hover:text-white transition-colors disabled:opacity-30 z-10 shrink-0"
+                                title="Delete page"
                             >
-                                <Layers className="w-4 h-4" />
-                                Layout
-                            </Button>
+                                <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                         )}
 
-                        {/* Right: Action Button */}
+                        {isAdmin && onLayoutChange && page.illustration_url && (
+                            <button
+                                onClick={handleOpenLayoutDialog}
+                                disabled={isGenerating}
+                                title="Change Layout"
+                                className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors disabled:opacity-30 z-10 shrink-0"
+                            >
+                                <Layers className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+
+                        {isAdmin && onRegenerate && (
+                            <div ref={regenerateSplitMobileRef} className="flex z-10 shrink-0">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleOpenRegenerateDialog}
+                                    disabled={isGenerating}
+                                    title="Regenerate with Instructions"
+                                    className="bg-white/20 hover:bg-white/30 text-white border-transparent font-medium h-8 px-3 rounded-l-full rounded-r-none transition-colors"
+                                >
+                                    Regenerate
+                                </Button>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            disabled={isGenerating || !page.illustration_url}
+                                            title="More options"
+                                            className="bg-white/20 hover:bg-white/30 text-white border-transparent h-8 px-2 rounded-l-none rounded-r-full border-l border-white/20 transition-colors"
+                                        >
+                                            <ChevronDown className="w-3.5 h-3.5" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                        align="end"
+                                        style={regenerateSplitMobileWidth ? { width: regenerateSplitMobileWidth } : undefined}
+                                    >
+                                        <DropdownMenuLabel className="flex items-center whitespace-nowrap text-sm font-semibold text-slate-700 py-1.5">
+                                            <Sparkles className="w-4 h-4 mr-2 shrink-0 text-purple-500" />
+                                            Remaster
+                                        </DropdownMenuLabel>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => handleRefreshQuality('nb2')} className="cursor-pointer pl-8">
+                                            NB2
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleRefreshQuality('nb-pro')} className="cursor-pointer pl-8">
+                                            NB Pro
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleRefreshQuality('gpt-2')} className="cursor-pointer pl-8">
+                                            GPT 2
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                        )}
+
+                        {/* Revisions / Request Revision */}
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => setHistoryOpen(true)}
-                            className="bg-amber-500 hover:bg-amber-600 text-white border-transparent font-semibold px-4 h-8 gap-2 rounded-full z-10 transition-colors shadow-sm"
+                            className="bg-amber-500 hover:bg-amber-600 text-white border-transparent font-semibold px-4 h-8 rounded-full z-10 transition-colors shadow-sm shrink-0"
                         >
-                            <MessageSquarePlus className="w-4 h-4" />
                             {isAdmin ? 'Revisions' : 'Request Revision'}
                         </Button>
 
@@ -1791,27 +1848,16 @@ export function SharedIllustrationBoard({
                                     </span>
                                 )}
 
-                                {/* 1. REGENERATE (Admin) - Invisible in Text Mode to prevent layout shift */}
-                                {isAdmin && onRegenerate && (
-                                    <button
-                                        className={`h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm transition-all ml-auto ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`}
-                                        onClick={isGenerating ? undefined : handleOpenRegenerateDialog}
-                                        disabled={isGenerating}
-                                    >
-                                        <RefreshCw className={`h-4 w-4 ${isGenerating ? 'animate-spin' : ''}`} />
-                                    </button>
-                                )}
-
-                                {/* 2. UPLOAD (Admin) - Invisible in Text Mode to prevent layout shift */}
+                                {/* UPLOAD (Admin) - Invisible in Text Mode to prevent layout shift */}
                                 {isAdmin && onUpload && (
-                                    <Button variant="ghost" size="icon" className={`h-8 w-8 rounded-full bg-black/40 text-red-500 hover:bg-black/60 backdrop-blur-sm transition-opacity ${!isAdmin || !onRegenerate ? 'ml-auto' : ''} ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`} onClick={() => sketchInputRef.current?.click()}>
+                                    <Button variant="ghost" size="icon" className={`h-8 w-8 rounded-full bg-black/40 text-red-500 hover:bg-black/60 backdrop-blur-sm transition-opacity ml-auto ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`} onClick={() => sketchInputRef.current?.click()}>
                                         <Upload className="w-4 h-4" />
                                     </Button>
                                 )}
 
-                                {/* 3. DOWNLOAD - Invisible in Text Mode to prevent layout shift */}
+                                {/* DOWNLOAD - Invisible in Text Mode to prevent layout shift */}
                                 {sketchUrl && (
-                                    <button onClick={() => handleDownload(sketchUrl!, `Page-${page.page_number}-Sketch.jpg`)} className={`h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm transition-opacity ${(!isAdmin || (!onRegenerate && !onUpload)) ? 'ml-auto' : ''} ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`}>
+                                    <button onClick={() => handleDownload(sketchUrl!, `Page-${page.page_number}-Sketch.jpg`)} className={`h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm transition-opacity ${(!isAdmin || !onUpload) ? 'ml-auto' : ''} ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`}>
                                         <Download className="w-4 h-4" />
                                     </button>
                                 )}
@@ -1890,27 +1936,16 @@ export function SharedIllustrationBoard({
                                 <div className="absolute top-0 left-0 right-0 z-10 flex items-center gap-2 md:hidden p-3 bg-gradient-to-b from-black/40 to-transparent">
                                     <span className="text-xs font-bold tracking-wider text-white/90 uppercase shadow-sm">Colored</span>
 
-                                    {/* 1. REGENERATE (Admin) */}
-                                    {isAdmin && onRegenerate && (
-                                        <button
-                                            className="h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm transition-colors ml-auto"
-                                            onClick={isGenerating ? undefined : handleOpenRegenerateDialog}
-                                            disabled={isGenerating}
-                                        >
-                                            <RefreshCw className={`h-4 w-4 ${isGenerating ? 'animate-spin' : ''}`} />
-                                        </button>
-                                    )}
-
-                                    {/* 2. UPLOAD (Admin) */}
+                                    {/* UPLOAD (Admin) */}
                                     {isAdmin && onUpload && (
-                                        <Button variant="ghost" size="icon" className={`h-8 w-8 rounded-full bg-black/40 text-red-500 hover:bg-black/60 backdrop-blur-sm ${isAdmin && onRegenerate ? 'ml-1' : 'ml-auto'}`} onClick={() => illustrationInputRef.current?.click()}>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-red-500 hover:bg-black/60 backdrop-blur-sm ml-auto" onClick={() => illustrationInputRef.current?.click()}>
                                             <Upload className="w-4 h-4" />
                                         </Button>
                                     )}
 
-                                    {/* 3. DOWNLOAD */}
+                                    {/* DOWNLOAD */}
                                     {illustrationUrl && (
-                                        <button onClick={() => handleDownload(illustrationUrl!, `Page-${page.page_number}-Final.jpg`)} className={`h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm ${isAdmin && (onRegenerate || onUpload) ? 'ml-1' : 'ml-auto'}`}>
+                                        <button onClick={() => handleDownload(illustrationUrl!, `Page-${page.page_number}-Final.jpg`)} className={`h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm ${isAdmin && onUpload ? 'ml-1' : 'ml-auto'}`}>
                                             <Download className="w-4 h-4" />
                                         </button>
                                     )}
@@ -2140,8 +2175,8 @@ export function SharedIllustrationBoard({
                             {!isSceneRecreationMode && (
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between">
-                                        <Label className="text-sm font-medium">Reference Images (Optional)</Label>
-                                        <span className="text-xs text-slate-400">{referenceImages.length}/5 • Max 10MB each</span>
+                                        <Label className="text-sm font-medium">Add Images (Optional)</Label>
+                                        <span className="text-xs text-slate-400">{referenceImages.length}/5 • Max 10MB</span>
                                     </div>
 
                                     <input
@@ -2378,8 +2413,6 @@ export function SharedIllustrationBoard({
                                 )}
                             </div>
                             <div className="flex items-center gap-2">
-                            <Button variant="ghost" onClick={() => setIsRegenerateDialogOpen(false)}>Cancel</Button>
-                            
                             {/* Reset to Original button — only when original exists, not already showing it, and no custom input */}
                             {hasOriginal && !isShowingOriginal && !regenerationPrompt.trim() && referenceImages.length === 0 && !isSceneRecreationMode && (
                                 <Button
