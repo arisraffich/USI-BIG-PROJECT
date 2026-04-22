@@ -16,7 +16,7 @@ const ENGINES: Record<AIModel, CharacterEngine> = {
 const ENGINE_LABELS: Record<AIModel, string> = {
   gemini: 'Gemini',
   'gemini-pro': 'Gemini Pro',
-  gpt: 'GPT',
+  gpt: 'GPT 2',
 }
 
 async function fetchImageAsBuffer(url: string): Promise<ImageRef | null> {

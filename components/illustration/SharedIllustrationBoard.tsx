@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, ChevronUp, AlignLeft, Users, Plus, Minus, Pencil, Check, Layers, CornerDownRight, AlertCircle, ChevronRight, Trash2 } from 'lucide-react'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { getErrorMessage } from '@/lib/utils/error'
 
@@ -70,7 +70,7 @@ export interface SharedIllustrationBoardProps {
     illustrationType?: 'spread' | 'spot' | null
     setIllustrationType?: (type: 'spread' | 'spot' | null) => void
     onGenerate?: () => void
-    onRegenerate?: (prompt: string, referenceImages?: string[], referenceImageUrl?: string, sceneCharacters?: SceneCharacter[], useThinking?: boolean, modelId?: string) => void
+    onRegenerate?: (prompt: string, referenceImages?: string[], referenceImageUrl?: string, sceneCharacters?: SceneCharacter[], useThinking?: boolean, modelId?: string, isRefresh?: boolean) => void
     onLayoutChange?: (newType: 'spread' | 'spot' | null) => void // For changing layout type (triggers regeneration)
     onUpload?: (type: 'sketch' | 'illustration', file: File) => Promise<void>
     illustratedPages?: Page[] // All pages with illustrations (for environment reference)
@@ -270,7 +270,7 @@ export function SharedIllustrationBoard({
     const [editEmotion, setEditEmotion] = useState('')
     const [promptWasAutoPopulated, setPromptWasAutoPopulated] = useState(false)
     const [useThinkingMode, setUseThinkingMode] = useState(false)
-    const [illustrationModel, setIllustrationModel] = useState<'nb2' | 'nb-pro'>('nb2')
+    const [illustrationModel, setIllustrationModel] = useState<'nb2' | 'nb-pro' | 'gpt-2'>('nb2')
     
     const ENV_AUTO_PROMPT = 'Use the same environment as in the reference image. Keep all characters and composition the same.'
     
@@ -290,6 +290,31 @@ export function SharedIllustrationBoard({
                 setPromptWasAutoPopulated(false)
             }
         }
+    }
+
+    // Measure the split-button wrapper so the dropdown panel width matches it
+    const regenerateSplitRef = useRef<HTMLDivElement>(null)
+    const [regenerateSplitWidth, setRegenerateSplitWidth] = useState<number | null>(null)
+    useEffect(() => {
+        if (!regenerateSplitRef.current) return
+        const el = regenerateSplitRef.current
+        const update = () => setRegenerateSplitWidth(el.offsetWidth)
+        update()
+        const ro = new ResizeObserver(update)
+        ro.observe(el)
+        return () => ro.disconnect()
+    }, [])
+
+    // Handler for quality refresh — bypasses modal, skips prompt/refs/instructions.
+    // User picks the engine directly from the submenu at click time.
+    const handleRefreshQuality = (engine: 'nb2' | 'nb-pro' | 'gpt-2') => {
+        if (!onRegenerate || !page.illustration_url) return
+        const resolvedModelId = engine === 'nb-pro'
+            ? 'gemini-3-pro-image-preview'
+            : engine === 'gpt-2'
+                ? 'gpt-image-2'
+                : undefined
+        onRegenerate('', undefined, undefined, undefined, false, resolvedModelId, true)
     }
 
     // Handler to open regenerate dialog with saved prompt or customer feedback pre-populated
@@ -886,11 +911,52 @@ export function SharedIllustrationBoard({
                                         </Button>
                                     ) : null}
                                 </div>
-                                {/* Regenerate Button - Right */}
-                                <Button variant="outline" size="sm" onClick={handleOpenRegenerateDialog} disabled={isGenerating} title="Regenerate with Instructions">
-                                    <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-                                    Regenerate
-                                </Button>
+                                {/* Regenerate Split Button: main click = full modal; caret = Refresh Quality */}
+                                <div ref={regenerateSplitRef} className="flex">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleOpenRegenerateDialog}
+                                        disabled={isGenerating}
+                                        title="Regenerate with Instructions"
+                                        className="rounded-r-none border-r-0"
+                                    >
+                                        <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                                        Regenerate
+                                    </Button>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={isGenerating || !page.illustration_url}
+                                                className="rounded-l-none px-2"
+                                                title="More options"
+                                            >
+                                                <ChevronDown className="w-3.5 h-3.5" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent
+                                            align="end"
+                                            style={regenerateSplitWidth ? { width: regenerateSplitWidth } : undefined}
+                                        >
+                                            <DropdownMenuLabel className="flex items-center text-sm font-semibold text-slate-700 py-1.5">
+                                                <Sparkles className="w-4 h-4 mr-2 text-purple-500" />
+                                                Refresh quality
+                                            </DropdownMenuLabel>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => handleRefreshQuality('nb2')} className="cursor-pointer pl-8">
+                                                NB2
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleRefreshQuality('nb-pro')} className="cursor-pointer pl-8">
+                                                NB Pro
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleRefreshQuality('gpt-2')} className="cursor-pointer pl-8">
+                                                GPT 2
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
                             </>
                         ) : <div />}
                     </div>
@@ -1979,13 +2045,14 @@ export function SharedIllustrationBoard({
                         <DialogHeader>
                             <DialogTitle className="flex items-center gap-1.5">
                                 <span>Regenerate with</span>
-                                <Select value={illustrationModel} onValueChange={(v) => { setIllustrationModel(v as 'nb2' | 'nb-pro'); if (v === 'nb-pro') setUseThinkingMode(false) }}>
+                                <Select value={illustrationModel} onValueChange={(v) => { setIllustrationModel(v as 'nb2' | 'nb-pro' | 'gpt-2'); if (v !== 'nb2') setUseThinkingMode(false) }}>
                                     <SelectTrigger className="w-[100px] h-7 text-sm font-semibold">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="nb2">NB2</SelectItem>
                                         <SelectItem value="nb-pro">NB Pro</SelectItem>
+                                        <SelectItem value="gpt-2">GPT 2</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </DialogTitle>
@@ -2385,9 +2452,13 @@ export function SharedIllustrationBoard({
                                         }))
                                     }
                                     
-                                    const geminiModelId = illustrationModel === 'nb-pro' ? 'gemini-3-pro-image-preview' : undefined
+                                    const resolvedModelId = illustrationModel === 'nb-pro'
+                                        ? 'gemini-3-pro-image-preview'
+                                        : illustrationModel === 'gpt-2'
+                                            ? 'gpt-image-2'
+                                            : undefined
                                     setIsRegenerateDialogOpen(false)
-                                    onRegenerate(regenerationPrompt, base64Images, refUrl, includedChars, useThinkingMode, geminiModelId)
+                                    onRegenerate(regenerationPrompt, base64Images, refUrl, includedChars, useThinkingMode, resolvedModelId)
                                 }}
                                 disabled={isSceneRecreationMode && sceneCharacters.filter(c => c.isIncluded).length === 0}
                                 className={

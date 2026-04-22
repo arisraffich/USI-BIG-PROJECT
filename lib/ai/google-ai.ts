@@ -112,6 +112,7 @@ interface GenerateOptions {
     hasCustomStyleRefs?: boolean // When true, style refs define style instead of main character
     useThinking?: boolean // Enable thinking mode for complex scene composition
     modelId?: string // Override Gemini model (default: gemini-3.1-flash-image-preview)
+    isRefresh?: boolean // Quality refresh mode: anchor labeled as source to re-render
 }
 
 async function fetchImageAsBase64(
@@ -183,7 +184,8 @@ export async function generateIllustration({
     isSceneRecreation = false,
     hasCustomStyleRefs = false,
     useThinking = false,
-    modelId
+    modelId,
+    isRefresh = false,
 }: GenerateOptions): Promise<{ success: boolean, imageBuffer: Buffer | null, error: string | null }> {
     const activeModel = modelId || DEFAULT_MODEL
     const isPro = activeModel.includes('-pro-')
@@ -254,7 +256,9 @@ export async function generateIllustration({
         if (anchorResult) {
             let anchorLabel: string
             
-            if (isSceneRecreation) {
+            if (isRefresh) {
+                anchorLabel = "REFERENCE IMAGE TO REFRESH (preserve every detail exactly):"
+            } else if (isSceneRecreation) {
                 anchorLabel = "SCENE BASE IMAGE (Edit this scene - preserve environment, change characters):"
             } else if (totalStyleRefs > 1) {
                 anchorLabel = `STYLE REFERENCE IMAGE 1 of ${totalStyleRefs}:

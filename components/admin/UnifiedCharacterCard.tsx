@@ -799,7 +799,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                                                     <SelectContent>
                                                         <SelectItem value="gemini">NB2</SelectItem>
                                                         <SelectItem value="gemini-pro">NB Pro</SelectItem>
-                                                        <SelectItem value="gpt">GPT</SelectItem>
+                                                        <SelectItem value="gpt">GPT 2</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </DialogTitle>

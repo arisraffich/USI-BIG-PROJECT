@@ -336,7 +336,8 @@ export function IllustrationsTabContent({
         referenceImageUrl?: string, 
         sceneCharacters?: SceneCharacter[],
         useThinking?: boolean,
-        modelId?: string
+        modelId?: string,
+        isRefresh?: boolean
     ) => {
         const hasExistingIllustration = !!page.illustration_url
         
@@ -347,13 +348,18 @@ export function IllustrationsTabContent({
             setGeneratingPageIds(prev => new Set(prev).add(page.id))
             setLoadingState(prev => ({ ...prev, [page.id]: { ...prev[page.id], illustration: true } }))
 
+            if (isRefresh) {
+                console.log(`[Refresh] Page ${page.page_number} model=${modelId || 'nb2'}`)
+                toast.info('Refreshing at max quality…', { description: 'This may take a minute.' })
+            }
+
             // Auto-download backup if there's an existing illustration
             if (hasExistingIllustration && page.illustration_url) {
                 downloadImageBackup(page.illustration_url, page.page_number)
             }
 
             // Determine if this is Scene Recreation mode
-            const isSceneRecreation = !!referenceImageUrl
+            const isSceneRecreation = !isRefresh && !!referenceImageUrl
 
             const response = await fetch('/api/illustrations/generate', {
                 method: 'POST',
@@ -368,7 +374,8 @@ export function IllustrationsTabContent({
                     sceneCharacters: isSceneRecreation ? sceneCharacters : undefined, // Character overrides (Mode 3/4)
                     skipDbUpdate: hasExistingIllustration, // Don't save to DB if regenerating (comparison mode)
                     useThinking: useThinking || false,
-                    modelId
+                    modelId,
+                    isRefresh: isRefresh || false
                 })
             })
 

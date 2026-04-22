@@ -8,7 +8,7 @@ Each engine implements the `CharacterEngine` function type: accepts a prompt + i
 |--------------|----------|----------------------------------|----------|------------------------------------|
 | `gemini`     | NB2      | `gemini-3.1-flash-image-preview` | Google   | Thinking: controllable (HIGH/min)  |
 | `gemini-pro` | NB Pro   | `gemini-3-pro-image-preview`     | Google   | Thinking: always on, not disablable|
-| `gpt`        | GPT      | `gpt-4.1` + `image_generation`   | OpenAI   | Responses API with tool call       |
+| `gpt`        | GPT 2    | `gpt-5.4` + `gpt-image-2`        | OpenAI   | Responses API with tool call       |
 
 ## Add a Gemini variant
 
@@ -35,7 +35,7 @@ If the new model has different thinking behavior, update the `isPro` logic in `c
 engines/
   types.ts              — AIModel union, EngineInput/Output, CharacterEngine type
   gemini.ts             — Factory: createGeminiEngine(modelId) → NB2 + NB Pro
-  gpt.ts                — GPT Image 1.5 via OpenAI Responses API
+  gpt.ts                — GPT Image 2 via OpenAI Responses API (gpt-5.4 orchestrator)
   index.ts              — Barrel exports
   README.md             — This file
 character-generator.ts  — Orchestrator: image fetch → engine → upload → DB

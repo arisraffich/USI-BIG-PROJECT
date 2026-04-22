@@ -51,13 +51,13 @@ export const gptEngine: CharacterEngine = async (input: EngineInput): Promise<En
 
     try {
       const response = await openai.responses.create({
-        model: 'gpt-4.1',
+        model: 'gpt-5.4',
         input: [{ role: 'user', content }],
         tools: [{
           type: 'image_generation' as any,
+          model: 'gpt-image-2',
           quality: 'high',
           size: '1024x1536',
-          input_fidelity: 'high',
         }],
       })
 

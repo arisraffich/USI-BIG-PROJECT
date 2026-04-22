@@ -1,12 +1,17 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { generateIllustration } from '@/lib/ai/google-ai'
+import { generateIllustrationGPT2 } from '@/lib/ai/openai-illustration'
+import { REFRESH_PROMPT } from '@/lib/ai/refresh-prompt'
 import { getErrorMessage } from '@/lib/utils/error'
 import sharp from 'sharp'
 import { isFollowUp } from '@/lib/constants/statusBadgeConfig'
 
-// Allow max duration for AI generation
-export const maxDuration = 60
+// Allow max duration for AI generation (GPT-2 can take ~120-150s)
+export const maxDuration = 180
+
+// GPT Image 2 model ID used as the dispatch key for the OpenAI path
+const GPT2_MODEL_ID = 'gpt-image-2'
 
 // Helper to map UI aspect ratios to Gemini-supported values
 // When isSpread is true, returns wider aspect ratios for double-page spreads
@@ -53,7 +58,8 @@ export async function POST(request: Request) {
             sceneCharacters, // New: Character overrides for Scene Recreation mode
             skipDbUpdate, // New: For comparison mode - upload but don't save to DB
             useThinking, // New: Enable thinking mode for regeneration
-            modelId // Optional: Override Gemini model (e.g. gemini-3-pro-image-preview)
+            modelId, // Optional: Override model (gemini-3-pro-image-preview, gpt-image-2, ...)
+            isRefresh // New: Quality refresh mode (re-render current image at max fidelity)
         } = body as {
             projectId: string
             pageId?: string
@@ -65,6 +71,7 @@ export async function POST(request: Request) {
             skipDbUpdate?: boolean
             useThinking?: boolean
             modelId?: string
+            isRefresh?: boolean
         }
 
         // Debug: Log mode detection
@@ -116,7 +123,69 @@ export async function POST(request: Request) {
         const isSpread = illustrationType === 'spread'
         const isSpot = illustrationType === 'spot'
         const mappedAspectRatio = mapAspectRatio(project?.illustration_aspect_ratio || undefined, isSpread)
-        
+        const useGPT2 = modelId === GPT2_MODEL_ID
+
+        // ========================================================================
+        // REFRESH MODE: Short-circuit — re-render current image at max fidelity.
+        // Bypasses prompt-building, character refs, anchors — just sends the
+        // current illustration + REFRESH_PROMPT to the selected engine.
+        // ========================================================================
+        if (isRefresh) {
+            if (!pageData.illustration_url && !currentImageUrl) {
+                return NextResponse.json(
+                    { error: 'Refresh requires an existing illustration on this page' },
+                    { status: 400 }
+                )
+            }
+            const sourceUrl = currentImageUrl || pageData.illustration_url
+            console.log(`[Illustration Refresh] ✨ Page ${pageData.page_number} using ${useGPT2 ? 'GPT-2' : (modelId || 'NB2')}`)
+
+            const refreshResult = useGPT2
+                ? await generateIllustrationGPT2({
+                    prompt: REFRESH_PROMPT,
+                    bookAspectRatio: project?.illustration_aspect_ratio || undefined,
+                    isSpread,
+                    isRefresh: true,
+                    currentImageUrl: sourceUrl,
+                })
+                : await generateIllustration({
+                    prompt: REFRESH_PROMPT,
+                    characterReferences: [],
+                    anchorImage: sourceUrl,
+                    styleReferenceImages: [],
+                    aspectRatio: mappedAspectRatio,
+                    isRefresh: true,
+                    modelId,
+                })
+
+            if (!refreshResult.success || !refreshResult.imageBuffer) {
+                throw new Error(refreshResult.error || 'Refresh failed')
+            }
+
+            const jpegBuffer = await sharp(refreshResult.imageBuffer).jpeg({ quality: 95 }).toBuffer()
+            const timestamp = Date.now()
+            const filename = `${projectId}/illustrations/page-${pageData.page_number}-refresh-${timestamp}.jpg`
+
+            const { error: uploadError } = await supabase.storage
+                .from('illustrations')
+                .upload(filename, jpegBuffer, { contentType: 'image/jpeg', upsert: true })
+            if (uploadError) throw new Error(`Storage Upload Failed: ${uploadError.message}`)
+
+            const { data: urlData } = supabase.storage.from('illustrations').getPublicUrl(filename)
+
+            // Refresh always runs in comparison mode — caller decides which version to keep
+            return NextResponse.json({
+                success: true,
+                illustrationUrl: urlData.publicUrl,
+                pageId: pageData.id,
+                aspectRatioUsed: mappedAspectRatio,
+                isSpread,
+                illustrationType,
+                isPreview: true,
+                isRefresh: true,
+            })
+        }
+
         if (isSpread) {
             console.log(`[Illustration Generate] 📖 SPREAD MODE - Page ${pageData.page_number} using ${mappedAspectRatio} aspect ratio`)
         }
@@ -560,19 +629,29 @@ ${textPromptSection}`
         // (referenceImageUrl indicates manual page selection = Scene Recreation mode)
         // Pass hasCustomStyleRefs to disable main character style anchoring when custom style refs exist
         
-        console.log(`[Illustration Generate] Prompt: ${fullPrompt.length} chars, ${characterReferences.length} character refs, page ${pageData.page_number}, anchor: ${!!anchorImage}`)
-        
-        const result = await generateIllustration({
-            prompt: fullPrompt,
-            characterReferences: characterReferences,
-            anchorImage: anchorImage,
-            styleReferenceImages: styleReferenceImages,
-            aspectRatio: mappedAspectRatio,
-            isSceneRecreation: isSceneRecreationMode,
-            hasCustomStyleRefs: hasCustomStyleRefs,
-            useThinking: isEditMode ? (useThinking || false) : true,
-            modelId
-        })
+        console.log(`[Illustration Generate] Prompt: ${fullPrompt.length} chars, ${characterReferences.length} character refs, page ${pageData.page_number}, anchor: ${!!anchorImage}, engine: ${useGPT2 ? 'GPT-2' : (modelId || 'NB2')}`)
+
+        const result = useGPT2
+            ? await generateIllustrationGPT2({
+                prompt: fullPrompt,
+                characterReferences: characterReferences,
+                anchorImage: anchorImage,
+                styleReferenceImages: styleReferenceImages,
+                bookAspectRatio: project?.illustration_aspect_ratio || undefined,
+                isSpread,
+                hasCustomStyleRefs,
+            })
+            : await generateIllustration({
+                prompt: fullPrompt,
+                characterReferences: characterReferences,
+                anchorImage: anchorImage,
+                styleReferenceImages: styleReferenceImages,
+                aspectRatio: mappedAspectRatio,
+                isSceneRecreation: isSceneRecreationMode,
+                hasCustomStyleRefs: hasCustomStyleRefs,
+                useThinking: isEditMode ? (useThinking || false) : true,
+                modelId,
+            })
 
         if (!result.success || !result.imageBuffer) {
             throw new Error(result.error || 'Failed to generate illustration')

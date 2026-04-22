@@ -30,7 +30,7 @@ interface UnifiedIllustrationFeedProps {
     // ADMIN STATE/HANDLERS
     loadingState?: { sketch: boolean; illustration: boolean }
     onGenerate?: (page: Page, referenceImageUrl?: string) => void
-    onRegenerate?: (page: Page, prompt: string, referenceImages?: string[], referenceImageUrl?: string, sceneCharacters?: SceneCharacter[], useThinking?: boolean, modelId?: string) => void
+    onRegenerate?: (page: Page, prompt: string, referenceImages?: string[], referenceImageUrl?: string, sceneCharacters?: SceneCharacter[], useThinking?: boolean, modelId?: string, isRefresh?: boolean) => void
     onLayoutChange?: (page: Page, newType: 'spread' | 'spot' | null) => void // For changing layout type (triggers regeneration)
     onUpload?: (page: Page, type: 'sketch' | 'illustration', file: File) => void
 
@@ -327,7 +327,7 @@ export function UnifiedIllustrationFeed({
                                 if (onSaveFeedback) await onSaveFeedback(page.id, notes)
                             }}
                             onGenerate={onGenerate ? ((refUrl?: string) => onGenerate(page, refUrl)) : undefined}
-                            onRegenerate={onRegenerate ? (prompt, referenceImages, referenceImageUrl, sceneCharacters, useThinking, modelId) => onRegenerate(page, prompt, referenceImages, referenceImageUrl, sceneCharacters, useThinking, modelId) : undefined}
+                            onRegenerate={onRegenerate ? (prompt, referenceImages, referenceImageUrl, sceneCharacters, useThinking, modelId, isRefresh) => onRegenerate(page, prompt, referenceImages, referenceImageUrl, sceneCharacters, useThinking, modelId, isRefresh) : undefined}
                             onLayoutChange={onLayoutChange ? (newType) => onLayoutChange(page, newType) : undefined}
                             onUpload={async (type, file) => {
                                 if (onUpload) await onUpload(page, type, file)
