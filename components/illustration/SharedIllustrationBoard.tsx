@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, ChevronUp, AlignLeft, Users, Plus, Minus, Pencil, Check, Layers, CornerDownRight, AlertCircle, ChevronRight, Trash2 } from 'lucide-react'
+import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, ChevronUp, AlignLeft, Users, Plus, Minus, Pencil, Check, Layers, CornerDownRight, AlertCircle, ChevronRight, Trash2, BookImage } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { getErrorMessage } from '@/lib/utils/error'
@@ -23,6 +23,7 @@ import { PageStatusBar } from '@/components/project/PageStatusBar'
 import { EmptyStateBoard } from '@/components/illustration/EmptyStateBoard'
 import { ReviewHistoryDialog } from '@/components/project/ReviewHistoryDialog'
 import { useIllustrationLock } from '@/hooks/use-illustration-lock'
+import { CoverModal } from '@/components/illustration/CoverModal'
 
 // Type for scene character with action/emotion
 export interface SceneCharacter {
@@ -256,6 +257,9 @@ export function SharedIllustrationBoard({
     
     // Line Art Generation State
     const [isGeneratingLineArt, setIsGeneratingLineArt] = useState(false)
+
+    // Cover Generation Modal State
+    const [isCoverModalOpen, setIsCoverModalOpen] = useState(false)
     
     // Reset to Original state
     const [isResettingToOriginal, setIsResettingToOriginal] = useState(false)
@@ -1696,29 +1700,41 @@ export function SharedIllustrationBoard({
 
                         {/* ILLUSTRATION HEADER (or PAGE TEXT for customer pages 2+) */}
                         <div className="flex items-center justify-between gap-2 px-3 bg-slate-50/30">
-                            {/* LEFT: Create LineArt Button (Admin only, when illustration exists) */}
+                            {/* LEFT: Create LineArt + Create Cover Buttons (Admin only, when illustration exists) */}
                             <div className="flex items-center gap-2 min-w-[80px]">
                                 {isAdmin && illustrationUrl && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleGenerateLineArt}
-                                        disabled={isGeneratingLineArt}
-                                        className="h-7 px-2.5 text-[10px] font-semibold bg-white border-purple-200 text-purple-700 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-800 transition-colors"
-                                        title="Generate transparent line art PNG"
-                                    >
-                                        {isGeneratingLineArt ? (
-                                            <>
-                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                Creating...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Pencil className="w-3 h-3 mr-1" />
-                                                Create LineArt
-                                            </>
-                                        )}
-                                    </Button>
+                                    <>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleGenerateLineArt}
+                                            disabled={isGeneratingLineArt}
+                                            className="h-7 px-2.5 text-[10px] font-semibold bg-white border-purple-200 text-purple-700 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-800 transition-colors"
+                                            title="Generate transparent line art PNG"
+                                        >
+                                            {isGeneratingLineArt ? (
+                                                <>
+                                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                                    Creating...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Pencil className="w-3 h-3 mr-1" />
+                                                    Create LineArt
+                                                </>
+                                            )}
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setIsCoverModalOpen(true)}
+                                            className="h-7 px-2.5 text-[10px] font-semibold bg-white border-purple-200 text-purple-700 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-800 transition-colors"
+                                            title="Generate a book cover using this illustration"
+                                        >
+                                            <BookImage className="w-3 h-3 mr-1" />
+                                            Create Cover
+                                        </Button>
+                                    </>
                                 )}
                             </div>
 
@@ -1936,16 +1952,27 @@ export function SharedIllustrationBoard({
                                 <div className="absolute top-0 left-0 right-0 z-10 flex items-center gap-2 md:hidden p-3 bg-gradient-to-b from-black/40 to-transparent">
                                     <span className="text-xs font-bold tracking-wider text-white/90 uppercase shadow-sm">Colored</span>
 
+                                    {/* CREATE COVER (Admin, when illustration exists) */}
+                                    {isAdmin && illustrationUrl && (
+                                        <button
+                                            onClick={() => setIsCoverModalOpen(true)}
+                                            className="h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm ml-auto"
+                                            title="Create Cover"
+                                        >
+                                            <BookImage className="w-4 h-4" />
+                                        </button>
+                                    )}
+
                                     {/* UPLOAD (Admin) */}
                                     {isAdmin && onUpload && (
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-red-500 hover:bg-black/60 backdrop-blur-sm ml-auto" onClick={() => illustrationInputRef.current?.click()}>
+                                        <Button variant="ghost" size="icon" className={`h-8 w-8 rounded-full bg-black/40 text-red-500 hover:bg-black/60 backdrop-blur-sm ${isAdmin && illustrationUrl ? 'ml-1' : 'ml-auto'}`} onClick={() => illustrationInputRef.current?.click()}>
                                             <Upload className="w-4 h-4" />
                                         </Button>
                                     )}
 
                                     {/* DOWNLOAD */}
                                     {illustrationUrl && (
-                                        <button onClick={() => handleDownload(illustrationUrl!, `Page-${page.page_number}-Final.jpg`)} className={`h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm ${isAdmin && onUpload ? 'ml-1' : 'ml-auto'}`}>
+                                        <button onClick={() => handleDownload(illustrationUrl!, `Page-${page.page_number}-Final.jpg`)} className={`h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm ${(isAdmin && onUpload) || (isAdmin && illustrationUrl) ? 'ml-1' : 'ml-auto'}`}>
                                             <Download className="w-4 h-4" />
                                         </button>
                                     )}
@@ -2600,6 +2627,17 @@ export function SharedIllustrationBoard({
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
+            )}
+
+            {/* Cover Generation Modal (Admin only) */}
+            {isAdmin && projectId && (
+                <CoverModal
+                    open={isCoverModalOpen}
+                    onOpenChange={setIsCoverModalOpen}
+                    projectId={projectId}
+                    pageId={page.id}
+                    pageNumber={page.page_number}
+                />
             )}
         </div>
     )
