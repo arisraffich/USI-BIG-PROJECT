@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getErrorMessage } from '@/lib/utils/error'
+import { getReviewToken, reviewUnauthorized, verifyReviewTokenForProject } from '@/lib/auth/review-token'
 
 
 export async function PATCH(
@@ -43,6 +44,9 @@ export async function PATCH(
                 { status: 404 }
             )
         }
+
+        const isAuthorized = await verifyReviewTokenForProject(supabase, page.project_id, getReviewToken(request, body))
+        if (!isAuthorized) return reviewUnauthorized()
 
         // Strict status check can be problematic if statuses overlap, but for now we essentially want to ensure the project isn't "completed" or something.
         // However, recreating the character logic exactly:

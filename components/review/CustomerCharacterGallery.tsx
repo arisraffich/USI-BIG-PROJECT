@@ -6,9 +6,10 @@ import { CustomerCharacterGalleryCard } from './CustomerCharacterGalleryCard'
 interface CustomerCharacterGalleryProps {
     characters: Character[]
     mainCharacter?: Character
+    reviewToken: string
 }
 
-export function CustomerCharacterGallery({ characters, mainCharacter }: CustomerCharacterGalleryProps) {
+export function CustomerCharacterGallery({ characters, mainCharacter, reviewToken }: CustomerCharacterGalleryProps) {
     // Filter out main character from the list if it's there (to handle duplicates if passed incorrectly)
     const secondaryCharacters = characters.filter(c => !c.is_main)
 
@@ -33,6 +34,7 @@ export function CustomerCharacterGallery({ characters, mainCharacter }: Customer
                         <CustomerCharacterGalleryCard
                             character={char}
                             isMain={char.is_main}
+                            reviewToken={reviewToken}
                         />
                     </div>
                 ))}

@@ -12,6 +12,7 @@ interface CustomerCharacterCardProps {
   onSaved?: (id: string) => void
   isLocked?: boolean
   showSaveToast?: boolean
+  reviewToken: string
 }
 
 export const CustomerCharacterCard = memo(function CustomerCharacterCard({
@@ -20,14 +21,15 @@ export const CustomerCharacterCard = memo(function CustomerCharacterCard({
   onChange,
   onSaved,
   isLocked = false,
-  showSaveToast = true
+  showSaveToast = true,
+  reviewToken
 }: CustomerCharacterCardProps) {
 
   const handleSave = async (data: CharacterFormData) => {
     try {
       const response = await fetch(`/api/review/characters/${character.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-review-token': reviewToken },
         body: JSON.stringify(data),
       })
 
@@ -66,6 +68,7 @@ export const CustomerCharacterCard = memo(function CustomerCharacterCard({
       onChange={handleChange}
       isLocked={isLocked}
       enablePhotoUpload={!character.is_main}
+      reviewToken={reviewToken}
     />
   )
 })

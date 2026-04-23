@@ -500,7 +500,7 @@ export function CustomerProjectTabsContent({
     try {
       const response = await fetch(`/api/review/pages/${pageId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-review-token': reviewToken },
         body: JSON.stringify({ feedback_notes: notes }),
       })
 
@@ -512,14 +512,14 @@ export function CustomerProjectTabsContent({
       toast.error('Failed to save feedback')
       throw error
     }
-  }, [])
+  }, [reviewToken])
 
   // Handle customer accepting admin reply (resolves the feedback)
   const handleAcceptAdminReply = useCallback(async (pageId: string) => {
     try {
       const response = await fetch(`/api/review/pages/${pageId}/accept-reply`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-review-token': reviewToken },
       })
 
       if (!response.ok) {
@@ -539,14 +539,14 @@ export function CustomerProjectTabsContent({
       toast.error('Failed to accept response')
       throw error
     }
-  }, [])
+  }, [reviewToken])
 
   // Handle customer follow-up reply
   const handleCustomerFollowUp = useCallback(async (pageId: string, notes: string) => {
     try {
       const response = await fetch(`/api/review/pages/${pageId}/follow-up`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-review-token': reviewToken },
         body: JSON.stringify({ feedback_notes: notes }),
       })
 
@@ -567,14 +567,14 @@ export function CustomerProjectTabsContent({
       toast.error('Failed to save follow-up')
       throw error
     }
-  }, [])
+  }, [reviewToken])
 
   // Handle customer edit follow-up (only last message, only if admin hasn't responded)
   const handleEditFollowUp = useCallback(async (pageId: string, notes: string) => {
     try {
       const response = await fetch(`/api/review/pages/${pageId}/follow-up`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-review-token': reviewToken },
         body: JSON.stringify({ feedback_notes: notes }),
       })
 
@@ -595,7 +595,7 @@ export function CustomerProjectTabsContent({
       toast.error('Failed to edit follow-up')
       throw error
     }
-  }, [])
+  }, [reviewToken])
 
   // Find pages with pending admin replies (unresolved feedback WITH admin reply)
   const pagesWithPendingAdminReply = useMemo(() => {
@@ -804,6 +804,7 @@ export function CustomerProjectTabsContent({
                 isEditMode={isEditMode}
                 onEditModeChange={setIsEditMode}
                 isVisible={activeTab === 'pages'}
+                reviewToken={reviewToken}
               />
             </div>
 
@@ -814,6 +815,7 @@ export function CustomerProjectTabsContent({
                 <CustomerCharacterGallery
                   characters={sortedCharacters.secondary}
                   mainCharacter={sortedCharacters.main || undefined}
+                  reviewToken={reviewToken}
                 />
               ) : (
                 // Character Forms - only show secondary characters (main character has no form data)
@@ -827,6 +829,7 @@ export function CustomerProjectTabsContent({
                         character={character}
                         onChange={handleCharacterChange}
                         isLocked={index > activeFormIndex}
+                        reviewToken={reviewToken}
                       />
                     ))}
                     <div className="h-full">
@@ -835,6 +838,7 @@ export function CustomerProjectTabsContent({
                         projectId={projectId}
                         mainCharacterName={sortedCharacters.main?.name || sortedCharacters.main?.role || null}
                         onCharacterAdded={handleCharacterAdded}
+                        reviewToken={reviewToken}
                       />
                     </div>
                   </div>

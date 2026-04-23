@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/client'
 interface CustomerCharacterGalleryCardProps {
     character: Character
     isMain?: boolean
+    reviewToken: string
 }
 
 interface SubCardProps {
@@ -56,7 +57,7 @@ function SubCard({ title, imageUrl, onClick, characterName }: SubCardProps) {
     )
 }
 
-export function CustomerCharacterGalleryCard({ character, isMain = false }: CustomerCharacterGalleryCardProps) {
+export function CustomerCharacterGalleryCard({ character, isMain = false, reviewToken }: CustomerCharacterGalleryCardProps) {
     const [isEditing, setIsEditing] = useState(false)
     const [notes, setNotes] = useState(character.feedback_notes || '')
     const [isSaving, setIsSaving] = useState(false)
@@ -144,7 +145,7 @@ export function CustomerCharacterGalleryCard({ character, isMain = false }: Cust
         try {
             const response = await fetch(`/api/review/characters/${character.id}`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'x-review-token': reviewToken },
                 body: JSON.stringify({ feedback_notes: notes }),
             })
 

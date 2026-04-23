@@ -3,6 +3,7 @@ import sharp from 'sharp'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getErrorMessage } from '@/lib/utils/error'
 import { removeMetadata, sanitizeFilename } from '@/lib/utils/metadata-cleaner'
+import { getReviewToken, reviewUnauthorized, verifyReviewTokenForProject } from '@/lib/auth/review-token'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 const MIN_DIMENSION = 300
@@ -40,6 +41,9 @@ export async function POST(
     if (charError || !character) {
       return NextResponse.json({ error: 'Character not found' }, { status: 404 })
     }
+
+    const isAuthorized = await verifyReviewTokenForProject(supabase, character.project_id, getReviewToken(request))
+    if (!isAuthorized) return reviewUnauthorized()
 
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
@@ -121,13 +125,16 @@ export async function DELETE(
 
     const { data: character, error: charError } = await supabase
       .from('characters')
-      .select('id, reference_photo_url')
+      .select('id, project_id, reference_photo_url')
       .eq('id', characterId)
       .single()
 
     if (charError || !character) {
       return NextResponse.json({ error: 'Character not found' }, { status: 404 })
     }
+
+    const isAuthorized = await verifyReviewTokenForProject(supabase, character.project_id, getReviewToken(request))
+    if (!isAuthorized) return reviewUnauthorized()
 
     if (character.reference_photo_url) {
       try {

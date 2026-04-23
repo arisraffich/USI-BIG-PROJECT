@@ -41,7 +41,10 @@ export async function POST(request: NextRequest) {
 
         const res = await fetch(`${baseUrl}/api/projects/${send.project_id}/send-to-customer`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${CRON_SECRET}`,
+          },
           body: JSON.stringify({ personalNote: send.personal_note || undefined }),
         })
 

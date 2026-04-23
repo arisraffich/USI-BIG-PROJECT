@@ -24,6 +24,7 @@ GOOGLE_GENERATIVE_AI_API_KEY=your-google-ai-key
 # Admin Auth
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=change-this-to-secure-password
+ADMIN_SESSION_SECRET=use-a-long-random-secret-in-production
 
 # Email
 RESEND_API_KEY=re_...
@@ -65,6 +66,7 @@ DATABASE_URL=postgresql://...
 | `GOOGLE_GENERATIVE_AI_API_KEY` | Yes | Image generation (characters, illustrations, line art) |
 | `ADMIN_USERNAME` | Yes | Admin login |
 | `ADMIN_PASSWORD` | Yes | Admin login |
+| `ADMIN_SESSION_SECRET` | No | Recommended dedicated secret for signed admin sessions. Falls back to `ADMIN_PASSWORD` if unset. |
 | `RESEND_API_KEY` | Yes | Email delivery |
 | `CRON_SECRET` | Yes | Authenticates pg_cron calls to scheduled-sends endpoint |
 | `NEXT_PUBLIC_BASE_URL` | No | Defaults to `http://localhost:3000` |

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getErrorMessage } from '@/lib/utils/error'
+import { getReviewToken, reviewUnauthorized, verifyReviewTokenForProject } from '@/lib/auth/review-token'
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,6 +30,9 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       )
     }
+
+    const isAuthorized = await verifyReviewTokenForProject(supabase, project_id, getReviewToken(request, body))
+    if (!isAuthorized) return reviewUnauthorized()
 
     if (project.status !== 'character_review') {
       return NextResponse.json(

@@ -1085,6 +1085,7 @@ export function CustomerSubmissionWizard({
                   onSaved={handleCharacterSaved}
                   isLocked={index > activeFormIndex}
                   showSaveToast={false}
+                  reviewToken={reviewToken}
                 />
               ))}
             </div>

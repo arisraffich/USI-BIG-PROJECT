@@ -67,6 +67,7 @@ export interface UniversalCharacterCardProps {
     onChange?: (data: CharacterFormData, isValid: boolean) => void
     isLocked?: boolean
     enablePhotoUpload?: boolean
+    reviewToken?: string
 }
 
 export const UniversalCharacterCard = memo(function UniversalCharacterCard({
@@ -81,6 +82,7 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
     onChange,
     isLocked = false,
     enablePhotoUpload = false,
+    reviewToken,
 }: UniversalCharacterCardProps) {
     const [isEditing, setIsEditing] = useState(alwaysEditing)
     const [saving, setSaving] = useState(false)
@@ -110,6 +112,7 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
     } = useReferencePhoto({
         characterId: character.id,
         initialUrl: character.reference_photo_url,
+        reviewToken,
         onValidityChange: (hasPhotoNow) => {
             if (!onChange) return
             const isValid = hasPhotoNow || validateForm(formData)

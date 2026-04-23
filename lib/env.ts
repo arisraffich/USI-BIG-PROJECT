@@ -18,6 +18,7 @@ const REQUIRED_SERVER_VARS = [
 /** Optional vars that enhance functionality but aren't required to start */
 const OPTIONAL_VARS = [
   'NEXT_PUBLIC_BASE_URL',
+  'ADMIN_SESSION_SECRET',
   'SLACK_WEBHOOK_URL',
   'QUO_API_KEY',
   'QUO_PHONE_NUMBER',

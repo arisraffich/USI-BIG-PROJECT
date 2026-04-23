@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import LoginForm from './login-form'
+import { ADMIN_SESSION_COOKIE, verifyAdminSessionValue } from '@/lib/auth/admin'
 
 export default async function AdminLoginPage() {
   const cookieStore = await cookies()
-  const isAuthenticated = cookieStore.get('admin_session_v2')?.value === 'true'
+  const isAuthenticated = await verifyAdminSessionValue(cookieStore.get(ADMIN_SESSION_COOKIE)?.value)
 
   if (isAuthenticated) {
     redirect('/admin/dashboard')
@@ -21,5 +22,3 @@ export default async function AdminLoginPage() {
     </div>
   )
 }
-
-

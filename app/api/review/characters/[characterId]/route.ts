@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getErrorMessage } from '@/lib/utils/error'
+import { getReviewToken, reviewUnauthorized, verifyReviewTokenForProject } from '@/lib/auth/review-token'
 
 export async function PATCH(
   request: NextRequest,
@@ -39,6 +40,9 @@ export async function PATCH(
         { status: 404 }
       )
     }
+
+    const isAuthorized = await verifyReviewTokenForProject(supabase, character.project_id, getReviewToken(request, body))
+    if (!isAuthorized) return reviewUnauthorized()
 
     const allowedStatuses = ['character_review', 'character_revision_needed', 'characters_regenerated']
     if (!allowedStatuses.includes(project.status)) {

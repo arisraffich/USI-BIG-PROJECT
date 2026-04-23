@@ -121,6 +121,7 @@ GOOGLE_GENERATIVE_AI_API_KEY=...
 # Admin Auth
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=your-secure-password
+ADMIN_SESSION_SECRET=use-a-long-random-secret-in-production
 
 # Email (Resend)
 RESEND_API_KEY=re_...

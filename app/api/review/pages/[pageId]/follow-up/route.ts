@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getErrorMessage } from '@/lib/utils/error'
+import { getReviewToken, reviewUnauthorized, verifyReviewTokenForProject } from '@/lib/auth/review-token'
 
 // POST: Customer adds a follow-up reply to the conversation thread
 export async function POST(
@@ -34,6 +35,9 @@ export async function POST(
                 { status: 404 }
             )
         }
+
+        const isAuthorized = await verifyReviewTokenForProject(supabase, page.project_id, getReviewToken(request, body))
+        if (!isAuthorized) return reviewUnauthorized()
 
         if (!page.admin_reply) {
             return NextResponse.json(
@@ -151,7 +155,7 @@ export async function PUT(
         // Get page with current state
         const { data: page, error: pageError } = await supabase
             .from('pages')
-            .select('id, admin_reply, conversation_thread')
+            .select('id, project_id, admin_reply, conversation_thread')
             .eq('id', pageId)
             .single()
 
@@ -161,6 +165,9 @@ export async function PUT(
                 { status: 404 }
             )
         }
+
+        const isAuthorized = await verifyReviewTokenForProject(supabase, page.project_id, getReviewToken(request, body))
+        if (!isAuthorized) return reviewUnauthorized()
 
         // Check that admin hasn't responded yet
         if (page.admin_reply) {

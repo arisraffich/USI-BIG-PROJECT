@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import sharp from 'sharp'
 import { getErrorMessage } from '@/lib/utils/error'
+import { requireAdmin } from '@/lib/auth/admin'
 
 const MAX_SIZE_MB = 20
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024
@@ -9,11 +10,8 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
 export async function POST(request: NextRequest) {
     try {
-        // Auth check (same cookie middleware uses)
-        const isAuthenticated = request.cookies.get('admin_session_v2')?.value === 'true'
-        if (!isAuthenticated) {
-            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const unauthorized = await requireAdmin(request)
+        if (unauthorized) return unauthorized
 
         const formData = await request.formData()
         const file = formData.get('file') as File

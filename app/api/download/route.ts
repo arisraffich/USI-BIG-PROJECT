@@ -1,5 +1,23 @@
-
 import { NextRequest, NextResponse } from 'next/server'
+
+function getAllowedDownloadHosts(): Set<string> {
+    const hosts = new Set<string>()
+
+    for (const value of [process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.R2_PUBLIC_URL]) {
+        if (!value) continue
+        try {
+            hosts.add(new URL(value).hostname)
+        } catch {
+            // Ignore invalid optional URLs.
+        }
+    }
+
+    return hosts
+}
+
+function sanitizeDownloadFilename(filename: string): string {
+    return filename.replace(/[\r\n"\\]/g, '').replace(/[^a-zA-Z0-9._ -]/g, '_').trim() || 'download'
+}
 
 export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams
@@ -10,13 +28,25 @@ export async function GET(req: NextRequest) {
         return new NextResponse('Missing url or filename', { status: 400 })
     }
 
+    let parsedUrl: URL
     try {
-        const response = await fetch(url)
+        parsedUrl = new URL(url)
+    } catch {
+        return new NextResponse('Invalid url', { status: 400 })
+    }
+
+    const allowedHosts = getAllowedDownloadHosts()
+    if (parsedUrl.protocol !== 'https:' || !allowedHosts.has(parsedUrl.hostname)) {
+        return new NextResponse('Download host is not allowed', { status: 403 })
+    }
+
+    try {
+        const response = await fetch(parsedUrl.toString())
         if (!response.ok) throw new Error('Failed to fetch image')
 
         const headers = new Headers()
         headers.set('Content-Type', response.headers.get('Content-Type') || 'application/octet-stream')
-        headers.set('Content-Disposition', `attachment; filename="${filename}"`)
+        headers.set('Content-Disposition', `attachment; filename="${sanitizeDownloadFilename(filename)}"`)
         const contentLength = response.headers.get('Content-Length')
         if (contentLength) headers.set('Content-Length', contentLength)
 

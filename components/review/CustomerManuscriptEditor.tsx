@@ -15,6 +15,7 @@ interface CustomerManuscriptEditorProps {
   isEditMode: boolean
   onEditModeChange: (isEditMode: boolean) => void
   isVisible?: boolean
+  reviewToken: string
 }
 
 type PageEdits = {
@@ -24,7 +25,7 @@ type PageEdits = {
   }
 }
 
-export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEditMode, onEditModeChange, isVisible = true }: CustomerManuscriptEditorProps) {
+export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEditMode, onEditModeChange, isVisible = true, reviewToken }: CustomerManuscriptEditorProps) {
   const [activePageId, setActivePageId] = useState<string | null>(null)
   const isManualScrollRef = useRef(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -234,9 +235,9 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEd
 
       // Save all edits in parallel
       const savePromises = pageUpdates.map(async (update) => {
-        const response = await fetch(`/api/pages/${update.id}`, {
+        const response = await fetch(`/api/review/pages/${update.id}/manuscript`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-review-token': reviewToken },
           body: JSON.stringify({
             story_text: update.story_text,
             scene_description: update.scene_description,
@@ -256,7 +257,9 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEd
       // Fetch updated pages from server to get latest data with flags
       const updatedPageIds = pageUpdates.map(u => u.id)
       const fetchPromises = updatedPageIds.map(async (pageId) => {
-        const response = await fetch(`/api/pages/${pageId}`)
+        const response = await fetch(`/api/review/pages/${pageId}/manuscript`, {
+          headers: { 'x-review-token': reviewToken },
+        })
         if (!response.ok) {
           throw new Error(`Failed to fetch updated page ${pageId}`)
         }
@@ -287,7 +290,7 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEd
     } finally {
       setIsSaving(false)
     }
-  }, [pageEdits, displayedPages])
+  }, [pageEdits, displayedPages, reviewToken])
 
   // Scroll spy: Highlight active page based on scroll position
   useEffect(() => {

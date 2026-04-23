@@ -82,9 +82,10 @@ interface UseReferencePhotoOptions {
     characterId: string
     initialUrl: string | null | undefined
     onValidityChange?: (hasPhoto: boolean) => void
+    reviewToken?: string
 }
 
-export function useReferencePhoto({ characterId, initialUrl, onValidityChange }: UseReferencePhotoOptions) {
+export function useReferencePhoto({ characterId, initialUrl, onValidityChange, reviewToken }: UseReferencePhotoOptions) {
     const [photoUrl, setPhotoUrl] = useState<string | null>(initialUrl || null)
     const [localPreview, setLocalPreview] = useState<string | null>(null)
     const [uploading, setUploading] = useState(false)
@@ -115,6 +116,7 @@ export function useReferencePhoto({ characterId, initialUrl, onValidityChange }:
             fd.append('file', resized, file.name)
             const response = await fetch(`/api/review/characters/${characterId}/reference-photo`, {
                 method: 'POST',
+                headers: reviewToken ? { 'x-review-token': reviewToken } : undefined,
                 body: fd,
             })
 
@@ -137,11 +139,14 @@ export function useReferencePhoto({ characterId, initialUrl, onValidityChange }:
             setLocalPreview(null)
             setUploading(false)
         }
-    }, [characterId, onValidityChange])
+    }, [characterId, onValidityChange, reviewToken])
 
     const handleRemove = useCallback(async () => {
         try {
-            await fetch(`/api/review/characters/${characterId}/reference-photo`, { method: 'DELETE' })
+            await fetch(`/api/review/characters/${characterId}/reference-photo`, {
+                method: 'DELETE',
+                headers: reviewToken ? { 'x-review-token': reviewToken } : undefined,
+            })
             setPhotoUrl(null)
             setLocalPreview(null)
             onValidityChange?.(false)
@@ -149,7 +154,7 @@ export function useReferencePhoto({ characterId, initialUrl, onValidityChange }:
         } catch {
             toast.error('Failed to remove photo')
         }
-    }, [characterId, onValidityChange])
+    }, [characterId, onValidityChange, reviewToken])
 
     const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]

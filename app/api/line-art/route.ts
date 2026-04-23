@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import sharp from 'sharp'
 import { removeMetadata } from '@/lib/utils/metadata-cleaner'
 import { processLineArtToTransparentPng, LINE_ART_PROMPT } from '@/lib/line-art/processor'
+import { requireAdmin } from '@/lib/auth/admin'
 
 const API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY
 const ILLUSTRATION_MODEL = 'gemini-3.1-flash-image-preview'
@@ -19,10 +20,8 @@ export const maxDuration = 120
 
 export async function POST(request: NextRequest) {
     try {
-        const isAuthenticated = request.cookies.get('admin_session_v2')?.value === 'true'
-        if (!isAuthenticated) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const unauthorized = await requireAdmin(request)
+        if (unauthorized) return unauthorized
 
         if (!API_KEY) {
             return NextResponse.json({ error: 'API key not configured' }, { status: 500 })

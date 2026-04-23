@@ -22,13 +22,15 @@ interface CustomerAddCharacterButtonProps {
   mainCharacterName: string | null
   onCharacterAdded: () => void
   mode?: 'button' | 'card'
+  reviewToken: string
 }
 
 export function CustomerAddCharacterButton({
   projectId,
   mainCharacterName,
   onCharacterAdded,
-  mode = 'button'
+  mode = 'button',
+  reviewToken
 }: CustomerAddCharacterButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isAddingCharacter, setIsAddingCharacter] = useState(false)
@@ -54,7 +56,7 @@ export function CustomerAddCharacterButton({
     try {
       const response = await fetch('/api/review/characters', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-review-token': reviewToken },
         body: JSON.stringify({
           project_id: projectId,
           name: nameRole.trim() || null,
