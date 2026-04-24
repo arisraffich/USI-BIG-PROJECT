@@ -98,3 +98,63 @@ export function buildCoverPrompt(opts: {
 
     return prompt
 }
+
+/**
+ * Back cover = minimal background plate (InDesign gets text/barcode later).
+ * Reference is a flat front-cover image only — prompt asks the model to infer
+ * atmosphere “behind” the hero and extend it without redrawing the story.
+ *
+ * Substitutions:
+ *   <ASPECT_RATIO> — via mapAspectRatioToCoverLabel()
+ */
+export const BACK_COVER_PROMPT_TEMPLATE = `TASK: CHILDREN'S BOOK BACK COVER — MINIMAL BACKGROUND
+
+Create a matching back cover from the provided front cover reference.
+
+This image is NOT a story illustration. It is a quiet background surface for later book description text in InDesign.
+
+PRIMARY GOAL:
+- Create a mostly empty, low-detail background.
+- Use the same color palette, lighting, texture, and art style as the front cover.
+- Use the simplest non-character background feeling from the front cover.
+- The back cover should feel related to the front, but much simpler and calmer.
+
+COMPOSITION:
+- Keep at least 80% of the image as open, low-detail space.
+- The center must be especially clean and quiet.
+- Use only soft color, subtle texture, gentle tonal variation, and very minimal atmospheric detail.
+- Any decorative detail must be tiny, sparse, and pushed to the far edges or corners.
+- No central subject.
+- No scene action.
+- No storytelling moment.
+- No foreground.
+
+STRICT LIMITS:
+- Do not create a landscape, full setting, room, environment, or detailed scene.
+- Do not add paths, roads, fences, buildings, furniture, vehicles, characters, animals, faces, bodies, props, signs, or symbols.
+- Do not fill the bottom with grass, flowers, objects, texture, or decorative clutter.
+- Do not fill the sides with large trees, branches, objects, or patterns.
+- Do not copy the front cover composition.
+- Do not make the back cover visually busy.
+
+TEXT / SYMBOLS:
+- No text of any kind.
+- No title, subtitle, author line, blurb, barcode, ISBN, logo, letters, numbers, symbols, labels, signs, or watermarks.
+
+ASPECT RATIO:
+- Output aspect ratio: <ASPECT_RATIO>.
+- Do not stretch, squeeze, distort, crop awkwardly, or letterbox.
+
+QUALITY:
+- Match the front cover's style and palette.
+- Print-ready, clean, professional.`
+
+/**
+ * Builds the back-cover prompt with the project's aspect ratio injected.
+ */
+export function buildBackCoverPrompt(opts: {
+    aspectRatio: string | null | undefined
+}): string {
+    const aspectLabel = mapAspectRatioToCoverLabel(opts.aspectRatio)
+    return BACK_COVER_PROMPT_TEMPLATE.replace('<ASPECT_RATIO>', aspectLabel)
+}

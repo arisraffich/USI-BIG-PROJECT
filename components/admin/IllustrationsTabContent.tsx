@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Page } from '@/types/page'
 import { Character } from '@/types/character'
+import { Cover } from '@/types/cover'
 import { createClient } from '@/lib/supabase/client'
 import { UnifiedIllustrationFeed } from '@/components/illustration/UnifiedIllustrationFeed'
 import { SceneCharacter } from '@/components/illustration/SharedIllustrationBoard'
@@ -55,6 +56,10 @@ interface IllustrationsTabContentProps {
     // Page Delete Feature (ref shared with sidebar via parent)
     deletePageHandlerRef?: React.MutableRefObject<((pageId: string) => void) | null>
     onDeleteDisabledChange?: (disabled: boolean) => void
+
+    // Cover Module — hide "Create Cover" once a cover exists; propagate up on creation.
+    hasCover?: boolean
+    onCoverCreated?: (cover: Cover) => void
 }
 
 export function IllustrationsTabContent({
@@ -73,7 +78,9 @@ export function IllustrationsTabContent({
     onComparisonPageIdsChange,
     onSketchGeneratingPageIdsChange,
     deletePageHandlerRef,
-    onDeleteDisabledChange
+    onDeleteDisabledChange,
+    hasCover = false,
+    onCoverCreated,
 }: IllustrationsTabContentProps) {
     const router = useRouter()
 
@@ -1105,6 +1112,10 @@ export function IllustrationsTabContent({
                 // Sketch/Story Toggle "All Pages"
                 globalSketchViewMode={globalSketchViewMode}
                 onToggleAllSketchView={handleToggleAllSketchView}
+
+                // Cover Module
+                hasCover={hasCover}
+                onCoverCreated={onCoverCreated}
             />
 
             {/* PAGE DELETE CONFIRMATION DIALOG */}

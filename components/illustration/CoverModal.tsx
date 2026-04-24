@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, BookImage } from 'lucide-react'
 import { toast } from 'sonner'
-import JSZip from 'jszip'
+import { Cover } from '@/types/cover'
 
 interface CoverModalProps {
     open: boolean
@@ -15,27 +16,7 @@ interface CoverModalProps {
     projectId: string
     pageId: string
     pageNumber: number
-}
-
-type Stage = 'idle' | 'cover' | 'lineart'
-
-function sanitizeFilename(input: string): string {
-    return input
-        .replace(/[<>:"/\\|?*\x00-\x1F]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .substring(0, 80) || 'cover'
-}
-
-function triggerDownload(blob: Blob, filename: string) {
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    onCoverCreated?: (cover: Cover) => void
 }
 
 export function CoverModal({
@@ -44,17 +25,19 @@ export function CoverModal({
     projectId,
     pageId,
     pageNumber,
+    onCoverCreated,
 }: CoverModalProps) {
+    const router = useRouter()
+    const searchParams = useSearchParams()
+    const pathname = usePathname()
+
     const [title, setTitle] = useState('')
     const [subtitle, setSubtitle] = useState('')
-    const [includeLineArt, setIncludeLineArt] = useState(true)
-    const [stage, setStage] = useState<Stage>('idle')
+    const [isGenerating, setIsGenerating] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    const isGenerating = stage !== 'idle'
-
     const handleOpenChange = useCallback((next: boolean) => {
-        if (isGenerating) return // block close while generating
+        if (isGenerating) return
         if (!next) {
             setTitle('')
             setSubtitle('')
@@ -71,114 +54,63 @@ export function CoverModal({
         }
 
         setError(null)
-        setStage('cover')
-
-        const safeTitle = sanitizeFilename(trimmedTitle)
+        setIsGenerating(true)
 
         try {
-            // ---------- STAGE 1: Generate cover ----------
-            const coverRes = await fetch('/api/covers/generate', {
+            const res = await fetch('/api/covers/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     projectId,
-                    pageId,
+                    sourcePageId: pageId,
                     title: trimmedTitle,
                     subtitle: subtitle.trim() || undefined,
                 }),
             })
 
-            if (!coverRes.ok) {
-                const errData = await coverRes.json().catch(() => ({} as { error?: string }))
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({} as { error?: string }))
                 const msg = errData?.error || 'Cover generation failed'
                 setError(msg)
                 toast.error(msg)
-                setStage('idle')
+                setIsGenerating(false)
                 return
             }
 
-            const coverBlob = await coverRes.blob()
+            const data = await res.json() as { cover: Cover }
 
-            // ---------- STAGE 2: Line art (optional, graceful fallback) ----------
-            if (includeLineArt) {
-                setStage('lineart')
-
-                let lineArtBlob: Blob | null = null
-                try {
-                    const coverFile = new File([coverBlob], `${safeTitle}-cover.png`, { type: 'image/png' })
-                    const formData = new FormData()
-                    formData.append('file', coverFile)
-
-                    const lineArtRes = await fetch('/api/line-art', {
-                        method: 'POST',
-                        body: formData,
-                    })
-
-                    if (lineArtRes.ok) {
-                        lineArtBlob = await lineArtRes.blob()
-                    } else {
-                        const errData = await lineArtRes.json().catch(() => ({} as { error?: string }))
-                        throw new Error(errData?.error || 'Line art request failed')
-                    }
-                } catch (lineArtErr) {
-                    console.warn('[Cover] Line art failed, falling back to cover-only:', lineArtErr)
-                    toast.warning('Line art failed — downloading cover only.')
-                }
-
-                if (lineArtBlob) {
-                    // Both succeeded → zip + download
-                    const zip = new JSZip()
-                    zip.file(`${safeTitle}-cover.png`, coverBlob)
-                    zip.file(`${safeTitle}-cover-lineart.png`, lineArtBlob)
-                    const zipBlob = await zip.generateAsync({ type: 'blob' })
-                    triggerDownload(zipBlob, `${safeTitle}-cover.zip`)
-                    toast.success('Cover + line art downloaded!')
-                } else {
-                    // Line art failed → deliver cover only
-                    triggerDownload(coverBlob, `${safeTitle}-cover.png`)
-                }
-            } else {
-                // Checkbox OFF → today's behavior, single PNG
-                triggerDownload(coverBlob, `${safeTitle}-cover.png`)
-                toast.success('Cover downloaded!')
-            }
+            onCoverCreated?.(data.cover)
 
             setTitle('')
             setSubtitle('')
-            setStage('idle')
+            setIsGenerating(false)
             onOpenChange(false)
+
+            toast.success('Cover created — redirecting...')
+
+            // Switch to the Cover tab.
+            const params = new URLSearchParams(searchParams?.toString() || '')
+            params.set('tab', 'cover')
+            router.replace(`${pathname}?${params.toString()}`, { scroll: false })
         } catch (err) {
             const msg = err instanceof Error ? err.message : 'Cover generation failed'
             setError(msg)
             toast.error(msg)
-            setStage('idle')
+            setIsGenerating(false)
         }
-    }, [title, subtitle, includeLineArt, projectId, pageId, onOpenChange])
+    }, [title, subtitle, projectId, pageId, onOpenChange, onCoverCreated, router, searchParams, pathname])
 
-    // Progress button label
-    let buttonLabel: React.ReactNode
-    if (stage === 'cover') {
-        buttonLabel = (
-            <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                {includeLineArt ? 'Generating cover... (1/2)' : 'Generating cover...'}
-            </>
-        )
-    } else if (stage === 'lineart') {
-        buttonLabel = (
-            <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Creating line art... (2/2)
-            </>
-        )
-    } else {
-        buttonLabel = (
-            <>
-                <BookImage className="w-4 h-4 mr-2" />
-                Generate & Download
-            </>
-        )
-    }
+    const buttonLabel = isGenerating ? (
+        <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Generating cover... (~60-120s)
+        </>
+    ) : (
+        <>
+            <BookImage className="w-4 h-4 mr-2" />
+            Generate Cover
+        </>
+    )
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -226,20 +158,6 @@ export function CoverModal({
                             maxLength={120}
                         />
                     </div>
-
-                    <label className="flex items-start gap-2.5 cursor-pointer select-none pt-1">
-                        <input
-                            type="checkbox"
-                            checked={includeLineArt}
-                            onChange={(e) => setIncludeLineArt(e.target.checked)}
-                            disabled={isGenerating}
-                            className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-purple-600 cursor-pointer disabled:cursor-not-allowed"
-                        />
-                        <span className="text-sm text-slate-700 leading-snug">
-                            Also include line art
-                            <span className="text-slate-400 font-normal"> (adds ~30s, bundled as ZIP)</span>
-                        </span>
-                    </label>
 
                     {error && (
                         <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">

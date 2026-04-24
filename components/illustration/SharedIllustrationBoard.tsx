@@ -119,6 +119,11 @@ export interface SharedIllustrationBoardProps {
     // Sketch/Story Toggle "All Pages" (Admin only)
     globalSketchViewMode?: { mode: 'sketch' | 'text'; version: number }
     onToggleAllSketchView?: (mode: 'sketch' | 'text') => void
+
+    // Cover Module (Admin only) — hide "Create Cover" button once one exists;
+    // propagate the new cover back up-tree on success so the parent can surface the Cover tab.
+    hasCover?: boolean
+    onCoverCreated?: (cover: import('@/types/cover').Cover) => void
 }
 
 export function SharedIllustrationBoard({
@@ -169,7 +174,10 @@ export function SharedIllustrationBoard({
     isDeleteDisabled = false,
     // Sketch/Story Toggle "All Pages"
     globalSketchViewMode,
-    onToggleAllSketchView
+    onToggleAllSketchView,
+    // Cover Module
+    hasCover = false,
+    onCoverCreated,
 }: SharedIllustrationBoardProps) {
 
     // --------------------------------------------------------------------------
@@ -1724,16 +1732,18 @@ export function SharedIllustrationBoard({
                                                 </>
                                             )}
                                         </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => setIsCoverModalOpen(true)}
-                                            className="h-7 px-2.5 text-[10px] font-semibold bg-white border-purple-200 text-purple-700 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-800 transition-colors"
-                                            title="Generate a book cover using this illustration"
-                                        >
-                                            <BookImage className="w-3 h-3 mr-1" />
-                                            Create Cover
-                                        </Button>
+                                        {!hasCover && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setIsCoverModalOpen(true)}
+                                                className="h-7 px-2.5 text-[10px] font-semibold bg-white border-purple-200 text-purple-700 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-800 transition-colors"
+                                                title="Generate a book cover using this illustration"
+                                            >
+                                                <BookImage className="w-3 h-3 mr-1" />
+                                                Create Cover
+                                            </Button>
+                                        )}
                                     </>
                                 )}
                             </div>
@@ -1952,8 +1962,8 @@ export function SharedIllustrationBoard({
                                 <div className="absolute top-0 left-0 right-0 z-10 flex items-center gap-2 md:hidden p-3 bg-gradient-to-b from-black/40 to-transparent">
                                     <span className="text-xs font-bold tracking-wider text-white/90 uppercase shadow-sm">Colored</span>
 
-                                    {/* CREATE COVER (Admin, when illustration exists) */}
-                                    {isAdmin && illustrationUrl && (
+                                    {/* CREATE COVER (Admin, when illustration exists & no cover yet) */}
+                                    {isAdmin && illustrationUrl && !hasCover && (
                                         <button
                                             onClick={() => setIsCoverModalOpen(true)}
                                             className="h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm ml-auto"
@@ -1965,7 +1975,7 @@ export function SharedIllustrationBoard({
 
                                     {/* UPLOAD (Admin) */}
                                     {isAdmin && onUpload && (
-                                        <Button variant="ghost" size="icon" className={`h-8 w-8 rounded-full bg-black/40 text-red-500 hover:bg-black/60 backdrop-blur-sm ${isAdmin && illustrationUrl ? 'ml-1' : 'ml-auto'}`} onClick={() => illustrationInputRef.current?.click()}>
+                                        <Button variant="ghost" size="icon" className={`h-8 w-8 rounded-full bg-black/40 text-red-500 hover:bg-black/60 backdrop-blur-sm ${isAdmin && illustrationUrl && !hasCover ? 'ml-1' : 'ml-auto'}`} onClick={() => illustrationInputRef.current?.click()}>
                                             <Upload className="w-4 h-4" />
                                         </Button>
                                     )}
@@ -2637,6 +2647,7 @@ export function SharedIllustrationBoard({
                     projectId={projectId}
                     pageId={page.id}
                     pageNumber={page.page_number}
+                    onCoverCreated={onCoverCreated}
                 />
             )}
         </div>

@@ -14,8 +14,11 @@ import { UnifiedProjectLayout } from '@/components/layout/UnifiedProjectLayout'
 import { Loader2, Sparkles, Upload, Clock, ExternalLink, AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IllustrationsTabContent } from '@/components/admin/IllustrationsTabContent'
+import { CoverTabContent } from '@/components/cover/CoverTabContent'
+import { CoverHeaderActions } from '@/components/cover/CoverHeaderActions'
 import { Page } from '@/types/page'
 import { Character } from '@/types/character'
+import { Cover } from '@/types/cover'
 import { ProjectStatus } from '@/types/project'
 import { CharacterFormData } from '@/components/shared/UniversalCharacterCard'
 import { getErrorMessage } from '@/lib/utils/error'
@@ -71,6 +74,26 @@ export function ProjectTabsContent({
   // Page delete handler ref (set by IllustrationsTabContent, used by sidebar)
   const deletePageHandlerRef = useRef<((pageId: string) => void) | null>(null)
   const [isDeleteDisabled, setIsDeleteDisabled] = useState(false)
+
+  // Cover state (single cover per project). Fetched once on mount; kept in sync
+  // by CoverTabContent's onCoverChange callback.
+  const [cover, setCover] = useState<Cover | null>(null)
+  const hasCover = !!cover
+
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/cover`)
+        if (!res.ok) return
+        const data = await res.json() as { cover: Cover | null }
+        if (active) setCover(data.cover ?? null)
+      } catch {
+        // Swallow: Cover tab UX is resilient to missing data.
+      }
+    })()
+    return () => { active = false }
+  }, [projectId])
 
   // Sync local characters when server props update
   useEffect(() => {
@@ -135,6 +158,7 @@ export function ProjectTabsContent({
   // 1. Determine Active Tab (Hoist to top)
   const activeTab = useMemo(() => {
     const tab = searchParams?.get('tab')
+    if (tab === 'cover' && hasCover) return 'cover'
     if (tab === 'illustrations') return 'illustrations'
     // Only allow characters tab if there are secondary characters
     if (tab === 'characters' && hasSecondaryCharacters) return 'characters'
@@ -145,11 +169,12 @@ export function ProjectTabsContent({
     // Only default to characters if there are secondary characters
     if (hasSecondaryCharacters && (localProjectStatus === 'character_review' || localProjectStatus === 'character_generation' || localProjectStatus === 'character_generation_failed' || localProjectStatus === 'draft')) return 'characters'
     return 'pages'
-  }, [searchParams, isIllustrationsUnlocked, localProjectStatus, hasSecondaryCharacters])
+  }, [searchParams, isIllustrationsUnlocked, localProjectStatus, hasSecondaryCharacters, hasCover])
 
   const isPagesActive = activeTab === 'pages'
   const isCharactersActive = activeTab === 'characters'
   const isIllustrationsActive = activeTab === 'illustrations'
+  const isCoverActive = activeTab === 'cover'
 
   // 2. Determine Sidebar State
   const showPagesSidebar = isPagesActive
@@ -408,7 +433,7 @@ export function ProjectTabsContent({
   // NOTE: Analysis Loop removed - illustration_status field no longer used
   // Character actions are now extracted on-demand during illustration generation
 
-  const handleTabClick = (tab: 'pages' | 'characters' | 'illustrations', e: React.MouseEvent) => {
+  const handleTabClick = (tab: 'pages' | 'characters' | 'illustrations' | 'cover', e: React.MouseEvent) => {
     e.preventDefault()
     if (tab === 'characters' && isCharactersLoading) return
 
@@ -537,6 +562,15 @@ export function ProjectTabsContent({
           }
           isTrialReady={isTrialReady}
           generatedIllustrationCount={localPages.filter(p => !!p.illustration_url).length}
+          showCoverTab={hasCover}
+          coverHeaderActions={
+            cover ? (
+              <CoverHeaderActions
+                cover={cover}
+                onCoverDeleted={() => setCover(null)}
+              />
+            ) : undefined
+          }
           onCreateIllustrations={() => {
             const params = new URLSearchParams(searchParams?.toString() || '')
             params.set('tab', 'illustrations')
@@ -657,7 +691,7 @@ export function ProjectTabsContent({
       }
     >
       {/* Main Content Area */}
-      <div className={activeTab === 'illustrations' ? 'p-0 pb-0 pt-0' : 'p-8 pb-32'}>
+      <div className={activeTab === 'illustrations' || activeTab === 'cover' ? 'p-0 pb-0 pt-0' : 'p-8 pb-32'}>
 
         {/* Pages Tab Content */}
         <div className={activeTab === 'pages' ? 'block' : 'hidden'}>
@@ -860,8 +894,20 @@ export function ProjectTabsContent({
             onSketchGeneratingPageIdsChange={setSketchGeneratingPageIds}
             deletePageHandlerRef={deletePageHandlerRef}
             onDeleteDisabledChange={setIsDeleteDisabled}
+            hasCover={hasCover}
+            onCoverCreated={setCover}
           />
         </div >
+
+        {/* Cover Tab Content */}
+        <div className={isCoverActive ? 'block' : 'hidden'}>
+          <CoverTabContent
+            projectId={projectId}
+            pages={localPages}
+            initialCover={cover}
+            onCoverChange={setCover}
+          />
+        </div>
       </div >
     </UnifiedProjectLayout >
   )

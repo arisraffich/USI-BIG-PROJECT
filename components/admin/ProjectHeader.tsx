@@ -4,7 +4,7 @@ import { SharedProjectHeader } from '@/components/layout/SharedProjectHeader'
 import { useTransition, useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Home, Loader2, Send, FileText, Sparkles, Download, ExternalLink, Info, Upload, Palette, Pencil, CheckCircle2, XCircle, AlertTriangle, RefreshCw, Mail, Clock, ChevronDown, X } from 'lucide-react'
+import { Home, Loader2, Send, FileText, Sparkles, Download, ExternalLink, Info, Upload, Palette, Pencil, CheckCircle2, XCircle, AlertTriangle, RefreshCw, Mail, Clock, ChevronDown, X, BookImage } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -59,6 +59,15 @@ interface ProjectHeaderProps {
   centerContent?: React.ReactNode
   hasUnresolvedFeedback?: boolean
   hasResolvedFeedback?: boolean
+  /** Cover tab is only shown once a cover has been generated for the project. */
+  showCoverTab?: boolean
+  /**
+   * When the Cover tab is active, this replaces the normal stage actions
+   * (Resend Sketches / Send Illustrations / feedback pill) with cover-specific
+   * icon-only buttons (Download Both, Delete Cover). Composed by
+   * ProjectTabsContent; header just slots it in.
+   */
+  coverHeaderActions?: React.ReactNode
 }
 
 // Define clear stage configuration
@@ -85,7 +94,7 @@ function isInIllustrationPhase(status: ProjectStatus): boolean {
   ].includes(status)
 }
 
-export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations, generatedIllustrationCount = 0, centerContent, hasUnresolvedFeedback = false, hasResolvedFeedback = false }: ProjectHeaderProps) {
+export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations, generatedIllustrationCount = 0, centerContent, hasUnresolvedFeedback = false, hasResolvedFeedback = false, showCoverTab = false, coverHeaderActions }: ProjectHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -689,7 +698,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   // Check if Illustrations tab is unlocked
   const isIllustrationsUnlocked = isInIllustrationPhase(status)
 
-  const handleTabClick = (tab: 'pages' | 'characters' | 'illustrations', e?: React.MouseEvent) => {
+  const handleTabClick = (tab: 'pages' | 'characters' | 'illustrations' | 'cover', e?: React.MouseEvent) => {
     if (e) e.preventDefault()
     if (tab === 'characters' && isCharactersLoading) return
 
@@ -1270,6 +1279,12 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   // Determine current tab for display
   const currentTab = activeTab || (isIllustrationsUnlocked ? 'illustrations' : 'pages')
 
+  // Cover tab gets special header treatment: admin-only view, so we suppress
+  // customer-facing stage controls (Sketches Feedback pill, Resend button) and
+  // swap in cover-specific actions + a "<Book Title> Cover" identity line.
+  const isCoverTab = currentTab === 'cover'
+  const coverAuthorName = `${projectInfo.book_title} Cover`
+
   // Construct Tabs
   const tabs: Array<{
     id: string
@@ -1310,11 +1325,21 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     })
   }
 
+  if (showCoverTab) {
+    tabs.push({
+      id: 'cover',
+      label: 'Cover',
+      icon: <BookImage className="w-4 h-4 text-purple-600" />,
+      onClick: () => handleTabClick('cover'),
+      count: 0
+    })
+  }
+
   return (
     <>
     <SharedProjectHeader
       projectTitle={projectInfo.book_title}
-      authorName={`${projectInfo.author_firstname} ${projectInfo.author_lastname}'s Project`}
+      authorName={isCoverTab ? coverAuthorName : `${projectInfo.author_firstname} ${projectInfo.author_lastname}'s Project`}
       currentTabId={currentTab}
       tabs={tabs}
       dashboardLink={{
@@ -1325,9 +1350,11 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }}
       centerContent={centerContent}
       statusTag={
-        <span className={`hidden md:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${stage.tagStyle} shadow-sm`}>
-          {stage.tag}
-        </span>
+        isCoverTab ? null : (
+          <span className={`hidden md:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${stage.tagStyle} shadow-sm`}>
+            {stage.tag}
+          </span>
+        )
       }
       showSettings={true}
       showAIStatus={true}
@@ -1623,7 +1650,9 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         </>
       }
       actions={
-        !stage.isDownload ? (
+        isCoverTab ? (
+          coverHeaderActions ?? null
+        ) : !stage.isDownload ? (
           scheduledSend ? (
             /* SCHEDULED STATE: show scheduled time + cancel */
             <div className="flex items-center gap-1.5">

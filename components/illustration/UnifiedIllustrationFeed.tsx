@@ -90,6 +90,10 @@ interface UnifiedIllustrationFeedProps {
     // Sketch/Story Toggle "All Pages" (Admin only)
     globalSketchViewMode?: { mode: 'sketch' | 'text'; version: number }
     onToggleAllSketchView?: (mode: 'sketch' | 'text') => void
+
+    // Cover Module (Admin only) — hide "Create Cover" once one exists; surface new cover up-tree.
+    hasCover?: boolean
+    onCoverCreated?: (cover: import('@/types/cover').Cover) => void
 }
 
 export function UnifiedIllustrationFeed({
@@ -142,7 +146,10 @@ export function UnifiedIllustrationFeed({
     isDeleteDisabled = false,
     // Sketch/Story Toggle "All Pages"
     globalSketchViewMode,
-    onToggleAllSketchView
+    onToggleAllSketchView,
+    // Cover Module
+    hasCover = false,
+    onCoverCreated,
 }: UnifiedIllustrationFeedProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const isScrollingRef = useRef(false)
@@ -379,6 +386,9 @@ export function UnifiedIllustrationFeed({
                             // Sketch/Story Toggle "All Pages"
                             globalSketchViewMode={globalSketchViewMode}
                             onToggleAllSketchView={onToggleAllSketchView}
+                            // Cover Module
+                            hasCover={hasCover}
+                            onCoverCreated={onCoverCreated}
                         />
                     </div>
                 )
