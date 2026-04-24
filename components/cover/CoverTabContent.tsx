@@ -5,7 +5,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { BookImage } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CoverBoard } from '@/components/cover/CoverBoard'
-import { Cover } from '@/types/cover'
+import { Cover, CoverCandidateSet } from '@/types/cover'
 import { Page } from '@/types/page'
 
 interface CoverTabContentProps {
@@ -35,6 +35,7 @@ export function CoverTabContent({ projectId: _projectId, pages, initialCover, on
     const pathname = usePathname()
 
     const [cover, setCover] = useState<Cover | null>(initialCover)
+    const [pendingCandidates, setPendingCandidates] = useState<CoverCandidateSet | null>(null)
 
     useEffect(() => {
         setCover(initialCover)
@@ -43,6 +44,33 @@ export function CoverTabContent({ projectId: _projectId, pages, initialCover, on
     useEffect(() => {
         onCoverChange?.(cover)
     }, [cover, onCoverChange])
+
+    useEffect(() => {
+        if (!cover || typeof window === 'undefined') {
+            setPendingCandidates(null)
+            return
+        }
+        const key = `cover-candidates-${cover.id}`
+        const raw = window.sessionStorage.getItem(key)
+        if (!raw) {
+            setPendingCandidates(null)
+            return
+        }
+        try {
+            setPendingCandidates(JSON.parse(raw) as CoverCandidateSet)
+        } catch {
+            window.sessionStorage.removeItem(key)
+            setPendingCandidates(null)
+        }
+    }, [cover?.id])
+
+    const handleCoverUpdated = useCallback((nextCover: Cover) => {
+        setCover(nextCover)
+        if (typeof window !== 'undefined') {
+            window.sessionStorage.removeItem(`cover-candidates-${nextCover.id}`)
+        }
+        setPendingCandidates(null)
+    }, [])
 
     const goToIllustrations = useCallback(() => {
         const params = new URLSearchParams(searchParams?.toString() || '')
@@ -77,7 +105,9 @@ export function CoverTabContent({ projectId: _projectId, pages, initialCover, on
         <CoverBoard
             cover={cover}
             pages={pages}
-            onCoverUpdated={setCover}
+            pendingCandidates={pendingCandidates}
+            onCoverUpdated={handleCoverUpdated}
+            onCandidatesCleared={() => setPendingCandidates(null)}
         />
     )
 }

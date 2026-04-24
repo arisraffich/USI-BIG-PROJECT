@@ -1,25 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth/admin'
-import { buildCoverPrompt } from '@/lib/ai/cover-prompt'
+import { buildCoverPrompt, buildFaithfulCoverPrompt } from '@/lib/ai/cover-prompt'
 import { generateCover } from '@/lib/ai/cover-generator'
-import { Cover } from '@/types/cover'
+import { Cover, CoverCandidate } from '@/types/cover'
 
 export const maxDuration = 180
 
 /**
  * POST /api/covers/generate
  *
- * Synchronous initial cover generation (front only). Blocks for ~60-120s.
+ * Synchronous initial cover generation (front only). Blocks while both
+ * candidates generate in parallel.
  *
  * Flow:
  *   1. Verify project + source page + ensure no cover exists yet (UNIQUE enforced).
- *   2. Call GPT-2 (awaited).
- *   3. Upload PNG to illustrations/{projectId}/covers/front-{timestamp}.png.
- *   4. INSERT covers row with front_url + front_status='completed'.
- *   5. Return { cover }.
- *
- * No DB row is created until generation succeeds — failed attempts leave nothing behind.
+ *   2. Generate Faithful + Designed candidates in parallel.
+ *   3. Upload both PNGs to temporary candidate storage paths.
+ *   4. INSERT covers row with front_url=null + front_status='pending'.
+ *   5. Return { cover, candidates } so admin can pick the official front cover.
  */
 export async function POST(request: NextRequest) {
     try {
@@ -105,52 +104,78 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // 4. Build prompt + generate (sync, awaited).
-        const prompt = buildCoverPrompt({
+        // 4. Build prompts + generate both candidates in parallel.
+        const faithfulPrompt = buildFaithfulCoverPrompt({
+            aspectRatio: project.illustration_aspect_ratio,
+            title,
+            subtitle,
+            author,
+        })
+        const designedPrompt = buildCoverPrompt({
             aspectRatio: project.illustration_aspect_ratio,
             title,
             subtitle,
             author,
         })
 
-        console.log(`[Cover generate] project=${projectId} page=${sourcePageId} ratio=${project.illustration_aspect_ratio}`)
+        console.log(`[Cover generate] project=${projectId} page=${sourcePageId} ratio=${project.illustration_aspect_ratio} candidates=faithful,designed`)
 
-        const result = await generateCover({
-            prompt,
-            referenceImageUrl: page.illustration_url,
-            bookAspectRatio: project.illustration_aspect_ratio,
-        })
+        const [faithfulResult, designedResult] = await Promise.all([
+            generateCover({
+                prompt: faithfulPrompt,
+                referenceImageUrl: page.illustration_url,
+                bookAspectRatio: project.illustration_aspect_ratio,
+            }),
+            generateCover({
+                prompt: designedPrompt,
+                referenceImageUrl: page.illustration_url,
+                bookAspectRatio: project.illustration_aspect_ratio,
+            }),
+        ])
 
-        if (!result.success || !result.imageBuffer) {
+        if (!faithfulResult.success || !faithfulResult.imageBuffer || !designedResult.success || !designedResult.imageBuffer) {
+            const errors = [
+                !faithfulResult.success ? `Faithful: ${faithfulResult.error || 'failed'}` : null,
+                !designedResult.success ? `Designed: ${designedResult.error || 'failed'}` : null,
+            ].filter(Boolean).join('; ')
             return NextResponse.json(
-                { error: result.error || 'Cover generation failed' },
+                { error: errors || 'Cover generation failed' },
                 { status: 502 }
             )
         }
 
-        // 5. Upload to storage.
+        // 5. Upload candidates to temporary storage paths. They become official
+        // only after admin selects one in /api/covers/select-candidate.
         const timestamp = Date.now()
-        const storagePath = `${projectId}/covers/front-${timestamp}.png`
+        const generationId = `${timestamp}-${Math.random().toString(36).slice(2, 8)}`
+        const faithfulPath = `${projectId}/covers/candidates/${generationId}/faithful.png`
+        const designedPath = `${projectId}/covers/candidates/${generationId}/designed.png`
 
-        const { error: uploadErr } = await supabase.storage
-            .from('illustrations')
-            .upload(storagePath, result.imageBuffer, {
+        const [faithfulUpload, designedUpload] = await Promise.all([
+            supabase.storage.from('illustrations').upload(faithfulPath, faithfulResult.imageBuffer, {
                 contentType: 'image/png',
                 upsert: false,
-            })
+            }),
+            supabase.storage.from('illustrations').upload(designedPath, designedResult.imageBuffer, {
+                contentType: 'image/png',
+                upsert: false,
+            }),
+        ])
 
-        if (uploadErr) {
-            console.error('[Cover generate] upload failed', uploadErr)
+        if (faithfulUpload.error || designedUpload.error) {
+            console.error('[Cover generate] candidate upload failed', faithfulUpload.error || designedUpload.error)
+            await supabase.storage.from('illustrations').remove([faithfulPath, designedPath]).catch(() => {})
             return NextResponse.json(
-                { error: `Storage upload failed: ${uploadErr.message}` },
+                { error: `Storage upload failed: ${(faithfulUpload.error || designedUpload.error)?.message || 'unknown error'}` },
                 { status: 500 }
             )
         }
 
-        const { data: urlData } = supabase.storage.from('illustrations').getPublicUrl(storagePath)
-        const frontUrl = urlData.publicUrl
+        const faithfulUrl = supabase.storage.from('illustrations').getPublicUrl(faithfulPath).data.publicUrl
+        const designedUrl = supabase.storage.from('illustrations').getPublicUrl(designedPath).data.publicUrl
 
         // 6. Insert covers row (UNIQUE constraint is our race-condition safety net).
+        // The official front_url remains null until admin selects a candidate.
         const { data: cover, error: insertErr } = await supabase
             .from('covers')
             .insert({
@@ -158,8 +183,8 @@ export async function POST(request: NextRequest) {
                 title,
                 subtitle,
                 source_page_id: sourcePageId,
-                front_url: frontUrl,
-                front_status: 'completed',
+                front_url: null,
+                front_status: 'pending',
                 back_status: 'pending',
             })
             .select('*')
@@ -167,15 +192,29 @@ export async function POST(request: NextRequest) {
 
         if (insertErr || !cover) {
             console.error('[Cover generate] insert failed', insertErr)
-            // Best-effort: clean up the uploaded file so we don't leave an orphan.
-            await supabase.storage.from('illustrations').remove([storagePath]).catch(() => {})
+            await supabase.storage.from('illustrations').remove([faithfulPath, designedPath]).catch(() => {})
             return NextResponse.json(
                 { error: insertErr?.message || 'Failed to save cover record' },
                 { status: 500 }
             )
         }
 
-        return NextResponse.json({ cover: cover as Cover })
+        const candidates: { faithful: CoverCandidate, designed: CoverCandidate } = {
+            faithful: {
+                kind: 'faithful',
+                label: 'Faithful Version',
+                url: faithfulUrl,
+                storagePath: faithfulPath,
+            },
+            designed: {
+                kind: 'designed',
+                label: 'Designed Version',
+                url: designedUrl,
+                storagePath: designedPath,
+            },
+        }
+
+        return NextResponse.json({ cover: cover as Cover, candidates })
     } catch (error: unknown) {
         console.error('[Cover generate] Fatal error:', error)
         const message = error instanceof Error ? error.message : 'Unknown error'

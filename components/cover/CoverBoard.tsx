@@ -8,14 +8,16 @@ import { CoverFrontRegenModal } from '@/components/cover/CoverFrontRegenModal'
 import { CoverBackRegenModal } from '@/components/cover/CoverBackRegenModal'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Cover } from '@/types/cover'
+import { Cover, CoverCandidate, CoverCandidateSet } from '@/types/cover'
 import { Page } from '@/types/page'
 
 interface CoverBoardProps {
     cover: Cover
     pages: Page[]
+    pendingCandidates?: CoverCandidateSet | null
     /** Parent owns the canonical cover state; board reports changes upward. */
     onCoverUpdated: (cover: Cover) => void
+    onCandidatesCleared?: () => void
 }
 
 type Comparison = { oldUrl: string, newUrl: string }
@@ -29,7 +31,7 @@ type CoverLightbox = { side: 'front' | 'back', url: string }
  * component is purely the visual board. On mobile, front stacks first since
  * it's the primary image; on desktop it stays on the right.
  */
-export function CoverBoard({ cover, pages, onCoverUpdated }: CoverBoardProps) {
+export function CoverBoard({ cover, pages, pendingCandidates, onCoverUpdated, onCandidatesCleared }: CoverBoardProps) {
     const [isFrontRegenOpen, setIsFrontRegenOpen] = useState(false)
     const [isFrontRegenerating, setIsFrontRegenerating] = useState(false)
     const [frontComparison, setFrontComparison] = useState<Comparison | null>(null)
@@ -38,6 +40,7 @@ export function CoverBoard({ cover, pages, onCoverUpdated }: CoverBoardProps) {
     const [isBackRegenerating, setIsBackRegenerating] = useState(false)
     const [backComparison, setBackComparison] = useState<Comparison | null>(null)
     const [isComparisonReverting, setIsComparisonReverting] = useState(false)
+    const [isSelectingCandidate, setIsSelectingCandidate] = useState(false)
 
     // Fullscreen viewer: tracks which image URL is shown (may be a comparison candidate)
     // and which side it belongs to, for left/right navigation between front & back.
@@ -274,9 +277,90 @@ export function CoverBoard({ cover, pages, onCoverUpdated }: CoverBoardProps) {
         }
     }, [activeComparison])
 
+
+    const candidateList = useMemo(() => {
+        if (!pendingCandidates) return [] as CoverCandidate[]
+        return [pendingCandidates.faithful, pendingCandidates.designed].filter((candidate): candidate is CoverCandidate => !!candidate)
+    }, [pendingCandidates])
+
+    const handleCandidateSelect = useCallback(async (candidate: CoverCandidate) => {
+        if (isSelectingCandidate) return
+        setIsSelectingCandidate(true)
+        try {
+            const rejectedStoragePaths = candidateList
+                .filter(item => item.storagePath !== candidate.storagePath)
+                .map(item => item.storagePath)
+
+            const res = await fetch('/api/covers/select-candidate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    coverId: cover.id,
+                    selectedStoragePath: candidate.storagePath,
+                    rejectedStoragePaths,
+                }),
+            })
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({} as { error?: string }))
+                throw new Error(data?.error || 'Failed to save selected cover')
+            }
+            const data = await res.json() as { cover: Cover }
+            onCoverUpdated(data.cover)
+            onCandidatesCleared?.()
+            toast.success(`${candidate.label} saved as front cover`)
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Failed to save selected cover'
+            toast.error(msg)
+        } finally {
+            setIsSelectingCandidate(false)
+        }
+    }, [candidateList, cover.id, isSelectingCandidate, onCandidatesCleared, onCoverUpdated])
+
     return (
         <div className="px-4 md:px-6 pt-3 md:pt-4 pb-8 md:pb-4 md:h-[calc(100vh-170px)] md:min-h-[520px] md:flex md:items-center md:justify-center">
-            {activeComparison ? (
+            {candidateList.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-4 w-full md:w-auto md:h-full md:max-w-full">
+                    {candidateList.map((candidate) => {
+                        const isFaithful = candidate.kind === 'faithful'
+                        return (
+                            <div
+                                key={candidate.kind}
+                                className="flex flex-col items-center bg-white relative min-h-[420px] md:min-h-0 md:h-full md:w-auto md:aspect-[4/5] border border-slate-200 rounded-xl overflow-hidden shadow-sm"
+                            >
+                                <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-3 bg-gradient-to-b from-black/60 to-transparent">
+                                    <span className={`text-sm font-bold tracking-wider text-white uppercase px-3 py-1 rounded ${isFaithful ? 'bg-slate-700/80' : 'bg-green-600/90'}`}>
+                                        {isFaithful ? 'FAITHFUL' : 'DESIGNED'}
+                                    </span>
+                                </div>
+                                <div
+                                    className={`relative w-full flex-1 min-h-[420px] md:min-h-0 transition-opacity ${handleImageClick ? 'cursor-pointer hover:opacity-95' : ''}`}
+                                    onClick={handleImageClick ? () => handleImageClick('front', candidate.url) : undefined}
+                                >
+                                    <img
+                                        src={candidate.url}
+                                        alt={candidate.label}
+                                        className="w-full h-full object-contain block"
+                                    />
+                                </div>
+                                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+                                    <Button
+                                        onClick={() => handleCandidateSelect(candidate)}
+                                        disabled={isSelectingCandidate}
+                                        variant={isFaithful ? 'outline' : 'default'}
+                                        className={isFaithful
+                                            ? 'w-full bg-white/90 hover:bg-white text-slate-800 border-slate-300'
+                                            : 'w-full bg-green-600 hover:bg-green-700 text-white'}
+                                    >
+                                        {isSelectingCandidate ? (
+                                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
+                                        ) : `Keep ${isFaithful ? 'Faithful' : 'Designed'}`}
+                                    </Button>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            ) : activeComparison ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-4 w-full md:w-auto md:h-full md:max-w-full">
                     {/* OLD COVER VERSION (Left) */}
                     <div className="flex flex-col items-center bg-white relative min-h-[420px] md:min-h-0 md:h-full md:w-auto md:aspect-[4/5] border border-slate-200 rounded-xl overflow-hidden shadow-sm">

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, BookImage } from 'lucide-react'
 import { toast } from 'sonner'
-import { Cover } from '@/types/cover'
+import { Cover, CoverCandidateSet } from '@/types/cover'
 
 interface CoverModalProps {
     open: boolean
@@ -77,7 +77,14 @@ export function CoverModal({
                 return
             }
 
-            const data = await res.json() as { cover: Cover }
+            const data = await res.json() as { cover: Cover, candidates?: CoverCandidateSet }
+
+            if (data.candidates && typeof window !== 'undefined') {
+                window.sessionStorage.setItem(
+                    `cover-candidates-${data.cover.id}`,
+                    JSON.stringify(data.candidates)
+                )
+            }
 
             onCoverCreated?.(data.cover)
 
@@ -103,7 +110,7 @@ export function CoverModal({
     const buttonLabel = isGenerating ? (
         <>
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            Generating cover... (~60-120s)
+            Generating 2 cover options... (~60-120s)
         </>
     ) : (
         <>

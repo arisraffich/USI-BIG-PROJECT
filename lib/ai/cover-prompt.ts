@@ -29,11 +29,17 @@ COMPOSITION:
 - Keep busy areas away from where text will sit.
 - Leave clear natural space for the title, subtitle, and author line.
 
-SAFE AREA:
-- Keep title, subtitle, author line, and important character faces comfortably inside the inner 85-90% of the cover.
-- Background artwork may extend fully to the edges; text and key faces must stay away from the outer edges.
-- Do not place the title, subtitle, or author line touching or nearly touching any edge.
-- Do not place the author line at the very bottom edge.
+PRINT SAFE AREA FOR TEXT:
+- All title, subtitle, and author text must stay well inside the trim edges.
+- Keep every letter at least 8% of the cover width away from the left and right edges.
+- Keep every letter at least 8% of the cover height away from the top and bottom edges.
+- Preferred: keep all text inside the central 80-84% of the cover, leaving generous empty margin on every side.
+- Do not let any letter, shadow, outline, glow, or decorative flourish enter the outer 8% margin.
+- Title text must not touch or nearly touch the top edge.
+- Title text must not span almost the full width of the cover.
+- Author text must not touch or nearly touch the bottom edge.
+- If the title is long, use more lines and slightly smaller type instead of stretching it close to the edges.
+- Background artwork may extend fully to the edges for bleed, but text and important faces must stay safely inside the print safe area.
 
 TEXT:
 - Render the text exactly as written, with no typos.
@@ -42,11 +48,12 @@ TEXT:
 - Author line: "Written by <AUTHOR>"
 
 TYPOGRAPHY:
-- Title: large, bold, highly readable, friendly children's-book feel.
+- Title: large, bold, highly readable, friendly children's-book feel, but never oversized. It must fit comfortably within the print safe area.
+- If the title is long, break it into balanced lines and reduce size so it has generous margins.
 - Subtitle, if present: smaller than the title.
 - Author line: smaller than the title, clean, legible, formatted exactly as "Written by <AUTHOR>".
-- Place title, subtitle, and author line wherever they create the strongest cover composition.
-- The author line does not have to be at the bottom; it may sit under the title, in the lower third, or another clean area if more readable and safely inside the safe area.
+- Place title, subtitle, and author line wherever they create the strongest cover composition while staying safely inside the print safe area.
+- The author line does not have to be at the bottom; it may sit under the title, in the lower third, or another clean area if more readable and safely inside the print safe area.
 - Do not use text boxes, banners, labels, ribbons, or visible panels behind the text.
 - Keep text readable by composing the illustration with natural low-detail space behind it.
 
@@ -93,6 +100,96 @@ export function buildCoverPrompt(opts: {
         prompt = prompt.replace('<SUBTITLE>', (opts.subtitle as string).trim())
     } else {
         // Strip the whole subtitle line so the model doesn't render an empty placeholder.
+        prompt = prompt.replace(/^- Subtitle, only if provided: "<SUBTITLE>"\n/m, '')
+    }
+
+    return prompt
+}
+
+
+/**
+ * Faithful front-cover prompt. This is the low-change counterpart to
+ * COVER_PROMPT_TEMPLATE: preserve the selected interior illustration as the
+ * visual base and add print-safe cover typography with minimal alteration.
+ */
+export const FAITHFUL_COVER_PROMPT_TEMPLATE = `TASK: CHILDREN'S BOOK FRONT COVER — FAITHFUL VERSION
+
+You are a professional children's book cover designer. You are given ONE reference illustration from the book's interior. Create a front cover using this illustration as the exact visual base.
+
+The goal is to preserve the original illustration as faithfully as possible while adding professional cover typography.
+
+STYLE PRESERVATION:
+- Match the reference illustration exactly: same medium, linework, palette, shading, lighting, texture, and mood.
+- Preserve the same characters exactly: faces, hair, clothing, proportions, poses, expressions, and placement.
+- Preserve the same background, objects, scenery, composition, framing, camera angle, and visual world.
+- Do not redesign, recompose, zoom, crop, rotate, flip, simplify, expand, or reinterpret the scene.
+
+COVER ADAPTATION:
+- Add professional children's book cover typography for the title, optional subtitle, and author line.
+- Integrate the typography naturally into the existing illustration.
+- Make only minimal local adjustments needed for text readability and print polish.
+- Do not alter the illustration except where absolutely necessary to make the text readable.
+- The result should feel like the original illustration became a book cover, not like a new illustration was created.
+
+ASPECT RATIO:
+- Output aspect ratio: <ASPECT_RATIO>.
+- Preserve the reference composition naturally within these proportions.
+- Do not stretch, squeeze, distort, crop awkwardly, or letterbox.
+
+PRINT SAFE AREA FOR TEXT:
+- All title, subtitle, and author text must stay well inside the trim edges.
+- Keep every letter at least 8% of the cover width away from the left and right edges.
+- Keep every letter at least 8% of the cover height away from the top and bottom edges.
+- Preferred: keep all text inside the central 80-84% of the cover, leaving generous empty margin on every side.
+- Do not let any letter, shadow, outline, glow, or decorative flourish enter the outer 8% margin.
+- Title text must not touch or nearly touch the top edge.
+- Title text must not span almost the full width of the cover.
+- Author text must not touch or nearly touch the bottom edge.
+- If the title is long, use more lines and slightly smaller type instead of stretching it close to the edges.
+- Background artwork may extend fully to the edges for bleed, but text and important faces must stay safely inside the print safe area.
+
+TEXT:
+- Render the text exactly as written, with no typos.
+- Title: "<TITLE>"
+- Subtitle, only if provided: "<SUBTITLE>"
+- Author line: "Written by <AUTHOR>"
+
+TYPOGRAPHY:
+- Title: large, bold, highly readable, friendly children's-book feel, but never oversized. It must fit comfortably within the print safe area.
+- If the title is long, break it into balanced lines and reduce size so it has generous margins.
+- Subtitle, if present: smaller than the title.
+- Author line: smaller than the title, clean, legible, formatted exactly as "Written by <AUTHOR>".
+- Place title, subtitle, and author line in the cleanest available areas of the existing composition while staying safely inside the print safe area.
+- Do not use text boxes, banners, labels, ribbons, or visible panels behind the text.
+- Keep text readable using natural low-detail areas already present in the illustration whenever possible.
+
+CONSTRAINTS:
+- No new characters, animals, props, scenery, or story elements.
+- No major composition changes.
+- No 3D effects, bevels, or stock-clip-art shadows.
+- No photographic filters or plastic gloss.
+- No extra text: no ISBN, barcodes, watermarks, page numbers, publisher logo, or tagline.
+- No decorative border or frame.
+- No book mockup, spine, back cover, or 3D product render.
+- Print-ready: crisp, clean, professional.`
+
+export function buildFaithfulCoverPrompt(opts: {
+    aspectRatio: string | null | undefined
+    title: string
+    subtitle?: string | null
+    author: string
+}): string {
+    const aspectLabel = mapAspectRatioToCoverLabel(opts.aspectRatio)
+    const hasSubtitle = !!(opts.subtitle && opts.subtitle.trim())
+
+    let prompt = FAITHFUL_COVER_PROMPT_TEMPLATE
+        .replace('<ASPECT_RATIO>', aspectLabel)
+        .replace('<TITLE>', opts.title)
+        .replace(/<AUTHOR>/g, opts.author)
+
+    if (hasSubtitle) {
+        prompt = prompt.replace('<SUBTITLE>', (opts.subtitle as string).trim())
+    } else {
         prompt = prompt.replace(/^- Subtitle, only if provided: "<SUBTITLE>"\n/m, '')
     }
 

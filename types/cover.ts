@@ -28,3 +28,16 @@ export interface Cover {
   created_at: string
   updated_at: string
 }
+
+
+export interface CoverCandidate {
+  kind: 'faithful' | 'designed'
+  label: string
+  url: string
+  storagePath: string
+}
+
+export interface CoverCandidateSet {
+  faithful?: CoverCandidate
+  designed?: CoverCandidate
+}
