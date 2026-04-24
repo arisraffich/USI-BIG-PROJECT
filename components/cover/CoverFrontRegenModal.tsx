@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
     DropdownMenu,
@@ -50,9 +49,8 @@ export function CoverFrontRegenModal({
     onSuccess,
     onFailure,
 }: CoverFrontRegenModalProps) {
-    const [title, setTitle] = useState(cover.title)
-    const [subtitle, setSubtitle] = useState(cover.subtitle || '')
-    const [sourcePageId, setSourcePageId] = useState<string>(cover.source_page_id || '')
+    // Empty string = "Current cover" (edit mode). A page UUID = redesign mode.
+    const [sourcePageId, setSourcePageId] = useState<string>('')
     const [instructions, setInstructions] = useState('')
     const [addedImages, setAddedImages] = useState<Array<{ dataUrl: string, name: string }>>([])
     const [isSubmitting, setIsSubmitting] = useState(false)
@@ -61,9 +59,7 @@ export function CoverFrontRegenModal({
     // Reset fields whenever the modal opens with a fresh cover.
     useEffect(() => {
         if (open) {
-            setTitle(cover.title)
-            setSubtitle(cover.subtitle || '')
-            setSourcePageId(cover.source_page_id || '')
+            setSourcePageId('')
             setInstructions('')
             setAddedImages([])
             setError(null)
@@ -121,16 +117,6 @@ export function CoverFrontRegenModal({
     }, [])
 
     const handleSubmit = useCallback(async () => {
-        const trimmedTitle = title.trim()
-        if (!trimmedTitle) {
-            setError('Title is required')
-            return
-        }
-        if (!sourcePageId) {
-            setError('Pick a reference illustration')
-            return
-        }
-
         setError(null)
         setIsSubmitting(true)
         onSubmitStart()
@@ -143,9 +129,12 @@ export function CoverFrontRegenModal({
                 body: JSON.stringify({
                     coverId: cover.id,
                     side: 'front',
-                    title: trimmedTitle,
-                    subtitle: subtitle.trim() || undefined,
-                    sourcePageId,
+                    // Title/subtitle are no longer editable here — backend falls
+                    // back to the values already stored on the cover.
+                    // Omit sourcePageId when "Current cover" is selected so the
+                    // backend treats it as edit mode and keeps the existing
+                    // source_page_id unchanged.
+                    sourcePageId: sourcePageId || undefined,
                     instructions: instructions.trim() || undefined,
                     addedImages: addedImages.map(i => i.dataUrl),
                 }),
@@ -168,7 +157,7 @@ export function CoverFrontRegenModal({
         } finally {
             setIsSubmitting(false)
         }
-    }, [title, subtitle, sourcePageId, instructions, addedImages, cover.id, onSubmitStart, onSuccess, onFailure, onOpenChange])
+    }, [sourcePageId, instructions, addedImages, cover.id, onSubmitStart, onSuccess, onFailure, onOpenChange])
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -185,52 +174,42 @@ export function CoverFrontRegenModal({
                 </DialogHeader>
 
                 <div className="space-y-4 py-2">
-                    {/* Title */}
-                    <div className="space-y-1.5">
-                        <Label htmlFor="front-regen-title" className="text-sm font-semibold text-slate-700">
-                            Title <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                            id="front-regen-title"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            disabled={isSubmitting}
-                            maxLength={120}
-                        />
-                    </div>
-
-                    {/* Subtitle */}
-                    <div className="space-y-1.5">
-                        <Label htmlFor="front-regen-subtitle" className="text-sm font-semibold text-slate-700">
-                            Subtitle <span className="text-slate-400 font-normal">(optional)</span>
-                        </Label>
-                        <Input
-                            id="front-regen-subtitle"
-                            value={subtitle}
-                            onChange={(e) => setSubtitle(e.target.value)}
-                            disabled={isSubmitting}
-                            maxLength={120}
-                        />
-                    </div>
-
-                    {/* Source Page — dropdown with thumbnails, same pattern as the
-                        Illustration regen "Environment Reference" picker. */}
+                    {/* Reference — "Current cover" (edit mode) by default, or an
+                        interior page (full redesign from that page). */}
                     <div className="space-y-1.5">
                         <Label className="text-sm font-semibold text-slate-700">
-                            Reference illustration <span className="text-red-500">*</span>
+                            Reference
                         </Label>
                         {(() => {
-                            const selectedPage = eligiblePages.find(p => p.id === sourcePageId)
-                            const hasPages = eligiblePages.length > 0
+                            const isCurrentCover = sourcePageId === ''
+                            const selectedPage = isCurrentCover
+                                ? null
+                                : eligiblePages.find(p => p.id === sourcePageId)
                             return (
                                 <DropdownMenu>
-                                    <DropdownMenuTrigger asChild disabled={isSubmitting || !hasPages}>
+                                    <DropdownMenuTrigger asChild disabled={isSubmitting}>
                                         <Button
                                             variant="outline"
                                             className="w-full justify-between h-auto min-h-[40px] py-1.5 px-3"
                                         >
                                             <span className="flex items-center gap-2.5 min-w-0">
-                                                {selectedPage ? (
+                                                {isCurrentCover ? (
+                                                    <>
+                                                        {cover.front_url ? (
+                                                            <img
+                                                                src={cover.front_url}
+                                                                alt="Current cover"
+                                                                className="w-8 h-8 rounded object-cover border border-slate-200 flex-shrink-0"
+                                                            />
+                                                        ) : (
+                                                            <Bookmark className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                                                        )}
+                                                        <span className="truncate">
+                                                            Current cover
+                                                            <span className="text-slate-400 font-normal ml-1.5">edit mode</span>
+                                                        </span>
+                                                    </>
+                                                ) : selectedPage ? (
                                                     <>
                                                         {selectedPage.illustration_url ? (
                                                             <img
@@ -241,12 +220,13 @@ export function CoverFrontRegenModal({
                                                         ) : (
                                                             <Bookmark className="w-4 h-4 text-purple-500 flex-shrink-0" />
                                                         )}
-                                                        <span className="truncate">Page {selectedPage.page_number}</span>
+                                                        <span className="truncate">
+                                                            Page {selectedPage.page_number}
+                                                            <span className="text-slate-400 font-normal ml-1.5">redesign</span>
+                                                        </span>
                                                     </>
                                                 ) : (
-                                                    <span className="text-slate-500">
-                                                        {hasPages ? 'Pick a page…' : 'No illustrated pages yet'}
-                                                    </span>
+                                                    <span className="text-slate-500">Pick a reference…</span>
                                                 )}
                                             </span>
                                             <ChevronDown className="w-4 h-4 ml-2 opacity-50 flex-shrink-0" />
@@ -256,6 +236,22 @@ export function CoverFrontRegenModal({
                                         align="start"
                                         className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-[300px] overflow-y-auto"
                                     >
+                                        <DropdownMenuItem
+                                            onClick={() => setSourcePageId('')}
+                                            className="cursor-pointer flex items-center gap-2.5 py-2"
+                                        >
+                                            {cover.front_url ? (
+                                                <img
+                                                    src={cover.front_url}
+                                                    alt="Current cover"
+                                                    className="w-8 h-8 rounded object-cover border border-slate-200 flex-shrink-0"
+                                                />
+                                            ) : (
+                                                <Bookmark className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                                            )}
+                                            <span className="flex-1">Current cover</span>
+                                            <span className="text-xs text-slate-400">edit mode</span>
+                                        </DropdownMenuItem>
                                         {eligiblePages.map(p => (
                                             <DropdownMenuItem
                                                 key={p.id}
@@ -271,18 +267,14 @@ export function CoverFrontRegenModal({
                                                 ) : (
                                                     <Bookmark className="w-4 h-4 text-purple-500 flex-shrink-0" />
                                                 )}
-                                                <span>Page {p.page_number}</span>
+                                                <span className="flex-1">Page {p.page_number}</span>
+                                                <span className="text-xs text-slate-400">redesign</span>
                                             </DropdownMenuItem>
                                         ))}
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             )
                         })()}
-                        {cover.source_page_id && !eligiblePages.find(p => p.id === cover.source_page_id) && (
-                            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                                The original source page was deleted. Pick another illustration.
-                            </p>
-                        )}
                     </div>
 
                     {/* Instructions */}
@@ -359,7 +351,7 @@ export function CoverFrontRegenModal({
                 <DialogFooter>
                     <Button
                         onClick={handleSubmit}
-                        disabled={isSubmitting || !title.trim() || !sourcePageId}
+                        disabled={isSubmitting}
                         className="bg-purple-600 hover:bg-purple-700 text-white"
                     >
                         {isSubmitting ? (

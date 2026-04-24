@@ -1,12 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { CoverSidePane } from '@/components/cover/CoverSidePane'
 import { CoverFrontRegenModal } from '@/components/cover/CoverFrontRegenModal'
 import { CoverBackRegenModal } from '@/components/cover/CoverBackRegenModal'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { Cover } from '@/types/cover'
 import { Page } from '@/types/page'
 
@@ -36,16 +37,33 @@ export function CoverBoard({ cover, pages, onCoverUpdated }: CoverBoardProps) {
     const [isBackRegenOpen, setIsBackRegenOpen] = useState(false)
     const [isBackRegenerating, setIsBackRegenerating] = useState(false)
     const [backComparison, setBackComparison] = useState<Comparison | null>(null)
+    const [isComparisonReverting, setIsComparisonReverting] = useState(false)
 
     // Fullscreen viewer: tracks which image URL is shown (may be a comparison candidate)
     // and which side it belongs to, for left/right navigation between front & back.
     const [lightbox, setLightbox] = useState<CoverLightbox | null>(null)
+
+    // Disable the lightbox entirely on mobile (<768px, matches the board's stacking
+    // breakpoint). Default to desktop so SSR render doesn't flash the wrong behavior.
+    const [isDesktop, setIsDesktop] = useState(true)
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+        const mq = window.matchMedia('(min-width: 768px)')
+        const update = () => setIsDesktop(mq.matches)
+        update()
+        mq.addEventListener('change', update)
+        return () => mq.removeEventListener('change', update)
+    }, [])
 
     const canNavigateLightbox = !!(cover.front_url && cover.back_url)
 
     const openLightbox = useCallback((side: 'front' | 'back', url: string) => {
         setLightbox({ side, url })
     }, [])
+
+    // Passed into CoverSidePane only on desktop. When undefined, the pane skips
+    // the zoom-in cursor/hover styling and becomes non-interactive for taps.
+    const handleImageClick = isDesktop ? openLightbox : undefined
 
     /** Left side of the spread = back cover. */
     const goLightboxToBack = useCallback(() => {
@@ -133,6 +151,36 @@ export function CoverBoard({ cover, pages, onCoverUpdated }: CoverBoardProps) {
         }
     }, [frontComparison, cover.id, onCoverUpdated])
 
+
+    const handleFrontRemaster = useCallback(async () => {
+        if (!cover.front_url || isFrontRegenerating) return
+        setIsFrontRegenerating(true)
+        setFrontComparison(null)
+        toast.info('Remastering front cover at max quality…')
+
+        try {
+            const res = await fetch('/api/covers/regenerate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    coverId: cover.id,
+                    side: 'front',
+                    mode: 'remaster',
+                }),
+            })
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({} as { error?: string }))
+                throw new Error(data?.error || 'Remaster failed')
+            }
+            const data = await res.json() as { cover: Cover, newUrl: string, oldUrl: string | null }
+            handleFrontRegenSuccess(data)
+        } catch (err) {
+            handleFrontRegenFailure()
+            const msg = err instanceof Error ? err.message : 'Remaster failed'
+            toast.error(msg)
+        }
+    }, [cover.id, cover.front_url, isFrontRegenerating, handleFrontRegenSuccess, handleFrontRegenFailure])
+
     // --- Back regen -------------------------------------------------------
     const handleBackRegenerate = useCallback(() => {
         if (!cover.front_url) {
@@ -194,40 +242,124 @@ export function CoverBoard({ cover, pages, onCoverUpdated }: CoverBoardProps) {
         }
     }, [backComparison, cover.id, onCoverUpdated])
 
+    const activeComparison = useMemo(() => {
+        if (frontComparison) {
+            return {
+                side: 'front' as const,
+                oldUrl: frontComparison.oldUrl,
+                newUrl: frontComparison.newUrl,
+                onKeepNew: handleFrontKeepNew,
+                onKeepOld: handleFrontKeepOld,
+            }
+        }
+        if (backComparison) {
+            return {
+                side: 'back' as const,
+                oldUrl: backComparison.oldUrl,
+                newUrl: backComparison.newUrl,
+                onKeepNew: handleBackKeepNew,
+                onKeepOld: handleBackKeepOld,
+            }
+        }
+        return null
+    }, [frontComparison, backComparison, handleFrontKeepNew, handleFrontKeepOld, handleBackKeepNew, handleBackKeepOld])
+
+    const handleComparisonKeepOld = useCallback(async () => {
+        if (!activeComparison) return
+        setIsComparisonReverting(true)
+        try {
+            await activeComparison.onKeepOld()
+        } finally {
+            setIsComparisonReverting(false)
+        }
+    }, [activeComparison])
+
     return (
-        <div className="px-4 md:px-8 pt-3 md:pt-4 pb-8 md:pb-12">
-            {/* Dual-pane: Back (left) + Front (right) on desktop.
-                On mobile (stacked) Front shows first since it's the primary image. */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                <div className="order-2 md:order-1">
-                    <CoverSidePane
-                        side="back"
-                        imageUrl={cover.back_url}
-                        isRegenerating={isBackRegenerating}
-                        comparison={backComparison}
-                        onRegenerate={handleBackRegenerate}
-                        onKeepNew={handleBackKeepNew}
-                        onKeepOld={handleBackKeepOld}
-                        onImageClick={openLightbox}
-                        emptyCta={cover.back_url ? undefined : {
-                            label: 'Create Back Cover',
-                            onClick: handleBackRegenerate,
-                        }}
-                    />
+        <div className="px-4 md:px-6 pt-3 md:pt-4 pb-8 md:pb-4 md:h-[calc(100vh-170px)] md:min-h-[520px] md:flex md:items-center md:justify-center">
+            {activeComparison ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-4 w-full md:w-auto md:h-full md:max-w-full">
+                    {/* OLD COVER VERSION (Left) */}
+                    <div className="flex flex-col items-center bg-white relative min-h-[420px] md:min-h-0 md:h-full md:w-auto md:aspect-[4/5] border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                        <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-3 bg-gradient-to-b from-black/60 to-transparent">
+                            <span className="text-sm font-bold tracking-wider text-white uppercase px-3 py-1 bg-slate-700/80 rounded">OLD</span>
+                        </div>
+                        <div
+                            className={`relative w-full flex-1 min-h-[420px] md:min-h-0 transition-opacity ${handleImageClick ? 'cursor-pointer hover:opacity-95' : ''}`}
+                            onClick={handleImageClick ? () => handleImageClick(activeComparison.side, activeComparison.oldUrl) : undefined}
+                        >
+                            <img
+                                src={activeComparison.oldUrl}
+                                alt="Previous cover"
+                                className="w-full h-full object-contain block"
+                            />
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+                            <Button
+                                onClick={handleComparisonKeepOld}
+                                disabled={isComparisonReverting}
+                                variant="outline"
+                                className="w-full bg-white/90 hover:bg-white text-slate-800 border-slate-300"
+                            >
+                                {isComparisonReverting ? (
+                                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Reverting...</>
+                                ) : 'Revert Old'}
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* NEW COVER VERSION (Right) */}
+                    <div className="flex flex-col items-center bg-slate-50/10 relative min-h-[420px] md:min-h-0 md:h-full md:w-auto md:aspect-[4/5] border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                        <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-3 bg-gradient-to-b from-black/60 to-transparent">
+                            <span className="text-sm font-bold tracking-wider text-white uppercase px-3 py-1 bg-green-600/90 rounded">NEW</span>
+                        </div>
+                        <div
+                            className={`relative w-full flex-1 min-h-[420px] md:min-h-0 transition-opacity ${handleImageClick ? 'cursor-pointer hover:opacity-95' : ''}`}
+                            onClick={handleImageClick ? () => handleImageClick(activeComparison.side, activeComparison.newUrl) : undefined}
+                        >
+                            <img
+                                src={activeComparison.newUrl}
+                                alt="New cover"
+                                className="w-full h-full object-contain block"
+                            />
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+                            <Button
+                                onClick={activeComparison.onKeepNew}
+                                disabled={isComparisonReverting}
+                                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                            >
+                                Keep New
+                            </Button>
+                        </div>
+                    </div>
                 </div>
-                <div className="order-1 md:order-2">
-                    <CoverSidePane
-                        side="front"
-                        imageUrl={cover.front_url}
-                        isRegenerating={isFrontRegenerating}
-                        comparison={frontComparison}
-                        onRegenerate={() => setIsFrontRegenOpen(true)}
-                        onKeepNew={handleFrontKeepNew}
-                        onKeepOld={handleFrontKeepOld}
-                        onImageClick={openLightbox}
-                    />
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-4 w-full md:w-auto md:h-full md:max-w-full">
+                    <div className="order-2 md:order-1 md:h-full md:w-auto md:aspect-[4/5] min-h-0">
+                        <CoverSidePane
+                            side="back"
+                            imageUrl={cover.back_url}
+                            isRegenerating={isBackRegenerating}
+                            onRegenerate={handleBackRegenerate}
+                            onImageClick={handleImageClick}
+                            emptyCta={cover.back_url ? undefined : {
+                                label: 'Create Back Cover',
+                                onClick: handleBackRegenerate,
+                            }}
+                        />
+                    </div>
+                    <div className="order-1 md:order-2 md:h-full md:w-auto md:aspect-[4/5] min-h-0">
+                        <CoverSidePane
+                            side="front"
+                            imageUrl={cover.front_url}
+                            isRegenerating={isFrontRegenerating}
+                            onRegenerate={() => setIsFrontRegenOpen(true)}
+                            onRemaster={handleFrontRemaster}
+                            onImageClick={handleImageClick}
+                        />
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Full-image lightbox — click image to expand; arrows / ← → keys switch front ↔ back when both exist. */}
             <Dialog open={!!lightbox} onOpenChange={(open) => !open && setLightbox(null)}>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth/admin'
-import { buildCoverPrompt, buildBackCoverPrompt } from '@/lib/ai/cover-prompt'
+import { buildCoverPrompt, buildCoverEditPrompt, buildBackCoverPrompt, buildCoverRemasterPrompt } from '@/lib/ai/cover-prompt'
 import { generateCover, generateBackCover } from '@/lib/ai/cover-generator'
 import { Cover } from '@/types/cover'
 
@@ -13,9 +13,8 @@ const MAX_ADDED_IMAGES = 5
 type Body = {
     coverId?: string
     side?: 'front' | 'back'
-    // Front-only
-    title?: string
-    subtitle?: string
+    mode?: 'regenerate' | 'remaster'
+    // Front-only: sourcePageId omitted/empty = "Current cover" (edit mode).
     sourcePageId?: string
     // Common
     instructions?: string
@@ -81,57 +80,104 @@ export async function POST(request: NextRequest) {
 
         // 2. Branch on side.
         if (side === 'front') {
-            const title = body.title?.trim()
-            if (!title) {
-                return NextResponse.json({ error: 'Title is required' }, { status: 400 })
-            }
-            const subtitle = body.subtitle?.trim() || null
+            // ------------------------------------------------------------------
+            // Edit mode vs redesign mode.
+            //
+            // Signal from the modal:
+            //   - body.sourcePageId omitted/empty → admin picked "Current cover"
+            //     → EDIT MODE (use existing cover as reference, keep
+            //       cover.source_page_id unchanged).
+            //   - body.sourcePageId = <page uuid> → admin picked an interior
+            //     page → REDESIGN MODE (use that page as reference, overwrite
+            //     cover.source_page_id).
+            //
+            // Title/subtitle are no longer editable through this endpoint — the
+            // modal removed those fields. Redesign mode uses whatever values
+            // are already stored on the cover; admin instructions can override
+            // via the appended "ADMIN INSTRUCTIONS (take priority)" block.
+            // ------------------------------------------------------------------
+            const pickedPageId = body.sourcePageId?.trim() || null
+            const isRemasterMode = body.mode === 'remaster'
+            const isEditMode = !isRemasterMode && !pickedPageId && !!cover.front_url
 
-            // Source page: either the new one admin picked, or keep the existing one.
-            const sourcePageId = body.sourcePageId || cover.source_page_id
-            if (!sourcePageId) {
-                return NextResponse.json(
-                    { error: 'No source page — pick an illustration to regenerate from' },
-                    { status: 400 }
-                )
+            let prompt: string
+            let referenceImageUrl: string
+            let referenceMode: 'source-page' | 'current-cover'
+            // Undefined = don't touch the column on DB update (edit/remaster mode).
+            let sourcePageIdForDb: string | undefined
+            let effectiveAddedImages = addedImages
+
+            if (isRemasterMode) {
+                if (!cover.front_url) {
+                    return NextResponse.json(
+                        { error: 'Remaster requires an existing front cover' },
+                        { status: 400 }
+                    )
+                }
+                prompt = buildCoverRemasterPrompt({
+                    aspectRatio: project.illustration_aspect_ratio,
+                })
+                referenceImageUrl = cover.front_url as string
+                referenceMode = 'current-cover'
+                sourcePageIdForDb = undefined
+                effectiveAddedImages = []
+            } else if (isEditMode) {
+                const basePrompt = buildCoverEditPrompt({
+                    aspectRatio: project.illustration_aspect_ratio,
+                })
+                prompt = appendInstructions(basePrompt, instructions)
+                referenceImageUrl = cover.front_url as string
+                referenceMode = 'current-cover'
+                sourcePageIdForDb = undefined
+            } else {
+                if (!pickedPageId) {
+                    return NextResponse.json(
+                        { error: 'No cover exists yet — pick an illustration to regenerate from.' },
+                        { status: 400 }
+                    )
+                }
+
+                const author = `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim()
+                if (!author) {
+                    return NextResponse.json({ error: 'Project is missing author name' }, { status: 400 })
+                }
+
+                const { data: page, error: pageErr } = await supabase
+                    .from('pages')
+                    .select('id, project_id, illustration_url')
+                    .eq('id', pickedPageId)
+                    .single()
+
+                if (pageErr || !page) {
+                    return NextResponse.json({ error: 'Source page not found' }, { status: 404 })
+                }
+                if (page.project_id !== cover.project_id) {
+                    return NextResponse.json({ error: 'Source page does not belong to project' }, { status: 403 })
+                }
+                if (!page.illustration_url) {
+                    return NextResponse.json({ error: 'Source page has no illustration' }, { status: 400 })
+                }
+
+                const basePrompt = buildCoverPrompt({
+                    aspectRatio: project.illustration_aspect_ratio,
+                    title: cover.title,
+                    subtitle: cover.subtitle || null,
+                    author,
+                })
+                prompt = appendInstructions(basePrompt, instructions)
+                referenceImageUrl = page.illustration_url
+                referenceMode = 'source-page'
+                sourcePageIdForDb = pickedPageId
             }
 
-            const { data: page, error: pageErr } = await supabase
-                .from('pages')
-                .select('id, project_id, illustration_url')
-                .eq('id', sourcePageId)
-                .single()
-
-            if (pageErr || !page) {
-                return NextResponse.json({ error: 'Source page not found' }, { status: 404 })
-            }
-            if (page.project_id !== cover.project_id) {
-                return NextResponse.json({ error: 'Source page does not belong to project' }, { status: 403 })
-            }
-            if (!page.illustration_url) {
-                return NextResponse.json({ error: 'Source page has no illustration' }, { status: 400 })
-            }
-
-            const author = `${project.author_firstname || ''} ${project.author_lastname || ''}`.trim()
-            if (!author) {
-                return NextResponse.json({ error: 'Project is missing author name' }, { status: 400 })
-            }
-
-            const basePrompt = buildCoverPrompt({
-                aspectRatio: project.illustration_aspect_ratio,
-                title,
-                subtitle,
-                author,
-            })
-            const prompt = appendInstructions(basePrompt, instructions)
-
-            console.log(`[Cover regen] FRONT cover=${coverId} sourcePage=${sourcePageId} extras=${addedImages.length}`)
+            console.log(`[Cover regen] FRONT cover=${coverId} mode=${isRemasterMode ? 'remaster' : isEditMode ? 'edit' : 'redesign'} sourcePage=${sourcePageIdForDb ?? '(unchanged)'} extras=${effectiveAddedImages.length}`)
 
             const result = await generateCover({
                 prompt,
-                referenceImageUrl: page.illustration_url,
+                referenceImageUrl,
                 bookAspectRatio: project.illustration_aspect_ratio,
-                additionalImageUrls: addedImages,
+                additionalImageUrls: effectiveAddedImages,
+                referenceMode,
             })
 
             if (!result.success || !result.imageBuffer) {
@@ -164,16 +210,26 @@ export async function POST(request: NextRequest) {
             const newUrl = urlData.publicUrl
             const oldUrl: string | null = cover.front_url ?? null
 
+            // Title/subtitle are intentionally left untouched — they keep the
+            // values set at initial cover creation. Only overwrite
+            // source_page_id in redesign mode.
+            const coverUpdate: {
+                front_url: string
+                front_status: 'completed'
+                updated_at: string
+                source_page_id?: string
+            } = {
+                front_url: newUrl,
+                front_status: 'completed',
+                updated_at: new Date().toISOString(),
+            }
+            if (sourcePageIdForDb) {
+                coverUpdate.source_page_id = sourcePageIdForDb
+            }
+
             const { data: updated, error: updateErr } = await supabase
                 .from('covers')
-                .update({
-                    title,
-                    subtitle,
-                    source_page_id: sourcePageId,
-                    front_url: newUrl,
-                    front_status: 'completed',
-                    updated_at: new Date().toISOString(),
-                })
+                .update(coverUpdate)
                 .eq('id', coverId)
                 .select('*')
                 .single()

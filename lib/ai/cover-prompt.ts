@@ -100,6 +100,76 @@ export function buildCoverPrompt(opts: {
 }
 
 /**
+ * Front cover EDIT prompt — used when admin regenerates a front cover and
+ * keeps the same source page (i.e. they want to tweak the existing cover, not
+ * redesign it from scratch). Mirrors the illustration "Edit Mode" pattern:
+ * the provided image IS the target, admin instructions drive changes, and the
+ * model preserves everything else.
+ *
+ * Substitutions:
+ *   <ASPECT_RATIO> — via mapAspectRatioToCoverLabel()
+ */
+export const COVER_EDIT_PROMPT_TEMPLATE = `MODE: COVER EDIT
+
+The provided image is the current front cover of a children's book. Treat it as the target image to edit, not as inspiration.
+
+Keep the composition, subjects, background, colors, typography, and overall style exactly as they are. Do not recompose or redesign. Apply only the changes described in the admin instructions below — if the instructions do not mention a change, do not change it.
+
+Output aspect ratio: <ASPECT_RATIO>. Do not stretch, squeeze, distort, or letterbox.`
+
+/**
+ * Fills the cover-edit prompt template with the project's aspect ratio.
+ * Everything else is left to the admin instructions that get appended by the
+ * API layer.
+ */
+export function buildCoverEditPrompt(opts: {
+    aspectRatio: string | null | undefined
+}): string {
+    const aspectLabel = mapAspectRatioToCoverLabel(opts.aspectRatio)
+    return COVER_EDIT_PROMPT_TEMPLATE.replace('<ASPECT_RATIO>', aspectLabel)
+}
+
+/**
+ * Front cover REMASTER prompt — quality refresh only. This is intentionally
+ * stricter than the general illustration refresh prompt because book-cover
+ * typography must remain readable and spelled exactly the same.
+ */
+export const COVER_REMASTER_PROMPT_TEMPLATE = `TASK: FRONT COVER QUALITY REMASTER
+
+You are given ONE reference image: the current completed front cover of a children's book. Re-render this exact cover at maximum print fidelity.
+
+ABSOLUTE PRESERVATION RULES:
+- Preserve the exact same composition, framing, crop, aspect ratio, and layout.
+- Preserve every character, object, background element, and decorative element in the exact same position.
+- Preserve all title, subtitle, and author typography exactly: same words, spelling, capitalization, placement, size relationship, color, and style.
+- Preserve the exact same art style, medium, palette, lighting, shadows, texture, and mood.
+- Do not redesign, recompose, simplify, expand, crop, or reinterpret the cover.
+
+QUALITY IMPROVEMENT ONLY:
+- Improve sharpness, edge clarity, print polish, texture fidelity, and overall cleanliness.
+- Clean up softness, blur, compression artifacts, or muddy rendering.
+- Make the same cover look crisper and more professionally finished.
+
+DO NOT:
+- Do not change, add, remove, or reposition anything.
+- Do not alter character faces, expressions, poses, clothing, or proportions.
+- Do not alter, rewrite, misspell, or restyle any text.
+- Do not add new text, logos, barcodes, borders, frames, or mockup elements.
+
+ASPECT RATIO:
+- Output aspect ratio: <ASPECT_RATIO>.
+- Do not stretch, squeeze, distort, crop awkwardly, or letterbox.
+
+OUTPUT: The same front cover, remastered cleanly at maximum quality.`
+
+export function buildCoverRemasterPrompt(opts: {
+    aspectRatio: string | null | undefined
+}): string {
+    const aspectLabel = mapAspectRatioToCoverLabel(opts.aspectRatio)
+    return COVER_REMASTER_PROMPT_TEMPLATE.replace('<ASPECT_RATIO>', aspectLabel)
+}
+
+/**
  * Back cover = minimal background plate (InDesign gets text/barcode later).
  * Reference is a flat front-cover image only — prompt asks the model to infer
  * atmosphere “behind” the hero and extend it without redrawing the story.

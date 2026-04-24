@@ -12,6 +12,16 @@ interface CoverGenerateOptions {
      * by the API layer.
      */
     additionalImageUrls?: string[]
+    /**
+     * Controls how the primary reference image is introduced to the model.
+     * - 'source-page' (default): used for first-gen + regen when the admin
+     *   picks a new source page. The reference is an interior illustration;
+     *   the model is expected to redesign from it.
+     * - 'current-cover': used for regen when the admin keeps the same source
+     *   page. The reference IS the existing cover; the model must edit it
+     *   in place instead of redesigning.
+     */
+    referenceMode?: 'source-page' | 'current-cover'
 }
 
 interface BackCoverGenerateOptions {
@@ -128,20 +138,24 @@ export async function generateCover(opts: CoverGenerateOptions): Promise<GenResu
         return { success: false, imageBuffer: null, error: 'OpenAI API Key not configured' }
     }
 
-    const { prompt, referenceImageUrl, bookAspectRatio, additionalImageUrls } = opts
+    const { prompt, referenceImageUrl, bookAspectRatio, additionalImageUrls, referenceMode = 'source-page' } = opts
     const size = mapBookRatioToCoverSize(bookAspectRatio)
-    console.log(`[GPT2 Front] 📸 size=${size} ratio=${bookAspectRatio ?? 'default'} extras=${additionalImageUrls?.length ?? 0}`)
+    console.log(`[GPT2 Front] 📸 size=${size} ratio=${bookAspectRatio ?? 'default'} mode=${referenceMode} extras=${additionalImageUrls?.length ?? 0}`)
 
     try {
         const refImg = await fetchImageAsBase64(referenceImageUrl)
         if (!refImg) {
-            return { success: false, imageBuffer: null, error: 'Failed to fetch reference illustration' }
+            return { success: false, imageBuffer: null, error: 'Failed to fetch reference image' }
         }
 
         const extras = await fetchAdditionalReferences(additionalImageUrls)
 
+        const referencePreamble = referenceMode === 'current-cover'
+            ? 'CURRENT FRONT COVER (the target image to edit — preserve composition, subjects, background, and style exactly; only apply the changes described in the prompt):'
+            : 'REFERENCE ILLUSTRATION (from the book\'s interior — match this art style exactly):'
+
         const content: any[] = [
-            { type: 'input_text', text: 'REFERENCE ILLUSTRATION (from the book\'s interior — match this art style exactly):' },
+            { type: 'input_text', text: referencePreamble },
             { type: 'input_image', image_url: `data:${refImg.mimeType};base64,${refImg.data}` },
         ]
 
