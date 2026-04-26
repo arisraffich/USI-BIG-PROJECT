@@ -77,6 +77,11 @@ export function UnifiedIllustrationSidebar({
                     {filterVisiblePages(pages).map((page) => {
                         const isActive = activePageId === page.id
                         const approvedStage = getApprovalStage(page)
+                        const reviewStage = approvalStage || approvedStage || 'sketch'
+                        const reviewAdminImageUrl = reviewStage === 'illustration' ? page.illustration_url : page.sketch_url
+                        const reviewCustomerImageUrl = reviewStage === 'illustration' ? page.customer_illustration_url : page.customer_sketch_url
+                        const hasUnsentCustomerImageUpdate = mode === 'customer' && !!page.feedback_notes && !approvedStage && !!reviewAdminImageUrl && reviewAdminImageUrl !== reviewCustomerImageUrl
+                        const customerVisibleIsResolved = mode === 'customer' ? (!!page.is_resolved && !hasUnsentCustomerImageUpdate) : !!page.is_resolved
 
                         return (
                             <div
@@ -94,7 +99,7 @@ export function UnifiedIllustrationSidebar({
                                     {/* Feedback indicator - active revisions are visible to both admin and customer */}
                                     {page.illustration_url && (
                                         <>
-                                            {page.feedback_notes && !page.is_resolved ? (
+                                            {page.feedback_notes && !customerVisibleIsResolved ? (
                                                 /* Unresolved feedback - amber */
                                                 <span title="Has unresolved feedback">
                                                     <MessageSquare className="w-4 h-4 text-amber-500" />
@@ -102,7 +107,7 @@ export function UnifiedIllustrationSidebar({
                                             ) : approvedStage ? (
                                                 /* Customer approved - radio marker in the primary status slot */
                                                 <ApprovedRadio stage={approvedStage} className="w-4 h-4" />
-                                            ) : page.feedback_notes && page.is_resolved ? (
+                                            ) : page.feedback_notes && customerVisibleIsResolved ? (
                                                 /* Resolved feedback - green outline with green checkmark */
                                                 <span title="Feedback resolved">
                                                     <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -176,6 +181,11 @@ export function UnifiedIllustrationSidebar({
                     {filterVisiblePages(pages).map((page) => {
                         const isActive = activePageId === page.id
                         const approvedStage = getApprovalStage(page)
+                        const reviewStage = approvalStage || approvedStage || 'sketch'
+                        const reviewAdminImageUrl = reviewStage === 'illustration' ? page.illustration_url : page.sketch_url
+                        const reviewCustomerImageUrl = reviewStage === 'illustration' ? page.customer_illustration_url : page.customer_sketch_url
+                        const hasUnsentCustomerImageUpdate = mode === 'customer' && !!page.feedback_notes && !approvedStage && !!reviewAdminImageUrl && reviewAdminImageUrl !== reviewCustomerImageUrl
+                        const customerVisibleIsResolved = mode === 'customer' ? (!!page.is_resolved && !hasUnsentCustomerImageUpdate) : !!page.is_resolved
 
                         return (
                             <div key={page.id} className="relative flex-shrink-0">
@@ -210,12 +220,12 @@ export function UnifiedIllustrationSidebar({
                                 )}
                                 {/* Feedback indicator - active revisions are visible to both admin and customer */}
                                 {page.illustration_url && (
-                                    page.feedback_notes && !page.is_resolved ? (
+                                    page.feedback_notes && !customerVisibleIsResolved ? (
                                         /* Unresolved feedback - amber */
                                         <span className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full bg-amber-400 border border-white flex items-center justify-center">
                                             <MessageSquare className="w-2 h-2 text-white" />
                                         </span>
-                                    ) : page.feedback_notes && page.is_resolved ? (
+                                    ) : page.feedback_notes && customerVisibleIsResolved ? (
                                         /* Resolved feedback - green with checkmark outline style */
                                         <span className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full bg-white border-2 border-green-500 flex items-center justify-center">
                                             <Check className="w-2 h-2 text-green-500" strokeWidth={3} />

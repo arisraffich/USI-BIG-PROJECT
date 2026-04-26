@@ -616,17 +616,26 @@ export function CustomerProjectTabsContent({
     }
   }, [reviewToken])
 
+  const isCustomerVisibleResolved = useCallback((page: Page) => {
+    const isApproved = showColoredToCustomer ? !!page.illustration_approved_at : !!page.sketch_approved_at
+    const adminImageUrl = showColoredToCustomer ? page.illustration_url : page.sketch_url
+    const customerImageUrl = showColoredToCustomer ? page.customer_illustration_url : page.customer_sketch_url
+    const hasUnsentCustomerImageUpdate = !!page.feedback_notes && !isApproved && !!adminImageUrl && adminImageUrl !== customerImageUrl
+
+    return !!page.is_resolved && !hasUnsentCustomerImageUpdate
+  }, [showColoredToCustomer])
+
   // Find pages with pending admin replies (unresolved feedback WITH admin reply)
   const pagesWithPendingAdminReply = useMemo(() => {
-    return localPages.filter(p => p.feedback_notes && !p.is_resolved && p.admin_reply)
-  }, [localPages])
+    return localPages.filter(p => p.feedback_notes && !isCustomerVisibleResolved(p) && p.admin_reply)
+  }, [localPages, isCustomerVisibleResolved])
 
   // Calculate submit disabled
   const isSubmitDisabled = useMemo(() => {
     // If in Illustration Mode, disable Approve only if there's unresolved feedback WITHOUT admin reply
     // (Pages with admin reply can be auto-resolved on approval)
     if (showIllustrationsTab) {
-      const hasUnresolvedFeedbackWithoutReply = localPages.some(p => p.feedback_notes && !p.is_resolved && !p.admin_reply)
+      const hasUnresolvedFeedbackWithoutReply = localPages.some(p => p.feedback_notes && !isCustomerVisibleResolved(p) && !p.admin_reply)
       return hasUnresolvedFeedbackWithoutReply
     }
 
@@ -636,7 +645,7 @@ export function CustomerProjectTabsContent({
       const formInfo = characterForms[char.id]
       return formInfo && formInfo.isValid
     })
-  }, [sortedCharacters.secondary, characterForms, showIllustrationsTab, localPages])
+  }, [sortedCharacters.secondary, characterForms, showIllustrationsTab, localPages, isCustomerVisibleResolved])
 
   const handleCharacterAdded = useCallback(() => {
     // Character addition handled by realtime subscription

@@ -430,6 +430,10 @@ export function SharedIllustrationBoard({
     const isLocked = isCustomerLocked && !isColoredReviewOpen
     const resolvedApprovalStage = approvalStage || (page.illustration_approved_at ? 'illustration' : 'sketch')
     const isPageApproved = resolvedApprovalStage === 'illustration' ? !!page.illustration_approved_at : !!page.sketch_approved_at
+    const reviewAdminImageUrl = resolvedApprovalStage === 'illustration' ? page.illustration_url : page.sketch_url
+    const reviewCustomerImageUrl = resolvedApprovalStage === 'illustration' ? page.customer_illustration_url : page.customer_sketch_url
+    const hasUnsentCustomerImageUpdate = isCustomer && !!page.feedback_notes && !isPageApproved && !!reviewAdminImageUrl && reviewAdminImageUrl !== reviewCustomerImageUrl
+    const customerVisibleIsResolved = isCustomer ? (!!page.is_resolved && !hasUnsentCustomerImageUpdate) : !!page.is_resolved
     const approvalPlural = resolvedApprovalStage === 'illustration' ? 'illustrations' : 'sketches'
     const approvalTitle = resolvedApprovalStage === 'illustration' ? 'Illustration approval' : 'Sketch approval'
     
@@ -1050,11 +1054,11 @@ export function SharedIllustrationBoard({
                         <div className="mt-2 space-y-3" ref={feedbackSectionRef}>
                             {/* READ ONLY FEEDBACK (Customer's Original Request) */}
                             {!isEditing && !isCustomerFollowingUp && page.feedback_notes && (
-                                <div className={`${page.is_resolved ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-100'} border rounded-md p-3 text-sm relative group animate-in fade-in zoom-in-95 duration-200`}>
+                                <div className={`${customerVisibleIsResolved ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-100'} border rounded-md p-3 text-sm relative group animate-in fade-in zoom-in-95 duration-200`}>
                                     <div className="flex items-center justify-between mb-1">
                                         <div className="flex items-center gap-2">
-                                            <p className={`font-semibold text-xs uppercase ${page.is_resolved ? 'text-green-700' : 'text-amber-700'}`}>
-                                                {page.is_resolved ? 'Resolved:' : 'Your Request:'}
+                                            <p className={`font-semibold text-xs uppercase ${customerVisibleIsResolved ? 'text-green-700' : 'text-amber-700'}`}>
+                                                {customerVisibleIsResolved ? 'Resolved:' : 'Your Request:'}
                                             </p>
                                             {/* Admin Resolve Button - only for unresolved feedback */}
                                             {isAdmin && !page.is_resolved && onManualResolve && (
@@ -1068,15 +1072,15 @@ export function SharedIllustrationBoard({
                                                 </Button>
                                             )}
                                         </div>
-                                        {page.is_resolved && (
+                                        {customerVisibleIsResolved && (
                                             <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
                                                 RESOLVED
                                             </span>
                                         )}
                                     </div>
-                                    <p className={`whitespace-pre-wrap ${page.is_resolved ? 'text-green-900' : 'text-amber-900'}`}>{page.feedback_notes}</p>
+                                    <p className={`whitespace-pre-wrap ${customerVisibleIsResolved ? 'text-green-900' : 'text-amber-900'}`}>{page.feedback_notes}</p>
                                     {/* Customer Edit Button - only if no admin reply yet and no conversation started */}
-                                    {isCustomer && !page.is_resolved && !isLocked && !page.admin_reply && (!page.conversation_thread || page.conversation_thread.length === 0) && (
+                                    {isCustomer && !customerVisibleIsResolved && !isLocked && !page.admin_reply && (!page.conversation_thread || page.conversation_thread.length === 0) && (
                                         <Button
                                             variant="ghost"
                                             size="sm"
@@ -1326,7 +1330,7 @@ export function SharedIllustrationBoard({
                             )}
 
                             {/* CUSTOMER WAITING FOR RESPONSE (conversation thread exists but no admin reply yet) */}
-                            {isCustomer && !page.admin_reply && !page.is_resolved && page.conversation_thread && page.conversation_thread.length > 0 && !isCustomerFollowingUp && (
+                            {isCustomer && !page.admin_reply && !customerVisibleIsResolved && page.conversation_thread && page.conversation_thread.length > 0 && !isCustomerFollowingUp && (
                                 <div className="ml-4 p-3 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600 italic">
                                     Awaiting illustrator response...
                                 </div>
@@ -1529,7 +1533,7 @@ export function SharedIllustrationBoard({
                         )}
 
                         {/* REQUEST REVISION + APPROVAL BUTTONS (Customer Only) */}
-                        {!isEditing && isCustomer && !isPageApproved && (!page.feedback_notes || page.is_resolved) && !isLocked && !isCustomerFollowingUp && (
+                        {!isEditing && isCustomer && !isPageApproved && (!page.feedback_notes || customerVisibleIsResolved) && !isLocked && !isCustomerFollowingUp && (
                             <div className="mt-3 flex flex-col sm:flex-row gap-2">
                                 <Button variant="outline" size="sm" className="w-full sm:flex-1 min-w-0 h-11 gap-2 text-amber-600 border-amber-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-700 shadow-sm bg-white font-medium justify-center" onClick={() => { setNotes(''); setIsEditing(true) }}>
                                     <MessageSquarePlus className="w-4 h-4 shrink-0" />
