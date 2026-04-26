@@ -19,6 +19,8 @@ import { Send, Check, PartyPopper } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { UnifiedProjectLayout } from '@/components/layout/UnifiedProjectLayout'
+type IllustrationApprovalStage = 'sketch' | 'illustration'
+
 import {
   Dialog,
   DialogContent,
@@ -62,6 +64,7 @@ export function CustomerProjectTabsContent({
   const [refreshing, setRefreshing] = useState(false)
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'loading' | 'success'>('idle')
   const [showApproveWarningDialog, setShowApproveWarningDialog] = useState(false)
+  const [showApprovalMilestonePopup, setShowApprovalMilestonePopup] = useState<null | IllustrationApprovalStage>(null)
   // Lifted state for Edit Mode to coordinate Header and Editor
   const [isEditMode, setIsEditMode] = useState(false)
   
@@ -143,9 +146,25 @@ export function CustomerProjectTabsContent({
 
             setLocalPages(prev => prev.map(p => p.id === updatedPage.id ? { ...p, ...updatedPage } : p))
 
-            toast.info('Page content updated', {
-              description: 'The author has modified the manuscript.'
-            })
+            const oldPage = payload.old as Partial<Page> | undefined
+            const approvalChanged = !!oldPage && (
+              oldPage.sketch_approved_at !== updatedPage.sketch_approved_at ||
+              oldPage.illustration_approved_at !== updatedPage.illustration_approved_at
+            )
+            const visibleContentUnchanged = !!oldPage &&
+              oldPage.story_text === updatedPage.story_text &&
+              oldPage.scene_description === updatedPage.scene_description &&
+              oldPage.sketch_url === updatedPage.sketch_url &&
+              oldPage.illustration_url === updatedPage.illustration_url &&
+              oldPage.feedback_notes === updatedPage.feedback_notes &&
+              oldPage.admin_reply === updatedPage.admin_reply
+            const approvalOnlyUpdate = approvalChanged && visibleContentUnchanged
+
+            if (!approvalOnlyUpdate) {
+              toast.info('Page content updated', {
+                description: 'The author has modified the manuscript.'
+              })
+            }
           } else if (payload.eventType === 'INSERT' && payload.new) {
             setLocalPages(prev => [...prev, payload.new as Page])
           } else if (payload.eventType === 'DELETE' && payload.old) {
@@ -749,6 +768,42 @@ export function CustomerProjectTabsContent({
   // 3. Characters approved but no illustrations sent yet (prevent premature APPROVE SKETCHES button)
   const showStatusScreen = (isLocked && !showIllustrationsTab && !showGallery) || isHiddenGenerationState || (isApprovedState && illustrationSendCount === 0)
 
+  const approvalStage: IllustrationApprovalStage = showColoredToCustomer ? 'illustration' : 'sketch'
+  const approvalPages = useMemo(() => localPages.filter(p => p.page_number > 0), [localPages])
+  const approvalProgress = useMemo(() => {
+    const total = approvalPages.length
+    const approved = approvalPages.filter(p => approvalStage === 'illustration' ? !!p.illustration_approved_at : !!p.sketch_approved_at).length
+    return { approved, total, allApproved: total > 0 && approved === total }
+  }, [approvalPages, approvalStage])
+
+  const handleApproveIllustrationPage = useCallback(async (pageId: string) => {
+    try {
+      const response = await fetch(`/api/review/pages/${pageId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-review-token': reviewToken },
+        body: JSON.stringify({ reviewToken }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error.error || 'Failed to approve')
+      }
+
+      const result = await response.json()
+      if (result.page) {
+        setLocalPages(prev => prev.map(p => p.id === pageId ? { ...p, ...result.page } : p))
+      }
+
+      if (result.allApproved) {
+        setShowApprovalMilestonePopup(result.stage === 'illustration' ? 'illustration' : 'sketch')
+      }
+    } catch (error) {
+      console.error('Failed to approve illustration page:', error)
+      toast.error('Failed to approve')
+      throw error
+    }
+  }, [reviewToken])
+
   const page1 = localPages.find(p => p.page_number === 1)
   const pageCount = localPages.length
   // Use local characters length
@@ -773,8 +828,12 @@ export function CustomerProjectTabsContent({
             isApproving={isApproving}
             isApproveDisabled={isApproveDisabled}
             showIllustrationsTab={showIllustrationsTab}
-            projectStatus={projectStatus}
+            projectStatus={localProjectStatus}
             illustrationSendCount={illustrationSendCount}
+            approvalStage={approvalStage}
+            approvalApprovedCount={approvalProgress.approved}
+            approvalTotalCount={approvalProgress.total}
+            approvalAllApproved={approvalProgress.allApproved}
           />
         }
         sidebar={
@@ -785,6 +844,7 @@ export function CustomerProjectTabsContent({
               activePageId={activeIllustrationPageId || localPages.find(p => p.page_number === 1)?.id || null}
               projectStatus={localProjectStatus as any}
               illustrationSendCount={illustrationSendCount}
+              approvalStage={approvalStage}
               onPageClick={setActiveIllustrationPageId}
             />
           ) : null
@@ -883,6 +943,11 @@ export function CustomerProjectTabsContent({
                   onCustomerFollowUp={handleCustomerFollowUp}
                   onEditFollowUp={handleEditFollowUp}
                   showColoredToCustomer={showColoredToCustomer}
+                  approvalStage={approvalStage}
+                  approvalApprovedCount={approvalProgress.approved}
+                  approvalTotalCount={approvalProgress.total}
+                  approvalAllApproved={approvalProgress.allApproved}
+                  onApprovePage={handleApproveIllustrationPage}
                 />
               </div>
             )}
@@ -930,6 +995,30 @@ export function CustomerProjectTabsContent({
               ) : (
                 "SUBMIT FORMS"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!showApprovalMilestonePopup} onOpenChange={(open) => { if (!open) setShowApprovalMilestonePopup(null) }}>
+        <DialogContent className="sm:max-w-md overflow-hidden">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-green-400 via-emerald-500 to-lime-400" />
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-center">
+              {showApprovalMilestonePopup === 'illustration' ? '🎉 Illustrations approved!' : '🎉 Sketches approved!'}
+            </DialogTitle>
+            <DialogDescription className="text-center text-base pt-2">
+              {showApprovalMilestonePopup === 'illustration'
+                ? 'Thank you — all illustrations have been approved. We’ll move forward with final layout and cover design.'
+                : 'Thank you — all sketches have been approved. We’ll begin preparing the colored illustrations.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center mt-4">
+            <Button
+              onClick={() => setShowApprovalMilestonePopup(null)}
+              className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-semibold"
+            >
+              OK
             </Button>
           </DialogFooter>
         </DialogContent>

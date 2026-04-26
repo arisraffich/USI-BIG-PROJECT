@@ -81,6 +81,11 @@ interface UnifiedIllustrationFeedProps {
     
     // Customer Display Settings
     showColoredToCustomer?: boolean
+    approvalStage?: 'sketch' | 'illustration'
+    approvalApprovedCount?: number
+    approvalTotalCount?: number
+    approvalAllApproved?: boolean
+    onApprovePage?: (pageId: string) => Promise<void>
     onRemoveComment?: (pageId: string) => Promise<void>
     // Admin Manual Resolve Feature
     onManualResolve?: (pageId: string) => Promise<void>
@@ -141,6 +146,11 @@ export function UnifiedIllustrationFeed({
     onManualResolve,
     // Customer Display Settings
     showColoredToCustomer = false,
+    approvalStage,
+    approvalApprovedCount = 0,
+    approvalTotalCount = 0,
+    approvalAllApproved = false,
+    onApprovePage,
     // Page Delete Feature
     onDeletePage,
     isDeleteDisabled = false,
@@ -380,6 +390,11 @@ export function UnifiedIllustrationFeed({
                             onManualResolve={onManualResolve ? () => onManualResolve(page.id) : undefined}
                             // Customer Display Settings
                             showColoredToCustomer={showColoredToCustomer}
+                            approvalStage={approvalStage}
+                            approvalApprovedCount={approvalApprovedCount}
+                            approvalTotalCount={approvalTotalCount}
+                            approvalAllApproved={approvalAllApproved}
+                            onApprovePage={onApprovePage ? () => onApprovePage(page.id) : undefined}
                             // Page Delete Feature
                             onDeletePage={onDeletePage ? () => onDeletePage(page.id) : undefined}
                             isDeleteDisabled={isDeleteDisabled}

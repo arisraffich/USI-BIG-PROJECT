@@ -684,6 +684,7 @@ ${textPromptSection}`
             await supabase.from('pages')
                 .update({
                     illustration_url: publicUrl,
+                    illustration_approved_at: null,
                     is_resolved: true, // Mark feedback as resolved after regeneration
                     ...(isFirstGeneration ? { original_illustration_url: publicUrl } : {}),
                 })

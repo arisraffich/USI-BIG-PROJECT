@@ -76,6 +76,7 @@ The result must look like a faithful pencil-line tracing of the original image â
         const { error: updateError } = await supabase.from('pages')
             .update({
                 sketch_url: publicUrl,
+                sketch_approved_at: null,
                 // sketch_generated_at is missing from DB schema
             })
             .eq('id', pageId)

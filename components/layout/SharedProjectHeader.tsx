@@ -33,6 +33,10 @@ interface SharedProjectHeaderProps {
 
     // Slots
     centerContent?: ReactNode // Content to display in the absolute center (Desktop only)
+    middleContent?: ReactNode // Desktop content that fills the space between title/actions and right status
+    titleActions?: ReactNode // Inline actions displayed next to the desktop project title
+    mobileTitleActions?: ReactNode // Compact actions displayed in the mobile header
+    mobileBottomContent?: ReactNode // Thin full-width mobile content at the bottom of the header
     actions?: ReactNode   // Right side buttons (Save, Send, etc.)
     statusTag?: ReactNode // Status badge
     settingsContent?: ReactNode // Content to show in settings panel
@@ -54,6 +58,10 @@ export function SharedProjectHeader({
     currentTabId,
     tabs,
     centerContent,
+    middleContent,
+    titleActions,
+    mobileTitleActions,
+    mobileBottomContent,
     actions,
     statusTag,
     settingsContent,
@@ -165,6 +173,7 @@ export function SharedProjectHeader({
                         </DropdownMenuContent>
                     </DropdownMenu>
 
+
                     {/* DESKTOP TITLE INFO */}
                     {/* Hidden on Mobile as per request/design to save space */}
                     <div className="hidden md:flex items-center gap-4">
@@ -172,13 +181,23 @@ export function SharedProjectHeader({
                         <div className="h-8 w-px bg-slate-200" />
 
 
-                        <div className="flex items-center gap-1.5">
-                            <div className="flex flex-col justify-center h-full">
-                                <h1 className="text-sm font-bold text-slate-900 leading-none">
-                                    {authorName}
-                                </h1>
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <div className="flex flex-col justify-center h-full min-w-0">
+                                    <h1 className="text-sm font-bold text-slate-900 leading-none truncate">
+                                        {authorName}
+                                    </h1>
+                                </div>
+                                {showAIStatus && <AIStatusDot />}
                             </div>
-                            {showAIStatus && <AIStatusDot />}
+                            {titleActions && (
+                                <>
+                                    <div className="h-6 w-px bg-slate-200" />
+                                    <div className="flex items-center shrink-0">
+                                        {titleActions}
+                                    </div>
+                                </>
+                            )}
                         </div>
 
                         {/* Separator */}
@@ -196,6 +215,12 @@ export function SharedProjectHeader({
                     {centerContent}
                 </div>
 
+                {middleContent && (
+                    <div className="hidden md:flex flex-1 min-w-0 mx-[30px] items-center justify-center">
+                        {middleContent}
+                    </div>
+                )}
+
 
 
                 {/* ------------------------------------------------------------- */}
@@ -203,8 +228,13 @@ export function SharedProjectHeader({
                 {/* Actions & Status                                             */}
                 {/* ------------------------------------------------------------- */}
                 <div className="flex items-center gap-3 md:gap-4">
+                    {mobileTitleActions && (
+                        <div className="md:hidden shrink-0">
+                            {mobileTitleActions}
+                        </div>
+                    )}
                     {centerContent && (
-                        <div className="md:hidden">
+                        <div className="hidden md:hidden">
                             {centerContent}
                         </div>
                     )}
@@ -217,6 +247,11 @@ export function SharedProjectHeader({
                 </div>
 
             </div>
+            {mobileBottomContent && (
+                <div className="md:hidden absolute left-16 right-4 top-1/2 -translate-y-1/2">
+                    {mobileBottomContent}
+                </div>
+            )}
         </UnifiedHeaderShell>
     )
 }

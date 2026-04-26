@@ -17,6 +17,7 @@ interface UnifiedIllustrationSidebarProps {
     comparisonPageIds?: string[]
     sketchGeneratingPageIds?: string[]
     illustrationSendCount?: number
+    approvalStage?: 'sketch' | 'illustration'
     onDeletePage?: (pageId: string) => void
     isDeleteDisabled?: boolean
 }
@@ -36,6 +37,7 @@ export function UnifiedIllustrationSidebar({
     comparisonPageIds = [],
     sketchGeneratingPageIds = [],
     illustrationSendCount = 0,
+    approvalStage,
     onDeletePage,
     isDeleteDisabled = false
 }: UnifiedIllustrationSidebarProps) {
@@ -46,6 +48,27 @@ export function UnifiedIllustrationSidebar({
         pages,
     })
 
+    const getApprovalStage = (page: Page): 'sketch' | 'illustration' | null => {
+        if (approvalStage) {
+            return approvalStage === 'illustration'
+                ? (page.illustration_approved_at ? 'illustration' : null)
+                : (page.sketch_approved_at ? 'sketch' : null)
+        }
+
+        if (page.illustration_approved_at) return 'illustration'
+        if (page.sketch_approved_at) return 'sketch'
+        return null
+    }
+
+    const ApprovedRadio = ({ stage, className = '' }: { stage: 'sketch' | 'illustration'; className?: string }) => (
+        <span
+            className={`rounded-full border-2 border-green-500 bg-white flex items-center justify-center shadow-sm ${className}`}
+            title={stage === 'illustration' ? 'Customer approved illustration' : 'Customer approved sketch'}
+        >
+            <span className="w-1/2 h-1/2 rounded-full bg-green-500" />
+        </span>
+    )
+
     return (
         <>
             {/* Desktop Sidebar */}
@@ -53,6 +76,7 @@ export function UnifiedIllustrationSidebar({
                 <div className="p-2 space-y-1">
                     {filterVisiblePages(pages).map((page) => {
                         const isActive = activePageId === page.id
+                        const approvedStage = getApprovalStage(page)
 
                         return (
                             <div
@@ -67,8 +91,8 @@ export function UnifiedIllustrationSidebar({
                                     } ${disabled ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
                             >
                                 <span className="flex items-center gap-2">
-                                    {/* Feedback indicator - Admin only, only for generated pages */}
-                                    {mode === 'admin' && page.illustration_url && (
+                                    {/* Feedback indicator - active revisions are visible to both admin and customer */}
+                                    {page.illustration_url && (
                                         <>
                                             {page.feedback_notes && !page.is_resolved ? (
                                                 /* Unresolved feedback - amber */
@@ -125,17 +149,21 @@ export function UnifiedIllustrationSidebar({
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </button>
                                     )}
-                                    <span className={`w-2 h-2 rounded-full ${
-                                        failedPageIds.includes(page.id) 
-                                            ? 'bg-red-500' 
-                                            : generatingPageIds.includes(page.id)
-                                                ? 'bg-orange-400 animate-pulse'
-                                                : sketchGeneratingPageIds.includes(page.id)
-                                                    ? 'bg-gray-400 animate-pulse'
-                                                    : page.illustration_url 
-                                                        ? 'bg-green-400' 
-                                                        : 'bg-gray-300'
-                                        }`} title={failedPageIds.includes(page.id) ? "Failed" : generatingPageIds.includes(page.id) ? "Generating illustration..." : sketchGeneratingPageIds.includes(page.id) ? "Generating sketch..." : page.illustration_url ? "Completed" : "Pending"}></span>
+                                    {approvedStage ? (
+                                        <ApprovedRadio stage={approvedStage} className="w-4 h-4" />
+                                    ) : (
+                                        <span className={`w-2 h-2 rounded-full ${
+                                            failedPageIds.includes(page.id)
+                                                ? 'bg-red-500'
+                                                : generatingPageIds.includes(page.id)
+                                                    ? 'bg-orange-400 animate-pulse'
+                                                    : sketchGeneratingPageIds.includes(page.id)
+                                                        ? 'bg-gray-400 animate-pulse'
+                                                        : page.illustration_url
+                                                            ? 'bg-green-400'
+                                                            : 'bg-gray-300'
+                                            }`} title={failedPageIds.includes(page.id) ? "Failed" : generatingPageIds.includes(page.id) ? "Generating illustration..." : sketchGeneratingPageIds.includes(page.id) ? "Generating sketch..." : page.illustration_url ? "Completed" : "Pending"}></span>
+                                    )}
                                 </span>
                             </div>
                         )
@@ -144,17 +172,18 @@ export function UnifiedIllustrationSidebar({
             </div>
 
             {/* Mobile Bottom Navigation */}
-            <div className="block lg:hidden fixed bottom-1 left-0 right-0 z-50 pointer-events-none">
-                <div className="flex items-center gap-2 overflow-x-auto pointer-events-auto px-4 py-2 [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-400/30 [&::-webkit-scrollbar-thumb]:rounded-full">
+            <div className="block lg:hidden fixed bottom-6 left-0 right-0 z-50 pointer-events-none">
+                <div className="flex items-center gap-3 overflow-x-auto pointer-events-auto px-4 py-3 [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-400/30 [&::-webkit-scrollbar-thumb]:rounded-full">
                     {filterVisiblePages(pages).map((page) => {
                         const isActive = activePageId === page.id
+                        const approvedStage = getApprovalStage(page)
 
                         return (
                             <div key={page.id} className="relative flex-shrink-0">
                                 <button
                                     onClick={() => onPageClick(page.id)}
                                     disabled={disabled}
-                                    className={`w-9 h-9 flex items-center justify-center rounded-full text-xs font-bold transition-all shadow-sm ${isActive
+                                    className={`${mode === 'customer' ? 'min-w-[64px] px-3' : 'w-9'} h-9 flex items-center justify-center rounded-full text-xs font-bold transition-all shadow-sm ${isActive
                                         ? 'bg-purple-600 text-white shadow-lg scale-110 border border-purple-500'
                                         : failedPageIds.includes(page.id)
                                             ? 'bg-red-100 border border-red-400 text-red-700'
@@ -162,10 +191,12 @@ export function UnifiedIllustrationSidebar({
                                                 ? 'bg-orange-100 border border-orange-400 text-orange-700 animate-pulse'
                                                 : sketchGeneratingPageIds.includes(page.id)
                                                     ? 'bg-gray-100 border border-gray-400 text-gray-700 animate-pulse'
-                                                    : 'bg-white/30 backdrop-blur-md border border-white/20 text-slate-900 ring-1 ring-white/30 hover:bg-white/50'
+                                                    : approvedStage
+                                                        ? 'bg-green-100/80 backdrop-blur-md border border-green-500/50 text-green-800 ring-1 ring-white/40 hover:bg-green-100'
+                                                        : 'bg-white/30 backdrop-blur-md border border-white/20 text-slate-900 ring-1 ring-white/30 hover:bg-white/50'
                                         } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
                                 >
-                                    {page.page_number}
+                                    {mode === 'customer' ? `Page ${page.page_number}` : page.page_number}
                                 </button>
                                 {failedPageIds.includes(page.id) && (
                                     <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 border border-white animate-pulse" />
@@ -178,8 +209,8 @@ export function UnifiedIllustrationSidebar({
                                         <Layers2 className="w-2 h-2 text-white" />
                                     </span>
                                 )}
-                                {/* Feedback indicator - Admin only (mobile), only for generated pages */}
-                                {mode === 'admin' && page.illustration_url && (
+                                {/* Feedback indicator - active revisions are visible to both admin and customer */}
+                                {page.illustration_url && (
                                     page.feedback_notes && !page.is_resolved ? (
                                         /* Unresolved feedback - amber */
                                         <span className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full bg-amber-400 border border-white flex items-center justify-center">

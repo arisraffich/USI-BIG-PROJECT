@@ -49,6 +49,7 @@ export async function POST(request: Request) {
                 .update({
                     illustration_url: newUrl,
                     original_illustration_url: newUrl,
+                    illustration_approved_at: null,
                     is_resolved: true,
                 })
                 .eq('id', pageId)

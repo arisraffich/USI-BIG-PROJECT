@@ -554,6 +554,80 @@ export async function notifyIllustrationsApproved(options: {
   }
 }
 
+export async function notifyPageIllustrationApproved(options: {
+  projectTitle: string
+  authorName: string
+  projectUrl: string
+  pageNumber: number
+  stage: 'Sketch review' | 'Colored illustration review'
+}): Promise<void> {
+  const { projectTitle, authorName, projectUrl, pageNumber, stage } = options
+
+  try {
+    await sendSlackIfNotTest(authorName, {
+      text: `✅ Illustration approved for "${projectTitle}"`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Illustration Approved*\nProject: ${projectTitle}\nPage: ${pageNumber}\nStage: ${stage}\nCustomer: ${authorName}`,
+          },
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'View Project' },
+              url: projectUrl,
+              style: 'primary',
+            },
+          ],
+        },
+      ],
+    })
+  } catch (error: unknown) {
+    console.error('Failed to send page approval notification:', error)
+  }
+}
+
+export async function notifyColoredIllustrationsApproved(options: {
+  projectTitle: string
+  authorName: string
+  projectUrl: string
+}): Promise<void> {
+  const { projectTitle, authorName, projectUrl } = options
+
+  try {
+    await sendSlackIfNotTest(authorName, {
+      text: `✅ Colored illustrations APPROVED for "${projectTitle}"`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Colored Illustrations Approved*\n${authorName} has approved all colored illustrations for "${projectTitle}".\nReady for layout and cover design.`,
+          },
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'View Project' },
+              url: projectUrl,
+              style: 'primary',
+            },
+          ],
+        },
+      ],
+    })
+  } catch (error: unknown) {
+    console.error('Failed to send colored illustration approval notification:', error)
+  }
+}
+
 export async function notifyIllustrationFeedback(options: {
   projectId: string
   projectTitle: string

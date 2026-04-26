@@ -113,6 +113,11 @@ export interface SharedIllustrationBoardProps {
     onManualResolve?: () => Promise<void>
     // Customer Display Settings
     showColoredToCustomer?: boolean
+    approvalStage?: 'sketch' | 'illustration'
+    approvalApprovedCount?: number
+    approvalTotalCount?: number
+    approvalAllApproved?: boolean
+    onApprovePage?: () => Promise<void>
     // Page Delete Feature (Admin only)
     onDeletePage?: () => void
     isDeleteDisabled?: boolean
@@ -169,6 +174,11 @@ export function SharedIllustrationBoard({
     onManualResolve,
     // Customer Display Settings
     showColoredToCustomer = false,
+    approvalStage,
+    approvalApprovedCount = 0,
+    approvalTotalCount = 0,
+    approvalAllApproved = false,
+    onApprovePage,
     // Page Delete Feature
     onDeletePage,
     isDeleteDisabled = false,
@@ -216,6 +226,8 @@ export function SharedIllustrationBoard({
     // Admin Manual Resolve State
     const [showResolveDialog, setShowResolveDialog] = useState(false)
     const [isResolving, setIsResolving] = useState(false)
+    const [showApprovalDialog, setShowApprovalDialog] = useState(false)
+    const [isApprovingPage, setIsApprovingPage] = useState(false)
     const historyDropdownRef = useRef<HTMLDivElement>(null) // For click-outside collapse
     const feedbackSectionRef = useRef<HTMLDivElement>(null) // For auto-scroll to buttons
 
@@ -414,7 +426,12 @@ export function SharedIllustrationBoard({
         projectStatus,
         mode,
     })
-    const isLocked = isCustomerLocked
+    const isColoredReviewOpen = showColoredToCustomer && projectStatus === 'illustration_approved'
+    const isLocked = isCustomerLocked && !isColoredReviewOpen
+    const resolvedApprovalStage = approvalStage || (page.illustration_approved_at ? 'illustration' : 'sketch')
+    const isPageApproved = resolvedApprovalStage === 'illustration' ? !!page.illustration_approved_at : !!page.sketch_approved_at
+    const approvalPlural = resolvedApprovalStage === 'illustration' ? 'illustrations' : 'sketches'
+    const approvalTitle = resolvedApprovalStage === 'illustration' ? 'Illustration approval' : 'Sketch approval'
     
     // Check if we're in Scene Recreation mode (dropdown selected)
     const isSceneRecreationMode = selectedEnvPageId !== null
@@ -503,6 +520,17 @@ export function SharedIllustrationBoard({
             setIsSavingSceneNotes(false)
         }
     }, [projectId, page.id, editedSceneNotes])
+
+    const handleApprovePageClick = async () => {
+        if (!onApprovePage) return
+        setIsApprovingPage(true)
+        try {
+            await onApprovePage()
+            setShowApprovalDialog(false)
+        } finally {
+            setIsApprovingPage(false)
+        }
+    }
 
     // --------------------------------------------------------------------------
     // HANDLERS
@@ -1014,7 +1042,7 @@ export function SharedIllustrationBoard({
 
                         {isCustomer && (
                             <div className="text-sm text-slate-600 mb-4 leading-relaxed">
-                                <p>Request revisions here. Adjustments will be ready within 1-3 days.</p>
+                                <p>Request revisions here.</p>
                             </div>
                         )}
 
@@ -1493,12 +1521,27 @@ export function SharedIllustrationBoard({
                             </div>
                         )}
 
-                        {/* REQUEST REVISION BUTTON (Customer Only) - Always at bottom */}
-                        {!isEditing && isCustomer && (!page.feedback_notes || page.is_resolved) && !isLocked && !isCustomerFollowingUp && (
-                            <Button variant="outline" size="sm" className="w-full h-11 gap-2 text-amber-600 border-amber-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-700 shadow-sm bg-white font-medium mt-3" onClick={() => { setNotes(''); setIsEditing(true) }}>
-                                <MessageSquarePlus className="w-4 h-4" />
-                                Request Revision
-                            </Button>
+                        {(isCustomer || isAdmin) && isPageApproved && (
+                            <div className="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700 flex items-center justify-center gap-2">
+                                <Check className="w-4 h-4" />
+                                {resolvedApprovalStage === 'illustration' ? 'Illustration approved 🎉' : 'Sketch approved 🎉'}
+                            </div>
+                        )}
+
+                        {/* REQUEST REVISION + APPROVAL BUTTONS (Customer Only) */}
+                        {!isEditing && isCustomer && !isPageApproved && (!page.feedback_notes || page.is_resolved) && !isLocked && !isCustomerFollowingUp && (
+                            <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                                <Button variant="outline" size="sm" className="w-full sm:flex-1 min-w-0 h-11 gap-2 text-amber-600 border-amber-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-700 shadow-sm bg-white font-medium justify-center" onClick={() => { setNotes(''); setIsEditing(true) }}>
+                                    <MessageSquarePlus className="w-4 h-4 shrink-0" />
+                                    <span className="truncate">Request Revision</span>
+                                </Button>
+                                {onApprovePage && (
+                                    <Button size="sm" className="w-full sm:w-[116px] shrink-0 h-11 gap-2 bg-green-600 hover:bg-green-700 text-white shadow-sm font-semibold" onClick={() => setShowApprovalDialog(true)}>
+                                        <Check className="w-4 h-4 shrink-0" />
+                                        Approve
+                                    </Button>
+                                )}
+                            </div>
                         )}
                     </div>
                 </div>
@@ -1509,23 +1552,23 @@ export function SharedIllustrationBoard({
                 <div className="flex-1 flex flex-col min-w-0 h-full">
 
                     {/* MOBILE TOP BAR (Vibrant Page Separator) */}
-                    <div className="md:hidden w-full py-3 px-5 bg-gradient-to-r from-violet-600 to-indigo-600 shadow-md flex items-center justify-between shrink-0 relative overflow-hidden z-20">
+                    <div className="md:hidden w-full py-3 px-4 bg-gradient-to-r from-violet-600 to-indigo-600 shadow-md flex items-center gap-3 shrink-0 relative overflow-hidden z-20">
                         {/* Abstract Background Element (Subtle) */}
                         <div className="absolute top-0 right-16 w-64 h-full bg-white/5 skew-x-12"></div>
 
                         {/* Page Identity — page number */}
                         <span
-                            className="text-white text-sm font-bold z-10 shrink-0"
+                            className="text-white text-sm font-bold z-10 shrink-0 min-w-fit"
                             title={`Page ${page.page_number}`}
                         >
-                            {page.page_number}
+                            {isCustomer ? `Page ${page.page_number}` : page.page_number}
                         </span>
 
                         {isAdmin && onDeletePage && (
                             <button
                                 onClick={onDeletePage}
                                 disabled={isGenerating || isDeleteDisabled}
-                                className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-red-500/80 text-white/70 hover:text-white transition-colors disabled:opacity-30 z-10 shrink-0"
+                                className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-red-500/80 text-white/70 hover:text-white transition-colors disabled:opacity-30 z-10 shrink-0"
                                 title="Delete page"
                             >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -1537,14 +1580,14 @@ export function SharedIllustrationBoard({
                                 onClick={handleOpenLayoutDialog}
                                 disabled={isGenerating}
                                 title="Change Layout"
-                                className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors disabled:opacity-30 z-10 shrink-0"
+                                className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors disabled:opacity-30 z-10 shrink-0"
                             >
                                 <Layers className="w-3.5 h-3.5" />
                             </button>
                         )}
 
                         {isAdmin && onRegenerate && (
-                            <div ref={regenerateSplitMobileRef} className="flex z-10 shrink-0">
+                            <div ref={regenerateSplitMobileRef} className="flex z-10 shrink-0 ml-1">
                                 <Button
                                     variant="ghost"
                                     size="sm"
@@ -1590,15 +1633,37 @@ export function SharedIllustrationBoard({
                             </div>
                         )}
 
-                        {/* Revisions / Request Revision */}
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setHistoryOpen(true)}
-                            className="bg-amber-500 hover:bg-amber-600 text-white border-transparent font-semibold px-4 h-8 rounded-full z-10 transition-colors shadow-sm shrink-0"
-                        >
-                            {isAdmin ? 'Revisions' : 'Request Revision'}
-                        </Button>
+                        {/* Revisions / Request Revision + Approval */}
+                        <div className="ml-auto flex items-center gap-2 z-10 shrink-0">
+                            {isCustomer && isPageApproved ? (
+                                <div className="h-8 px-3 rounded-full bg-green-100 text-green-700 border border-green-300 text-xs font-semibold flex items-center gap-1.5 shadow-sm shrink-0 pointer-events-none">
+                                    <Check className="w-3.5 h-3.5" />
+                                    Approved
+                                </div>
+                            ) : (
+                                <>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setHistoryOpen(true)}
+                                        className="bg-amber-500 hover:bg-amber-600 text-white border-transparent font-semibold px-3 h-8 rounded-full transition-colors shadow-sm shrink-0 text-xs sm:text-sm"
+                                    >
+                                        {isAdmin ? 'Revisions' : 'Request Revision'}
+                                    </Button>
+                                    {isCustomer && onApprovePage && !isLocked && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setShowApprovalDialog(true)}
+                                            className="bg-green-600 hover:bg-green-700 text-white border-transparent font-semibold px-3 h-8 rounded-full transition-colors shadow-sm shrink-0 text-xs sm:text-sm"
+                                        >
+                                            <Check className="w-3.5 h-3.5 mr-1" />
+                                            Approve
+                                        </Button>
+                                    )}
+                                </>
+                            )}
+                        </div>
 
                         {/* HISTORY DIALOG */}
                         <ReviewHistoryDialog
@@ -2633,6 +2698,42 @@ export function SharedIllustrationBoard({
                                 className="bg-violet-600 hover:bg-violet-700 text-white"
                             >
                                 Change Layout
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {isCustomer && onApprovePage && (
+                <Dialog open={showApprovalDialog} onOpenChange={setShowApprovalDialog}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>{approvalTitle}</DialogTitle>
+                            <DialogDescription className="text-base pt-2">
+                                Great, we’re one step closer to finalizing your {approvalPlural}. 🎉
+                            </DialogDescription>
+                        </DialogHeader>
+                        {approvalTotalCount > 0 && (
+                            <div className="space-y-2 py-2">
+                                <div className="flex items-center justify-between text-sm font-medium text-slate-600">
+                                    <span>{approvalPlural.charAt(0).toUpperCase() + approvalPlural.slice(1)} approved</span>
+                                    <span>{Math.min(approvalApprovedCount + (isPageApproved ? 0 : 1), approvalTotalCount)}/{approvalTotalCount}</span>
+                                </div>
+                                <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+                                    <div
+                                        className="h-full rounded-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-700 ease-out"
+                                        style={{ width: approvalTotalCount > 0 ? ((Math.min(approvalApprovedCount + (isPageApproved ? 0 : 1), approvalTotalCount) / approvalTotalCount) * 100) + '%' : '0%' }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        <DialogFooter className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+                            <Button variant="outline" onClick={() => setShowApprovalDialog(false)} disabled={isApprovingPage}>
+                                Cancel
+                            </Button>
+                            <Button onClick={handleApprovePageClick} disabled={isApprovingPage} className="bg-green-600 hover:bg-green-700 text-white font-semibold">
+                                {isApprovingPage ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+                                Approve
                             </Button>
                         </DialogFooter>
                     </DialogContent>

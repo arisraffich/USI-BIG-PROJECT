@@ -57,6 +57,7 @@ export async function POST(request: Request) {
         await supabase.from('pages')
             .update({
                 illustration_url: page.original_illustration_url,
+                illustration_approved_at: null,
                 is_resolved: true,
             })
             .eq('id', pageId)

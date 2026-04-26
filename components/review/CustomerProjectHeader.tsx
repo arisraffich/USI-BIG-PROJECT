@@ -25,6 +25,10 @@ interface CustomerProjectHeaderProps {
   showIllustrationsTab?: boolean
   projectStatus?: string
   illustrationSendCount?: number
+  approvalStage?: 'sketch' | 'illustration'
+  approvalApprovedCount?: number
+  approvalTotalCount?: number
+  approvalAllApproved?: boolean
 }
 
 export function CustomerProjectHeader({
@@ -43,7 +47,11 @@ export function CustomerProjectHeader({
   isApproveDisabled = false,
   showIllustrationsTab = false,
   projectStatus,
-  illustrationSendCount = 0
+  illustrationSendCount = 0,
+  approvalStage = 'sketch',
+  approvalApprovedCount = 0,
+  approvalTotalCount = 0,
+  approvalAllApproved = false
 }: CustomerProjectHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -93,11 +101,13 @@ export function CustomerProjectHeader({
   }
 
   const currentTabId = isIllustrationsActive ? 'illustrations' : (isCharactersActive ? 'characters' : 'pages')
-  const isApprovedStage = projectStatus === 'illustration_approved' || projectStatus === 'completed'
-  
-  // Simplified: Always show "APPROVE SKETCHES" (no trial phase)
+  const isCompleted = projectStatus === 'completed'
+  const isApprovedStage = isCompleted || (approvalStage === 'sketch' && (projectStatus === 'illustration_approved' || approvalAllApproved)) || (approvalStage === 'illustration' && approvalAllApproved)
   const approveButtonText = 'APPROVE SKETCHES'
-  const approvedButtonText = 'SKETCHES APPROVED'
+  const approvedButtonText = approvalStage === 'illustration' ? 'ILLUSTRATIONS APPROVED' : 'SKETCHES APPROVED'
+  const progressLabel = approvalStage === 'illustration' ? 'Illustrations approved' : 'Sketches approved'
+  const progressPercent = approvalTotalCount > 0 ? Math.round((approvalApprovedCount / approvalTotalCount) * 100) : 0
+  const showTopIllustrationApproveButton = approvalStage === 'sketch' || isApprovedStage
   
   // Determine status badge text based on project status
   const getStatusBadgeText = () => {
@@ -119,6 +129,61 @@ export function CustomerProjectHeader({
           authorName={`${authorName}'s Project`}
           currentTabId={currentTabId}
           tabs={tabs}
+          titleActions={
+            showIllustrationsTab && showSubmitButton && showTopIllustrationApproveButton ? (
+              <Button
+                onClick={onSubmit}
+                disabled={isSubmitting || isSubmitDisabled || isApprovedStage}
+                size="sm"
+                className="h-8 bg-green-600 hover:bg-green-700 text-white shadow-sm transition-all font-semibold uppercase disabled:opacity-100"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    SUBMITTING...
+                  </>
+                ) : isApprovedStage ? (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    {approvedButtonText}
+                  </>
+                ) : (
+                  approveButtonText
+                )}
+              </Button>
+            ) : null
+          }
+          mobileTitleActions={null}
+          mobileBottomContent={
+            showIllustrationsTab && showSubmitButton && approvalTotalCount > 0 ? (
+              <div className="w-full space-y-1.5">
+                <div className="text-center text-[11px] font-semibold text-slate-600 leading-none">
+                  {progressLabel} {approvalApprovedCount}/{approvalTotalCount}
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden shadow-inner">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-700 ease-out"
+                    style={{ width: progressPercent + '%' }}
+                  />
+                </div>
+              </div>
+            ) : null
+          }
+          middleContent={
+            showIllustrationsTab && showSubmitButton && approvalTotalCount > 0 ? (
+              <div className="flex w-full flex-col items-center gap-1.5">
+                <div className="text-xs font-semibold text-slate-600 leading-none">
+                  {progressLabel} {approvalApprovedCount}/{approvalTotalCount}
+                </div>
+                <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden shadow-inner">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-700 ease-out"
+                    style={{ width: progressPercent + '%' }}
+                  />
+                </div>
+              </div>
+            ) : null
+          }
           centerContent={
             <>
               {/* Approve Characters Button (Desktop - Centered) */}
@@ -158,30 +223,6 @@ export function CustomerProjectHeader({
                     </>
                   ) : (
                     "SUBMIT FORMS"
-                  )}
-                </Button>
-              )}
-
-              {/* Approve Illustrations Button (Centered) */}
-              {showIllustrationsTab && showSubmitButton && (
-                <Button
-                  onClick={onSubmit}
-                  disabled={isSubmitting || isSubmitDisabled || isApprovedStage}
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700 text-white shadow-md transition-all font-semibold uppercase"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      SUBMITTING...
-                    </>
-                  ) : isApprovedStage ? (
-                    <>
-                      <Check className="w-4 h-4 mr-2" />
-                      {approvedButtonText}
-                    </>
-                  ) : (
-                    approveButtonText
                   )}
                 </Button>
               )}

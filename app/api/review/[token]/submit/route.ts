@@ -146,6 +146,14 @@ export async function POST(
         message = 'All sketches approved!'
       }
 
+      if (!hasFeedback) {
+        const approvedAt = new Date().toISOString()
+        await supabase
+          .from('pages')
+          .update({ sketch_approved_at: approvedAt })
+          .eq('project_id', project.id)
+      }
+
       const { error: statusUpdateError } = await supabase.from('projects').update({
         status: newStatus
       }).eq('id', project.id)

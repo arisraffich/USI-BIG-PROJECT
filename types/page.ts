@@ -38,6 +38,8 @@ export interface Page {
   }> | null
   is_approved?: boolean
   is_resolved?: boolean
+  sketch_approved_at?: string | null
+  illustration_approved_at?: string | null
   // Admin Reply (Illustrator Note)
   admin_reply?: string | null
   admin_reply_at?: string | null
@@ -49,7 +51,6 @@ export interface Page {
   text_integration?: 'integrated' | 'separated' | null
   illustration_type?: 'spread' | 'spot' | null // null = normal full-page illustration
 }
-
 
 
 

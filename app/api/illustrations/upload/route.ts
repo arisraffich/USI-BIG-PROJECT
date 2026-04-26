@@ -72,8 +72,8 @@ export async function POST(request: NextRequest) {
 
         // Update database — auto-resolve any pending feedback
         const updateData = type === 'sketch'
-            ? { sketch_url: publicUrl, sketch_generated_at: new Date().toISOString(), updated_at: new Date().toISOString(), is_resolved: true }
-            : { illustration_url: publicUrl, illustration_generated_at: new Date().toISOString(), updated_at: new Date().toISOString(), is_resolved: true }
+            ? { sketch_url: publicUrl, sketch_generated_at: new Date().toISOString(), updated_at: new Date().toISOString(), is_resolved: true, sketch_approved_at: null }
+            : { illustration_url: publicUrl, illustration_generated_at: new Date().toISOString(), updated_at: new Date().toISOString(), is_resolved: true, illustration_approved_at: null }
 
         const { error: dbError } = await supabase
             .from('pages')
