@@ -99,6 +99,9 @@ export function UnifiedIllustrationSidebar({
                                                 <span title="Has unresolved feedback">
                                                     <MessageSquare className="w-4 h-4 text-amber-500" />
                                                 </span>
+                                            ) : approvedStage ? (
+                                                /* Customer approved - radio marker in the primary status slot */
+                                                <ApprovedRadio stage={approvedStage} className="w-4 h-4" />
                                             ) : page.feedback_notes && page.is_resolved ? (
                                                 /* Resolved feedback - green outline with green checkmark */
                                                 <span title="Feedback resolved">
@@ -149,21 +152,17 @@ export function UnifiedIllustrationSidebar({
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </button>
                                     )}
-                                    {approvedStage ? (
-                                        <ApprovedRadio stage={approvedStage} className="w-4 h-4" />
-                                    ) : (
-                                        <span className={`w-2 h-2 rounded-full ${
-                                            failedPageIds.includes(page.id)
-                                                ? 'bg-red-500'
-                                                : generatingPageIds.includes(page.id)
-                                                    ? 'bg-orange-400 animate-pulse'
-                                                    : sketchGeneratingPageIds.includes(page.id)
-                                                        ? 'bg-gray-400 animate-pulse'
-                                                        : page.illustration_url
-                                                            ? 'bg-green-400'
-                                                            : 'bg-gray-300'
-                                            }`} title={failedPageIds.includes(page.id) ? "Failed" : generatingPageIds.includes(page.id) ? "Generating illustration..." : sketchGeneratingPageIds.includes(page.id) ? "Generating sketch..." : page.illustration_url ? "Completed" : "Pending"}></span>
-                                    )}
+                                    <span className={`w-2 h-2 rounded-full ${
+                                        failedPageIds.includes(page.id)
+                                            ? 'bg-red-500'
+                                            : generatingPageIds.includes(page.id)
+                                                ? 'bg-orange-400 animate-pulse'
+                                                : sketchGeneratingPageIds.includes(page.id)
+                                                    ? 'bg-gray-400 animate-pulse'
+                                                    : page.illustration_url
+                                                        ? 'bg-green-400'
+                                                        : 'bg-gray-300'
+                                        }`} title={failedPageIds.includes(page.id) ? "Failed" : generatingPageIds.includes(page.id) ? "Generating illustration..." : sketchGeneratingPageIds.includes(page.id) ? "Generating sketch..." : page.illustration_url ? "Completed" : "Pending"}></span>
                                 </span>
                             </div>
                         )
