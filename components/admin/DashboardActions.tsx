@@ -3,14 +3,16 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Plus, Pencil, Menu, X, Settings, BookImage } from 'lucide-react'
+import { Plus, Pencil, Menu, X, Settings, BookImage, Sparkles } from 'lucide-react'
 import { LineArtModal } from './LineArtModal'
 import { CoverDesignModal } from './CoverDesignModal'
+import { RemasterModal } from './RemasterModal'
 import { AIStatusDot } from './AIStatusDot'
 
 export function DashboardActions() {
     const [lineArtOpen, setLineArtOpen] = useState(false)
     const [coverDesignOpen, setCoverDesignOpen] = useState(false)
+    const [remasterOpen, setRemasterOpen] = useState(false)
 
     return (
         <>
@@ -29,9 +31,14 @@ export function DashboardActions() {
                     <BookImage className="w-4 h-4 mr-2" />
                     Cover Design
                 </Button>
+                <Button variant="outline" className="w-full" onClick={() => setRemasterOpen(true)}>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Remaster
+                </Button>
             </div>
             <LineArtModal open={lineArtOpen} onOpenChange={setLineArtOpen} />
             <CoverDesignModal open={coverDesignOpen} onOpenChange={setCoverDesignOpen} />
+            <RemasterModal open={remasterOpen} onOpenChange={setRemasterOpen} />
         </>
     )
 }
@@ -40,6 +47,7 @@ export function MobileHeader() {
     const [menuOpen, setMenuOpen] = useState(false)
     const [lineArtOpen, setLineArtOpen] = useState(false)
     const [coverDesignOpen, setCoverDesignOpen] = useState(false)
+    const [remasterOpen, setRemasterOpen] = useState(false)
 
     return (
         <>
@@ -68,6 +76,10 @@ export function MobileHeader() {
                             <BookImage className="w-4 h-4 mr-2" />
                             Cover Design
                         </Button>
+                        <Button variant="outline" className="w-full" onClick={() => { setRemasterOpen(true); setMenuOpen(false) }}>
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            Remaster
+                        </Button>
                         <Link href="/admin/settings" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors text-base font-medium mt-4">
                             <Settings className="w-5 h-5" />
                             Settings
@@ -78,6 +90,7 @@ export function MobileHeader() {
 
             <LineArtModal open={lineArtOpen} onOpenChange={setLineArtOpen} />
             <CoverDesignModal open={coverDesignOpen} onOpenChange={setCoverDesignOpen} />
+            <RemasterModal open={remasterOpen} onOpenChange={setRemasterOpen} />
         </>
     )
 }

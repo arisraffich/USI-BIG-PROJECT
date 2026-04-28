@@ -22,10 +22,53 @@ interface GPT2GenerateOptions {
     currentImageUrl?: string | null
 }
 
+// Safe GPT Image 2 size helper for arbitrary uploaded images.
+// Constraints: max edge <= 3840, ratio <= 3:1, total pixels <= 8,294,400, dimensions divisible by 16.
+function fitGpt2SizeToInputRatio(width: number, height: number): string {
+    const MAX_PIXELS = 8_294_400
+    const MAX_EDGE = 3840
+    const MIN_PIXELS = 655_360
+    const ratio = Math.max(1 / 3, Math.min(3, width / height))
+    let outWidth = Math.sqrt(MAX_PIXELS * ratio)
+    let outHeight = outWidth / ratio
+
+    if (outWidth > MAX_EDGE) {
+        outWidth = MAX_EDGE
+        outHeight = outWidth / ratio
+    }
+    if (outHeight > MAX_EDGE) {
+        outHeight = MAX_EDGE
+        outWidth = outHeight * ratio
+    }
+
+    outWidth = Math.floor(outWidth / 16) * 16
+    outHeight = Math.floor(outHeight / 16) * 16
+
+    while (outWidth * outHeight > MAX_PIXELS) {
+        if (outWidth >= outHeight) outWidth -= 16
+        else outHeight -= 16
+    }
+    while (outWidth * outHeight < MIN_PIXELS) {
+        if (outWidth <= outHeight && outWidth + 16 <= MAX_EDGE) outWidth += 16
+        else if (outHeight + 16 <= MAX_EDGE) outHeight += 16
+        else break
+    }
+
+    return `${Math.max(16, outWidth)}x${Math.max(16, outHeight)}`
+}
+
 // Safe (non-experimental) GPT Image 2 sizes.
-// Constraints: ≤ 3,686,400 total pixels, both dimensions divisible by 16, exact book ratios.
+// Project book ratios stay exact. Standalone tools may pass custom:W:H for uploaded-image remastering.
 // Reference: https://platform.openai.com/docs/guides/image-generation (size constraints)
 function mapBookRatioToGpt2Size(ratio: string | null | undefined, isSpread: boolean): string {
+    if (ratio?.startsWith('custom:')) {
+        const [, widthRaw, heightRaw] = ratio.split(':')
+        const width = Number(widthRaw)
+        const height = Number(heightRaw)
+        if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+            return fitGpt2SizeToInputRatio(width, height)
+        }
+    }
     if (isSpread) {
         switch (ratio) {
             case '8:10': return '2304x1440'       // 8:5 spread (exact)

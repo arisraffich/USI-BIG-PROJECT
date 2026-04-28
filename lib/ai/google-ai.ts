@@ -106,7 +106,7 @@ interface GenerateOptions {
     characterReferences?: CharacterReference[] // Replaces simple string[]
     anchorImage?: string | null // Explicit anchor image
     styleReferenceImages?: string[] // Optional extra style refs
-    aspectRatio?: string
+    aspectRatio?: string | null
     textIntegration?: string
     isSceneRecreation?: boolean // Scene Recreation mode - uses higher quality input/output
     hasCustomStyleRefs?: boolean // When true, style refs define style instead of main character
@@ -180,7 +180,7 @@ export async function generateIllustration({
     characterReferences = [],
     anchorImage,
     styleReferenceImages = [],
-    aspectRatio = "1:1",
+    aspectRatio,
     isSceneRecreation = false,
     hasCustomStyleRefs = false,
     useThinking = false,
@@ -320,9 +320,11 @@ Apply the style uniformly to characters, backgrounds, props, and all scene eleme
         const generationConfig: Record<string, any> = {
             responseModalities: ['IMAGE'],
             imageConfig: {
-                aspectRatio: aspectRatio,
                 imageSize: '4K'
             }
+        }
+        if (aspectRatio) {
+            generationConfig.imageConfig.aspectRatio = aspectRatio
         }
         if (useThinking && !isPro) {
             generationConfig.thinkingConfig = { thinkingLevel: 'HIGH' }
