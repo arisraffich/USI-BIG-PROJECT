@@ -3,12 +3,14 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Plus, Pencil, Menu, X, Settings } from 'lucide-react'
+import { Plus, Pencil, Menu, X, Settings, BookImage } from 'lucide-react'
 import { LineArtModal } from './LineArtModal'
+import { CoverDesignModal } from './CoverDesignModal'
 import { AIStatusDot } from './AIStatusDot'
 
 export function DashboardActions() {
     const [lineArtOpen, setLineArtOpen] = useState(false)
+    const [coverDesignOpen, setCoverDesignOpen] = useState(false)
 
     return (
         <>
@@ -23,8 +25,13 @@ export function DashboardActions() {
                     <Pencil className="w-4 h-4 mr-2" />
                     Line Art
                 </Button>
+                <Button variant="outline" className="w-full" onClick={() => setCoverDesignOpen(true)}>
+                    <BookImage className="w-4 h-4 mr-2" />
+                    Cover Design
+                </Button>
             </div>
             <LineArtModal open={lineArtOpen} onOpenChange={setLineArtOpen} />
+            <CoverDesignModal open={coverDesignOpen} onOpenChange={setCoverDesignOpen} />
         </>
     )
 }
@@ -32,6 +39,7 @@ export function DashboardActions() {
 export function MobileHeader() {
     const [menuOpen, setMenuOpen] = useState(false)
     const [lineArtOpen, setLineArtOpen] = useState(false)
+    const [coverDesignOpen, setCoverDesignOpen] = useState(false)
 
     return (
         <>
@@ -56,6 +64,10 @@ export function MobileHeader() {
                             <Pencil className="w-4 h-4 mr-2" />
                             Line Art
                         </Button>
+                        <Button variant="outline" className="w-full" onClick={() => { setCoverDesignOpen(true); setMenuOpen(false) }}>
+                            <BookImage className="w-4 h-4 mr-2" />
+                            Cover Design
+                        </Button>
                         <Link href="/admin/settings" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors text-base font-medium mt-4">
                             <Settings className="w-5 h-5" />
                             Settings
@@ -65,6 +77,7 @@ export function MobileHeader() {
             )}
 
             <LineArtModal open={lineArtOpen} onOpenChange={setLineArtOpen} />
+            <CoverDesignModal open={coverDesignOpen} onOpenChange={setCoverDesignOpen} />
         </>
     )
 }

@@ -70,6 +70,14 @@ CONSTRAINTS:
  * Mapped from projects.illustration_aspect_ratio.
  */
 export function mapAspectRatioToCoverLabel(ratio: string | null | undefined): string {
+    if (ratio?.startsWith('custom:')) {
+        const [, width, height] = ratio.split(':')
+        if (width && height) {
+            return `match the uploaded reference image aspect ratio (${width}:${height})`
+        }
+        return 'match the uploaded reference image aspect ratio'
+    }
+
     switch (ratio) {
         case '8:10':    return '4:5 (portrait)'
         case '8.5:8.5': return '1:1 (square)'

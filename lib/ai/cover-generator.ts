@@ -33,7 +33,43 @@ interface BackCoverGenerateOptions {
 
 // Reuses the exact sizes from openai-illustration.ts for single-page covers.
 // Constraints: ≤ 3,686,400 total pixels, both dimensions divisible by 16, exact book ratios.
+function fitCoverSizeToPixelBudget(width: number, height: number): string {
+    const MAX_PIXELS = 3_686_400
+    const MIN_EDGE = 1024
+    const ratio = Math.max(0.25, Math.min(4, width / height))
+    let outWidth = Math.sqrt(MAX_PIXELS * ratio)
+    let outHeight = outWidth / ratio
+
+    if (outWidth < MIN_EDGE) {
+        outWidth = MIN_EDGE
+        outHeight = outWidth / ratio
+    }
+    if (outHeight < MIN_EDGE) {
+        outHeight = MIN_EDGE
+        outWidth = outHeight * ratio
+    }
+
+    outWidth = Math.floor(outWidth / 16) * 16
+    outHeight = Math.floor(outHeight / 16) * 16
+
+    while (outWidth * outHeight > MAX_PIXELS) {
+        if (outWidth >= outHeight) outWidth -= 16
+        else outHeight -= 16
+    }
+
+    return `${Math.max(16, outWidth)}x${Math.max(16, outHeight)}`
+}
+
 function mapBookRatioToCoverSize(ratio: string | null | undefined): string {
+    if (ratio?.startsWith('custom:')) {
+        const [, widthRaw, heightRaw] = ratio.split(':')
+        const width = Number(widthRaw)
+        const height = Number(heightRaw)
+        if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+            return fitCoverSizeToPixelBudget(width, height)
+        }
+    }
+
     switch (ratio) {
         case '8:10':    return '1664x2080'  // 4:5 portrait
         case '8.5:8.5': return '1904x1904'  // 1:1 square
