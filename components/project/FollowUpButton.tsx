@@ -154,8 +154,7 @@ export function FollowUpButton({
         className="inline-flex h-7 items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2.5 text-xs font-semibold text-red-700 shadow-sm cursor-not-allowed"
       >
         <UserRound className="w-3 h-3" />
-        <span className="hidden sm:inline">Max Sent</span>
-        <span className="sm:hidden">Max</span>
+        <span>Max Sent</span>
       </button>
     )
   }
@@ -169,7 +168,7 @@ export function FollowUpButton({
         className="inline-flex h-7 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 text-xs font-semibold text-gray-800 shadow-sm transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-950 disabled:opacity-60 disabled:cursor-wait"
       >
         {initialIsSending ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserRound className="w-3 h-3" />}
-        <span className="hidden sm:inline">{initialIsSending ? 'Sending' : 'Follow Up'}</span>
+        <span>{initialIsSending ? 'Sending' : 'Follow Up'}</span>
         <span>{count}/{MAX_FOLLOW_UP_SEQUENCE}</span>
         {lastSentLabel && (
           <span className="hidden lg:inline text-gray-500">· {lastSentLabel}</span>
