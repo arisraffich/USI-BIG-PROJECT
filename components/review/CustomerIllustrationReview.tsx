@@ -1,24 +1,18 @@
 'use client'
 
-import { memo, useState } from 'react'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
+import { memo } from 'react'
 import { Page } from '@/types/page'
-import { MessageSquare, MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { createClient } from '@/lib/supabase/client'
-import { PageStatusBar, PageStatus } from '@/components/project/PageStatusBar'
-import { ReviewHistoryDialog } from '@/components/project/ReviewHistoryDialog'
 
 // ... imports
 import { SharedIllustrationBoard } from '@/components/illustration/SharedIllustrationBoard'
 
+type CustomerIllustrationStatus = 'draft' | 'illustration_approved' | 'completed'
+
 interface CustomerIllustrationReviewProps {
     page: Page
     onChange: (id: string, notes: string) => void
-    illustrationStatus?: string
+    illustrationStatus?: CustomerIllustrationStatus
     projectStatus?: string
     illustrationSendCount?: number
 }
@@ -85,7 +79,7 @@ export const CustomerIllustrationReview = memo(function CustomerIllustrationRevi
             <SharedIllustrationBoard
                 mode="customer"
                 page={page}
-                illustrationStatus={illustrationStatus as any}
+                illustrationStatus={illustrationStatus}
                 projectStatus={projectStatus}
                 onSaveFeedback={handleSaveFeedback}
                 illustrationSendCount={illustrationSendCount}

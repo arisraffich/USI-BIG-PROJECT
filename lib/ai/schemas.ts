@@ -117,21 +117,35 @@ export function actionsArrayToObject(actions: Array<{ character_name: string; ac
   return obj
 }
 
+interface ResponseContentLike {
+  refusal?: string | null
+  text?: string | null
+}
+
+interface ResponseMessageLike {
+  type?: string
+  content?: ResponseContentLike[]
+}
+
+interface ResponseCompletionLike {
+  output?: ResponseMessageLike[]
+}
+
 /**
  * Extracts the text content from a Responses API completion, handling refusals.
  * Returns { text, refusal } -- one will be null.
  */
-export function extractResponseContent(completion: any): { text: string | null; refusal: string | null } {
-  const msgOut = completion.output?.find((o: any) => o.type === 'message')
+export function extractResponseContent(completion: ResponseCompletionLike): { text: string | null; refusal: string | null } {
+  const msgOut = completion.output?.find(o => o.type === 'message')
   if (!msgOut || !('content' in msgOut)) return { text: null, refusal: null }
 
   const firstContent = msgOut.content?.[0]
   if (!firstContent) return { text: null, refusal: null }
 
-  if ('refusal' in firstContent && firstContent.refusal) {
+  if (firstContent.refusal) {
     return { text: null, refusal: firstContent.refusal }
   }
 
-  const text = 'text' in firstContent ? firstContent.text : null
+  const text = firstContent.text ?? null
   return { text: text?.trim() || null, refusal: null }
 }

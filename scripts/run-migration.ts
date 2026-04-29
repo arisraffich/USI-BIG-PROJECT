@@ -91,8 +91,9 @@ async function runMigration() {
       }
       
       console.log('   ✅ Success')
-    } catch (error: any) {
-      console.error(`   ❌ Error: ${error.message}`)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(`   ❌ Error: ${message}`)
       console.log('   💡 You may need to run this SQL manually in Supabase SQL Editor')
       console.log(`\n${statement}\n`)
     }
@@ -103,7 +104,6 @@ async function runMigration() {
 }
 
 runMigration().catch(console.error)
-
 
 
 

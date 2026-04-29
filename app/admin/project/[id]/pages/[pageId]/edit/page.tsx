@@ -24,7 +24,6 @@ export default function EditPagePage({
   params: Promise<{ id: string; pageId: string }>
 }) {
   const router = useRouter()
-  const [resolvedParams, setResolvedParams] = useState<{ id: string; pageId: string } | null>(null)
   const [projectId, setProjectId] = useState<string>('')
   const [pageId, setPageId] = useState<string>('')
   const [page, setPage] = useState<Page | null>(null)
@@ -36,7 +35,6 @@ export default function EditPagePage({
   useEffect(() => {
     async function resolveParams() {
       const resolved = await params
-      setResolvedParams(resolved)
       setProjectId(resolved.id)
       setPageId(resolved.pageId)
     }
@@ -56,7 +54,7 @@ export default function EditPagePage({
         setPage(data)
         setStoryText(data.story_text || '')
         setSceneDescription(data.scene_description || '')
-      } catch (error) {
+      } catch {
         toast.error('Failed to load page')
         if (projectId) {
           router.push(`/admin/project/${projectId}/pages`)
@@ -91,7 +89,7 @@ export default function EditPagePage({
       if (projectId) {
         router.push(`/admin/project/${projectId}/pages`)
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to save page')
     } finally {
       setSaving(false)
@@ -186,4 +184,3 @@ export default function EditPagePage({
     </div>
   )
 }
-

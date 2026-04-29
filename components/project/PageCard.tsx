@@ -58,7 +58,7 @@ export const PageCard = memo(function PageCard({ page }: PageCardProps) {
       toast.success('Page saved successfully')
       setIsEditing(false)
       router.refresh()
-    } catch (error) {
+    } catch {
       toast.error('Failed to save page')
     } finally {
       setSaving(false)

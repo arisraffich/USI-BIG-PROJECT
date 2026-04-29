@@ -10,16 +10,14 @@ import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, RefreshCw, Bookmark, X, ChevronDown, ChevronUp, AlignLeft, Users, Plus, Minus, Pencil, Check, Layers, CornerDownRight, AlertCircle, ChevronRight, Trash2, BookImage } from 'lucide-react'
+import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, Bookmark, X, ChevronDown, ChevronUp, Users, Plus, Minus, Pencil, Check, Layers, CornerDownRight, AlertCircle, ChevronRight, Trash2, BookImage } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { getErrorMessage } from '@/lib/utils/error'
 
-import Image from 'next/image'
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
-import { PageStatusBar } from '@/components/project/PageStatusBar'
 import { EmptyStateBoard } from '@/components/illustration/EmptyStateBoard'
 import { ReviewHistoryDialog } from '@/components/project/ReviewHistoryDialog'
 import { useIllustrationLock } from '@/hooks/use-illustration-lock'
@@ -35,6 +33,8 @@ export interface SceneCharacter {
     isIncluded: boolean
     isModified: boolean // Track if user modified from AI Director's original
 }
+
+type FeedbackHistoryItem = NonNullable<NonNullable<Page['feedback_history']>[number]>
 
 // Helper for the beautiful animation
 const AnimatedOverlay = ({ label }: { label: string }) => (
@@ -135,12 +135,10 @@ export function SharedIllustrationBoard({
     page,
     mode,
     projectId,
-    illustrationStatus = 'draft',
     projectStatus,
     illustrationSendCount = 0,
     onSaveFeedback,
     isGenerating = false,
-    isUploading = false,
     loadingState = { sketch: false, illustration: false },
     aspectRatio,
     setAspectRatio,
@@ -177,7 +175,6 @@ export function SharedIllustrationBoard({
     approvalStage,
     approvalApprovedCount = 0,
     approvalTotalCount = 0,
-    approvalAllApproved = false,
     onApprovePage,
     // Page Delete Feature
     onDeletePage,
@@ -693,7 +690,7 @@ export function SharedIllustrationBoard({
         } finally {
             setIsGeneratingLineArt(false)
         }
-    }, [page.illustration_url, page.page_number])
+    }, [page.illustration_url, page.page_number, projectId])
 
     const handleCustomerSave = useCallback(async (textOverride?: string) => {
         if (!onSaveFeedback) return
@@ -1428,7 +1425,7 @@ export function SharedIllustrationBoard({
                             const hasCurrentFeedback = !!page.feedback_notes
                             
                             // Check if ANY item has a revision_round (new system)
-                            const hasAnyRounds = page.feedback_history.some((item: any) => item.revision_round != null)
+                            const hasAnyRounds = page.feedback_history.some((item) => item.revision_round != null)
                             
                             // Badge component: shows round number if available, checkmark for legacy
                             const RevisionBadge = ({ round }: { round?: number }) => (
@@ -1441,8 +1438,8 @@ export function SharedIllustrationBoard({
                                 )
                             )
                             
-                            let itemsOutside: any[] = []
-                            let itemsToCollapse: any[] = []
+                            let itemsOutside: FeedbackHistoryItem[] = []
+                            let itemsToCollapse: FeedbackHistoryItem[] = []
                             
                             if (!hasAnyRounds) {
                                 // LEGACY MODE: No rounds tracked yet - use old logic (latest by array order)
@@ -1459,21 +1456,21 @@ export function SharedIllustrationBoard({
                                 const currentRound = illustrationSendCount
                                 
                                 if (!hasCurrentFeedback) {
-                                    itemsOutside = page.feedback_history.filter((item: any) => item.revision_round === currentRound)
-                                    itemsToCollapse = page.feedback_history.filter((item: any) => item.revision_round !== currentRound)
+                                    itemsOutside = page.feedback_history.filter((item) => item.revision_round === currentRound)
+                                    itemsToCollapse = page.feedback_history.filter((item) => item.revision_round !== currentRound)
                                 } else {
                                     // Customer is writing feedback - collapse all history
                                     itemsToCollapse = page.feedback_history.slice()
                                 }
                                 
                                 // Sort collapsed items by round (newest first)
-                                itemsToCollapse.sort((a: any, b: any) => (b.revision_round || 0) - (a.revision_round || 0))
+                                itemsToCollapse.sort((a, b) => (b.revision_round || 0) - (a.revision_round || 0))
                             }
                             
                             return (
                                 <div className="mt-3 space-y-2">
                                     {/* Current round items - show outside dropdown */}
-                                    {itemsOutside.map((item: any, idx: number) => (
+                                    {itemsOutside.map((item, idx) => (
                                         <div key={`outside-${idx}`} className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm flex items-start gap-2">
                                             <RevisionBadge round={item.revision_round} />
                                             <p className="leading-relaxed text-green-900">
@@ -1502,7 +1499,7 @@ export function SharedIllustrationBoard({
                                             
                                             {inlineHistoryExpanded && (
                                                 <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
-                                                    {itemsToCollapse.map((item: any, i: number) => (
+                                                    {itemsToCollapse.map((item, i) => (
                                                         <div key={`hist-${i}`} className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm flex items-start gap-2">
                                                             <RevisionBadge round={item.revision_round} />
                                                             <p className="leading-relaxed text-slate-700">
@@ -2252,7 +2249,7 @@ export function SharedIllustrationBoard({
                                     </DropdownMenu>
                                     {isSceneRecreationMode && (
                                         <p className="text-xs text-purple-600 bg-purple-50 p-2 rounded-md">
-                                            Scene Recreation Mode: The selected page's background will be preserved.
+                                            Scene Recreation Mode: The selected page&apos;s background will be preserved.
                                         </p>
                                     )}
                                 </div>

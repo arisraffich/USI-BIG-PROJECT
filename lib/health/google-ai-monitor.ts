@@ -13,7 +13,7 @@ interface MonitorState {
 const REQUIRED_SUCCESSES = 3
 const CHECK_INTERVAL_MS = 30_000 // 30 seconds
 
-let state: MonitorState = {
+const state: MonitorState = {
     status: 'healthy',
     isMonitoring: false,
     consecutiveSuccesses: 0,

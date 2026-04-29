@@ -7,7 +7,7 @@ export async function GET(
     { params }: { params: Promise<{ id: string; pageId: string }> }
 ) {
     try {
-        const { id: projectId, pageId } = await params
+        const { pageId } = await params
         const supabase = await createAdminClient()
 
         const { data, error } = await supabase

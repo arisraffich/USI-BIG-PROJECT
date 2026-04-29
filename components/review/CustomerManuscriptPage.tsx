@@ -41,8 +41,6 @@ interface CustomerManuscriptPageProps {
 export function CustomerManuscriptPage({
   page,
   isEditMode,
-  originalStoryText,
-  originalSceneDescription,
   onStoryTextChange,
   onSceneDescriptionChange,
 }: CustomerManuscriptPageProps) {

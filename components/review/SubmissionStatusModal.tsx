@@ -2,7 +2,6 @@
 
 import { Loader2, Check } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { cn } from '@/lib/utils'
 
 interface SubmissionStatusModalProps {
     isOpen: boolean

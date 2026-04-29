@@ -7,12 +7,30 @@ import { UserRound, Wrench, CheckCircle2, FileText, Users, Palette, FlaskConical
 
 type Tab = 'follow_up' | 'working' | 'finished' | 'test'
 
-function isTestProject(project: any): boolean {
+interface DashboardProject {
+  id: string
+  book_title: string
+  author_firstname: string
+  author_lastname: string
+  author_email: string
+  created_at: string
+  status: string
+  status_changed_at?: string
+  character_send_count?: number
+  illustration_send_count?: number
+  pageCount?: number
+  follow_up_stage?: string | null
+  follow_up_count?: number
+  follow_up_last_sent_at?: string | null
+  follow_up_is_sending?: boolean
+}
+
+function isTestProject(project: DashboardProject): boolean {
   return (project.author_firstname || '').toLowerCase().includes('test')
 }
 
 interface ProjectTabsProps {
-  projects: Array<any>
+  projects: DashboardProject[]
 }
 
 function isFinished(status: string): boolean {
@@ -39,7 +57,13 @@ const STAGE_CONFIG: Record<Stage, { label: string; icon: typeof FileText }> = {
 
 const STAGE_ORDER: Stage[] = ['input', 'characters', 'sketches']
 
-function GroupedProjectList({ projects }: { projects: Array<any> }) {
+function GroupedProjectList({
+  projects,
+  showFollowUpActions = false,
+}: {
+  projects: DashboardProject[]
+  showFollowUpActions?: boolean
+}) {
   const grouped = STAGE_ORDER.map(stage => ({
     stage,
     config: STAGE_CONFIG[stage],
@@ -67,7 +91,12 @@ function GroupedProjectList({ projects }: { projects: Array<any> }) {
             </div>
             <div className="space-y-4">
               {projects.map((project) => (
-                <ProjectCard key={project.id} project={project} pageCount={project.pageCount} />
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  pageCount={project.pageCount}
+                  showFollowUpAction={showFollowUpActions}
+                />
               ))}
             </div>
           </div>
@@ -143,7 +172,7 @@ export function ProjectTabs({ projects }: ProjectTabsProps) {
           </div>
         )
       ) : (
-        <GroupedProjectList projects={activeProjects} />
+        <GroupedProjectList projects={activeProjects} showFollowUpActions={activeTab === 'follow_up'} />
       )}
     </div>
   )

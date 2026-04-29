@@ -36,7 +36,6 @@ export function UnifiedIllustrationSidebar({
     generatingPageIds = [],
     comparisonPageIds = [],
     sketchGeneratingPageIds = [],
-    illustrationSendCount = 0,
     approvalStage,
     onDeletePage,
     isDeleteDisabled = false

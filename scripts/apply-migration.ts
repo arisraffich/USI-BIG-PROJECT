@@ -2,15 +2,14 @@ import { Client } from 'pg';
 import fs from 'fs';
 import path from 'path';
 import dns from 'dns';
+import dotenv from 'dotenv';
 
 // Force IPV4 to avoid ENETUNREACH on some networks
 if (dns.setDefaultResultOrder) {
     dns.setDefaultResultOrder('ipv4first');
 }
 
-// Load env vars
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-require('dotenv').config();
+dotenv.config();
 
 async function migrate() {
     console.log('Connecting to database...');

@@ -19,10 +19,10 @@ export function PagesList({ projectId, initialPages, projectStatus }: PagesListP
   const [pages, setPages] = useState<Page[]>(initialPages)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [hasNewChanges, setHasNewChanges] = useState(false)
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(() => {
+  const [, setLastUpdatedAt] = useState<string | null>(() => {
     if (initialPages.length > 0) {
       // Get the latest updated_at from all pages
-      const latest = initialPages.reduce((latest: string | null, page: any) => {
+      const latest = initialPages.reduce((latest: string | null, page) => {
         if (!latest || (page.updated_at && page.updated_at > latest)) {
           return page.updated_at
         }
@@ -45,7 +45,7 @@ export function PagesList({ projectId, initialPages, projectStatus }: PagesListP
         setPages((prevPages) => {
           if (data && data.length > 0) {
             // Get latest updated_at from fetched data
-            const latestUpdate = data.reduce((latest: string | null, page: any) => {
+            const latestUpdate = data.reduce((latest: string | null, page: Page) => {
               if (!latest || (page.updated_at && page.updated_at > latest)) {
                 return page.updated_at
               }
@@ -54,7 +54,7 @@ export function PagesList({ projectId, initialPages, projectStatus }: PagesListP
             
             // Get latest updated_at from previous state (not closure)
             const prevLatestUpdate = prevPages.length > 0
-              ? prevPages.reduce((latest: string | null, page: any) => {
+              ? prevPages.reduce((latest: string | null, page) => {
                   if (!latest || (page.updated_at && page.updated_at > latest)) {
                     return page.updated_at
                   }
@@ -227,7 +227,6 @@ export function PagesList({ projectId, initialPages, projectStatus }: PagesListP
     </div>
   )
 }
-
 
 
 

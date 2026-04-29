@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { CheckCircle2, MessageSquare, Loader2, X, Save } from 'lucide-react'
+import { CheckCircle2, MessageSquare, Loader2, Save } from 'lucide-react'
 import { Page } from '@/types/page'
 import { toast } from 'sonner'
 
@@ -10,12 +10,12 @@ interface ReviewHistoryDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     page: Page
-    reviews?: any[]
+    reviews?: unknown[]
     onSave?: (notes: string) => Promise<void>
     canEdit?: boolean
 }
 
-export function ReviewHistoryDialog({ open, onOpenChange, page, reviews = [], onSave, canEdit }: ReviewHistoryDialogProps) {
+export function ReviewHistoryDialog({ open, onOpenChange, page, onSave, canEdit }: ReviewHistoryDialogProps) {
     const [isEditing, setIsEditing] = useState(false)
     const [editText, setEditText] = useState('')
     const [isSaving, setIsSaving] = useState(false)
@@ -37,7 +37,7 @@ export function ReviewHistoryDialog({ open, onOpenChange, page, reviews = [], on
             await onSave(editText)
             setIsEditing(false)
             toast.success('Request updated')
-        } catch (error) {
+        } catch {
             toast.error('Failed to update request')
         } finally {
             setIsSaving(false)

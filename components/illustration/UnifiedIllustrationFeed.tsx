@@ -7,6 +7,8 @@ import { SharedIllustrationBoard, SceneCharacter } from './SharedIllustrationBoa
 import { Loader2 } from 'lucide-react'
 import { useIllustrationLock } from '@/hooks/use-illustration-lock'
 
+type IllustrationStatus = 'draft' | 'illustration_approved' | 'completed'
+
 // --------------------------------------------------------------------------
 // UNIFIED FEED PROPS (Hybrid of Admin + Customer needs)
 // --------------------------------------------------------------------------
@@ -17,7 +19,7 @@ interface UnifiedIllustrationFeedProps {
     onPageChange?: (pageId: string) => void
 
     // STATUS & LOCKING
-    illustrationStatus?: string
+    illustrationStatus?: IllustrationStatus
     projectStatus?: string // Main status field for lock logic
     illustrationSendCount?: number // For determining if all sketches have been sent
     onSaveFeedback?: (pageId: string, notes: string) => Promise<void>
@@ -113,7 +115,6 @@ export function UnifiedIllustrationFeed({
     isAnalyzing = false,
     projectId,
     characters = [],
-    loadingState,
     onGenerate,
     onRegenerate,
     onLayoutChange,
@@ -172,8 +173,6 @@ export function UnifiedIllustrationFeed({
     // --------------------------------------------------------------------------
     useEffect(() => {
         // NOTE: Switched to root: null (viewport) to match ManuscriptEditor and ensuring detection works regardless of container quirks.
-        const container = scrollContainerRef.current
-
         if (!pages || pages.length === 0) return // Removed container check for return since we use viewport
 
         // NOTE: Switched to root: null (viewport).
@@ -265,6 +264,13 @@ export function UnifiedIllustrationFeed({
         }
     }, [activePageId])
 
+    // Centralized lock logic from useIllustrationLock hook
+    const { filterVisiblePages } = useIllustrationLock({
+        projectStatus,
+        mode,
+        pages,
+    })
+
 
     // --------------------------------------------------------------------------
     // LOADING STATES (Empty Analysis)
@@ -293,13 +299,6 @@ export function UnifiedIllustrationFeed({
     // Unified Height Calculation: Both Admin and Customer headers are physically 70px tall.
     // Both views now use full-screen layout for illustrations.
     const heightClass = 'h-[calc(100vh-70px)]'
-
-    // Centralized lock logic from useIllustrationLock hook
-    const { filterVisiblePages, isCustomerLocked } = useIllustrationLock({
-        projectStatus,
-        mode,
-        pages,
-    })
 
     const visiblePages = filterVisiblePages(pages)
 
@@ -331,7 +330,7 @@ export function UnifiedIllustrationFeed({
                             mode={mode}
                             page={page}
                             projectId={projectId}
-                            illustrationStatus={illustrationStatus as any}
+                            illustrationStatus={illustrationStatus}
                             projectStatus={projectStatus}
                             illustrationSendCount={illustrationSendCount}
 

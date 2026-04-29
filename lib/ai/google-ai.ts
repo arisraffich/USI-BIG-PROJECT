@@ -249,10 +249,8 @@ export async function generateIllustration({
             }
         }
 
-        // 2. Anchor Image (Style Reference)
         const totalStyleRefs = (anchorImage ? 1 : 0) + styleReferenceImages.length
-        const isCustomStyleMode = totalStyleRefs > 0 && !isSceneRecreation
-        
+
         if (anchorResult) {
             let anchorLabel: string
             

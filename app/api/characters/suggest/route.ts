@@ -3,8 +3,23 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { openai } from '@/lib/ai/openai'
 import { getErrorMessage } from '@/lib/utils/error'
 import { CharacterIdentificationSchema, zodToResponsesFormat, extractResponseContent } from '@/lib/ai/schemas'
+import type { z } from 'zod'
 
 export const maxDuration = 30
+
+type CharacterSuggestionsResult = z.infer<typeof CharacterIdentificationSchema>
+
+interface StoryPageRow {
+    page_number: number
+    story_text: string | null
+    scene_description: string | null
+}
+
+interface ExistingCharacterRow {
+    name: string | null
+    role: string | null
+    is_main: boolean | null
+}
 
 export async function POST(request: NextRequest) {
     try {
@@ -25,33 +40,35 @@ export async function POST(request: NextRequest) {
         if (pagesError || !pages || pages.length === 0) {
             return NextResponse.json({ suggestions: [] })
         }
+        const pageRows = pages as StoryPageRow[]
 
         const { data: existingCharacters } = await supabase
             .from('characters')
             .select('name, role, is_main')
             .eq('project_id', project_id)
+        const existingCharacterRows = (existingCharacters || []) as ExistingCharacterRow[]
 
-        const mainChar = existingCharacters?.find((c: any) => c.is_main)
+        const mainChar = existingCharacterRows.find(c => c.is_main)
         const mainCharName = mainChar?.name || null
 
         const existingNames = new Set<string>()
         const existingRoles = new Set<string>()
-        existingCharacters?.forEach((c: any) => {
+        existingCharacterRows.forEach(c => {
             if (c.name) existingNames.add(c.name.toLowerCase().trim())
             if (c.role) existingRoles.add(c.role.toLowerCase().trim())
         })
 
-        const maxPageNumber = pages.length
-        const fullStory = pages
-            .map((p: any) => {
+        const maxPageNumber = pageRows.length
+        const fullStory = pageRows
+            .map(p => {
                 let text = `Page ${p.page_number}: ${p.story_text}`
                 if (p.scene_description) text += `\n  [Scene: ${p.scene_description}]`
                 return text
             })
             .join('\n\n')
 
-        const existingList = existingCharacters
-            ?.map((c: any) => `- ${c.name || c.role}${c.is_main ? ' (MAIN)' : ''}`)
+        const existingList = existingCharacterRows
+            .map(c => `- ${c.name || c.role}${c.is_main ? ' (MAIN)' : ''}`)
             .join('\n') || 'None'
 
         const prompt = `You are an expert children's book story analyst.
@@ -123,15 +140,15 @@ CONSTRAINTS:
             return NextResponse.json({ suggestions: [] })
         }
 
-        let parsed
+        let parsed: CharacterSuggestionsResult
         try {
-            parsed = JSON.parse(responseContent)
+            parsed = JSON.parse(responseContent) as CharacterSuggestionsResult
         } catch {
             return NextResponse.json({ suggestions: [] })
         }
 
         const suggestions = parsed.characters
-            .filter((char: any) => {
+            .filter(char => {
                 const name = char.name?.toLowerCase().trim()
                 const role = char.role?.toLowerCase().trim()
                 if (!name && !role) return false
@@ -139,7 +156,7 @@ CONSTRAINTS:
                 if (role && existingRoles.has(role)) return false
                 return true
             })
-            .map((char: any) => ({
+            .map(char => ({
                 name: char.name || null,
                 role: char.role || null,
                 story_role: char.story_role || null,

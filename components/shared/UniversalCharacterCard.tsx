@@ -98,7 +98,7 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
         clothing_and_accessories: '',
     })
 
-    const [initialData, setInitialData] = useState<InternalCharacterFormData | null>(null)
+    const [, setInitialData] = useState<InternalCharacterFormData | null>(null)
     const [focusedField, setFocusedField] = useState<string | null>(null)
 
     const {

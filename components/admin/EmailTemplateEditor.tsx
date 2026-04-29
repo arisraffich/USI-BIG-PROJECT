@@ -561,6 +561,7 @@ function sampleVal(key: string): string {
   const samples: Record<string, string> = {
     authorFirstName: 'Sarah',
     authorName: 'Sarah Johnson',
+    reviewUrl: 'https://example.com/review/abc123',
     revisionRound: '2',
     roundText: ' | Round 2',
     secondaryCharacterCount: '3',

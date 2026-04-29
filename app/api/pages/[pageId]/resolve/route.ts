@@ -55,7 +55,12 @@ export async function POST(
         }
 
         // Prepare update data based on whether admin has a reply
-        let updateData: any = {
+        const updateData: {
+            is_resolved: true
+            conversation_thread: null
+            admin_reply_type?: 'comment'
+            feedback_history?: unknown[]
+        } = {
             is_resolved: true,
             conversation_thread: null
         }

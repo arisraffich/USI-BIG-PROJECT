@@ -4,6 +4,22 @@ import { v4 as uuidv4 } from 'uuid'
 import { notifyProjectSentToCustomer } from '@/lib/notifications'
 import { getErrorMessage } from '@/lib/utils/error'
 
+interface PageSendUpdateData {
+  feedback_history?: unknown[]
+  feedback_notes?: null
+  is_resolved?: false
+  customer_illustration_url?: string
+  customer_sketch_url?: string
+}
+
+interface CharacterSendUpdateData {
+  feedback_history?: unknown[]
+  feedback_notes?: null
+  is_resolved?: false
+  customer_image_url?: string
+  customer_sketch_url?: string
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -72,7 +88,7 @@ export async function POST(
       // --- ILLUSTRATION REVIEW MODE ---
       
       // Get current send count FIRST (needed for revision_round tracking)
-      const currentCount = (project as any).illustration_send_count || 0
+      const currentCount = project.illustration_send_count || 0
 
       // 1. Get ALL Pages
       const { data: pages } = await supabase
@@ -90,7 +106,7 @@ export async function POST(
           if (hasPageImages) hasImages = true
 
           // Resolve Feedback Logic
-          const updateData: any = {}
+          const updateData: PageSendUpdateData = {}
           
           // If page has admin_reply, DON'T resolve - customer needs to see the reply first
           // Only resolve if there's feedback but NO admin_reply (meaning admin regenerated instead of replying)
@@ -214,7 +230,7 @@ export async function POST(
         console.log('[Send Characters] Processing', characters.length, 'characters')
         
         const charUpdates = characters.map(async (char) => {
-          const updateData: any = {}
+          const updateData: CharacterSendUpdateData = {}
           
           console.log(`[Send Characters] Character ${char.id}:`, {
             has_image_url: !!char.image_url,
@@ -375,7 +391,6 @@ export async function POST(
     )
   }
 }
-
 
 
 

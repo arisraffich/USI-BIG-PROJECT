@@ -1,18 +1,10 @@
 'use client'
 
-import { useState, useRef, startTransition } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Page } from '@/types/page'
-import { PageStatusBar, PageStatus } from '@/components/project/PageStatusBar'
-import { Button } from '@/components/ui/button'
-import { Loader2, Sparkles, AlertCircle, RefreshCw, MessageSquare, CheckCircle2, Download, Upload } from 'lucide-react'
 import { toast } from 'sonner'
-import Image from 'next/image'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
-import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogFooter, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
-import { Textarea } from '@/components/ui/textarea'
 import { SharedIllustrationBoard } from '@/components/illustration/SharedIllustrationBoard'
 
 // ... imports ...
@@ -20,7 +12,7 @@ import { SharedIllustrationBoard } from '@/components/illustration/SharedIllustr
 interface IllustrationItemProps {
     page: Page
     projectId: string
-    projectReviews: any[]
+    projectReviews: unknown[]
     initialAspectRatio?: string
     initialTextIntegration?: string | null
 }
@@ -28,7 +20,6 @@ interface IllustrationItemProps {
 export function IllustrationItem({
     page,
     projectId,
-    projectReviews,
     initialAspectRatio,
     initialTextIntegration
 }: IllustrationItemProps) {
@@ -42,19 +33,8 @@ export function IllustrationItem({
     const [isGenerating, setIsGenerating] = useState(false)
     const [isUploading, setIsUploading] = useState(false)
     const [loadingState, setLoadingState] = useState<{ sketch: boolean; illustration: boolean }>({ sketch: false, illustration: false })
-    const [loadingMessage, setLoadingMessage] = useState<{ sketch: string; illustration: string }>({ sketch: '', illustration: '' })
 
-    const [isRegenerateDialogOpen, setIsRegenerateDialogOpen] = useState(false)
-    const [regenerationPrompt, setRegenerationPrompt] = useState('')
-    const [isImageViewerOpen, setIsImageViewerOpen] = useState(false)
-    const [viewedImage, setViewedImage] = useState<string | null>(null)
-
-    const sketchInputRef = useRef<HTMLInputElement>(null)
-    const illustrationInputRef = useRef<HTMLInputElement>(null)
-
-    // Filter reviews for this page
-    const pageReviews = projectReviews.filter(r => r.page_id === page.id)
-    const hasUnresolvedFeedback = page.feedback_notes && !page.is_resolved
+    const [regenerationPrompt] = useState('')
 
     // -------------------------------------------------------------------------
     // HANDLERS
@@ -91,9 +71,9 @@ export function IllustrationItem({
                 handleGenerateSketch(data.illustrationUrl)
             }
             router.refresh()
-        } catch (error: any) {
+        } catch (error: unknown) {
             toast.dismiss(`painting-${page.id}`)
-            toast.error('Process Failed', { description: error.message })
+            toast.error('Process Failed', { description: error instanceof Error ? error.message : 'Generation failed' })
         } finally {
             setIsGenerating(false)
         }
@@ -117,7 +97,6 @@ export function IllustrationItem({
     }
 
     const handleRegenerateWithPrompt = async () => {
-        setIsRegenerateDialogOpen(false)
         setIsGenerating(true)
         setLoadingState(prev => ({ ...prev, illustration: true }))
 
@@ -144,9 +123,9 @@ export function IllustrationItem({
                 handleGenerateSketch(data.illustrationUrl)
             }
             router.refresh()
-        } catch (error: any) {
+        } catch (error: unknown) {
             toast.dismiss('regen-wait')
-            toast.error('Failed', { description: error.message })
+            toast.error('Failed', { description: error instanceof Error ? error.message : 'Regeneration failed' })
         } finally {
             setIsGenerating(false)
             setLoadingState(prev => ({ ...prev, illustration: false }))
@@ -176,20 +155,12 @@ export function IllustrationItem({
                 handleGenerateSketch(result.url)
             }
             router.refresh()
-        } catch (error: any) {
-            toast.error("Upload Failed", { id: toastId, description: error.message })
+        } catch (error: unknown) {
+            toast.error("Upload Failed", { id: toastId, description: error instanceof Error ? error.message : 'Upload failed' })
         } finally {
             setIsUploading(false)
             setLoadingState(prev => ({ ...prev, [type]: false }))
         }
-    }
-
-    const onFileSelect = (type: 'sketch' | 'illustration') => (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) handleUpload(type, e.target.files[0])
-    }
-
-    const handleDownload = (url: string, filename: string) => {
-        window.location.href = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
     }
 
     const handleSaveFeedback = async (notes: string) => {

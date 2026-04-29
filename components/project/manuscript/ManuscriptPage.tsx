@@ -42,8 +42,6 @@ interface ManuscriptPageProps {
 export function ManuscriptPage({
   page,
   isEditMode,
-  originalStoryText,
-  originalSceneDescription,
   onStoryTextChange,
   onSceneDescriptionChange,
 }: ManuscriptPageProps) {

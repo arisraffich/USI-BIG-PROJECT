@@ -4,7 +4,6 @@ import { createPortal } from 'react-dom'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Edit2, X, Save, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
 
 interface ManuscriptToolbarProps {
   isEditMode: boolean
@@ -42,10 +41,6 @@ export function ManuscriptToolbar({
 
   // If not visible, do not render anything (prevents portal button from appearing)
   if (!isVisible) return null
-
-  const handleDownloadClick = () => {
-    toast.info('Download feature coming soon!')
-  }
 
   const MobileActions = (
     <div className="flex items-center gap-2">

@@ -53,7 +53,6 @@ interface SharedProjectHeaderProps {
 }
 
 export function SharedProjectHeader({
-    projectTitle,
     authorName,
     currentTabId,
     tabs,
@@ -71,8 +70,6 @@ export function SharedProjectHeader({
 }: SharedProjectHeaderProps) {
     const [showSettingsPanel, setShowSettingsPanel] = useState(false)
     const [dropdownOpen, setDropdownOpen] = useState(false)
-
-    const activeTabLabel = tabs.find(t => t.id === currentTabId)?.label || 'Menu'
 
     return (
         <UnifiedHeaderShell>

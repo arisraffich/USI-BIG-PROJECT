@@ -8,7 +8,7 @@ import { UniversalCharacterCard, CharacterFormData } from '@/components/shared/U
 interface CustomerCharacterCardProps {
   character: Character
   isGenerating?: boolean
-  onChange?: (id: string, data: any, isValid: boolean) => void
+  onChange?: (id: string, data: CharacterFormData, isValid: boolean) => void
   onSaved?: (id: string) => void
   isLocked?: boolean
   showSaveToast?: boolean
@@ -72,7 +72,6 @@ export const CustomerCharacterCard = memo(function CustomerCharacterCard({
     />
   )
 })
-
 
 
 

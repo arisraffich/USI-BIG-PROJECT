@@ -14,6 +14,13 @@ interface NewCharacterFormCardProps {
     projectId: string
 }
 
+interface CharacterGenerationResult {
+    character_id: string
+    success: boolean
+    image_url?: string | null
+    error?: string | null
+}
+
 export function NewCharacterFormCard({ character, projectId }: NewCharacterFormCardProps) {
     const router = useRouter()
     const [isGenerating, setIsGenerating] = useState(false)
@@ -92,7 +99,7 @@ export function NewCharacterFormCard({ character, projectId }: NewCharacterFormC
                 throw new Error(genData.error || 'Failed to generate character')
             }
 
-            const result = genData.results?.find((r: any) => r.character_id === character.id)
+            const result = (genData.results as CharacterGenerationResult[] | undefined)?.find((r) => r.character_id === character.id)
             if (genData.failed > 0 || (result && !result.success)) {
                 throw new Error(result?.error || 'Generation failed')
             }

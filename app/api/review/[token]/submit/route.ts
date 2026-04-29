@@ -1,10 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notifyCustomerSubmission, notifyIllustrationsApproved, notifyIllustrationFeedback } from '@/lib/notifications'
-
-import { buildCharacterPrompt } from '@/lib/utils/prompt-builder'
-import { removeMetadata, sanitizeFilename } from '@/lib/utils/metadata-cleaner'
 import { getErrorMessage } from '@/lib/utils/error'
+
+interface PageEditData {
+  story_text?: string
+  scene_description?: string
+}
+
+interface CharacterEditData {
+  age?: string | null
+  gender?: string | null
+  skin_color?: string | null
+  hair_color?: string | null
+  hair_style?: string | null
+  eye_color?: string | null
+  clothing?: string | null
+  accessories?: string | null
+  special_features?: string | null
+}
 
 export async function POST(
   request: NextRequest,
@@ -198,7 +212,7 @@ export async function POST(
     // Update pages with customer edits (Shared)
     if (pageEdits && Object.keys(pageEdits).length > 0) {
       const sanitize = (s: string | undefined) => s ? s.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ') : s
-      const pageUpdates = Object.entries(pageEdits).map(([pageId, edits]: [string, any]) => ({
+      const pageUpdates = Object.entries(pageEdits as Record<string, PageEditData>).map(([pageId, edits]) => ({
         id: pageId,
         story_text: sanitize(edits.story_text),
         scene_description: sanitize(edits.scene_description),
@@ -228,7 +242,7 @@ export async function POST(
     if (characterEdits && Object.keys(characterEdits).length > 0) {
 
 
-      const characterUpdates = Object.entries(characterEdits).map(([charId, data]: [string, any]) => ({
+      const characterUpdates = Object.entries(characterEdits as Record<string, CharacterEditData>).map(([charId, data]) => ({
         id: charId,
         data: data
       }))
@@ -475,7 +489,6 @@ export async function POST(
     )
   }
 }
-
 
 
 

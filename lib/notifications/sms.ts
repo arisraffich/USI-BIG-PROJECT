@@ -1,5 +1,12 @@
 import { getErrorMessage } from '@/lib/utils/error'
 
+interface OpenPhoneNumber {
+  id: string
+  name?: string
+  number?: string
+  formattedNumber?: string
+}
+
 /**
  * Normalize phone number to E.164 format (+1234567890)
  * Handles formats like: (508) 300-9508, 508-300-9508, 5083009508, +15083009508
@@ -67,7 +74,7 @@ export async function sendSMS(options: {
       })
       if (numbersResponse.ok) {
         const numbersData = await numbersResponse.json()
-        const matchingNumber = numbersData.data?.find((num: any) =>
+        const matchingNumber = (numbersData.data as OpenPhoneNumber[] | undefined)?.find((num) =>
           num.number === fromNumber || num.formattedNumber?.includes(fromNumber.replace('+1', ''))
         )
         if (matchingNumber) {
@@ -79,7 +86,7 @@ export async function sendSMS(options: {
           }
         }
       }
-    } catch (err) {
+    } catch {
       console.log('[SMS] Could not fetch phone number ID, will use phone number directly')
     }
 
@@ -132,7 +139,7 @@ export async function sendSMS(options: {
     try {
       result = JSON.parse(responseText)
       console.log(`[SMS] SMS sent successfully. Response:`, JSON.stringify(result, null, 2))
-    } catch (parseError) {
+    } catch {
       console.log(`[SMS] Response is not JSON, raw response: ${responseText}`)
       result = { raw: responseText }
     }

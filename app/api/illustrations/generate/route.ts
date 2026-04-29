@@ -276,7 +276,7 @@ IMAGE CONTEXT:
                 try {
                     const regex = new RegExp(`\\b${mainCharacterName}(?:'s|s)?\\b`, 'gi')
                     return text.replace(regex, "THE MAIN CHARACTER")
-                } catch (e) {
+                } catch {
                     return text
                 }
             }

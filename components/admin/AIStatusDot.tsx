@@ -36,9 +36,12 @@ export function AIStatusDot() {
     }, [])
 
     useEffect(() => {
-        fetchStatus()
+        const timeout = setTimeout(fetchStatus, 0)
         const interval = setInterval(fetchStatus, isMonitoring ? 10_000 : 60_000)
-        return () => clearInterval(interval)
+        return () => {
+            clearTimeout(timeout)
+            clearInterval(interval)
+        }
     }, [fetchStatus, isMonitoring])
 
     const config = STATUS_CONFIG[status] || STATUS_CONFIG.unknown

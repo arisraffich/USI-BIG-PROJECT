@@ -67,7 +67,14 @@ export async function PATCH(
         // I will proceed with replicating the pattern as requested (admin client update).
 
         // Build update data
-        let updateData: any = {
+        const updateData: {
+            feedback_notes: string | null
+            is_resolved: false
+            feedback_history?: unknown[]
+            admin_reply?: null
+            admin_reply_at?: null
+            admin_reply_type?: null
+        } = {
             feedback_notes: body.feedback_notes || null,
             is_resolved: false, // Reset resolved status on new feedback
         }
@@ -77,7 +84,13 @@ export async function PATCH(
             // Archive old feedback if it exists
             if (page.feedback_notes) {
                 // Build history entry from old resolved feedback
-                const historyEntry: any = {
+                const historyEntry: {
+                    note: string
+                    created_at: string
+                    revision_round: number
+                    admin_comment?: string
+                    admin_comment_at?: string | null
+                } = {
                     note: page.feedback_notes,
                     created_at: new Date().toISOString(),
                     revision_round: project.illustration_send_count || 1
@@ -90,7 +103,7 @@ export async function PATCH(
                 }
                 
                 // Prepend to existing history
-                const existingHistory = page.feedback_history || []
+                const existingHistory = Array.isArray(page.feedback_history) ? page.feedback_history : []
                 updateData.feedback_history = [historyEntry, ...existingHistory]
             }
             

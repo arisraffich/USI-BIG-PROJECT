@@ -14,7 +14,7 @@ import potrace from 'potrace'
 // Manual promisify to handle overloaded trace function
 function trace(buffer: Buffer, options: Record<string, unknown>): Promise<string> {
     return new Promise((resolve, reject) => {
-        potrace.trace(buffer, options as any, (err: Error | null, svg: string) => {
+        potrace.trace(buffer, options, (err: Error | null, svg: string) => {
             if (err) reject(err)
             else resolve(svg)
         })

@@ -29,7 +29,7 @@ interface CoverTabContentProps {
  *   - Empty state: tells admin to click "Create Cover" on an illustration.
  *   - Filled state: renders CoverBoard (dual pane + regen + comparison + delete).
  */
-export function CoverTabContent({ projectId: _projectId, pages, initialCover, onCoverChange }: CoverTabContentProps) {
+export function CoverTabContent({ pages, initialCover, onCoverChange }: CoverTabContentProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const pathname = usePathname()
@@ -62,7 +62,7 @@ export function CoverTabContent({ projectId: _projectId, pages, initialCover, on
             window.sessionStorage.removeItem(key)
             setPendingCandidates(null)
         }
-    }, [cover?.id])
+    }, [cover])
 
     const handleCoverUpdated = useCallback((nextCover: Cover) => {
         setCover(nextCover)

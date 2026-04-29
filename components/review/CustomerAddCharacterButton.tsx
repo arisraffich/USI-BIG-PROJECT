@@ -75,7 +75,7 @@ export function CustomerAddCharacterButton({
       setNameRole('')
       setDescription('')
       onCharacterAdded()
-    } catch (error: unknown) {
+    } catch {
       toast.error('Failed to add character')
     } finally {
       setIsAddingCharacter(false)
@@ -93,7 +93,7 @@ export function CustomerAddCharacterButton({
       <DialogHeader>
         <DialogTitle>Add New Character</DialogTitle>
         <DialogDescription>
-          Enter the character's name or role and a brief description.
+          Enter the character&apos;s name or role and a brief description.
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4 py-4">
@@ -176,8 +176,6 @@ export function CustomerAddCharacterButton({
     </>
   )
 }
-
-
 
 
 

@@ -36,7 +36,7 @@ export default function LoginForm() {
       } else {
         setError('Invalid username or password')
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred. Please try again.')
     } finally {
       setIsLoading(false)
@@ -76,5 +76,4 @@ export default function LoginForm() {
     </form>
   )
 }
-
 

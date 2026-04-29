@@ -495,7 +495,7 @@ export function IllustrationsTabContent({
             // Clear admin reply since we're regenerating (addressing feedback with action)
             try {
                 await fetch(`/api/pages/${page.id}/admin-reply`, { method: 'DELETE' })
-            } catch (e) {
+            } catch {
                 // Non-critical, continue
             }
 
@@ -567,8 +567,6 @@ export function IllustrationsTabContent({
         if (!comparison) return
         
         const { oldUrl, newUrl } = comparison
-        const page = pages.find(p => p.id === pageId)
-        
         // Exit comparison mode IMMEDIATELY so UI switches back to normal view
         setComparisonStates(prev => {
             const next = { ...prev }
@@ -590,8 +588,6 @@ export function IllustrationsTabContent({
             
             if (!response.ok) throw new Error('Failed to confirm')
             
-            const data = await response.json()
-            
             if (decision === 'keep_new') {
                 toast.success('New illustration confirmed', { description: 'Generating sketch...' })
                 
@@ -600,7 +596,7 @@ export function IllustrationsTabContent({
                 // Clear admin reply since we're regenerating (addressing feedback with action)
                 try {
                     await fetch(`/api/pages/${pageId}/admin-reply`, { method: 'DELETE' })
-                } catch (e) {
+                } catch {
                     // Non-critical, continue
                 }
                 
@@ -616,7 +612,7 @@ export function IllustrationsTabContent({
                     } else {
                         toast.error('Sketch update failed')
                     }
-                } catch (e) {
+                } catch {
                     toast.error('Sketch update failed')
                 }
             } else {
@@ -1003,7 +999,7 @@ export function IllustrationsTabContent({
                                 Copy story text
                             </button>
                         </div>
-                    ) as any,
+                    ),
                 })
             } else {
                 toast.success(`Page ${deletedNumber} deleted`)

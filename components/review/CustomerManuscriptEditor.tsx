@@ -134,7 +134,8 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEd
         }
         // Remove pageId entry if it's now empty
         if (!newEdits[pageId] || Object.keys(newEdits[pageId]).length === 0) {
-          const { [pageId]: _, ...rest } = newEdits
+          const rest = { ...newEdits }
+          delete rest[pageId]
           return rest
         }
         return newEdits
@@ -173,7 +174,8 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEd
         }
         // Remove pageId entry if it's now empty
         if (!newEdits[pageId] || Object.keys(newEdits[pageId]).length === 0) {
-          const { [pageId]: _, ...rest } = newEdits
+          const rest = { ...newEdits }
+          delete rest[pageId]
           return rest
         }
         return newEdits
@@ -213,7 +215,7 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEd
     try {
       // Save each page edit to the database
       // Get current displayed values (baseline + edits)
-      const pageUpdates = Object.entries(pageEdits).map(([pageId, edits]: [string, any]) => {
+      const pageUpdates = Object.entries(pageEdits).map(([pageId, edits]) => {
         const baselinePage = baselinePagesRef.current.find((p) => p.id === pageId)
         const currentStoryText = edits.story_text ?? baselinePage?.story_text ?? ''
         const currentSceneDesc = edits.scene_description ?? baselinePage?.scene_description ?? null
@@ -451,8 +453,6 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEd
     </div>
   )
 }
-
-
 
 
 

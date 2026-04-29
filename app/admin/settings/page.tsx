@@ -16,13 +16,27 @@ const INTERNAL_SLUGS = new Set([
   'send_sketches_internal',
 ])
 
+const FOLLOW_UP_SLUGS = new Set([
+  'story_followup_v1',
+  'story_followup_v2',
+  'story_followup_v3',
+  'character_followup_v1',
+  'character_followup_v2',
+  'character_followup_v3',
+  'sketch_followup_v1',
+  'sketch_followup_v2',
+  'sketch_followup_v3',
+])
+
+type EmailTab = 'customer' | 'follow_up' | 'internal'
+
 export default function SettingsPage() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [seeding, setSeeding] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null)
-  const [emailTab, setEmailTab] = useState<'customer' | 'internal'>('customer')
+  const [emailTab, setEmailTab] = useState<EmailTab>('customer')
 
   const loadTemplates = useCallback(async () => {
     setLoading(true)
@@ -54,12 +68,19 @@ export default function SettingsPage() {
   }
 
   const filteredTemplates = useMemo(() => {
-    return templates.filter(t =>
-      emailTab === 'internal' ? INTERNAL_SLUGS.has(t.slug) : !INTERNAL_SLUGS.has(t.slug)
-    )
+    return templates.filter(t => {
+      if (emailTab === 'internal') return INTERNAL_SLUGS.has(t.slug)
+      if (emailTab === 'follow_up') return FOLLOW_UP_SLUGS.has(t.slug)
+      return !INTERNAL_SLUGS.has(t.slug) && !FOLLOW_UP_SLUGS.has(t.slug)
+    })
   }, [templates, emailTab])
 
   const selectedTemplate = templates.find(t => t.slug === selectedSlug) || null
+
+  const handleEmailTabChange = (tab: EmailTab) => {
+    setEmailTab(tab)
+    setSelectedSlug(null)
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -88,7 +109,7 @@ export default function SettingsPage() {
               {!loading && !error && templates.length > 0 && (
                 <div className="flex border-b border-gray-200">
                   <button
-                    onClick={() => setEmailTab('customer')}
+                    onClick={() => handleEmailTabChange('customer')}
                     className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors ${
                       emailTab === 'customer'
                         ? 'text-blue-700 border-b-2 border-blue-600 bg-blue-50/50'
@@ -98,7 +119,17 @@ export default function SettingsPage() {
                     Customer
                   </button>
                   <button
-                    onClick={() => setEmailTab('internal')}
+                    onClick={() => handleEmailTabChange('follow_up')}
+                    className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors ${
+                      emailTab === 'follow_up'
+                        ? 'text-blue-700 border-b-2 border-blue-600 bg-blue-50/50'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    Follow Up
+                  </button>
+                  <button
+                    onClick={() => handleEmailTabChange('internal')}
                     className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors ${
                       emailTab === 'internal'
                         ? 'text-blue-700 border-b-2 border-blue-600 bg-blue-50/50'

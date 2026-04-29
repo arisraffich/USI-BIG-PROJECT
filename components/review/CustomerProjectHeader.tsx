@@ -3,7 +3,7 @@
 import { useTransition } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Check, Loader2, FileText, Sparkles, Send } from 'lucide-react'
+import { Check, Loader2, FileText, Sparkles } from 'lucide-react'
 import { MobilePageNavigator } from '@/components/ui/mobile-page-navigator'
 import { Badge } from '@/components/ui/badge'
 import { SharedProjectHeader } from '@/components/layout/SharedProjectHeader'
@@ -40,14 +40,12 @@ export function CustomerProjectHeader({
   onSubmit,
   showSubmitButton = true,
   isSubmitDisabled = false,
-  hideOnMobile = false,
   onApprove,
   isApproving = false,
   showApproveButton = false,
   isApproveDisabled = false,
   showIllustrationsTab = false,
   projectStatus,
-  illustrationSendCount = 0,
   approvalStage = 'sketch',
   approvalApprovedCount = 0,
   approvalTotalCount = 0,
@@ -56,7 +54,7 @@ export function CustomerProjectHeader({
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
-  const [isPending, startTransition] = useTransition()
+  const [, startTransition] = useTransition()
 
   // Read active tab from search params
   const activeTab = searchParams?.get('tab')
@@ -294,7 +292,6 @@ export function CustomerProjectHeader({
     </>
   )
 }
-
 
 
 

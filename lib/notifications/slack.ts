@@ -1,8 +1,10 @@
 import { getErrorMessage } from '@/lib/utils/error'
 
+export type SlackBlock = Record<string, unknown>
+
 export async function sendSlackNotification(options: {
   text: string
-  blocks?: any[]
+  blocks?: SlackBlock[]
 }): Promise<void> {
   const webhookUrl = process.env.SLACK_WEBHOOK_URL
 

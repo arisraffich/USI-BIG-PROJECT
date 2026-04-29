@@ -2,6 +2,11 @@ import { OpenAI } from 'openai'
 import { createAdminClient } from '@/lib/supabase/server'
 import { DirectorSchema, zodToResponsesFormat, extractResponseContent, actionsArrayToObject } from '@/lib/ai/schemas'
 
+interface DirectorCharacter {
+    name?: string | null
+    description?: string | null
+    appearance_notes?: string | null
+}
 
 
 export async function analyzeScene(
@@ -9,7 +14,7 @@ export async function analyzeScene(
     pageId: string,
     storyText: string,
     sceneDescription: string,
-    characters: any[]
+    characters: DirectorCharacter[]
 ) {
     const openai = new OpenAI({
         apiKey: process.env.OPENAI_API_KEY

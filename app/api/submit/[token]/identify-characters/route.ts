@@ -96,7 +96,7 @@ export async function POST(
 
     // Use the existing character identification function
     const { identifyCharactersForProject } = await import('@/app/api/ai/identify-characters/route')
-    const result = await identifyCharactersForProject(project.id)
+    await identifyCharactersForProject(project.id)
 
     // Fetch the full secondary characters (all fields for UniversalCharacterCard)
     const { data: characters, error: charsError } = await supabase

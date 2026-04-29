@@ -5,10 +5,19 @@ import {
   PageParsingSchema,
   SceneDescriptionBatchSchema,
   SceneDescriptionSingleSchema,
+  SceneDescriptionPageSchema,
   zodToResponsesFormat,
   extractResponseContent,
   actionsArrayToObject,
 } from '@/lib/ai/schemas'
+import type { z } from 'zod'
+
+type PageParsingResult = z.infer<typeof PageParsingSchema>
+type SceneDescriptionBatchResult = z.infer<typeof SceneDescriptionBatchSchema>
+type SceneDescriptionPageResult = z.infer<typeof SceneDescriptionPageSchema>
+type ProcessedSceneDescription = Omit<SceneDescriptionPageResult, 'character_actions'> & {
+  character_actions: Record<string, string>
+}
 
 export async function parseStoryFile(
   fileBuffer: Buffer,
@@ -228,12 +237,12 @@ Example output format:
     if (!content) throw new Error('Empty response from GPT-5.4')
 
     console.log('[parsePagesWithAI] Raw AI response length:', content.length)
-    const result = JSON.parse(content)
+    const result = JSON.parse(content) as PageParsingResult
     console.log(`[parsePagesWithAI] Successfully parsed ${result.pages.length} pages.`)
 
-    result.pages.sort((a: any, b: any) => a.page_number - b.page_number)
+    result.pages.sort((a, b) => a.page_number - b.page_number)
 
-    pages = result.pages.map((page: any) => ({
+    pages = result.pages.map(page => ({
       page_number: page.page_number,
       story_text: page.story_text,
       scene_description: page.scene_description,
@@ -330,11 +339,11 @@ ${pagesBlock}`
     if (refusal) throw new Error(`Model refused: ${refusal}`)
     if (!jsonText) throw new Error('Empty response from GPT-5.4')
 
-    const result = JSON.parse(jsonText)
+    const result = JSON.parse(jsonText) as SceneDescriptionBatchResult
     console.log(`[SceneDescriptions] Batch success — ${result.pages.length} pages returned`)
 
     // Build lookup from AI results, converting array character_actions to object
-    const aiResults = new Map<number, any>()
+    const aiResults = new Map<number, ProcessedSceneDescription>()
     for (const p of result.pages) {
       aiResults.set(p.page_number, {
         ...p,
@@ -416,5 +425,4 @@ async function fallbackPerPage(
 
   return allPages.map(page => results.get(page.page_number) || { ...page })
 }
-
 

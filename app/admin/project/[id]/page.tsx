@@ -1,8 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
-import { getErrorMessage } from '@/lib/utils/error'
 import { ProjectTabsContent } from '@/components/admin/ProjectTabsContent'
 import { Suspense } from 'react'
+import { Project } from '@/types/project'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +15,7 @@ export default async function ProjectDetailPage({
   let pages = null
   let characters = null
   let projectStatus: string = 'draft'
-  let projectInfo: any = null
+  let projectInfo: Project | null = null
 
   try {
     const supabase = await createAdminClient()
@@ -54,7 +53,7 @@ export default async function ProjectDetailPage({
 
     characters = charactersResult.data || null
     projectStatus = projectResult.data?.status || 'draft'
-    projectInfo = projectResult.data
+    projectInfo = projectResult.data as Project | null
 
   } catch (error: unknown) {
     console.error('Error in ProjectDetailPage:', error)

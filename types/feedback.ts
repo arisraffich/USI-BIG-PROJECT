@@ -54,9 +54,7 @@ export interface PageFeedbackFields extends BaseFeedbackFields {
 /**
  * Character feedback fields (subset of Character type)
  */
-export interface CharacterFeedbackFields extends BaseFeedbackFields {
-  // Characters use the same base fields, no additional fields
-}
+export type CharacterFeedbackFields = BaseFeedbackFields
 
 // ============================================================================
 // API PAYLOAD TYPES

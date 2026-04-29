@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { ProjectStatus } from '@/types/project'
-import { getErrorMessage } from '@/lib/utils/error'
 
 interface ProjectStatusResponse {
   id: string
@@ -118,5 +117,4 @@ export function useProjectStatus(projectId: string, initialStatus: ProjectStatus
 
   return { status, isLoading, error }
 }
-
 

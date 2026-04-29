@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getErrorMessage } from '@/lib/utils/error'
 
+interface ReviewCharacterListItem {
+  is_main: boolean
+  customer_image_url?: string | null
+  image_url?: string | null
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
@@ -71,7 +77,7 @@ export async function GET(
         status: project.status,
       },
       pages: pages || [],
-      characters: (characters || []).filter((c: any) => c.is_main || c.customer_image_url || !c.image_url),
+      characters: (characters || []).filter((c: ReviewCharacterListItem) => c.is_main || c.customer_image_url || !c.image_url),
     })
   } catch (error: unknown) {
     console.error('Error fetching review project:', error)
@@ -81,7 +87,6 @@ export async function GET(
     )
   }
 }
-
 
 
 

@@ -1,7 +1,12 @@
 import { sendEmail } from './email'
-import { sendSlackNotification } from './slack'
+import { sendSlackNotification, SlackBlock } from './slack'
 import { getErrorMessage } from '@/lib/utils/error'
 import { renderTemplate, injectPersonalNote } from '@/lib/email/renderer'
+
+interface EmailProviderError extends Error {
+  code?: unknown
+  response?: unknown
+}
 
 function isTestAuthor(name: string): boolean {
   return name.toLowerCase().includes('test')
@@ -35,10 +40,10 @@ export async function notifyCustomerSubmission(options: {
     special_features?: string
   }>
 }): Promise<void> {
-  const { projectId: _projectId, projectTitle, authorName, projectUrl, characters } = options
+  const { projectTitle, authorName, projectUrl, characters } = options
 
   try {
-    const blocks: any[] = [
+    const blocks: SlackBlock[] = [
       {
         type: 'section',
         text: {
@@ -170,8 +175,8 @@ export async function notifyProjectSentToCustomer(options: {
     console.error('[Notification] Failed to send customer notification email:', emailError)
     console.error('[Notification] Email error details:', {
       message: getErrorMessage(emailError),
-      code: emailError instanceof Error ? (emailError as any).code : undefined,
-      response: emailError instanceof Error ? (emailError as any).response : undefined,
+      code: emailError instanceof Error ? (emailError as EmailProviderError).code : undefined,
+      response: emailError instanceof Error ? (emailError as EmailProviderError).response : undefined,
       stack: emailError instanceof Error ? emailError.stack : undefined,
     })
   }
@@ -523,7 +528,7 @@ export async function notifyIllustrationsApproved(options: {
   authorName: string
   projectUrl: string
 }): Promise<void> {
-  const { projectId, projectTitle, authorName, projectUrl } = options
+  const { projectTitle, authorName, projectUrl } = options
 
   try {
     await sendSlackIfNotTest(authorName, {

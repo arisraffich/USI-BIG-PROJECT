@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getErrorMessage } from '@/lib/utils/error'
 
+interface PageBulkUpdate {
+  id?: string
+  story_text?: string
+  scene_description?: string | null
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -21,7 +27,8 @@ export async function PATCH(
     const supabase = await createAdminClient()
 
     // Validate that all page IDs belong to this project
-    const pageIds = updates.map((u: any) => u.id).filter(Boolean)
+    const typedUpdates = updates as PageBulkUpdate[]
+    const pageIds = typedUpdates.map((u) => u.id).filter((id): id is string => Boolean(id))
     if (pageIds.length === 0) {
       return NextResponse.json(
         { error: 'No valid page IDs provided' },
@@ -60,7 +67,7 @@ export async function PATCH(
     // Update each page individually, but if any fails, we'll rollback
     const sanitize = (s: string) => s.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ')
 
-    const updatePromises = updates.map(async (update: any) => {
+    const updatePromises = typedUpdates.map(async (update) => {
       const updateData: {
         story_text?: string
         scene_description?: string | null
@@ -121,7 +128,6 @@ export async function PATCH(
     )
   }
 }
-
 
 
 

@@ -32,6 +32,10 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { BADGE_COLORS } from '@/lib/constants/statusBadgeConfig'
 import { getErrorMessage } from '@/lib/utils/error'
+
+interface ProjectStatusPayload {
+  status?: string
+}
 import { SendConfirmationDialog } from './SendConfirmationDialog'
 
 interface ProjectInfo {
@@ -94,14 +98,13 @@ function isInIllustrationPhase(status: ProjectStatus): boolean {
   ].includes(status)
 }
 
-export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, isTrialReady = false, onCreateIllustrations, generatedIllustrationCount = 0, centerContent, hasUnresolvedFeedback = false, hasResolvedFeedback = false, showCoverTab = false, coverHeaderActions }: ProjectHeaderProps) {
+export function ProjectHeader({ projectId, projectInfo, pageCount, characterCount, hasImages = false, onCreateIllustrations, generatedIllustrationCount = 0, centerContent, hasUnresolvedFeedback = false, hasResolvedFeedback = false, showCoverTab = false, coverHeaderActions }: ProjectHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
-  const [isPending, startTransition] = useTransition()
+  const [, startTransition] = useTransition()
   const [isSendingToCustomer, setIsSendingToCustomer] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
-  const [mounted, setMounted] = useState(false)
   
   // Settings state
   const [showColoredToCustomer, setShowColoredToCustomer] = useState(projectInfo.show_colored_to_customer ?? false)
@@ -161,11 +164,6 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const [scheduleNote, setScheduleNote] = useState('')
   const schedulePopoverRef = useRef<HTMLDivElement>(null)
 
-  // Hydration fix
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-  
   // Sync settings state when projectInfo changes
   useEffect(() => {
     setShowColoredToCustomer(projectInfo.show_colored_to_customer ?? false)
@@ -670,8 +668,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
           filter: `id=eq.${projectId}`
         },
         (payload) => {
-          const newProject = payload.new as any
-          const oldProject = payload.old as any
+          const newProject = payload.new as ProjectStatusPayload
+          const oldProject = payload.old as ProjectStatusPayload
           
           // Only refresh when status actually changes
           if (oldProject?.status !== newProject.status) {
@@ -687,7 +685,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   }, [projectId, router])
 
   // Poll project status to detect when character identification completes
-  const { status: currentStatus, isLoading: isCharactersLoading } = useProjectStatus(
+  const { isLoading: isCharactersLoading } = useProjectStatus(
     projectId,
     projectInfo.status
   )
@@ -912,7 +910,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         message: getErrorMessage(error, 'Failed to create ZIP'),
       }))
     }
-  }, [projectInfo.book_title])
+  }, [projectId, projectInfo.book_title])
 
   // Download existing line art from storage (no generation, for settings button)
   const handleDownloadExistingLineArt = useCallback(async () => {

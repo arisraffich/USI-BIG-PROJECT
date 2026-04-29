@@ -11,6 +11,7 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "google-cloud-sdk/**",
     "next-env.d.ts",
   ]),
 ]);

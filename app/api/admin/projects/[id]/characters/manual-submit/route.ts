@@ -3,6 +3,19 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { notifyCustomerSubmission } from '@/lib/notifications' // Only triggers Slack, safe to use or I will verify internal logic again
 import { getErrorMessage } from '@/lib/utils/error'
 
+interface CharacterEditData {
+    name?: string | null
+    age?: string | null
+    gender?: string | null
+    skin_color?: string | null
+    hair_color?: string | null
+    hair_style?: string | null
+    eye_color?: string | null
+    clothing?: string | null
+    accessories?: string | null
+    special_features?: string | null
+}
+
 // We will NOT import notification functions that send emails.
 // The notifyCustomerSubmission function in lib/notifications MAINLY sends Slack.
 // Let's re-verify if I should duplicate it to be 100% safe or if I can rely on it.
@@ -38,7 +51,7 @@ export async function POST(
 
         // 2. Update Characters (if edits provided)
         if (characterEdits && Object.keys(characterEdits).length > 0) {
-            const characterUpdates = Object.entries(characterEdits).map(([charId, data]: [string, any]) => ({
+            const characterUpdates = Object.entries(characterEdits as Record<string, CharacterEditData>).map(([charId, data]) => ({
                 id: charId,
                 data: data
             }))

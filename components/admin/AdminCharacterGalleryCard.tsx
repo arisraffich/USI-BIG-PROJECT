@@ -6,7 +6,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, X, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Character } from '@/types/character'
-import { useRouter } from 'next/navigation'
 import { getErrorMessage } from '@/lib/utils/error'
 
 interface AdminCharacterGalleryCardProps {
@@ -15,8 +14,14 @@ interface AdminCharacterGalleryCardProps {
     isGenerating?: boolean
 }
 
+interface CharacterGenerationResult {
+    character_id: string
+    success: boolean
+    image_url?: string
+    error?: string | null
+}
+
 export function AdminCharacterGalleryCard({ character, projectId, isGenerating = false }: AdminCharacterGalleryCardProps) {
-    const router = useRouter()
     const [isRegenerating, setIsRegenerating] = useState(false)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [customPrompt, setCustomPrompt] = useState(character.generation_prompt || '')
@@ -54,20 +59,22 @@ export function AdminCharacterGalleryCard({ character, projectId, isGenerating =
             }
 
             // Check for functional failures even if HTTP 200
-            const result = data.results?.find((r: any) => r.character_id === character.id)
+            const result = (data.results as CharacterGenerationResult[] | undefined)?.find((r) => r.character_id === character.id)
             if (data.failed > 0 || (result && !result.success)) {
                 throw new Error(result?.error || 'Generation failed on server')
             }
 
             // Preload new image to prevent flicker
-            if (result?.image_url) {
+            const resultImageUrl = result?.image_url
+
+            if (resultImageUrl) {
                 await new Promise((resolve) => {
                     const img = new Image()
                     img.onload = resolve
                     img.onerror = resolve // Don't block indefinitely
-                    img.src = result.image_url
+                    img.src = resultImageUrl
                 })
-                setOptimisticImage(result.image_url)
+                setOptimisticImage(resultImageUrl)
             }
 
             toast.success('Character generated successfully')

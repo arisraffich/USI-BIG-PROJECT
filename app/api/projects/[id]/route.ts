@@ -17,7 +17,7 @@ export async function GET(
       .eq('id', id)
       .single()
 
-    const { count: pagesCount, error: pagesError } = await supabase
+    const { count: pagesCount } = await supabase
       .from('pages')
       .select('id', { count: 'exact', head: true })
       .eq('project_id', id)
@@ -95,7 +95,7 @@ export async function DELETE(
       try {
         await supabase.storage.from('character-images').remove([id])
         await supabase.storage.from('project-files').remove([id])
-      } catch (folderError) {
+      } catch {
         // Folder deletion might not be supported
       }
     } catch (storageError: unknown) {
@@ -150,5 +150,4 @@ export async function DELETE(
     )
   }
 }
-
 

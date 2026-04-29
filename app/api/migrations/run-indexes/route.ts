@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { getErrorMessage } from '@/lib/utils/error'
@@ -25,8 +24,6 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = createAdminClient()
-    
     // Read the migration SQL file
     const migrationPath = join(process.cwd(), 'supabase', 'migrations', 'add_performance_indexes.sql')
     const sql = readFileSync(migrationPath, 'utf-8')
@@ -92,7 +89,6 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-
 
 
 

@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import { useSearchParams, usePathname, useRouter } from 'next/navigation'
-import { CustomerIllustrationReview } from './CustomerIllustrationReview'
 import { UnifiedIllustrationFeed } from '@/components/illustration/UnifiedIllustrationFeed'
 import { UnifiedIllustrationSidebar } from '@/components/illustration/UnifiedIllustrationSidebar'
 import { CustomerAddCharacterButton } from './CustomerAddCharacterButton'
@@ -14,8 +13,10 @@ import { CustomerCharacterGallery } from './CustomerCharacterGallery'
 import { CustomerCharacterCard } from './CustomerCharacterCard'
 import { Page } from '@/types/page'
 import { Character } from '@/types/character'
+import { ProjectStatus } from '@/types/project'
+import { CharacterFormData } from '@/components/shared/UniversalCharacterCard'
 import { Button } from '@/components/ui/button'
-import { Send, Check, PartyPopper } from 'lucide-react'
+import { Check, PartyPopper } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { UnifiedProjectLayout } from '@/components/layout/UnifiedProjectLayout'
@@ -61,7 +62,6 @@ export function CustomerProjectTabsContent({
   const pathname = usePathname()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'loading' | 'success'>('idle')
   const [showApproveWarningDialog, setShowApproveWarningDialog] = useState(false)
   const [showApprovalMilestonePopup, setShowApprovalMilestonePopup] = useState<null | IllustrationApprovalStage>(null)
@@ -74,6 +74,8 @@ export function CustomerProjectTabsContent({
 
   // Local project status state for realtime updates
   const [localProjectStatus, setLocalProjectStatus] = useState(projectStatus)
+
+  const [, setIllustrationEdits] = useState<Record<string, string>>({})
   
   // Track send count and sync project status from props
   const lastSendCount = useRef(characterSendCount)
@@ -87,9 +89,6 @@ export function CustomerProjectTabsContent({
     setLocalProjectStatus(projectStatus)
     latestProjectStatus.current = projectStatus
   }, [projectStatus])
-
-  // Illustration Feedback State
-  const [illustrationEdits, setIllustrationEdits] = useState<{ [pageId: string]: string }>({})
 
   // Local state for pages to support instant realtime updates
   const [localPages, setLocalPages] = useState<Page[]>(pages || [])
@@ -168,7 +167,7 @@ export function CustomerProjectTabsContent({
           } else if (payload.eventType === 'INSERT' && payload.new) {
             setLocalPages(prev => [...prev, payload.new as Page])
           } else if (payload.eventType === 'DELETE' && payload.old) {
-            const deletedId = (payload.old as any).id
+            const deletedId = (payload.old as { id: string }).id
             setLocalPages(prev => prev.filter(p => p.id !== deletedId))
             toast.info('A page has been removed', {
               description: 'The illustrator has updated the page structure.'
@@ -197,7 +196,7 @@ export function CustomerProjectTabsContent({
           filter: `id=eq.${projectId}`
         },
         (payload) => {
-          const newProject = payload.new as any
+          const newProject = payload.new as { status: string }
           const currentStatus = latestProjectStatus.current
 
           setLocalProjectStatus(newProject.status)
@@ -310,12 +309,12 @@ export function CustomerProjectTabsContent({
   const [manuscriptEdits, setManuscriptEdits] = useState<{ [pageId: string]: { story_text?: string; scene_description?: string } }>({})
 
   // Store character form data and validity
-  const [characterForms, setCharacterForms] = useState<{ [id: string]: { data: any; isValid: boolean } }>({})
+  const [characterForms, setCharacterForms] = useState<Record<string, { data: CharacterFormData; isValid: boolean }>>({})
 
   // Initialize character forms from props on mount (fix for manually added characters having disabled submit button)
   useEffect(() => {
     if (localCharacters && localCharacters.length > 0) {
-      const initialForms: Record<string, { data: any; isValid: boolean }> = {}
+      const initialForms: Record<string, { data: CharacterFormData; isValid: boolean }> = {}
 
       localCharacters.forEach(char => {
         // Only initialize if not main character (as main is read-only here)
@@ -323,7 +322,20 @@ export function CustomerProjectTabsContent({
           // Basic validation: needs name, age, gender. 
           // If manual add, these should exist.
           const isValid = !!(char.name && char.age && char.gender)
-          initialForms[char.id] = { data: char, isValid }
+          initialForms[char.id] = {
+            data: {
+              age: char.age ?? null,
+              gender: char.gender ?? null,
+              skin_color: char.skin_color ?? null,
+              hair_color: char.hair_color ?? null,
+              hair_style: char.hair_style ?? null,
+              eye_color: char.eye_color ?? null,
+              clothing: char.clothing ?? null,
+              accessories: char.accessories ?? null,
+              special_features: char.special_features ?? null,
+            },
+            isValid
+          }
         }
       })
 
@@ -337,7 +349,7 @@ export function CustomerProjectTabsContent({
     }
   }, [localCharacters])
 
-  const handleCharacterChange = useCallback((id: string, data: any, isValid: boolean) => {
+  const handleCharacterChange = useCallback((id: string, data: CharacterFormData, isValid: boolean) => {
     setCharacterForms(prev => ({
       ...prev,
       [id]: { data, isValid }
@@ -431,7 +443,7 @@ export function CustomerProjectTabsContent({
     // And gallery is shown when "Send Characters" is clicked (after images are synced)
     const hasCustomerImages = sortedCharacters.secondary.some(c => c.customer_image_url !== null && c.customer_image_url !== '')
     return hasCustomerImages
-  }, [sortedCharacters.secondary, localProjectStatus])
+  }, [sortedCharacters.secondary])
 
   const showIllustrationsTab = isIllustrationMode
 
@@ -687,7 +699,7 @@ export function CustomerProjectTabsContent({
     const characterEdits = Object.entries(characterForms).reduce((acc, [id, info]) => {
       acc[id] = info.data
       return acc
-    }, {} as Record<string, any>)
+    }, {} as Record<string, CharacterFormData>)
 
     try {
       const response = await fetch(`/api/review/${reviewToken}/submit`, {
@@ -813,7 +825,6 @@ export function CustomerProjectTabsContent({
     }
   }, [reviewToken])
 
-  const page1 = localPages.find(p => p.page_number === 1)
   const pageCount = localPages.length
   // Use local characters length
   const characterCount = localCharacters?.length || 0
@@ -849,9 +860,9 @@ export function CustomerProjectTabsContent({
           activeTab === 'illustrations' && showIllustrationsTab && !showStatusScreen ? (
             <UnifiedIllustrationSidebar
               mode="customer"
-              pages={localPages as any}
+              pages={localPages}
               activePageId={activeIllustrationPageId || localPages.find(p => p.page_number === 1)?.id || null}
-              projectStatus={localProjectStatus as any}
+              projectStatus={localProjectStatus as ProjectStatus}
               illustrationSendCount={illustrationSendCount}
               approvalStage={approvalStage}
               onPageClick={setActiveIllustrationPageId}
@@ -867,7 +878,7 @@ export function CustomerProjectTabsContent({
             {/* Pages Tab Content */}
             <div className={activeTab === 'pages' ? 'block' : 'hidden'}>
               <CustomerManuscriptEditor
-                pages={localPages as any}
+                pages={localPages}
                 projectId={projectId}
                 onEditsChange={setManuscriptEdits}
                 isEditMode={isEditMode}
@@ -1070,9 +1081,5 @@ export function CustomerProjectTabsContent({
     </>
   )
 }
-
-
-
-
 
 

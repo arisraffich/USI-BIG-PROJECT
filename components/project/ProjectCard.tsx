@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Trash2, Loader2, Clock, UserRound, Wrench } from 'lucide-react'
 import { toast } from 'sonner'
+import { FollowUpButton } from './FollowUpButton'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,11 +32,16 @@ interface Project {
   status_changed_at?: string
   character_send_count?: number
   illustration_send_count?: number
+  follow_up_stage?: string | null
+  follow_up_count?: number
+  follow_up_last_sent_at?: string | null
+  follow_up_is_sending?: boolean
 }
 
 interface ProjectCardProps {
   project: Project
   pageCount?: number
+  showFollowUpAction?: boolean
 }
 
 // Determine which tab to open based on project status
@@ -95,7 +101,7 @@ function timeAgo(dateString: string): string {
   return `${months} months ago`
 }
 
-export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }: ProjectCardProps) {
+export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0, showFollowUpAction = false }: ProjectCardProps) {
   const router = useRouter()
   const [isDeleting, setIsDeleting] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -209,19 +215,22 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }:
 
   const followUpBadge = isFollowUp(project.status)
   const workingBadge = isWorking(project.status)
+  const canShowFollowUpButton = showFollowUpAction && followUpBadge && Boolean(project.follow_up_stage)
 
   const cardContent = (
     <>
-      <Link href={`/admin/project/${project.id}?tab=${getDefaultTabForStatus(project.status)}`} className="flex-1 block cursor-pointer min-w-0">
-        <h2 className="text-xl font-semibold mb-0">
-          <span className="text-blue-600">{project.author_firstname} {project.author_lastname}</span> {project.book_title.replace(`${project.author_firstname} ${project.author_lastname}`, '').replace(/^'s\s*/, '').replace(/\bBook\b/i, 'Project').trim()}
-        </h2>
-        <p className="text-sm text-gray-600">
-          <span className="hidden md:inline">{pageCount} {pageCount === 1 ? 'Page' : 'Pages'} | Created: {formatDate(project.created_at).full}</span>
-          <span className="md:hidden">{pageCount} {pageCount === 1 ? 'Page' : 'Pages'} | {formatDate(project.created_at).compact}</span>
-        </p>
+      <div className="flex-1 min-w-0">
+        <Link href={`/admin/project/${project.id}?tab=${getDefaultTabForStatus(project.status)}`} className="block cursor-pointer min-w-0">
+          <h2 className="text-xl font-semibold mb-0">
+            <span className="text-blue-600">{project.author_firstname} {project.author_lastname}</span> {project.book_title.replace(`${project.author_firstname} ${project.author_lastname}`, '').replace(/^'s\s*/, '').replace(/\bBook\b/i, 'Project').trim()}
+          </h2>
+          <p className="text-sm text-gray-600">
+            <span className="hidden md:inline">{pageCount} {pageCount === 1 ? 'Page' : 'Pages'} | Created: {formatDate(project.created_at).full}</span>
+            <span className="md:hidden">{pageCount} {pageCount === 1 ? 'Page' : 'Pages'} | {formatDate(project.created_at).compact}</span>
+          </p>
+        </Link>
         {/* Status badges + follow up/working + time */}
-        <div className="mt-1.5 flex items-center gap-2">
+        <div className="mt-1.5 flex items-center gap-2 flex-wrap">
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${badgeConfig.style}`}>
             {badgeConfig.text}
             {roundNumber && (
@@ -235,7 +244,14 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }:
               <Clock className="w-3.5 h-3.5" /> {timeAgo(project.status_changed_at)}
             </span>
           )}
-          {followUpBadge && (
+          {canShowFollowUpButton ? (
+            <FollowUpButton
+              projectId={project.id}
+              initialCount={project.follow_up_count || 0}
+              initialLastSentAt={project.follow_up_last_sent_at || null}
+              initialIsSending={project.follow_up_is_sending || false}
+            />
+          ) : followUpBadge && (
             <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-900 text-white border border-gray-900">
               <UserRound className="w-3 h-3" />
               <span>Follow Up</span>
@@ -248,11 +264,11 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0 }:
             </span>
           )}
         </div>
-      </Link>
+      </div>
       {/* Desktop: delete button + mobile: follow up/working icon */}
       <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
         {/* Mobile: follow up/working icon */}
-        {followUpBadge && (
+        {followUpBadge && !canShowFollowUpButton && (
           <span className="md:hidden inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-900 text-white">
             <UserRound className="w-4 h-4" />
           </span>

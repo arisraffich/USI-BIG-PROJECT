@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-
-import { buildCharacterPrompt } from '@/lib/utils/prompt-builder'
-import { removeMetadata, sanitizeFilename } from '@/lib/utils/metadata-cleaner'
 import { getErrorMessage } from '@/lib/utils/error'
 import { isFollowUp } from '@/lib/constants/statusBadgeConfig'
+
+interface CharacterGenerationResult {
+  character_id: string
+  success: boolean
+  image_url?: string | null
+  error?: string | null
+  isPreview?: boolean
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -78,7 +83,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const results = []
+    const results: CharacterGenerationResult[] = []
 
     // Generate each character
     // Dynamically import to avoid top-level issues if any
@@ -105,8 +110,6 @@ export async function POST(request: NextRequest) {
 
         const hasValidCharacterImage = character.image_url && !character.image_url.startsWith('error:')
         const isEdit = !!(custom_prompt && hasValidCharacterImage)
-        const isReset = !custom_prompt && hasValidCharacterImage
-
         // Edit: pass the character's own image so the AI can modify it
         // Reset / initial: pass the main character image as style reference
         const referenceImage = isEdit ? character.image_url : mainCharacter.image_url
@@ -189,7 +192,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update project status if all succeeded (skip in preview mode)
-    const hasPreview = results.some((r: any) => r.isPreview)
+    const hasPreview = results.some((r) => r.isPreview)
     const allSucceeded = results.every((r) => r.success)
     console.log(`[Character Generate] 📊 Summary: ${results.filter(r => r.success).length}/${results.length} succeeded`)
     
@@ -244,8 +247,6 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-
-
 
 
 

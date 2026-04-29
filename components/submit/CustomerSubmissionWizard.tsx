@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { 
-  ChevronLeft, ChevronRight, Check, Plus, Trash2, Loader2,
+  ChevronLeft, ChevronRight, Check, Plus, Trash2,
   BookOpen, PenLine, Users, PartyPopper, Sparkles, Pencil
 } from 'lucide-react'
 import { getErrorMessage } from '@/lib/utils/error'
@@ -84,11 +84,9 @@ export function CustomerSubmissionWizard({
   projectId,
   reviewToken,
   authorFirstName,
-  authorLastName,
   numberOfIllustrations,
   existingPages,
 }: CustomerSubmissionWizardProps) {
-  const authorName = `${authorFirstName} ${authorLastName}`.trim()
   const estimatedMinutes = Math.ceil(numberOfIllustrations * 1.5)
 
   // Initialize pages from existing data or create blank ones
@@ -113,7 +111,7 @@ export function CustomerSubmissionWizard({
 
   const [identifiedCharacters, setIdentifiedCharacters] = useState<Character[]>([])
 
-  const [isLoading, setIsLoading] = useState(false)
+  const [, setIsLoading] = useState(false)
   const [loadingMessage, setLoadingMessage] = useState('')
 
   // Background character identification — runs while customer fills scene descriptions
@@ -150,7 +148,6 @@ export function CustomerSubmissionWizard({
       }
     }
     setHydrated(true)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId])
 
   // Auto-save to localStorage on every state change (only after hydration to avoid saving defaults)
@@ -467,7 +464,7 @@ export function CustomerSubmissionWizard({
   // ============================================================================
 
   // Track form validity for progress display (updates on every keystroke)
-  const [characterFormStates, setCharacterFormStates] = useState<Record<string, { isValid: boolean }>>({})
+  const [, setCharacterFormStates] = useState<Record<string, { isValid: boolean }>>({})
   // Track which characters have been SAVED (only updates on Save button click)
   const [savedCharacterIds, setSavedCharacterIds] = useState<Set<string>>(new Set())
 

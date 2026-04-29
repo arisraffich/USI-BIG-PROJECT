@@ -23,7 +23,7 @@ export function CustomerCharacterGallery({ characters, mainCharacter, reviewToke
             <div className="text-center mb-10">
                 <h2 className="text-3xl font-bold text-gray-900 mb-3 font-serif">Character Design</h2>
                 <p className="text-gray-600 max-w-2xl mx-auto">
-                    Here are the illustrations for your book's characters. Please review them. If you need any adjustments, click the <span className="text-orange-600 font-semibold">"Request Edits"</span> button to add your change requests.
+                    Here are the illustrations for your book&apos;s characters. Please review them. If you need any adjustments, click the <span className="text-orange-600 font-semibold">&quot;Request Edits&quot;</span> button to add your change requests.
                 </p>
             </div>
 

@@ -11,7 +11,7 @@ import { ManuscriptEditor } from '@/components/project/manuscript/ManuscriptEdit
 import { ProjectHeader } from '@/components/admin/ProjectHeader'
 import { UnifiedIllustrationSidebar } from '@/components/illustration/UnifiedIllustrationSidebar'
 import { UnifiedProjectLayout } from '@/components/layout/UnifiedProjectLayout'
-import { Loader2, Sparkles, Upload, Clock, ExternalLink, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Loader2, Sparkles, Clock, ExternalLink, AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IllustrationsTabContent } from '@/components/admin/IllustrationsTabContent'
 import { CoverTabContent } from '@/components/cover/CoverTabContent'
@@ -19,7 +19,7 @@ import { CoverHeaderActions } from '@/components/cover/CoverHeaderActions'
 import { Page } from '@/types/page'
 import { Character } from '@/types/character'
 import { Cover } from '@/types/cover'
-import { ProjectStatus } from '@/types/project'
+import { Project, ProjectStatus } from '@/types/project'
 import { CharacterFormData } from '@/components/shared/UniversalCharacterCard'
 import { getErrorMessage } from '@/lib/utils/error'
 import {
@@ -39,7 +39,7 @@ interface ProjectTabsContentProps {
   pages: Page[] | null
   characters: Character[] | null
   projectStatus?: string
-  projectInfo?: any
+  projectInfo?: Project | null
 }
 
 export function ProjectTabsContent({
@@ -171,19 +171,11 @@ export function ProjectTabsContent({
     return 'pages'
   }, [searchParams, isIllustrationsUnlocked, localProjectStatus, hasSecondaryCharacters, hasCover])
 
-  const isPagesActive = activeTab === 'pages'
-  const isCharactersActive = activeTab === 'characters'
-  const isIllustrationsActive = activeTab === 'illustrations'
   const isCoverActive = activeTab === 'cover'
 
   // 2. Determine Sidebar State
-  const showPagesSidebar = isPagesActive
-  const showIllustrationsSidebar = isIllustrationsActive
-  const showSidebar = showPagesSidebar || showIllustrationsSidebar
 
-  const isGenerating = localProjectStatus === 'character_generation' || localProjectStatus === 'character_generation_failed'
   const isSketchPhase = localProjectStatus === 'character_generation_complete'
-  const isCharactersLoading = isGenerating
   // NOTE: isAnalyzing removed - illustration_status field no longer used
   const isAnalyzing = false
 
@@ -208,25 +200,34 @@ export function ProjectTabsContent({
 
   // Manual Mode State
   const [isManualMode, setIsManualMode] = useState(false)
-  const [characterForms, setCharacterForms] = useState<{ [id: string]: { data: any; isValid: boolean } }>({})
+  const [characterForms, setCharacterForms] = useState<Record<string, { data: CharacterFormData; isValid: boolean }>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   
   
   // Scene Generation State
   const [isGeneratingScenes, setIsGeneratingScenes] = useState(false)
 
-  // Push Characters to Customer State
-  const [isCharPushDialogOpen, setIsCharPushDialogOpen] = useState(false)
-  const [isCharPushing, setIsCharPushing] = useState(false)
-
   // Initialize forms when entering manual mode (or when characters load)
   useEffect(() => {
     if (localCharacters && localCharacters.length > 0) {
-      const initialForms: Record<string, { data: any; isValid: boolean }> = {}
+      const initialForms: Record<string, { data: CharacterFormData; isValid: boolean }> = {}
       localCharacters.forEach(char => {
         if (!char.is_main) {
           const isValid = !!(char.name && char.age && char.gender)
-          initialForms[char.id] = { data: char, isValid }
+          initialForms[char.id] = {
+            data: {
+              age: char.age ?? null,
+              gender: char.gender ?? null,
+              skin_color: char.skin_color ?? null,
+              hair_color: char.hair_color ?? null,
+              hair_style: char.hair_style ?? null,
+              eye_color: char.eye_color ?? null,
+              clothing: char.clothing ?? null,
+              accessories: char.accessories ?? null,
+              special_features: char.special_features ?? null,
+            },
+            isValid
+          }
         }
       })
       setCharacterForms(prev => {
@@ -236,7 +237,7 @@ export function ProjectTabsContent({
     }
   }, [characters])
 
-  const handleCharacterFormChange = (id: string, data: any, isValid: boolean) => {
+  const handleCharacterFormChange = (id: string, data: CharacterFormData, isValid: boolean) => {
     setCharacterForms(prev => ({ ...prev, [id]: { data, isValid } }))
   }
 
@@ -255,7 +256,7 @@ export function ProjectTabsContent({
       const characterEdits = Object.entries(characterForms).reduce((acc, [id, info]) => {
         acc[id] = info.data
         return acc
-      }, {} as Record<string, any>)
+      }, {} as Record<string, CharacterFormData>)
 
       const response = await fetch(`/api/admin/projects/${projectId}/characters/manual-submit`, {
         method: 'POST',
@@ -268,7 +269,7 @@ export function ProjectTabsContent({
       toast.success('Manual submission successful')
       setIsManualMode(false)
       router.refresh()
-    } catch (e) {
+    } catch {
       toast.error('Failed to submit')
     } finally {
       setIsSubmitting(false)
@@ -287,7 +288,7 @@ export function ProjectTabsContent({
       toast.success('Characters manually approved')
       setIsManualMode(false)
       router.refresh()
-    } catch (e) {
+    } catch {
       toast.error('Failed to approve')
     } finally {
       setIsSubmitting(false)
@@ -361,37 +362,12 @@ export function ProjectTabsContent({
     }
   }
 
-  // Push Characters to Customer (Silent Update)
-  const handlePushCharactersToCustomer = async () => {
-    setIsCharPushing(true)
-    try {
-      const response = await fetch(`/api/projects/${projectId}/push-characters-to-customer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-      
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Push failed')
-      }
-      
-      const result = await response.json()
-      toast.success(result.message || 'Characters pushed to customer')
-      setIsCharPushDialogOpen(false)
-    } catch (e: unknown) {
-      toast.error(getErrorMessage(e, 'Failed to push characters'))
-    } finally {
-      setIsCharPushing(false)
-    }
-  }
-
   // Local state for pages to support instant realtime updates
   const [localPages, setLocalPages] = useState<Page[]>(pages || [])
   const lastToastTimeRef = useRef(0)
 
   const [activeIllustrationPageId, setActiveIllustrationPageId] = useState<string | null>(pages?.[0]?.id || null)
-  const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0 })
-  const hasStartedAnalysisRef = useRef(false)
+  const [analysisProgress] = useState({ current: 0, total: 0 })
 
   // Sync local state when server props update, but respect newer local versions (from realtime/fetch)
   useEffect(() => {
@@ -433,20 +409,6 @@ export function ProjectTabsContent({
   // NOTE: Analysis Loop removed - illustration_status field no longer used
   // Character actions are now extracted on-demand during illustration generation
 
-  const handleTabClick = (tab: 'pages' | 'characters' | 'illustrations' | 'cover', e: React.MouseEvent) => {
-    e.preventDefault()
-    if (tab === 'characters' && isCharactersLoading) return
-
-    startTransition(() => {
-      const params = new URLSearchParams(searchParams?.toString() || '')
-      if (tab === 'pages') params.delete('tab')
-      else params.set('tab', tab)
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-    })
-  }
-
-
-
   const showGallery = useMemo(() => {
     // Show gallery if:
     // 1. Any secondary character has an image (normal case)
@@ -467,7 +429,7 @@ export function ProjectTabsContent({
           setLocalCharacters(prev => prev.map(c => c.id === updatedChar.id ? { ...c, ...updatedChar } : c))
           
           // Toast for new image generation
-          const oldChar = payload.old as any
+          const oldChar = payload.old as Partial<Character>
           if (updatedChar.image_url && !oldChar.image_url) {
             toast.success('New character illustration ready', { description: `${updatedChar.name || updatedChar.role} has been generated.` })
           }
@@ -509,7 +471,7 @@ export function ProjectTabsContent({
         } else if (payload.eventType === 'INSERT' && payload.new) {
           setLocalPages(prev => [...prev, payload.new as Page])
         } else if (payload.eventType === 'DELETE' && payload.old) {
-          const deletedId = (payload.old as any).id
+          const deletedId = (payload.old as { id: string }).id
           setLocalPages(prev => prev.filter(p => p.id !== deletedId))
         }
       })
@@ -532,6 +494,17 @@ export function ProjectTabsContent({
 
   // No full-page loading - show character gallery with individual card spinners instead
 
+  const headerProjectInfo = {
+    id: projectInfo?.id ?? projectId,
+    book_title: projectInfo?.book_title ?? '',
+    author_firstname: projectInfo?.author_firstname || '',
+    author_lastname: projectInfo?.author_lastname || '',
+    status: (localProjectStatus as ProjectStatus) || 'draft',
+    character_send_count: projectInfo?.character_send_count || 0,
+    illustration_send_count: projectInfo?.illustration_send_count || 0,
+    review_token: projectInfo?.review_token ?? ''
+  }
+
 
 
   return (
@@ -539,16 +512,7 @@ export function ProjectTabsContent({
       header={
         <ProjectHeader
           projectId={projectId}
-          projectInfo={{
-            id: projectInfo.id,
-            book_title: projectInfo.book_title,
-            author_firstname: projectInfo.author_firstname || '',
-            author_lastname: projectInfo.author_lastname || '',
-            status: (localProjectStatus as ProjectStatus) || 'draft',
-            character_send_count: projectInfo.character_send_count || 0,
-            illustration_send_count: projectInfo.illustration_send_count || 0,
-            review_token: projectInfo.review_token
-          }}
+          projectInfo={headerProjectInfo}
           pageCount={pageCount}
           characterCount={characterCount}
           hasImages={sortedCharacters.secondary.some(c => c.image_url !== null && c.image_url !== '')}
@@ -678,7 +642,7 @@ export function ProjectTabsContent({
             pages={localPages}
             activePageId={activeIllustrationPageId}
             onPageClick={(id) => setActiveIllustrationPageId(id)}
-            projectStatus={localProjectStatus as any}
+            projectStatus={localProjectStatus as ProjectStatus}
             illustrationSendCount={projectInfo?.illustration_send_count || 0}
             failedPageIds={Object.keys(pageErrors)}
             generatingPageIds={generatingPageIds}
@@ -883,8 +847,8 @@ export function ProjectTabsContent({
             projectStatus={localProjectStatus}
             isAnalyzing={isAnalyzing}
             analysisProgress={analysisProgress}
-            initialAspectRatio={projectInfo?.illustration_aspect_ratio}
-            initialTextIntegration={projectInfo?.illustration_text_integration}
+            initialAspectRatio={projectInfo?.illustration_aspect_ratio ?? undefined}
+            initialTextIntegration={projectInfo?.illustration_text_integration ?? undefined}
             activePageId={activeIllustrationPageId}
             onPageChange={setActiveIllustrationPageId}
             pageErrors={pageErrors}

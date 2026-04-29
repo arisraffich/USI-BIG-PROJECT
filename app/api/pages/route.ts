@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getErrorMessage } from '@/lib/utils/error'
 
 export async function GET(request: NextRequest) {
   try {
@@ -39,7 +38,6 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-
 
 
 

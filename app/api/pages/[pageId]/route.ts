@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getErrorMessage } from '@/lib/utils/error'
 
+type SupabaseAdminClient = Awaited<ReturnType<typeof createAdminClient>>
+
 // ---------------------------------------------------------------------------
 // FUTURE: "Add Page" feature
 // Use renumberPagesAfterDelete() as a template — create renumberPagesAfterInsert()
@@ -14,7 +16,7 @@ import { getErrorMessage } from '@/lib/utils/error'
  * Renumber all pages in a project after a page is deleted.
  * Shifts page_numbers so they're sequential (1, 2, 3...) with no gaps.
  */
-async function renumberPagesAfterDelete(supabase: any, projectId: string) {
+async function renumberPagesAfterDelete(supabase: SupabaseAdminClient, projectId: string) {
   const { data: remaining, error } = await supabase
     .from('pages')
     .select('id, page_number')
@@ -207,7 +209,7 @@ export async function DELETE(
 
     for (const [bucket, paths] of Object.entries(bucketGroups)) {
       console.log(`[Page Delete] Removing ${paths.length} file(s) from ${bucket}:`, paths)
-      await supabase.storage.from(bucket).remove(paths).catch((err: any) => {
+      await supabase.storage.from(bucket).remove(paths).catch((err: unknown) => {
         console.warn(`[Page Delete] Failed to delete from ${bucket}:`, err)
       })
     }
@@ -244,4 +246,3 @@ export async function DELETE(
     )
   }
 }
-

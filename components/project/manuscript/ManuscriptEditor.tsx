@@ -15,16 +15,7 @@ import {
 import { ManuscriptPage } from './ManuscriptPage'
 import { ManuscriptSidebar } from './ManuscriptSidebar'
 import { ManuscriptToolbar } from './ManuscriptToolbar'
-
-interface Page {
-  id: string
-  page_number: number
-  story_text: string
-  scene_description?: string | null
-  description_auto_generated: boolean
-  // Other fields from full Page type are ignored but allowed
-  [key: string]: any
-}
+import { Page } from '@/types/page'
 
 interface ManuscriptEditorProps {
   pages: Page[] | null
@@ -174,8 +165,6 @@ export function ManuscriptEditor({ pages, projectId, isVisible = true }: Manuscr
         throw new Error(error.error || 'Failed to save changes')
       }
 
-      const result = await response.json()
-
       // Clear edits
       setPageEdits({})
       setIsEditMode(false)
@@ -185,9 +174,9 @@ export function ManuscriptEditor({ pages, projectId, isVisible = true }: Manuscr
 
       // No reload needed - Realtime subscription in parent will update the UI
       // window.location.reload()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving pages:', error)
-      toast.error(error.message || 'Failed to save changes')
+      toast.error(error instanceof Error ? error.message : 'Failed to save changes')
     } finally {
       setIsSaving(false)
     }
@@ -392,5 +381,3 @@ export function ManuscriptEditor({ pages, projectId, isVisible = true }: Manuscr
     </>
   )
 }
-
-

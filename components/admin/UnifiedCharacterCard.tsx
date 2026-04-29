@@ -46,6 +46,14 @@ interface SubCardProps {
     showDownload?: boolean
 }
 
+interface CharacterGenerationResult {
+    character_id: string
+    success: boolean
+    image_url?: string
+    error?: string
+    isPreview?: boolean
+}
+
 function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownload, onUpload, onRetry, onFileDrop, showUpload = false, showDownload = true }: SubCardProps) {
     const [isDragOver, setIsDragOver] = useState(false)
 
@@ -356,29 +364,31 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                 throw new Error(data.error || 'Failed to regenerate character')
             }
 
-            const result = data.results?.find((r: any) => r.character_id === character.id)
+            const result = (data.results as CharacterGenerationResult[] | undefined)?.find((r) => r.character_id === character.id)
             if (data.failed > 0 || (result && !result.success)) {
                 throw new Error(result?.error || 'Generation failed on server')
             }
 
+            const resultImageUrl = result?.image_url
+
             // Preload new image
-            if (result?.image_url) {
+            if (resultImageUrl) {
                 await new Promise((resolve) => {
                     const img = new Image()
                     img.onload = resolve
                     img.onerror = resolve
-                    img.src = result.image_url
+                    img.src = resultImageUrl
                 })
             }
 
-            if (result?.isPreview && result?.image_url && hasExistingImage) {
+            if (result?.isPreview && resultImageUrl && hasExistingImage) {
                 setComparisonState({
                     oldUrl: character.image_url!,
-                    newUrl: result.image_url,
+                    newUrl: resultImageUrl,
                 })
                 toast.success('Compare and choose', { description: 'Select which version to keep' })
-            } else if (result?.image_url) {
-                setOptimisticColoredImage(result.image_url)
+            } else if (resultImageUrl) {
+                setOptimisticColoredImage(resultImageUrl)
                 toast.success('Character regenerated successfully')
             }
 
@@ -862,7 +872,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                                                 </div>
 
                                                 <p className="text-xs text-gray-500">
-                                                    Upload an image to guide the character's appearance (e.g., a real hawk photo).
+                                                    Upload an image to guide the character&apos;s appearance (e.g., a real hawk photo).
                                                 </p>
                                             </div>
                                         </div>
@@ -1137,8 +1147,5 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
         </div>
     )
 }
-
-
-
 
 

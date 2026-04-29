@@ -7,6 +7,14 @@ import { notifyColoredIllustrationsApproved, notifyIllustrationsApproved, notify
 const FINISHED_STATUSES = new Set(['completed'])
 
 type ApprovalStage = 'sketch' | 'illustration'
+type ApprovalColumn = 'sketch_approved_at' | 'illustration_approved_at'
+
+interface ApprovalPage {
+  id: string
+  page_number: number
+  sketch_approved_at: string | null
+  illustration_approved_at: string | null
+}
 
 export async function POST(
   request: NextRequest,
@@ -46,7 +54,7 @@ export async function POST(
     }
 
     const stage: ApprovalStage = project.show_colored_to_customer ? 'illustration' : 'sketch'
-    const approvalColumn = stage === 'illustration' ? 'illustration_approved_at' : 'sketch_approved_at'
+    const approvalColumn: ApprovalColumn = stage === 'illustration' ? 'illustration_approved_at' : 'sketch_approved_at'
     const approvedAt = new Date().toISOString()
 
     const { data: updatedPage, error: updateError } = await supabase
@@ -71,8 +79,8 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to load approval progress' }, { status: 500 })
     }
 
-    const approvalPages = pages.filter((p: any) => p.page_number > 0)
-    const approvedCount = approvalPages.filter((p: any) => !!p[approvalColumn]).length
+    const approvalPages = (pages as ApprovalPage[]).filter((p) => p.page_number > 0)
+    const approvedCount = approvalPages.filter((p) => !!p[approvalColumn]).length
     const totalCount = approvalPages.length
     const allApproved = totalCount > 0 && approvedCount === totalCount
 

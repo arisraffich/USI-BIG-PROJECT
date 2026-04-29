@@ -9,7 +9,7 @@ import { UniversalCharacterCard, CharacterFormData } from '@/components/shared/U
 interface CharacterCardProps {
   character: Character
   readOnly?: boolean
-  onChange?: (id: string, data: any, isValid: boolean) => void
+  onChange?: (id: string, data: CharacterFormData, isValid: boolean) => void
 }
 
 export const CharacterCard = memo(function CharacterCard({
