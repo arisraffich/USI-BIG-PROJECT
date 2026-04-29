@@ -4,7 +4,7 @@ import { SharedProjectHeader } from '@/components/layout/SharedProjectHeader'
 import { useTransition, useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Home, Loader2, Send, FileText, Sparkles, Download, ExternalLink, Info, Upload, Palette, Pencil, CheckCircle2, XCircle, AlertTriangle, RefreshCw, Mail, Clock, ChevronDown, X, BookImage } from 'lucide-react'
+import { Home, Loader2, Send, FileText, Sparkles, Download, ExternalLink, Info, Upload, Pencil, CheckCircle2, XCircle, AlertTriangle, RefreshCw, Mail, Clock, ChevronDown, X, BookImage } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -110,12 +110,11 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
   const [showColoredToCustomer, setShowColoredToCustomer] = useState(projectInfo.show_colored_to_customer ?? false)
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
   
-  // Push & Coloring Request state
+  // Push state
   const [isPushDialogOpen, setIsPushDialogOpen] = useState(false)
   const [isPushing, setIsPushing] = useState(false)
   const [isCharPushDialogOpen, setIsCharPushDialogOpen] = useState(false)
   const [isCharPushing, setIsCharPushing] = useState(false)
-  const [isSendingColoringRequest, setIsSendingColoringRequest] = useState(false)
   
   // Line Art Download state
   const [isDownloadingLineArt, setIsDownloadingLineArt] = useState(false)
@@ -384,28 +383,6 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       toast.error(getErrorMessage(e, 'Failed to push characters'))
     } finally {
       setIsCharPushing(false)
-    }
-  }
-
-  // Send Page 1 Coloring Request
-  const handleSendColoringRequest = async () => {
-    setIsSendingColoringRequest(true)
-    try {
-      const response = await fetch(`/api/projects/${projectId}/send-karine-request`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-      
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to send request')
-      }
-      
-      toast.success('Coloring request sent')
-    } catch (e: unknown) {
-      toast.error(getErrorMessage(e, 'Failed to send request'))
-    } finally {
-      setIsSendingColoringRequest(false)
     }
   }
 
@@ -1463,31 +1440,7 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
               </AlertDialog>
               <p className="text-xs text-slate-500 flex items-start gap-1.5 px-1">
                 <Info className="w-3 h-3 mt-0.5 shrink-0" />
-                <span>Silently update customer&apos;s illustrations without email.</span>
-              </p>
-            </div>
-          )}
-          
-          {/* Request Page 1 Coloring - Illustrations tab only */}
-          {currentTab === 'illustrations' && generatedIllustrationCount > 0 && (
-            <div className="space-y-1.5">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full justify-start gap-2 h-9 border-purple-300 bg-purple-50 hover:bg-purple-100 hover:border-purple-400"
-                onClick={handleSendColoringRequest}
-                disabled={isSendingColoringRequest}
-              >
-                {isSendingColoringRequest ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Palette className="w-4 h-4 text-purple-600" />
-                )}
-                Request Page 1 Coloring
-              </Button>
-              <p className="text-xs text-slate-500 flex items-start gap-1.5 px-1">
-                <Info className="w-3 h-3 mt-0.5 shrink-0" />
-                <span>Send Page 1 sketch for coloring.</span>
+                <span>Silently update customer&apos;s illustrations</span>
               </p>
             </div>
           )}
