@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Trash2, Loader2, Clock, UserRound, Wrench } from 'lucide-react'
+import { Trash2, Loader2, Clock, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { FollowUpButton } from './FollowUpButton'
 import {
@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { getStatusBadgeConfig, getRoundNumber, isFollowUp, isWorking } from '@/lib/constants/statusBadgeConfig'
+import { getStatusBadgeConfig, getRoundNumber, isFollowUp } from '@/lib/constants/statusBadgeConfig'
 
 interface Project {
   id: string
@@ -214,7 +214,6 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0, s
   const resetSwipe = useCallback(() => setSwipeOffset(0), [])
 
   const followUpBadge = isFollowUp(project.status)
-  const workingBadge = isWorking(project.status)
   const canShowFollowUpButton = showFollowUpAction && followUpBadge && Boolean(project.follow_up_stage)
   const waitingSince = followUpBadge ? (project.status_changed_at || project.created_at) : project.status_changed_at
   const authorName = `${project.author_firstname} ${project.author_lastname}`
@@ -244,7 +243,7 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0, s
             <span className="md:hidden">{pageCount} {pageCount === 1 ? 'Page' : 'Pages'} | {formatDate(project.created_at).compact}</span>
           </p>
         </Link>
-        {/* Status badges + follow up/working + time */}
+        {/* Status badges + follow up */}
         <div className="mt-1.5 flex items-center gap-2 flex-wrap">
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${badgeConfig.style}`}>
             {badgeConfig.text}
@@ -267,25 +266,14 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0, s
               <span>Follow Up</span>
             </span>
           )}
-          {workingBadge && (
-            <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600 border border-gray-300">
-              <Wrench className="w-3 h-3" />
-              Working
-            </span>
-          )}
         </div>
       </div>
-      {/* Desktop: delete button + mobile: follow up/working icon */}
+      {/* Desktop: delete button + mobile: follow up icon */}
       <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-        {/* Mobile: follow up/working icon */}
+        {/* Mobile: follow up icon */}
         {followUpBadge && !canShowFollowUpButton && (
           <span className="md:hidden inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-900 text-white">
             <UserRound className="w-4 h-4" />
-          </span>
-        )}
-        {workingBadge && (
-          <span className="md:hidden inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 text-gray-600 border border-gray-300">
-            <Wrench className="w-4 h-4" />
           </span>
         )}
         {/* Desktop: delete button */}
