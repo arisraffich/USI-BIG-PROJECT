@@ -216,13 +216,21 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0, s
   const followUpBadge = isFollowUp(project.status)
   const workingBadge = isWorking(project.status)
   const canShowFollowUpButton = showFollowUpAction && followUpBadge && Boolean(project.follow_up_stage)
+  const waitingSince = followUpBadge ? (project.status_changed_at || project.created_at) : project.status_changed_at
 
   const cardContent = (
     <>
       <div className="flex-1 min-w-0">
         <Link href={`/admin/project/${project.id}?tab=${getDefaultTabForStatus(project.status)}`} className="block cursor-pointer min-w-0">
-          <h2 className="text-xl font-semibold mb-0">
+          <h2 className="text-xl font-semibold mb-0 flex items-center gap-2 flex-wrap">
             <span className="text-blue-600">{project.author_firstname} {project.author_lastname}</span> {project.book_title.replace(`${project.author_firstname} ${project.author_lastname}`, '').replace(/^'s\s*/, '').replace(/\bBook\b/i, 'Project').trim()}
+            {waitingSince && project.status !== 'illustration_approved' && (
+              <span className="inline-flex items-center gap-1 text-sm font-semibold text-red-600">
+                <span className="text-gray-300 font-medium">|</span>
+                <Clock className="w-3.5 h-3.5" />
+                {timeAgo(waitingSince)}
+              </span>
+            )}
           </h2>
           <p className="text-sm text-gray-600">
             <span className="hidden md:inline">{pageCount} {pageCount === 1 ? 'Page' : 'Pages'} | Created: {formatDate(project.created_at).full}</span>
@@ -239,11 +247,6 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0, s
               </span>
             )}
           </span>
-          {project.status_changed_at && project.status !== 'illustration_approved' && (
-            <span className="inline-flex items-center gap-1 text-sm font-semibold text-red-600">
-              <Clock className="w-3.5 h-3.5" /> {timeAgo(project.status_changed_at)}
-            </span>
-          )}
           {canShowFollowUpButton ? (
             <FollowUpButton
               projectId={project.id}
