@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -181,9 +180,6 @@ export function FollowUpButton({
             <DialogTitle>
               {draft ? `${draft.stageLabel} ${draft.sequence}/${draft.max}` : 'Follow-Up Email'}
             </DialogTitle>
-            <DialogDescription>
-              {draft ? 'You can edit the recipient and email before sending.' : 'Loading email draft...'}
-            </DialogDescription>
           </DialogHeader>
 
           {loading ? (
@@ -224,9 +220,6 @@ export function FollowUpButton({
                 />
               </div>
 
-              <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-                CTA button: <span className="font-semibold">{draft.buttonText}</span>
-              </div>
             </div>
           ) : null}
 
