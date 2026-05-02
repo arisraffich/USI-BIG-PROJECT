@@ -3527,9 +3527,47 @@ export function SharedIllustrationBoard({
                                 </div>
 
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 overflow-hidden flex flex-col">
-                                    <div className="px-3 py-2 text-sm font-medium text-slate-700 bg-white border-b border-slate-200">
-                                        <div className="flex items-center justify-between gap-2">
-                                            Quality Reference
+                                    <div className="flex h-9 items-stretch bg-white border-b border-slate-200">
+                                        <div className="flex min-w-0 flex-1 items-stretch">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <button
+                                                        type="button"
+                                                        disabled={illustratedPages.length === 0}
+                                                        className="flex h-full w-full min-w-0 cursor-pointer items-center justify-between gap-2 px-3 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-inset disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-white"
+                                                    >
+                                                        <span className="truncate">
+                                                            {remasterUpload
+                                                                ? 'Uploaded reference'
+                                                                : selectedRemasterReferencePage
+                                                                ? `Page ${selectedRemasterReferencePage.page_number}`
+                                                                : illustratedPages.length > 0 ? 'Select reference page' : 'No pages available'}
+                                                        </span>
+                                                        <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                                                    </button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent className="w-[calc(100vw-3rem)] max-h-[260px] overflow-y-auto sm:w-[var(--radix-dropdown-menu-trigger-width)] sm:min-w-[220px]" align="start">
+                                                    {illustratedPages.map(refPage => (
+                                                        <DropdownMenuItem
+                                                            key={refPage.id}
+                                                            onClick={() => {
+                                                                setRemasterReferencePageId(refPage.id)
+                                                                setRemasterUpload(null)
+                                                            }}
+                                                            className="cursor-pointer flex items-center gap-2.5 py-2"
+                                                        >
+                                                            {refPage.illustration_url ? (
+                                                                <img
+                                                                    src={refPage.illustration_url}
+                                                                    alt={`Page ${refPage.page_number}`}
+                                                                    className="w-10 h-10 rounded object-cover border border-slate-200 flex-shrink-0"
+                                                                />
+                                                            ) : null}
+                                                            <span>Page {refPage.page_number}</span>
+                                                        </DropdownMenuItem>
+                                                    ))}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                             {(selectedRemasterReferencePage?.illustration_url || remasterUpload) && (
                                                 <button
                                                     type="button"
@@ -3537,7 +3575,7 @@ export function SharedIllustrationBoard({
                                                         setRemasterReferencePageId(null)
                                                         setRemasterUpload(null)
                                                     }}
-                                                    className="text-slate-400 hover:text-red-500"
+                                                    className="flex h-full w-9 shrink-0 items-center justify-center border-l border-slate-200 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
                                                     aria-label="Clear quality reference"
                                                 >
                                                     <X className="w-4 h-4" />
@@ -3607,52 +3645,6 @@ export function SharedIllustrationBoard({
                         </div>
 
                         <DialogFooter className="flex-col gap-3 sm:flex-row sm:items-center">
-                            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" className="w-full justify-between sm:w-auto sm:justify-center" disabled={illustratedPages.length === 0}>
-                                            <span className="flex items-center gap-2 min-w-0">
-                                                {selectedRemasterReferencePage?.illustration_url ? (
-                                                    <img
-                                                        src={selectedRemasterReferencePage.illustration_url}
-                                                        alt={`Page ${selectedRemasterReferencePage.page_number}`}
-                                                        className="w-7 h-7 rounded object-cover border border-slate-200"
-                                                    />
-                                                ) : null}
-                                                <span className="whitespace-nowrap">
-                                                    {selectedRemasterReferencePage
-                                                        ? `Page ${selectedRemasterReferencePage.page_number}`
-                                                        : illustratedPages.length > 0 ? 'Select a reference page' : 'No pages available'}
-                                                </span>
-                                            </span>
-                                            <ChevronDown className="w-4 h-4 shrink-0 opacity-50" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="w-[calc(100vw-3rem)] sm:w-[260px] max-h-[260px] overflow-y-auto" align="start">
-                                        {illustratedPages.map(refPage => (
-                                            <DropdownMenuItem
-                                                key={refPage.id}
-                                                onClick={() => {
-                                                    setRemasterReferencePageId(refPage.id)
-                                                    setRemasterUpload(null)
-                                                }}
-                                                className="cursor-pointer flex items-center gap-2.5 py-2"
-                                            >
-                                                {refPage.illustration_url ? (
-                                                    <img
-                                                        src={refPage.illustration_url}
-                                                        alt={`Page ${refPage.page_number}`}
-                                                        className="w-10 h-10 rounded object-cover border border-slate-200 flex-shrink-0"
-                                                    />
-                                                ) : null}
-                                                <span>Page {refPage.page_number}</span>
-                                            </DropdownMenuItem>
-                                        ))}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-
-                            </div>
-
                             <div className="flex w-full justify-end gap-3 sm:ml-auto sm:w-auto">
                                 <Button
                                     onClick={handleRemasterSubmit}
