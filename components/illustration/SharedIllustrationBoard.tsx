@@ -2591,14 +2591,16 @@ export function SharedIllustrationBoard({
 		                                                    onComparisonDecision('keep_editing')
 		                                                }}
 	                                                variant="outline"
-	                                                className="bg-white/90 hover:bg-white text-slate-800 border-slate-300"
+	                                                className="bg-white/90 hover:bg-white text-slate-800 border-slate-300 gap-2"
 	                                            >
+	                                                <Pencil className="w-4 h-4" />
 	                                                Keep Editing
 	                                            </Button>
 	                                            <Button
 	                                                onClick={() => onComparisonDecision('keep_new')}
-	                                                className="bg-green-600 hover:bg-green-700 text-white"
+	                                                className="bg-green-600 hover:bg-green-700 text-white gap-2"
 	                                            >
+	                                                <CheckCircle2 className="w-4 h-4 text-white" />
 	                                                Keep New
 	                                            </Button>
 	                                        </div>
@@ -2680,8 +2682,9 @@ export function SharedIllustrationBoard({
 	                                    <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
 	                                        <Button
 	                                            onClick={() => onComparisonDecision('keep_new')}
-	                                            className="w-full bg-green-600 hover:bg-green-700 text-white"
+	                                            className="w-full bg-green-600 hover:bg-green-700 text-white gap-2"
 	                                        >
+	                                            <CheckCircle2 className="w-4 h-4 text-white" />
 	                                            Keep New
 	                                        </Button>
 	                                    </div>
