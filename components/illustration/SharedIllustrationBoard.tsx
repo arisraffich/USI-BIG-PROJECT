@@ -3514,12 +3514,12 @@ export function SharedIllustrationBoard({
                         <div className="space-y-5 py-2">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 overflow-hidden flex flex-col">
-                                    <div className="px-3 py-2 text-sm font-medium text-slate-700 bg-white border-b border-slate-200">
+                                    <div className="flex h-9 items-center px-3 text-sm font-medium text-slate-700 bg-white border-b border-slate-200">
                                         Current Image
                                     </div>
-                                    <div className="min-h-48 flex-1 flex items-center justify-center p-2">
+                                    <div className="m-2 flex h-72 items-center justify-center rounded-lg bg-white p-2 sm:h-[360px]">
                                         {page.illustration_url ? (
-                                            <img src={page.illustration_url} alt={`Page ${page.page_number}`} className="max-w-full max-h-full object-contain rounded" />
+                                            <img src={page.illustration_url} alt={`Page ${page.page_number}`} className="h-full w-full object-contain rounded" />
                                         ) : (
                                             <BookImage className="w-8 h-8 text-slate-300" />
                                         )}
@@ -3568,19 +3568,6 @@ export function SharedIllustrationBoard({
                                                     ))}
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
-                                            {(selectedRemasterReferencePage?.illustration_url || remasterUpload) && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setRemasterReferencePageId(null)
-                                                        setRemasterUpload(null)
-                                                    }}
-                                                    className="flex h-full w-9 shrink-0 items-center justify-center border-l border-slate-200 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                                                    aria-label="Clear quality reference"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                            )}
                                         </div>
                                     </div>
                                     <input
@@ -3590,33 +3577,50 @@ export function SharedIllustrationBoard({
                                         className="hidden"
                                         onChange={handleRemasterReferenceSelect}
                                     />
-                                    <button
-                                        type="button"
-                                        onClick={() => remasterFileInputRef.current?.click()}
-                                        onDragOver={(event) => event.preventDefault()}
-                                        onDrop={handleRemasterReferenceDrop}
-                                        className={`m-2 min-h-44 flex-1 flex items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 ${
+                                    <div
+                                        className={`relative m-2 flex h-72 items-center justify-center rounded-lg transition-colors sm:h-[360px] ${
                                             selectedRemasterReferencePage?.illustration_url || remasterUpload
-                                                ? 'border border-slate-200 bg-white hover:bg-slate-50 p-2'
+                                                ? 'bg-white p-2'
                                                 : 'border-2 border-dashed border-purple-300 bg-purple-50/20 hover:bg-purple-50 p-4'
                                         }`}
                                     >
-                                        {selectedRemasterReferencePage?.illustration_url ? (
-                                            <img
-                                                src={selectedRemasterReferencePage.illustration_url}
-                                                alt={`Page ${selectedRemasterReferencePage.page_number} reference`}
-                                                className="max-w-full max-h-full object-contain rounded"
-                                            />
-                                        ) : remasterUpload ? (
-                                            <img src={remasterUpload.preview} alt="Uploaded quality reference" className="max-w-full max-h-full object-contain rounded" />
-                                        ) : (
-                                            <span className="flex flex-col items-center gap-2 text-center text-sm text-slate-500">
-                                                <Upload className="w-8 h-8 text-slate-400" />
-                                                <span className="font-medium text-slate-700">Upload quality reference</span>
-                                                <span className="text-xs text-slate-400">Drop image or click to browse</span>
-                                            </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => remasterFileInputRef.current?.click()}
+                                            onDragOver={(event) => event.preventDefault()}
+                                            onDrop={handleRemasterReferenceDrop}
+                                            className="flex h-full w-full cursor-pointer items-center justify-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
+                                        >
+                                            {selectedRemasterReferencePage?.illustration_url ? (
+                                                <img
+                                                    src={selectedRemasterReferencePage.illustration_url}
+                                                    alt={`Page ${selectedRemasterReferencePage.page_number} reference`}
+                                                    className="h-full w-full object-contain rounded"
+                                                />
+                                            ) : remasterUpload ? (
+                                                <img src={remasterUpload.preview} alt="Uploaded quality reference" className="h-full w-full object-contain rounded" />
+                                            ) : (
+                                                <span className="flex flex-col items-center gap-2 text-center text-sm text-slate-500">
+                                                    <Upload className="w-8 h-8 text-slate-400" />
+                                                    <span className="font-medium text-slate-700">Upload quality reference</span>
+                                                    <span className="text-xs text-slate-400">Drop image or click to browse</span>
+                                                </span>
+                                            )}
+                                        </button>
+                                        {(selectedRemasterReferencePage?.illustration_url || remasterUpload) && (
+                                            <button
+                                                type="button"
+                                                onClick={(event) => {
+                                                    setRemasterReferencePageId(null)
+                                                    setRemasterUpload(null)
+                                                }}
+                                                className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-500 shadow-sm backdrop-blur transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500"
+                                                aria-label="Clear quality reference"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
                                         )}
-                                    </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -3645,7 +3649,15 @@ export function SharedIllustrationBoard({
                         </div>
 
                         <DialogFooter className="flex-col gap-3 sm:flex-row sm:items-center">
-                            <div className="flex w-full justify-end gap-3 sm:ml-auto sm:w-auto">
+                            <div className="flex w-full gap-3 sm:ml-auto sm:w-auto sm:justify-end">
+                                <Button
+                                    type="button"
+                                    variant="destructive"
+                                    onClick={() => setIsRemasterDialogOpen(false)}
+                                    className="w-full sm:w-auto"
+                                >
+                                    Cancel
+                                </Button>
                                 <Button
                                     onClick={handleRemasterSubmit}
                                     disabled={remasterSubmitDisabled}
