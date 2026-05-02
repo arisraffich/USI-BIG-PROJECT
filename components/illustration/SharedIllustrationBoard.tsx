@@ -544,6 +544,7 @@ export function SharedIllustrationBoard({
     const [isRemasterDialogOpen, setIsRemasterDialogOpen] = useState(false)
     const [remasterModel, setRemasterModel] = useState<IllustrationModelId>(DEFAULT_REMASTER_MODEL)
     const [remasterPrompt, setRemasterPrompt] = useState(REFRESH_PROMPT)
+    const [isRemasterPromptOpen, setIsRemasterPromptOpen] = useState(false)
     const [remasterReferencePageId, setRemasterReferencePageId] = useState<string | null>(null)
     const [remasterUpload, setRemasterUpload] = useState<{ file: File; preview: string } | null>(null)
     const [isTuneMode, setIsTuneMode] = useState(false)
@@ -641,6 +642,7 @@ export function SharedIllustrationBoard({
     const resetRemasterOptions = useCallback(() => {
         setRemasterModel(DEFAULT_REMASTER_MODEL)
         setRemasterPrompt(REFRESH_PROMPT)
+        setIsRemasterPromptOpen(false)
         setRemasterReferencePageId(null)
         setRemasterUpload(null)
         if (remasterFileInputRef.current) remasterFileInputRef.current.value = ''
@@ -3580,14 +3582,27 @@ export function SharedIllustrationBoard({
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor={`remaster-prompt-${page.id}`}>Prompt</Label>
-                                <Textarea
-                                    id={`remaster-prompt-${page.id}`}
-                                    value={remasterPrompt}
-                                    onChange={(event) => setRemasterPrompt(event.target.value)}
-                                    className="min-h-[160px] resize-y text-sm"
-                                />
+                            <div className="rounded-lg border border-slate-200 bg-white">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsRemasterPromptOpen(open => !open)}
+                                    className="flex w-full items-center justify-between px-3 py-2.5 text-sm font-semibold text-slate-800"
+                                    aria-expanded={isRemasterPromptOpen}
+                                    aria-controls={`remaster-prompt-${page.id}`}
+                                >
+                                    <span>Prompt</span>
+                                    <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${isRemasterPromptOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                {isRemasterPromptOpen && (
+                                    <div className="border-t border-slate-200 p-3">
+                                        <Textarea
+                                            id={`remaster-prompt-${page.id}`}
+                                            value={remasterPrompt}
+                                            onChange={(event) => setRemasterPrompt(event.target.value)}
+                                            className="min-h-[160px] resize-y text-sm"
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </div>
 
