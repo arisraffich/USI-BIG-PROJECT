@@ -6,8 +6,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Save, X } from 'lucide-react'
-import { toast } from 'sonner'
-
 interface Page {
   id: string
   page_number: number
@@ -55,11 +53,10 @@ export const PageCard = memo(function PageCard({ page }: PageCardProps) {
         throw new Error('Failed to save page')
       }
 
-      toast.success('Page saved successfully')
       setIsEditing(false)
       router.refresh()
-    } catch {
-      toast.error('Failed to save page')
+    } catch (error) {
+      console.error('Failed to save page:', error)
     } finally {
       setSaving(false)
     }

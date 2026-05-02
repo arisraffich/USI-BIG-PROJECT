@@ -18,8 +18,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, Download, Upload, X, AlertTriangle, Trash2, Camera, ChevronRight } from 'lucide-react'
-import { toast } from 'sonner'
+import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, Download, Upload, X, AlertTriangle, Trash2, Camera, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Character } from '@/types/character'
 import { createClient } from '@/lib/supabase/client'
 import { getErrorMessage } from '@/lib/utils/error'
@@ -83,8 +82,6 @@ function SubCard({ title, imageUrl, isLoading, onClick, characterName, onDownloa
         const file = Array.from(e.dataTransfer.files).find(f => f.type.startsWith('image/'))
         if (file) {
             onFileDrop(file)
-        } else {
-            toast.error('Please drop an image file')
         }
     }, [onFileDrop])
 
@@ -217,7 +214,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     const [aiModel, setAiModel] = useState<'gemini' | 'gemini-pro' | 'gpt'>('gemini')
     const referenceInputRef = useRef<HTMLInputElement>(null)
     const [comparisonState, setComparisonState] = useState<{ oldUrl: string; newUrl: string } | null>(null)
-    const [comparisonLightboxUrl, setComparisonLightboxUrl] = useState<string | null>(null)
+    const [comparisonLightboxIndex, setComparisonLightboxIndex] = useState<number | null>(null)
     const [generationError, setGenerationError] = useState<MappedError | null>(null)
     const [showTechnicalDetails, setShowTechnicalDetails] = useState(false)
     const [showResolveDialog, setShowResolveDialog] = useState(false)
@@ -262,13 +259,11 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                 const data = await response.json()
                 throw new Error(data.error || 'Failed to resolve')
             }
-            toast.success('Feedback resolved')
+
             setShowResolveDialog(false)
             router.refresh()
         } catch (error: unknown) {
-            toast.error('Failed to resolve feedback', {
-                description: getErrorMessage(error, 'An error occurred'),
-            })
+            console.error('Failed to resolve character:', error)
         } finally {
             setIsResolving(false)
         }
@@ -286,11 +281,9 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
 
     const addReferenceFile = useCallback((file: File) => {
         if (!file.type.startsWith('image/')) {
-            toast.error('Please select an image file')
             return
         }
         if (file.size > 10 * 1024 * 1024) {
-            toast.error(`"${file.name}" is too large (max 10MB).`)
             return
         }
         if (referenceImage) {
@@ -385,21 +378,15 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                 setComparisonState({
                     oldUrl: character.image_url!,
                     newUrl: resultImageUrl,
-                })
-                toast.success('Compare and choose', { description: 'Select which version to keep' })
-            } else if (resultImageUrl) {
-                setOptimisticColoredImage(resultImageUrl)
-                toast.success('Character regenerated successfully')
-            }
+                })            } else if (resultImageUrl) {
+                setOptimisticColoredImage(resultImageUrl)            }
 
             removeReferenceImage()
         } catch (error: unknown) {
             console.error('Regeneration error:', error)
             const errorMessage = getErrorMessage(error, 'Failed to regenerate')
             const mapped = mapErrorToUserMessage(errorMessage)
-            setGenerationError(mapped)
-            toast.error('Regeneration failed', { description: mapped.message })
-        } finally {
+            setGenerationError(mapped)        } finally {
             setIsRegenerating(false)
         }
     }
@@ -426,8 +413,6 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             if (!response.ok) throw new Error('Failed to confirm')
 
             if (decision === 'keep_new') {
-                toast.success('New image confirmed', { description: 'Generating sketch...' })
-
                 try {
                     const sketchRes = await fetch('/api/characters/generate-sketch', {
                         method: 'POST',
@@ -439,28 +424,31 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                         if (sketchData.sketchUrl) {
                             setLocalCharacter(prev => ({ ...prev, sketch_url: sketchData.sketchUrl }))
                         }
-                        toast.success('Sketch updated')
                     } else {
-                        toast.error('Sketch update failed')
+                        console.error('Failed to generate character sketch:', sketchRes.statusText)
                     }
-                } catch {
-                    toast.error('Sketch update failed')
+                } catch (error) {
+                    console.error('Failed to generate character sketch:', error)
                 }
-            } else {
-                toast.success('Reverted to previous image')
             }
 
             router.refresh()
         } catch (error: unknown) {
             console.error('Confirm error:', error)
-            toast.error(getErrorMessage(error, 'Failed to confirm decision'))
         } finally {
             setIsSketchGenerating(false)
         }
     }
 
     const handleOpenLightbox = (type: 'sketch' | 'colored') => {
+        setComparisonLightboxIndex(null)
         setLightboxImage(type)
+        setShowLightbox(true)
+    }
+
+    const handleOpenComparisonLightbox = (index: number) => {
+        setComparisonLightboxIndex(index)
+        setLightboxImage(null)
         setShowLightbox(true)
     }
 
@@ -468,7 +456,6 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
         e.stopPropagation()
         const imageUrl = type === 'sketch' ? displaySketchImageUrl : displayColoredImageUrl
         if (!imageUrl) {
-            toast.error('No image to download')
             return
         }
 
@@ -484,16 +471,13 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             link.click()
             document.body.removeChild(link)
             window.URL.revokeObjectURL(url)
-            toast.success(`${type === 'sketch' ? 'Sketch' : 'Colored image'} downloaded`)
         } catch (error) {
             console.error('Download failed:', error)
-            toast.error('Failed to download image')
         }
     }
 
     const uploadColoredFile = useCallback(async (file: File) => {
         if (!file.type.startsWith('image/')) {
-            toast.error('Please select an image file')
             return
         }
 
@@ -515,8 +499,6 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             }
 
             const data = await response.json()
-            toast.success('Colored image uploaded successfully')
-            
             if (data.imageUrl) {
                 await new Promise((resolve) => {
                     const img = new Image()
@@ -562,7 +544,6 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             }
         } catch (error: unknown) {
             console.error('Upload error:', error)
-            toast.error(getErrorMessage(error, 'Failed to upload colored image'))
         } finally {
             setIsRegenerating(false)
         }
@@ -597,8 +578,6 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             }
 
             const data = await response.json()
-            toast.success('Sketch uploaded successfully')
-            
             // Preload the new sketch
             if (data.sketchUrl) {
                 await new Promise((resolve) => {
@@ -615,7 +594,6 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             }
         } catch (error: unknown) {
             console.error('Upload error:', error)
-            toast.error(getErrorMessage(error, 'Failed to upload sketch'))
         } finally {
             setIsRegenerating(false)
             // Reset file input
@@ -626,7 +604,6 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     const handleRetrySketch = async () => {
         const coloredUrl = optimisticColoredImage || localCharacter.image_url
         if (!coloredUrl) {
-            toast.error('No colored image to generate sketch from')
             return
         }
         
@@ -647,7 +624,6 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                 const sketchData = await sketchRes.json()
                 if (sketchData.sketchUrl) {
                     setLocalCharacter(prev => ({ ...prev, sketch_url: sketchData.sketchUrl }))
-                    toast.success('Sketch generated successfully')
                 }
             } else {
                 const errorData = await sketchRes.json().catch(() => null)
@@ -676,11 +652,9 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                 throw new Error(data.error || 'Failed to delete character')
             }
 
-            toast.success(`${character.name || character.role || 'Character'} deleted`)
             router.refresh()
         } catch (error: unknown) {
             console.error('Delete error:', error)
-            toast.error(getErrorMessage(error, 'Failed to delete character'))
         } finally {
             setIsDeleting(false)
         }
@@ -700,7 +674,6 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                     if (file) {
                         e.preventDefault()
                         addReferenceFile(file)
-                        toast.success('Image pasted as reference')
                         return
                     }
                 }
@@ -730,7 +703,32 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
     // 4. Colored image exists but sketch hasn't arrived yet (e.g., after new character generation)
     const showSketchLoading = !!(isSketchGenerating || (isGenerating && displayColoredImageUrl && !sketchIsReady && !sketchHasError) || (isSketchPhase && displayColoredImageUrl && !sketchIsReady && !sketchHasError) || (displayColoredImageUrl && !sketchIsReady && !sketchHasError))
 
-    const lightboxImageUrl = comparisonLightboxUrl || (lightboxImage === 'sketch' ? displaySketchImageUrl : displayColoredImageUrl)
+    const comparisonLightboxImages = comparisonState
+        ? [
+            { url: comparisonState.oldUrl, label: 'Old' },
+            { url: comparisonState.newUrl, label: 'New' },
+        ]
+        : []
+    const activeComparisonLightboxImage = comparisonLightboxIndex !== null ? comparisonLightboxImages[comparisonLightboxIndex] : null
+    const lightboxImageUrl = activeComparisonLightboxImage?.url || (lightboxImage === 'sketch' ? displaySketchImageUrl : displayColoredImageUrl)
+    const lightboxImageLabel = activeComparisonLightboxImage?.label || lightboxImage || 'image'
+
+    useEffect(() => {
+        if (!showLightbox || comparisonLightboxIndex === null || comparisonLightboxImages.length < 2) return
+
+        const handleComparisonLightboxKey = (event: KeyboardEvent) => {
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault()
+                setComparisonLightboxIndex(index => Math.max(0, (index ?? 0) - 1))
+            } else if (event.key === 'ArrowRight') {
+                event.preventDefault()
+                setComparisonLightboxIndex(index => Math.min(comparisonLightboxImages.length - 1, (index ?? 0) + 1))
+            }
+        }
+
+        window.addEventListener('keydown', handleComparisonLightboxKey)
+        return () => window.removeEventListener('keydown', handleComparisonLightboxKey)
+    }, [comparisonLightboxImages.length, comparisonLightboxIndex, showLightbox])
 
     return (
         <div
@@ -955,7 +953,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                             <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-2 bg-gradient-to-b from-black/60 to-transparent">
                                 <span className="text-xs font-bold tracking-wider text-white uppercase px-2 py-0.5 bg-slate-700/80 rounded">OLD</span>
                             </div>
-                            <div className="aspect-[9/16] bg-gray-100 cursor-pointer" onClick={() => { setComparisonLightboxUrl(comparisonState.oldUrl); setShowLightbox(true) }}>
+                            <div className="aspect-[9/16] bg-gray-100 cursor-pointer" onClick={() => handleOpenComparisonLightbox(0)}>
                                 <img src={comparisonState.oldUrl} alt="Previous" className="w-full h-full object-cover" />
                             </div>
                             <div className="p-2">
@@ -974,7 +972,7 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
                             <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-2 bg-gradient-to-b from-black/60 to-transparent">
                                 <span className="text-xs font-bold tracking-wider text-white uppercase px-2 py-0.5 bg-green-600/90 rounded">NEW</span>
                             </div>
-                            <div className="aspect-[9/16] bg-gray-100 cursor-pointer" onClick={() => { setComparisonLightboxUrl(comparisonState.newUrl); setShowLightbox(true) }}>
+                            <div className="aspect-[9/16] bg-gray-100 cursor-pointer" onClick={() => handleOpenComparisonLightbox(1)}>
                                 <img src={comparisonState.newUrl} alt="New" className="w-full h-full object-cover" />
                             </div>
                             <div className="p-2">
@@ -1117,26 +1115,58 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
             </div>
 
             {/* Full View Lightbox */}
-            <Dialog open={showLightbox} onOpenChange={(open) => { setShowLightbox(open); if (!open) setComparisonLightboxUrl(null) }}>
+            <Dialog open={showLightbox} onOpenChange={(open) => { setShowLightbox(open); if (!open) setComparisonLightboxIndex(null) }}>
                 <DialogContent 
                     showCloseButton={false}
                     className="!max-w-none !w-screen !h-screen !p-0 !m-0 !translate-x-0 !translate-y-0 !top-0 !left-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none"
                 >
-                    <DialogTitle className="sr-only">{displayName} - {lightboxImage}</DialogTitle>
+                    <DialogTitle className="sr-only">{displayName} - {lightboxImageLabel}</DialogTitle>
                     <div className="relative w-full h-full flex items-center justify-center p-4" onClick={() => setShowLightbox(false)}>
                         {lightboxImageUrl && (
                             <img
                                 src={lightboxImageUrl}
-                                alt={`${displayName} - ${lightboxImage}`}
+                                alt={`${displayName} - ${lightboxImageLabel}`}
                                 className="max-w-full max-h-full object-contain rounded-md shadow-2xl"
                                 onClick={(e) => e.stopPropagation()}
                             />
+                        )}
+                        {comparisonLightboxIndex !== null && comparisonLightboxImages.length > 1 && (
+                            <>
+                                <button
+                                    type="button"
+                                    disabled={comparisonLightboxIndex === 0}
+                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-white/90 bg-black/50 hover:bg-black/70 rounded-full p-3 z-50 pointer-events-auto transition-colors disabled:opacity-30 disabled:pointer-events-none disabled:hover:bg-black/50"
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        setComparisonLightboxIndex(index => Math.max(0, (index ?? 0) - 1))
+                                    }}
+                                    aria-label="View previous character image"
+                                >
+                                    <ChevronLeft className="w-7 h-7" strokeWidth={2.5} />
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={comparisonLightboxIndex >= comparisonLightboxImages.length - 1}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-white/90 bg-black/50 hover:bg-black/70 rounded-full p-3 z-50 pointer-events-auto transition-colors disabled:opacity-30 disabled:pointer-events-none disabled:hover:bg-black/50"
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        setComparisonLightboxIndex(index => Math.min(comparisonLightboxImages.length - 1, (index ?? 0) + 1))
+                                    }}
+                                    aria-label="View next character image"
+                                >
+                                    <ChevronRight className="w-7 h-7" strokeWidth={2.5} />
+                                </button>
+                                <div className="absolute left-1/2 top-6 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-sm font-semibold uppercase tracking-wide text-white">
+                                    {lightboxImageLabel}
+                                </div>
+                            </>
                         )}
                         <button
                             className="absolute top-4 right-4 text-white hover:text-white/80 transition-colors bg-black/50 hover:bg-black/70 rounded-full p-2 z-50"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setShowLightbox(false);
+                                setComparisonLightboxIndex(null);
                             }}
                         >
                             <X className="w-6 h-6" />
@@ -1147,5 +1177,3 @@ export function UnifiedCharacterCard({ character, projectId, isGenerating = fals
         </div>
     )
 }
-
-

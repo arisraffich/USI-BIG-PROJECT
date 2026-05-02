@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, BookImage } from 'lucide-react'
-import { toast } from 'sonner'
 import { Cover, CoverCandidateSet } from '@/types/cover'
 
 interface CoverModalProps {
@@ -72,7 +71,6 @@ export function CoverModal({
                 const errData = await res.json().catch(() => ({} as { error?: string }))
                 const msg = errData?.error || 'Cover generation failed'
                 setError(msg)
-                toast.error(msg)
                 setIsGenerating(false)
                 return
             }
@@ -92,9 +90,6 @@ export function CoverModal({
             setSubtitle('')
             setIsGenerating(false)
             onOpenChange(false)
-
-            toast.success('Cover created — redirecting...')
-
             // Switch to the Cover tab.
             const params = new URLSearchParams(searchParams?.toString() || '')
             params.set('tab', 'cover')
@@ -102,7 +97,6 @@ export function CoverModal({
         } catch (err) {
             const msg = err instanceof Error ? err.message : 'Cover generation failed'
             setError(msg)
-            toast.error(msg)
             setIsGenerating(false)
         }
     }, [title, subtitle, projectId, pageId, onOpenChange, onCoverCreated, router, searchParams, pathname])

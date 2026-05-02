@@ -75,7 +75,9 @@ export async function POST(request: Request) {
         }
 
         // Debug: Log mode detection
-        if (referenceImageUrl) {
+        if (isRefresh) {
+            console.log('[Illustration Generate] ✨ Refresh Mode - quality remaster')
+        } else if (referenceImageUrl) {
             console.log('[Illustration Generate] 🎬 Scene Recreation Mode - manual reference image selected')
             if (sceneCharacters?.length) {
                 const includedChars = sceneCharacters.filter(c => c.isIncluded)
@@ -138,21 +140,28 @@ export async function POST(request: Request) {
                 )
             }
             const sourceUrl = currentImageUrl || pageData.illustration_url
-            console.log(`[Illustration Refresh] ✨ Page ${pageData.page_number} using ${useGPT2 ? 'GPT-2' : (modelId || 'NB2')}`)
+            const qualityReferenceImages = [
+                ...(uploadedReferenceImages || []),
+                ...(referenceImageUrl ? [referenceImageUrl] : []),
+            ]
+
+            console.log(`[Illustration Refresh] ✨ Page ${pageData.page_number} using ${useGPT2 ? 'GPT-2' : (modelId || 'NB2')} refs=${qualityReferenceImages.length}`)
+            const refreshPrompt = customPrompt?.trim() || REFRESH_PROMPT
 
             const refreshResult = useGPT2
                 ? await generateIllustrationGPT2({
-                    prompt: REFRESH_PROMPT,
+                    prompt: refreshPrompt,
                     bookAspectRatio: project?.illustration_aspect_ratio || undefined,
                     isSpread,
                     isRefresh: true,
                     currentImageUrl: sourceUrl,
+                    styleReferenceImages: qualityReferenceImages,
                 })
                 : await generateIllustration({
-                    prompt: REFRESH_PROMPT,
+                    prompt: refreshPrompt,
                     characterReferences: [],
                     anchorImage: sourceUrl,
-                    styleReferenceImages: [],
+                    styleReferenceImages: qualityReferenceImages,
                     aspectRatio: mappedAspectRatio,
                     isRefresh: true,
                     modelId,

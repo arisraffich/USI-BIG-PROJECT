@@ -14,7 +14,6 @@ import {
     AlertDialogAction,
     AlertDialogCancel,
 } from '@/components/ui/alert-dialog'
-import { toast } from 'sonner'
 import { Cover } from '@/types/cover'
 
 interface CoverHeaderActionsProps {
@@ -60,12 +59,6 @@ export function CoverHeaderActions({ cover, onCoverDeleted }: CoverHeaderActions
         const safe = slugify(cover.title)
         const folderName = `${safe}-cover`
         setIsDownloading(true)
-        const toastId = 'cover-download'
-        toast.loading('Preparing cover bundle (front + line art + back)...', {
-            id: toastId,
-            duration: 120_000,
-        })
-
         try {
             // 1) Front cover PNG — fetch in parallel with line-art kickoff below.
             const frontBufferPromise = fetchAsArrayBuffer(cover.front_url)
@@ -122,18 +115,8 @@ export function CoverHeaderActions({ cover, onCoverDeleted }: CoverHeaderActions
             link.click()
             document.body.removeChild(link)
             URL.revokeObjectURL(objUrl)
-
-            if (lineArtBuffer) {
-                toast.success('Cover bundle downloaded', { id: toastId })
-            } else {
-                toast.warning('Downloaded — but line art generation failed. Bundle contains cover images only.', {
-                    id: toastId,
-                    duration: 6000,
-                })
-            }
         } catch (err) {
             console.error('[CoverHeaderActions] Download failed', err)
-            toast.error('Download failed — please try again.', { id: toastId })
         } finally {
             setIsDownloading(false)
         }
@@ -148,11 +131,9 @@ export function CoverHeaderActions({ cover, onCoverDeleted }: CoverHeaderActions
                 throw new Error(data?.error || 'Delete failed')
             }
             onCoverDeleted()
-            toast.success('Cover deleted')
             setIsDeleteOpen(false)
         } catch (err) {
-            const msg = err instanceof Error ? err.message : 'Delete failed'
-            toast.error(msg)
+            console.error('Failed to delete cover:', err)
         } finally {
             setIsDeleting(false)
         }

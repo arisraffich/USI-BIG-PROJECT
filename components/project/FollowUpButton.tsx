@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Send, UserRound } from 'lucide-react'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -101,8 +100,8 @@ export function FollowUpButton({
         setBodyText(data.bodyText)
         setClosingText(data.closingText || '')
       } catch (error) {
+        console.error('Failed to load follow-up draft:', error)
         if (!cancelled) {
-          toast.error(error instanceof Error ? error.message : 'Failed to load follow-up email')
           setOpen(false)
         }
       } finally {
@@ -136,10 +135,9 @@ export function FollowUpButton({
       setCount(data.count)
       setLastSentAt(data.lastSentAt)
       setOpen(false)
-      toast.success('Follow-up email sent')
       router.refresh()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to send follow-up email')
+      console.error('Failed to send follow-up email:', error)
     } finally {
       setSending(false)
     }

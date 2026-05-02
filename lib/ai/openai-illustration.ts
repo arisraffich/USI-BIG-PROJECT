@@ -134,7 +134,7 @@ export async function generateIllustrationGPT2(
     } = opts
 
     const size = mapBookRatioToGpt2Size(bookAspectRatio, isSpread)
-    console.log(`[GPT2 Illustration] 📸 size=${size} refresh=${isRefresh} chars=${characterReferences.length} anchor=${!!anchorImage}`)
+    console.log(`[GPT2 Illustration] 📸 size=${size} refresh=${isRefresh} chars=${characterReferences.length} anchor=${!!anchorImage} refs=${styleReferenceImages.length}`)
 
     try {
         const content: any[] = []
@@ -148,9 +148,28 @@ export async function generateIllustrationGPT2(
             if (!img) {
                 return { success: false, imageBuffer: null, error: 'Failed to fetch current illustration for refresh' }
             }
-            content.push({ type: 'input_text', text: 'REFERENCE IMAGE TO REFRESH (preserve every detail exactly):' })
+            content.push({ type: 'input_text', text: 'IMAGE 1: ORIGINAL ILLUSTRATION. This is the exact illustration to remaster. Preserve its composition, characters, poses, expressions, objects, background, perspective, and layout exactly:' })
             content.push({ type: 'input_image', image_url: `data:${img.mimeType};base64,${img.data}` })
-            content.push({ type: 'input_text', text: REFRESH_PROMPT })
+
+            for (let i = 0; i < styleReferenceImages.length; i++) {
+                const styleImg = await fetchImageAsBase64(styleReferenceImages[i])
+                if (!styleImg) continue
+                content.push({
+                    type: 'input_text',
+                    text: `IMAGE 2: STYLE REFERENCE. Use this image only for visual quality guidance: color palette, shades, tone, warmth/coolness, saturation, contrast, shading style, texture, line cleanliness, and rendering finish.
+Do not copy its characters, objects, scene, background, composition, poses, typography, or story content.`
+                })
+                content.push({ type: 'input_image', image_url: `data:${styleImg.mimeType};base64,${styleImg.data}` })
+            }
+
+            if (styleReferenceImages.length > 0) {
+                content.push({
+                    type: 'input_text',
+                    text: `IMAGE ROLE INSTRUCTION: IMAGE 1 controls the illustration content and layout. IMAGE 2 controls only the color, texture, tone, shading, and rendering quality.
+The final result must be IMAGE 1 remastered with IMAGE 2's visual quality. Do not borrow content from IMAGE 2.`
+                })
+            }
+            content.push({ type: 'input_text', text: prompt?.trim() || REFRESH_PROMPT })
         } else {
             // Standard generation: character refs + anchor + prompt
             const charFetches = await Promise.all(

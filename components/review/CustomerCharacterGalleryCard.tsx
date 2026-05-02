@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { toast } from 'sonner'
 import { Character } from '@/types/character'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
@@ -106,7 +105,6 @@ export function CustomerCharacterGalleryCard({ character, isMain = false, review
         e.stopPropagation()
         const imageUrl = type === 'sketch' ? localCharacter.customer_sketch_url : localCharacter.customer_image_url
         if (!imageUrl) {
-            toast.error('No image to download')
             return
         }
 
@@ -122,10 +120,8 @@ export function CustomerCharacterGalleryCard({ character, isMain = false, review
             link.click()
             document.body.removeChild(link)
             window.URL.revokeObjectURL(url)
-            toast.success(`${type === 'sketch' ? 'Sketch' : 'Colored image'} downloaded`)
         } catch (error) {
             console.error('Download failed:', error)
-            toast.error('Failed to download image')
         }
     }
 
@@ -153,11 +149,9 @@ export function CustomerCharacterGalleryCard({ character, isMain = false, review
                 throw new Error(errorData.error || 'Failed to save notes')
             }
 
-            toast.success('Change request saved')
             setIsEditing(false)
             // Update handled by realtime subscription
         } catch (error: unknown) {
-            toast.error('Failed to save change request')
             console.error('Save error:', error)
         } finally {
             setIsSaving(false)

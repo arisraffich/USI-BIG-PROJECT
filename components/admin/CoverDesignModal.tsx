@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import JSZip from 'jszip'
-import { toast } from 'sonner'
 import { BookImage, Check, Download, Loader2, Upload, X } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -183,13 +182,9 @@ export function CoverDesignModal({ open, onOpenChange }: CoverDesignModalProps) 
             setEffectiveAspectRatio(data.aspectRatio || aspectRatio)
             setCandidates(nextCandidates)
             setSelectedKind(null)
-            setIsFrontPicked(false)
-            toast.success('Cover options generated')
-        } catch (err) {
+            setIsFrontPicked(false)        } catch (err) {
             const message = err instanceof Error ? err.message : 'Cover generation failed'
-            setError(message)
-            toast.error(message)
-        } finally {
+            setError(message)        } finally {
             setIsGeneratingFront(false)
         }
     }, [aspectRatio, author, referenceFile, subtitle, title])
@@ -202,9 +197,7 @@ export function CoverDesignModal({ open, onOpenChange }: CoverDesignModalProps) 
         setCandidates([candidate])
         setSelectedKind(candidate.kind)
         setIsFrontPicked(true)
-        setBackCoverDataUrl(null)
-        toast.success('Front cover selected')
-    }, [isBusy])
+        setBackCoverDataUrl(null)    }, [isBusy])
 
     const handleGenerateBack = useCallback(async () => {
         if (!selectedCandidate || !isFrontPicked) return
@@ -228,13 +221,9 @@ export function CoverDesignModal({ open, onOpenChange }: CoverDesignModalProps) 
             }
 
             const data = await response.json() as { backCover: { dataUrl: string } }
-            setBackCoverDataUrl(data.backCover.dataUrl)
-            toast.success('Back cover generated')
-        } catch (err) {
+            setBackCoverDataUrl(data.backCover.dataUrl)        } catch (err) {
             const message = err instanceof Error ? err.message : 'Back cover generation failed'
-            setError(message)
-            toast.error(message)
-        } finally {
+            setError(message)        } finally {
             setIsGeneratingBack(false)
         }
     }, [aspectRatio, effectiveAspectRatio, isFrontPicked, selectedCandidate, title])
@@ -277,12 +266,9 @@ export function CoverDesignModal({ open, onOpenChange }: CoverDesignModalProps) 
             ]
 
             if (includeLineArtInDownload) {
-                toast.loading('Creating front cover line art...', { id: 'cover-tool-download', duration: 120_000 })
                 const lineArtBlob = await generateLineArt(selectedCandidate.dataUrl)
                 if (lineArtBlob) {
                     files.push({ name: `${safeTitle}-front-cover-lineart.png`, blob: lineArtBlob })
-                } else {
-                    toast.warning('Line art failed. Downloading available cover files only.', { id: 'cover-tool-download', duration: 6000 })
                 }
             }
 
@@ -297,14 +283,9 @@ export function CoverDesignModal({ open, onOpenChange }: CoverDesignModalProps) 
                 for (const file of files) zip.file(file.name, file.blob)
                 const zipBlob = await zip.generateAsync({ type: 'blob' })
                 downloadBlob(zipBlob, `${safeTitle}-cover-design.zip`)
-            }
-
-            toast.success('Cover download ready', { id: 'cover-tool-download' })
-        } catch (err) {
+            }        } catch (err) {
             const message = err instanceof Error ? err.message : 'Download failed'
-            setError(message)
-            toast.error(message, { id: 'cover-tool-download' })
-        } finally {
+            setError(message)        } finally {
             setIsDownloading(false)
         }
     }, [backCoverDataUrl, generateLineArt, includeLineArtInDownload, isFrontPicked, selectedCandidate, title])

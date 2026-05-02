@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { toast } from 'sonner'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -168,16 +167,10 @@ export function ManuscriptEditor({ pages, projectId, isVisible = true }: Manuscr
       // Clear edits
       setPageEdits({})
       setIsEditMode(false)
-
-      // Show success toast
-      toast.success('Changes saved!')
-
       // No reload needed - Realtime subscription in parent will update the UI
       // window.location.reload()
     } catch (error: unknown) {
-      console.error('Error saving pages:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to save changes')
-    } finally {
+      console.error('Error saving pages:', error)    } finally {
       setIsSaving(false)
     }
   }

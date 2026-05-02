@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
 import { CoverSidePane } from '@/components/cover/CoverSidePane'
 import { CoverFrontRegenModal } from '@/components/cover/CoverFrontRegenModal'
 import { CoverBackRegenModal } from '@/components/cover/CoverBackRegenModal'
@@ -22,7 +21,8 @@ interface CoverBoardProps {
 
 type Comparison = { oldUrl: string, newUrl: string }
 
-type CoverLightbox = { side: 'front' | 'back', url: string }
+type CoverLightboxItem = { url: string, label: string }
+type CoverLightbox = { items: CoverLightboxItem[], index: number }
 
 /**
  * Dual-pane (back + front) cover display with per-side regenerate/compare.
@@ -42,8 +42,7 @@ export function CoverBoard({ cover, pages, pendingCandidates, onCoverUpdated, on
     const [isComparisonReverting, setIsComparisonReverting] = useState(false)
     const [isSelectingCandidate, setIsSelectingCandidate] = useState(false)
 
-    // Fullscreen viewer: tracks which image URL is shown (may be a comparison candidate)
-    // and which side it belongs to, for left/right navigation between front & back.
+    // Fullscreen viewer: stores the navigable image set for front/back or old/new comparisons.
     const [lightbox, setLightbox] = useState<CoverLightbox | null>(null)
 
     // Disable the lightbox entirely on mobile (<768px, matches the board's stacking
@@ -58,47 +57,68 @@ export function CoverBoard({ cover, pages, pendingCandidates, onCoverUpdated, on
         return () => mq.removeEventListener('change', update)
     }, [])
 
-    const canNavigateLightbox = !!(cover.front_url && cover.back_url)
+    const canNavigateLightbox = (lightbox?.items.length ?? 0) > 1
+    const currentLightboxItem = lightbox ? lightbox.items[lightbox.index] : null
 
     const openLightbox = useCallback((side: 'front' | 'back', url: string) => {
-        setLightbox({ side, url })
+        const items: CoverLightboxItem[] = [
+            cover.back_url ? { url: cover.back_url, label: 'Back cover' } : null,
+            cover.front_url ? { url: cover.front_url, label: 'Front cover' } : null,
+        ].filter((item): item is CoverLightboxItem => !!item)
+        const index = items.findIndex(item => item.url === url)
+
+        setLightbox(index >= 0
+            ? { items, index }
+            : { items: [{ url, label: side === 'front' ? 'Front cover' : 'Back cover' }], index: 0 }
+        )
+    }, [cover.back_url, cover.front_url])
+
+    const openComparisonLightbox = useCallback((oldUrl: string, newUrl: string, index: number) => {
+        setLightbox({
+            items: [
+                { url: oldUrl, label: 'Old' },
+                { url: newUrl, label: 'New' },
+            ],
+            index,
+        })
     }, [])
 
     // Passed into CoverSidePane only on desktop. When undefined, the pane skips
     // the zoom-in cursor/hover styling and becomes non-interactive for taps.
     const handleImageClick = isDesktop ? openLightbox : undefined
 
-    /** Left side of the spread = back cover. */
-    const goLightboxToBack = useCallback(() => {
-        if (!lightbox || !cover.back_url || lightbox.side === 'back') return
-        setLightbox({ side: 'back', url: cover.back_url })
-    }, [lightbox, cover.back_url])
+    const goLightboxPrevious = useCallback(() => {
+        setLightbox(current => current
+            ? { ...current, index: Math.max(0, current.index - 1) }
+            : current
+        )
+    }, [])
 
-    /** Right side of the spread = front cover. */
-    const goLightboxToFront = useCallback(() => {
-        if (!lightbox || !cover.front_url || lightbox.side === 'front') return
-        setLightbox({ side: 'front', url: cover.front_url })
-    }, [lightbox, cover.front_url])
+    const goLightboxNext = useCallback(() => {
+        setLightbox(current => current
+            ? { ...current, index: Math.min(current.items.length - 1, current.index + 1) }
+            : current
+        )
+    }, [])
 
     useEffect(() => {
         if (!lightbox || !canNavigateLightbox) return
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'ArrowLeft') {
                 e.preventDefault()
-                goLightboxToBack()
+                goLightboxPrevious()
             } else if (e.key === 'ArrowRight') {
                 e.preventDefault()
-                goLightboxToFront()
+                goLightboxNext()
             }
         }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
-    }, [lightbox, canNavigateLightbox, goLightboxToBack, goLightboxToFront])
+    }, [lightbox, canNavigateLightbox, goLightboxNext, goLightboxPrevious])
 
     const lightboxLabel = useMemo(() => {
-        if (!lightbox) return ''
-        return lightbox.side === 'front' ? 'Front cover' : 'Back cover'
-    }, [lightbox])
+        return currentLightboxItem?.label || ''
+    }, [currentLightboxItem])
 
     // --- Front regen ------------------------------------------------------
     const handleFrontRegenStart = useCallback(() => {
@@ -111,11 +131,6 @@ export function CoverBoard({ cover, pages, pendingCandidates, onCoverUpdated, on
         onCoverUpdated(payload.cover)
         if (payload.oldUrl) {
             setFrontComparison({ oldUrl: payload.oldUrl, newUrl: payload.newUrl })
-            toast.info('Pick the version you want to keep — don\'t refresh until you do.')
-        } else {
-            // First front gen shouldn't happen from regen (empty cover would mean no front yet).
-            // Fall back gracefully by just updating with no comparison.
-            toast.success('Front cover updated')
         }
     }, [onCoverUpdated])
 
@@ -125,7 +140,6 @@ export function CoverBoard({ cover, pages, pendingCandidates, onCoverUpdated, on
 
     const handleFrontKeepNew = useCallback(() => {
         setFrontComparison(null)
-        toast.success('New front cover saved')
     }, [])
 
     const handleFrontKeepOld = useCallback(async () => {
@@ -147,10 +161,8 @@ export function CoverBoard({ cover, pages, pendingCandidates, onCoverUpdated, on
             const data = await res.json() as { cover: Cover }
             onCoverUpdated(data.cover)
             setFrontComparison(null)
-            toast.success('Reverted to previous front cover')
         } catch (err) {
-            const msg = err instanceof Error ? err.message : 'Revert failed'
-            toast.error(msg)
+            console.error('Failed to revert front cover:', err)
         }
     }, [frontComparison, cover.id, onCoverUpdated])
 
@@ -159,8 +171,6 @@ export function CoverBoard({ cover, pages, pendingCandidates, onCoverUpdated, on
         if (!cover.front_url || isFrontRegenerating) return
         setIsFrontRegenerating(true)
         setFrontComparison(null)
-        toast.info('Remastering front cover at max quality…')
-
         try {
             const res = await fetch('/api/covers/regenerate', {
                 method: 'POST',
@@ -179,15 +189,13 @@ export function CoverBoard({ cover, pages, pendingCandidates, onCoverUpdated, on
             handleFrontRegenSuccess(data)
         } catch (err) {
             handleFrontRegenFailure()
-            const msg = err instanceof Error ? err.message : 'Remaster failed'
-            toast.error(msg)
+            console.error('Failed to remaster front cover:', err)
         }
     }, [cover.id, cover.front_url, isFrontRegenerating, handleFrontRegenSuccess, handleFrontRegenFailure])
 
     // --- Back regen -------------------------------------------------------
     const handleBackRegenerate = useCallback(() => {
         if (!cover.front_url) {
-            toast.error('Generate the front cover first — it\'s the reference for the back.')
             return
         }
         setIsBackRegenOpen(true)
@@ -203,10 +211,6 @@ export function CoverBoard({ cover, pages, pendingCandidates, onCoverUpdated, on
         onCoverUpdated(payload.cover)
         if (payload.oldUrl) {
             setBackComparison({ oldUrl: payload.oldUrl, newUrl: payload.newUrl })
-            toast.info('Pick the version you want to keep — don\'t refresh until you do.')
-        } else {
-            // First back gen — no OLD to compare against; just accept the new one.
-            toast.success('Back cover created')
         }
     }, [onCoverUpdated])
 
@@ -216,7 +220,6 @@ export function CoverBoard({ cover, pages, pendingCandidates, onCoverUpdated, on
 
     const handleBackKeepNew = useCallback(() => {
         setBackComparison(null)
-        toast.success('New back cover saved')
     }, [])
 
     const handleBackKeepOld = useCallback(async () => {
@@ -238,10 +241,8 @@ export function CoverBoard({ cover, pages, pendingCandidates, onCoverUpdated, on
             const data = await res.json() as { cover: Cover }
             onCoverUpdated(data.cover)
             setBackComparison(null)
-            toast.success('Reverted to previous back cover')
         } catch (err) {
-            const msg = err instanceof Error ? err.message : 'Revert failed'
-            toast.error(msg)
+            console.error('Failed to revert back cover:', err)
         }
     }, [backComparison, cover.id, onCoverUpdated])
 
@@ -307,10 +308,8 @@ export function CoverBoard({ cover, pages, pendingCandidates, onCoverUpdated, on
             const data = await res.json() as { cover: Cover }
             onCoverUpdated(data.cover)
             onCandidatesCleared?.()
-            toast.success(`${candidate.label} saved as front cover`)
         } catch (err) {
-            const msg = err instanceof Error ? err.message : 'Failed to save selected cover'
-            toast.error(msg)
+            console.error('Failed to save selected cover:', err)
         } finally {
             setIsSelectingCandidate(false)
         }
@@ -369,7 +368,7 @@ export function CoverBoard({ cover, pages, pendingCandidates, onCoverUpdated, on
                         </div>
                         <div
                             className={`relative w-full flex-1 min-h-[420px] md:min-h-0 transition-opacity ${handleImageClick ? 'cursor-pointer hover:opacity-95' : ''}`}
-                            onClick={handleImageClick ? () => handleImageClick(activeComparison.side, activeComparison.oldUrl) : undefined}
+                            onClick={handleImageClick ? () => openComparisonLightbox(activeComparison.oldUrl, activeComparison.newUrl, 0) : undefined}
                         >
                             <img
                                 src={activeComparison.oldUrl}
@@ -398,7 +397,7 @@ export function CoverBoard({ cover, pages, pendingCandidates, onCoverUpdated, on
                         </div>
                         <div
                             className={`relative w-full flex-1 min-h-[420px] md:min-h-0 transition-opacity ${handleImageClick ? 'cursor-pointer hover:opacity-95' : ''}`}
-                            onClick={handleImageClick ? () => handleImageClick(activeComparison.side, activeComparison.newUrl) : undefined}
+                            onClick={handleImageClick ? () => openComparisonLightbox(activeComparison.oldUrl, activeComparison.newUrl, 1) : undefined}
                         >
                             <img
                                 src={activeComparison.newUrl}
@@ -459,9 +458,9 @@ export function CoverBoard({ cover, pages, pendingCandidates, onCoverUpdated, on
                         Use the arrow buttons or keyboard to switch between front and back cover when both are available.
                     </DialogDescription>
                     <div className="relative w-full h-full flex items-center justify-center p-4" onClick={() => setLightbox(null)}>
-                        {lightbox && (
+                        {currentLightboxItem && (
                             <img
-                                src={lightbox.url}
+                                src={currentLightboxItem.url}
                                 alt={lightboxLabel || 'Cover'}
                                 className="max-w-full max-h-full object-contain rounded-md shadow-2xl"
                                 onClick={(e) => e.stopPropagation()}
@@ -471,28 +470,31 @@ export function CoverBoard({ cover, pages, pendingCandidates, onCoverUpdated, on
                             <>
                                 <button
                                     type="button"
-                                    disabled={lightbox.side === 'back'}
+                                    disabled={lightbox.index === 0}
                                     className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-white/90 bg-black/50 hover:bg-black/70 rounded-full p-3 z-50 pointer-events-auto transition-colors disabled:opacity-30 disabled:pointer-events-none disabled:hover:bg-black/50"
                                     onClick={(e) => {
                                         e.stopPropagation()
-                                        goLightboxToBack()
+                                        goLightboxPrevious()
                                     }}
-                                    aria-label="View back cover"
+                                    aria-label="View previous cover image"
                                 >
                                     <ChevronLeft className="w-7 h-7" strokeWidth={2.5} />
                                 </button>
                                 <button
                                     type="button"
-                                    disabled={lightbox.side === 'front'}
+                                    disabled={lightbox.index >= lightbox.items.length - 1}
                                     className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-white/90 bg-black/50 hover:bg-black/70 rounded-full p-3 z-50 pointer-events-auto transition-colors disabled:opacity-30 disabled:pointer-events-none disabled:hover:bg-black/50"
                                     onClick={(e) => {
                                         e.stopPropagation()
-                                        goLightboxToFront()
+                                        goLightboxNext()
                                     }}
-                                    aria-label="View front cover"
+                                    aria-label="View next cover image"
                                 >
                                     <ChevronRight className="w-7 h-7" strokeWidth={2.5} />
                                 </button>
+                                <div className="absolute left-1/2 top-6 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-sm font-semibold uppercase tracking-wide text-white">
+                                    {lightboxLabel}
+                                </div>
                             </>
                         )}
                         <button

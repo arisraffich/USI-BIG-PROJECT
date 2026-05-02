@@ -2,8 +2,6 @@
 
 import { memo } from 'react'
 import { Page } from '@/types/page'
-import { toast } from 'sonner'
-
 // ... imports
 import { SharedIllustrationBoard } from '@/components/illustration/SharedIllustrationBoard'
 
@@ -33,15 +31,11 @@ export const CustomerIllustrationReview = memo(function CustomerIllustrationRevi
             body: JSON.stringify({ feedback_notes: notes }),
         })
 
-        if (!response.ok) {
-            toast.error('Failed to save feedback')
-            throw new Error('Failed to save feedback')
+        if (!response.ok) {            throw new Error('Failed to save feedback')
         }
 
         // Update local parent state
-        onChange(page.id, notes)
-        toast.success('Feedback saved successfully')
-    }
+        onChange(page.id, notes)    }
 
     // Handle accepting admin reply (resolves the feedback)
     const handleAcceptAdminReply = async () => {

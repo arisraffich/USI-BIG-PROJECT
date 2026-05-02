@@ -17,13 +17,15 @@ export async function POST(request: Request) {
             pageId, 
             projectId,
             oldUrl, 
-            newUrl 
+            newUrl,
+            isRefresh
         } = await request.json() as {
             decision: 'keep_new' | 'revert_old'
             pageId: string
             projectId: string
             oldUrl: string
             newUrl: string
+            isRefresh?: boolean
         }
 
         if (!decision || !pageId || !projectId || !newUrl) {
@@ -45,16 +47,35 @@ export async function POST(request: Request) {
             // 1. Update DB with new illustration URL
             // Always update original_illustration_url to the last approved version
             // This powers "Reset to Original" (restores last accepted regeneration)
-            await supabase.from('pages')
-                .update({
-                    illustration_url: newUrl,
-                    original_illustration_url: newUrl,
-                    illustration_approved_at: null,
-                    is_resolved: true,
-                })
-                .eq('id', pageId)
+            if (isRefresh) {
+                await supabase.from('pages')
+                    .update({
+                        illustration_url: newUrl,
+                        original_illustration_url: newUrl,
+                    })
+                    .eq('id', pageId)
+            } else {
+                await supabase.from('pages')
+                    .update({
+                        illustration_url: newUrl,
+                        original_illustration_url: newUrl,
+                        illustration_approved_at: null,
+                        is_resolved: true,
+                    })
+                    .eq('id', pageId)
+            }
 
-            // 2. Delete old file from storage (if exists)
+            if (isRefresh) {
+                return NextResponse.json({
+                    success: true,
+                    decision: 'keep_new',
+                    illustrationUrl: newUrl,
+                    message: 'Remastered illustration confirmed.'
+                })
+            }
+
+            // 2. Delete old file from storage (if exists). Remaster skips this because
+            // customer_illustration_url can still point to the old file until Push Changes.
             if (oldUrl) {
                 const oldPath = extractPath(oldUrl)
                 if (oldPath) {

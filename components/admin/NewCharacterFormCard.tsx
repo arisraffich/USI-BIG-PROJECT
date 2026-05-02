@@ -6,8 +6,6 @@ import { Character } from '@/types/character'
 import { UniversalCharacterCard, CharacterFormData } from '@/components/shared/UniversalCharacterCard'
 import { Button } from '@/components/ui/button'
 import { Loader2, Sparkles } from 'lucide-react'
-import { toast } from 'sonner'
-import { getErrorMessage } from '@/lib/utils/error'
 
 interface NewCharacterFormCardProps {
     character: Character
@@ -55,9 +53,7 @@ export function NewCharacterFormCard({ character, projectId }: NewCharacterFormC
                 const err = await res.json()
                 throw new Error(err.error || 'Failed to save')
             }
-            toast.success('Character details saved')
         } catch (error) {
-            toast.error(getErrorMessage(error, 'Failed to save character'))
             throw error
         } finally {
             setIsSaving(false)
@@ -68,10 +64,9 @@ export function NewCharacterFormCard({ character, projectId }: NewCharacterFormC
         try {
             const res = await fetch(`/api/characters/${character.id}`, { method: 'DELETE' })
             if (!res.ok) throw new Error('Failed to delete')
-            toast.success('Character deleted')
             router.refresh()
         } catch (error) {
-            toast.error(getErrorMessage(error, 'Failed to delete character'))
+            console.error('Failed to delete character:', error)
         }
     }
 
@@ -103,9 +98,6 @@ export function NewCharacterFormCard({ character, projectId }: NewCharacterFormC
             if (genData.failed > 0 || (result && !result.success)) {
                 throw new Error(result?.error || 'Generation failed')
             }
-
-            toast.success('Character generated! Sketch generating...', { duration: 5000 })
-
             // Trigger sketch generation
             if (result?.image_url) {
                 fetch('/api/characters/generate-sketch', {
@@ -117,7 +109,7 @@ export function NewCharacterFormCard({ character, projectId }: NewCharacterFormC
 
             router.refresh()
         } catch (error) {
-            toast.error(getErrorMessage(error, 'Failed to generate character'))
+            console.error('Failed to save and generate character:', error)
         } finally {
             setIsGenerating(false)
         }

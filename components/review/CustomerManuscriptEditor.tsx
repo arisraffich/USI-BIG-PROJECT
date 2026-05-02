@@ -4,7 +4,6 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { CustomerManuscriptPage } from './CustomerManuscriptPage'
 import { ManuscriptSidebar } from '@/components/project/manuscript/ManuscriptSidebar'
 import { ManuscriptToolbar } from '@/components/project/manuscript/ManuscriptToolbar'
-import { toast } from 'sonner'
 import { Page } from '@/types/page'
 
 
@@ -207,7 +206,6 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEd
 
   const handleSave = useCallback(async () => {
     if (Object.keys(pageEdits).length === 0) {
-      toast.info('No changes to save')
       return
     }
 
@@ -284,12 +282,8 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEd
       // Clear local edits
       setPageEdits({})
       // Exit edit mode to return to read-only view with red highlighting
-      onEditModeChange(false)
-      toast.success('Changes saved successfully')
-    } catch (error: unknown) {
-      console.error('Error saving changes:', error)
-      toast.error('Failed to save changes')
-    } finally {
+      onEditModeChange(false)    } catch (error: unknown) {
+      console.error('Error saving changes:', error)    } finally {
       setIsSaving(false)
     }
   }, [pageEdits, displayedPages, reviewToken])
@@ -453,8 +447,6 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEd
     </div>
   )
 }
-
-
 
 
 

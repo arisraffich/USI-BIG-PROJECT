@@ -4,8 +4,6 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { CheckCircle2, MessageSquare, Loader2, Save } from 'lucide-react'
 import { Page } from '@/types/page'
-import { toast } from 'sonner'
-
 interface ReviewHistoryDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
@@ -36,9 +34,8 @@ export function ReviewHistoryDialog({ open, onOpenChange, page, onSave, canEdit 
         try {
             await onSave(editText)
             setIsEditing(false)
-            toast.success('Request updated')
-        } catch {
-            toast.error('Failed to update request')
+        } catch (error) {
+            console.error('Failed to save review history entry:', error)
         } finally {
             setIsSaving(false)
         }

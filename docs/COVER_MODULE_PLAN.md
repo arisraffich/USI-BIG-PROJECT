@@ -375,12 +375,12 @@ Back regen follows the identical pattern with `side: 'back'`.
 | Phase | Scope | Time |
 |---|---|---|
 | P1 | Migration + TS types + `generateBackCover()` + `buildBackCoverPrompt()` | 0.25 day |
-| P2 | Sync `/api/covers/generate` + GET + DELETE + empty state + Cover tab shell + updated initial modal + redirect flow | 0.75 day |
+| P2 | Async `/api/covers/generate` + GET + DELETE + empty state + Cover tab shell + updated initial modal + redirect flow + polling | 1 day |
 | P3 | Front side rendering with image + Regen modal + Regen API + comparison view + revert | 1 day |
 | P4 | Back side rendering + "Create Back Cover" button + Back regen modal + comparison view for back | 0.5 day |
 | P5 | Hide `Create Cover` button when cover exists + mobile responsive pass + download polish | 0.25 day |
 
-**Total: ~2.75 days.**
+**Total: ~3 days.**
 
 Checkpoints at the end of each phase — I'll pause, tell you the project URL to sanity-check, and only proceed when you're happy.
 
@@ -390,13 +390,12 @@ Checkpoints at the end of each phase — I'll pause, tell you the project URL to
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Admin navigates away during sync gen (closes tab / clicks another tab) | Medium | Low | Initial gen: modal is blocking, admin can't accidentally navigate. Regen: uses `AbortController` so if admin leaves the Cover tab, the request aborts cleanly — cover row is untouched |
-| Admin refreshes mid-comparison, loses OLD URL | Medium | Low | NEW becomes canonical. Toast when entering comparison: "Don't refresh — OLD version won't be recoverable." Matches illustration behavior |
-| Storage path collision on regen | Low | Low | Filename includes timestamp: `{side}-{timestamp}.png` |
-| Source page deleted after cover created | Low | Low | `ON DELETE SET NULL` on `source_page_id` — cover keeps working, front regen modal shows warning "source page no longer exists, pick another" |
-| Delete doesn't clean up storage files | Low | Low | Best-effort delete; orphaned files in storage are harmless. Log warning |
-| Back cover requested before front exists | Low | Low | "Create Back Cover" button only shown when `front_url` is non-null; server also guards with 400 |
-| Gen request hits Railway timeout (>180s) | Low | Medium | Matches current illustration gen behavior — has not been a problem in practice. If it becomes one, revisit async pattern |
+| Admin regenerates before first gen completes | Low | Low | Regen button disabled while `{side}_status === 'generating'` |
+| Admin refreshes mid-comparison, loses OLD URL | Medium | Low | NEW becomes canonical; matches illustration behavior. Toast notice when entering comparison: "Don't refresh — OLD version won't be recoverable." |
+| Storage path collision on regen | Low | Low | Filename includes timestamp: `front-{timestamp}.png` |
+| Source page deleted after cover created | Low | Low | `ON DELETE SET NULL` on `source_page_id` — cover keeps working, regen shows warning "source page no longer exists, please pick another" |
+| Delete doesn't clean up storage files | Low | Low | Best-effort delete; if it fails, orphaned file in storage is harmless. Log warning |
+| Back cover generated before front exists | Low | Low | "Create Back Cover" button disabled until `front_status === 'completed'` |
 
 ---
 

@@ -4,9 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
 import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, X, AlertTriangle } from 'lucide-react'
-import { toast } from 'sonner'
 import { Character } from '@/types/character'
-import { getErrorMessage } from '@/lib/utils/error'
 
 interface AdminCharacterGalleryCardProps {
     character: Character
@@ -76,12 +74,9 @@ export function AdminCharacterGalleryCard({ character, projectId, isGenerating =
                 })
                 setOptimisticImage(resultImageUrl)
             }
-
-            toast.success('Character generated successfully')
             // Character update handled by realtime subscription
         } catch (error: unknown) {
             console.error('Regeneration error:', error)
-            toast.error(getErrorMessage(error, 'Failed to regenerate'))
             // Don't close dialog on error so user keeps their prompt
             setIsDialogOpen(true)
         } finally {

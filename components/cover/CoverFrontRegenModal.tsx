@@ -11,7 +11,6 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Loader2, Sparkles, ImagePlus, X, ChevronDown, Bookmark } from 'lucide-react'
-import { toast } from 'sonner'
 import { Cover } from '@/types/cover'
 import { Page } from '@/types/page'
 
@@ -83,7 +82,6 @@ export function CoverFrontRegenModal({
 
         const remaining = MAX_IMAGES - addedImages.length
         if (remaining <= 0) {
-            toast.error(`Max ${MAX_IMAGES} reference images.`)
             return
         }
 
@@ -92,18 +90,16 @@ export function CoverFrontRegenModal({
 
         for (const file of toProcess) {
             if (!file.type.startsWith('image/')) {
-                toast.error(`${file.name}: not an image`)
                 continue
             }
             if (file.size > MAX_FILE_BYTES) {
-                toast.error(`${file.name}: exceeds 10MB`)
                 continue
             }
             try {
                 const dataUrl = await readFileAsDataUrl(file)
                 next.push({ dataUrl, name: file.name })
-            } catch {
-                toast.error(`${file.name}: failed to read`)
+            } catch (error) {
+                console.error('Failed to read front-cover reference image:', error)
             }
         }
 
@@ -142,8 +138,7 @@ export function CoverFrontRegenModal({
 
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({} as { error?: string }))
-                const msg = errData?.error || 'Regeneration failed'
-                toast.error(msg)
+                console.error('Front cover regeneration failed:', errData?.error || res.statusText)
                 onFailure()
                 return
             }
@@ -151,8 +146,7 @@ export function CoverFrontRegenModal({
             const data = await res.json() as { cover: Cover, newUrl: string, oldUrl: string | null }
             onSuccess(data)
         } catch (err) {
-            const msg = err instanceof Error ? err.message : 'Regeneration failed'
-            toast.error(msg)
+            console.error('Front cover regeneration failed:', err)
             onFailure()
         } finally {
             setIsSubmitting(false)

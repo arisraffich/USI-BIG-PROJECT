@@ -14,9 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Plus, Loader2, Sparkles, UserPlus, BookOpen } from 'lucide-react'
-import { toast } from 'sonner'
 import { useState, useEffect } from 'react'
-import { getErrorMessage } from '@/lib/utils/error'
 
 interface Suggestion {
   name: string | null
@@ -152,10 +150,6 @@ export function AddCharacterButton({ mainCharacterName, projectId: propProjectId
       const newCharacter = await response.json()
       const characterId = newCharacter.id
 
-      const pagesInfo = selectedSuggestion?.appears_in?.length
-        ? ` (pages ${selectedSuggestion.appears_in.join(', ')})`
-        : ''
-      toast.success(`Character "${nameRole.trim()}" added${pagesInfo}`)
       setIsOpen(false)
       setNameRole('')
       setDescription('')
@@ -183,9 +177,7 @@ export function AddCharacterButton({ mainCharacterName, projectId: propProjectId
         }
       }, 500)
     } catch (error: unknown) {
-      toast.error('Failed to add character', {
-        description: getErrorMessage(error, 'An error occurred'),
-      })
+      console.error('Failed to create character:', error)
     } finally {
       setIsCreating(false)
     }

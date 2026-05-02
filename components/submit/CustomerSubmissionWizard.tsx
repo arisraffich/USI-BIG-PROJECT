@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
@@ -219,9 +218,9 @@ export function CustomerSubmissionWizard({
 
   const removePage = (index: number) => {
     if (pages.length <= numberOfIllustrations) {
-      toast.error(`Cannot remove below ${numberOfIllustrations} pages`)
       return
     }
+
     setPages(prev => {
       const updated = prev.filter((_, i) => i !== index)
       // Renumber
@@ -246,9 +245,7 @@ export function CustomerSubmissionWizard({
   const finishStoryText = () => {
     // Check all pages have story text
     const emptyPages = pages.filter(p => !p.storyText.trim())
-    if (emptyPages.length > 0) {
-      toast.error(`Please fill in story text for all pages. ${emptyPages.length} page(s) are empty.`)
-      setCurrentPageIndex(pages.findIndex(p => !p.storyText.trim()))
+    if (emptyPages.length > 0) {      setCurrentPageIndex(pages.findIndex(p => !p.storyText.trim()))
       return
     }
 
@@ -305,9 +302,7 @@ export function CustomerSubmissionWizard({
   const finishSceneDescriptions = () => {
     // Check all pages have scene descriptions
     const emptyPages = pages.filter(p => !p.sceneDescription.trim())
-    if (emptyPages.length > 0) {
-      toast.error(`Please add a scene description for all pages. ${emptyPages.length} page(s) are empty.`)
-      setCurrentPageIndex(pages.findIndex(p => !p.sceneDescription.trim()))
+    if (emptyPages.length > 0) {      setCurrentPageIndex(pages.findIndex(p => !p.sceneDescription.trim()))
       return
     }
     handleIdentifyCharacters(sceneDescriptionChoice)
@@ -399,9 +394,7 @@ export function CustomerSubmissionWizard({
         await handleFinalSubmission()
       }
     } catch (error: unknown) {
-      console.error('Character identification error:', error)
-      toast.error(getErrorMessage(error, 'Something went wrong. Please try again.'))
-      // Reset background state so retry can work
+      console.error('Character identification error:', error)      // Reset background state so retry can work
       bgCharIdRef.current = { promise: null, result: null, error: null, started: false }
       setCurrentStep('scene_choice')
     } finally {
@@ -436,8 +429,6 @@ export function CustomerSubmissionWizard({
       setCurrentStep('thank_you')
     } catch (error: unknown) {
       console.error('Submission error:', error)
-      toast.error(getErrorMessage(error, 'Failed to submit. Please try again.'))
-
       // Re-fetch characters from DB so cards show saved data instead of blank
       try {
         const res = await fetch(`/api/submit/${reviewToken}/identify-characters`)

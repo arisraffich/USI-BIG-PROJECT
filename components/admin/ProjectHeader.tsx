@@ -28,7 +28,6 @@ import {
 import JSZip from 'jszip'
 import { ProjectStatus } from '@/types/project'
 import { useProjectStatus } from '@/hooks/use-project-status'
-import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { BADGE_COLORS } from '@/lib/constants/statusBadgeConfig'
 import { getErrorMessage } from '@/lib/utils/error'
@@ -253,12 +252,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       setLastFailedSend(null)
       setSchedulePopoverOpen(false)
       setScheduleNote('')
-
-      const dateStr = target.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      const hourStr = `${target.getHours().toString().padStart(2, '0')}:00`
-      toast.success(`Scheduled for ${dateStr} at ${hourStr}`)
-    } catch {
-      toast.error('Failed to schedule send')
+    } catch (error) {
+      console.error('Failed to schedule send:', error)
     } finally {
       setIsScheduling(false)
     }
@@ -275,9 +270,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       })
       if (!res.ok) throw new Error('Failed to cancel')
       setScheduledSend(null)
-      toast.success('Scheduled send cancelled')
-    } catch {
-      toast.error('Failed to cancel')
+    } catch (error) {
+      console.error('Failed to cancel scheduled send:', error)
     } finally {
       setIsCancellingSchedule(false)
     }
@@ -311,18 +305,10 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       }
       
       setShowColoredToCustomer(checked)
-      toast.success(
-        checked 
-          ? 'Colored images now visible to customer' 
-          : 'Colored images hidden from customer',
-        { duration: 3000 }
-      )
       router.refresh()
     } catch (error: unknown) {
-      toast.error('Failed to update settings', {
-        description: getErrorMessage(error, 'An error occurred')
-      })
       // Revert the toggle
+      console.error('Failed to update project settings:', error)
       setShowColoredToCustomer(!checked)
     } finally {
       setIsUpdatingSettings(false)
@@ -352,11 +338,10 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         throw new Error(error.error || 'Push failed')
       }
       
-      const result = await response.json()
-      toast.success(result.message || 'Changes pushed to customer')
+      await response.json()
       setIsPushDialogOpen(false)
     } catch (e: unknown) {
-      toast.error(getErrorMessage(e, 'Failed to push changes'))
+      console.error('Failed to push illustrations to customer:', e)
     } finally {
       setIsPushing(false)
     }
@@ -376,11 +361,10 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         throw new Error(error.error || 'Push failed')
       }
       
-      const result = await response.json()
-      toast.success(result.message || 'Characters pushed to customer')
+      await response.json()
       setIsCharPushDialogOpen(false)
     } catch (e: unknown) {
-      toast.error(getErrorMessage(e, 'Failed to push characters'))
+      console.error('Failed to push characters to customer:', e)
     } finally {
       setIsCharPushing(false)
     }
@@ -708,11 +692,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
-      toast.success('Characters downloaded!')
     } catch (error: unknown) {
-      toast.error('Failed to download characters', {
-        description: getErrorMessage(error, 'An error occurred'),
-      })
+      console.error('Failed to download characters:', error)
     } finally {
       setIsDownloadingCharacters(false)
     }
@@ -743,11 +724,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
-      toast.success('Story PDF downloaded!')
     } catch (error: unknown) {
-      toast.error('Failed to download story', {
-        description: getErrorMessage(error, 'An error occurred'),
-      })
+      console.error('Failed to download story:', error)
     } finally {
       setIsDownloadingStory(false)
     }
@@ -782,14 +760,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
-
-      toast.success('Download started!', {
-        description: `Downloading ${filename}`,
-      })
     } catch (error: unknown) {
-      toast.error('Failed to download illustrations', {
-        description: getErrorMessage(error, 'An error occurred'),
-      })
+      console.error('Failed to download illustrations:', error)
     } finally {
       setIsDownloading(false)
     }
@@ -900,7 +872,6 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       const statusData = await statusRes.json()
 
       if (!statusData.hasLineArt) {
-        toast.error('No line art found. Generate line art first.')
         return
       }
 
@@ -914,12 +885,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         .order('page_number', { ascending: true })
 
       if (!pages || pages.length === 0) {
-        toast.error('No pages found')
         return
       }
-
-      toast.info('Preparing download...')
-
       const zip = new JSZip()
       const lineArtFolder = zip.folder('Line Art')!
       const illustrationsFolder = zip.folder('Color References')!
@@ -973,10 +940,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
-
-      toast.success('Download started!')
     } catch (error: unknown) {
-      toast.error('Failed to download', { description: getErrorMessage(error) })
+      console.error('Failed to download existing line art:', error)
     } finally {
       setIsDownloadingExistingLineArt(false)
     }
@@ -1176,9 +1141,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         const error = await response.json()
         throw new Error(error.error || 'Failed to send email')
       }
-      toast.success('Sketches emailed!', { description: 'Sent to info@usillustrations.com' })
     } catch (error: unknown) {
-      toast.error('Failed to send email', { description: getErrorMessage(error) })
+      console.error('Failed to send sketches email:', error)
     } finally {
       setIsSendingSketchesEmail(false)
     }
@@ -1197,9 +1161,8 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         const error = await response.json()
         throw new Error(error.error || 'Failed to send email')
       }
-      toast.success('Line art emailed!', { description: 'Sent to info@usillustrations.com' })
     } catch (error: unknown) {
-      toast.error('Failed to send email', { description: getErrorMessage(error) })
+      console.error('Failed to send line art email:', error)
     } finally {
       setIsSendingLineArtEmail(false)
     }
@@ -1211,8 +1174,6 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
     if (stage.buttonLabel === 'Create Illustrations') {
       if (onCreateIllustrations) {
         onCreateIllustrations()
-      } else {
-        toast.info("Illustration setup is coming soon")
       }
       return
     }
@@ -1234,16 +1195,11 @@ export function ProjectHeader({ projectId, projectInfo, pageCount, characterCoun
         throw new Error(error.error || 'Failed to send project to customer')
       }
 
-      const data = await response.json()
-      toast.success(stage.isResend ? 'Project resent to customer' : 'Project sent to customer review', {
-        description: `Review URL: ${data.reviewUrl}`,
-      })
+      await response.json()
       setSendDialogOpen(false)
       router.refresh()
     } catch (error: unknown) {
-      toast.error('Failed to send project to customer', {
-        description: getErrorMessage(error, 'An error occurred'),
-      })
+      console.error('Failed to send project to customer:', error)
     } finally {
       setIsSendingToCustomer(false)
     }

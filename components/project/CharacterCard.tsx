@@ -2,7 +2,6 @@
 
 import { memo } from 'react'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
 import { Character } from '@/types/character'
 import { UniversalCharacterCard, CharacterFormData } from '@/components/shared/UniversalCharacterCard'
 
@@ -31,10 +30,8 @@ export const CharacterCard = memo(function CharacterCard({
         throw new Error('Failed to save character')
       }
 
-      toast.success('Character updated')
       router.refresh()
     } catch (error) {
-      toast.error('Failed to save character')
       throw error
     }
   }
@@ -49,10 +46,8 @@ export const CharacterCard = memo(function CharacterCard({
         throw new Error('Failed to delete character')
       }
 
-      toast.success('Character deleted')
       router.refresh()
     } catch (error) {
-      toast.error('Failed to delete character')
       throw error
     }
   }

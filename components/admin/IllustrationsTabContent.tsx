@@ -5,14 +5,14 @@ import { Cover } from '@/types/cover'
 import { createClient } from '@/lib/supabase/client'
 import { UnifiedIllustrationFeed } from '@/components/illustration/UnifiedIllustrationFeed'
 import { SceneCharacter } from '@/components/illustration/SharedIllustrationBoard'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AlertTriangle, Copy } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 
 import { useRouter } from 'next/navigation'
 import { getErrorMessage } from '@/lib/utils/error'
 import { mapErrorToUserMessage } from '@/lib/utils/generation-errors'
+import type { ImageTuneSettings } from '@/types/image-tune'
 
 // Batch generation state type
 interface BatchGenerationState {
@@ -27,6 +27,11 @@ interface BatchGenerationState {
 interface GenerationError {
     message: string
     technicalDetails: string
+}
+
+interface PendingIllustrationUpload {
+    page: Page
+    file: File
 }
 
 // GenerationError type matches MappedError from shared utility
@@ -62,6 +67,28 @@ interface IllustrationsTabContentProps {
     onCoverCreated?: (cover: Cover) => void
 }
 
+function preloadComparisonImage(url: string): Promise<void> {
+    return new Promise(resolve => {
+        const image = new Image()
+        image.onload = () => {
+            if (image.decode) {
+                image.decode().catch(() => undefined).finally(resolve)
+                return
+            }
+            resolve()
+        }
+        image.onerror = () => resolve()
+        image.src = url
+    })
+}
+
+async function preloadComparisonImages(oldUrl: string, newUrl: string): Promise<void> {
+    await Promise.all([
+        preloadComparisonImage(oldUrl),
+        preloadComparisonImage(newUrl),
+    ])
+}
+
 export function IllustrationsTabContent({
     projectId,
     pages,
@@ -83,12 +110,38 @@ export function IllustrationsTabContent({
     onCoverCreated,
 }: IllustrationsTabContentProps) {
     const router = useRouter()
+    const [optimisticIllustrationUrls, setOptimisticIllustrationUrls] = useState<Record<string, string>>({})
+
+    const pagesWithOptimisticIllustrations = useMemo(() => {
+        return pages.map(page => {
+            const illustrationUrl = optimisticIllustrationUrls[page.id]
+            return illustrationUrl
+                ? { ...page, illustration_url: illustrationUrl, original_illustration_url: illustrationUrl }
+                : page
+        })
+    }, [pages, optimisticIllustrationUrls])
+
+    useEffect(() => {
+        setOptimisticIllustrationUrls(prev => {
+            const next: Record<string, string> = {}
+            const pagesById = new Map(pages.map(page => [page.id, page]))
+
+            for (const [pageId, illustrationUrl] of Object.entries(prev)) {
+                const page = pagesById.get(pageId)
+                if (page && page.illustration_url !== illustrationUrl) {
+                    next[pageId] = illustrationUrl
+                }
+            }
+
+            return Object.keys(next).length === Object.keys(prev).length ? prev : next
+        })
+    }, [pages])
 
     // MEMOIZE VISIBLE PAGES to prevent unstable references passed to children
     // Admin sees only Page 1 until it's generated, then all pages unlock
     const visiblePages = useMemo(() => {
         // Check if page 1 has been generated
-        const page1 = pages.find(p => p.page_number === 1)
+        const page1 = pagesWithOptimisticIllustrations.find(p => p.page_number === 1)
         const page1Generated = !!page1?.illustration_url
         
         // Status-based logic (for review/revision/approved phases, always show all)
@@ -104,12 +157,12 @@ export function IllustrationsTabContent({
         // 1. Status is in a phase where all pages should be visible, OR
         // 2. Page 1 has been generated (admin can now generate rest)
         if (allPagesStatuses.includes(projectStatus) || page1Generated) {
-            return pages
+            return pagesWithOptimisticIllustrations
         }
         
         // Otherwise, show only page 1 (admin must generate page 1 first)
-        return pages.slice(0, 1)
-    }, [pages, projectStatus])
+        return pagesWithOptimisticIllustrations.slice(0, 1)
+    }, [pagesWithOptimisticIllustrations, projectStatus])
 
     // Local state for wizard settings (propagated to pages if needed via DB)
     const [aspectRatio, setAspectRatio] = useState(initialAspectRatio || '')
@@ -137,6 +190,8 @@ export function IllustrationsTabContent({
     
     const [generatingPageIds, setGeneratingPageIds] = useState<Set<string>>(new Set())
     const [loadingState, setLoadingState] = useState<{ [key: string]: { sketch: boolean; illustration: boolean } }>({})
+    const [pendingIllustrationUpload, setPendingIllustrationUpload] = useState<PendingIllustrationUpload | null>(null)
+    const [regenerateSketchAfterUpload, setRegenerateSketchAfterUpload] = useState(false)
     
     // Batch generation state
     const [batchState, setBatchState] = useState<BatchGenerationState>({
@@ -153,6 +208,8 @@ export function IllustrationsTabContent({
     const [comparisonStates, setComparisonStates] = useState<Record<string, {
         oldUrl: string
         newUrl: string
+        isRefresh?: boolean
+        isAutoTune?: boolean
     }>>({})
     
     // Sync generatingPageIds to parent (for sidebar orange dots)
@@ -273,8 +330,6 @@ export function IllustrationsTabContent({
                 throw new Error(errorData.error || 'Generation failed')
             }
             const data = await response.json()
-            toast.success('Illustration Generated!', { description: 'Starting sketch generation...' })
-
             // 3. Chain: Generate Sketch Immediately
             if (data.illustrationUrl) {
                 try {
@@ -284,17 +339,11 @@ export function IllustrationsTabContent({
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ projectId, pageId: page.id, illustrationUrl: data.illustrationUrl })
                     })
-                    if (sketchRes.ok) {
-                        toast.success('Sketch Generated!')
-                    } else {
+                    if (sketchRes.ok) {                    } else {
                         const errData = await sketchRes.json().catch(() => ({}))
-                        console.error("Sketch generation failed:", errData)
-                        toast.error('Sketch generation failed')
-                    }
+                        console.error("Sketch generation failed:", errData)                    }
                 } catch (e) {
-                    console.error("Sketch trigger failed", e)
-                    toast.error('Sketch generation failed')
-                }
+                    console.error("Sketch trigger failed", e)                }
             }
             
             // Refresh AFTER sketch generation to update UI with both illustration and sketch
@@ -305,8 +354,6 @@ export function IllustrationsTabContent({
             
             // Set error state for this page
             setPageError(page.id, mappedError)
-            
-            toast.error('Generation failed', { description: mappedError.message })
             console.error(error)
         } finally {
             setGeneratingPageIds(prev => {
@@ -356,9 +403,7 @@ export function IllustrationsTabContent({
             setLoadingState(prev => ({ ...prev, [page.id]: { ...prev[page.id], illustration: true } }))
 
             if (isRefresh) {
-                console.log(`[Refresh] Page ${page.page_number} model=${modelId || 'nb2'}`)
-                toast.info('Refreshing at max quality…', { description: 'This may take a minute.' })
-            }
+                console.log(`[Refresh] Page ${page.page_number} model=${modelId || 'nb2'}`)            }
 
             // Auto-download backup if there's an existing illustration
             if (hasExistingIllustration && page.illustration_url) {
@@ -396,14 +441,15 @@ export function IllustrationsTabContent({
 
             // If regenerating (has existing), enter comparison mode
             if (hasExistingIllustration && data.isPreview) {
+                await preloadComparisonImages(page.illustration_url!, data.illustrationUrl)
                 setComparisonStates(prev => ({
                     ...prev,
                     [page.id]: {
                         oldUrl: page.illustration_url!,
-                        newUrl: data.illustrationUrl
+                        newUrl: data.illustrationUrl,
+                        isRefresh: Boolean(data.isRefresh || isRefresh)
                     }
                 }))
-                toast.success('Compare and choose', { description: 'Select which version to keep' })
                 setLoadingState(prev => ({ ...prev, [page.id]: { illustration: false, sketch: false } }))
                 setGeneratingPageIds(prev => {
                     const next = new Set(prev)
@@ -414,9 +460,6 @@ export function IllustrationsTabContent({
             }
 
             // First generation (no existing) - proceed normally
-            const successMessage = isSceneRecreation ? 'Scene Recreated!' : 'Illustration Generated!'
-            toast.success(successMessage, { description: 'Updating sketch...' })
-
             // Unlock Illustration, Lock Sketch
             setLoadingState(prev => ({ ...prev, [page.id]: { illustration: false, sketch: true } }))
 
@@ -428,16 +471,11 @@ export function IllustrationsTabContent({
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ projectId, pageId: page.id, illustrationUrl: data.illustrationUrl })
                     })
-                    if (sketchRes.ok) {
-                        toast.success('Sketch Updated')
-                    } else {
+                    if (sketchRes.ok) {                    } else {
                         const errData = await sketchRes.json().catch(() => ({}))
-                        console.error("Sketch regeneration failed:", errData)
-                        toast.error('Sketch update failed')
-                    }
+                        console.error("Sketch regeneration failed:", errData)                    }
                 } catch (e) {
                     console.error("Sketch trigger failed", e)
-                    toast.error('Sketch update failed')
                 }
             }
             
@@ -447,7 +485,56 @@ export function IllustrationsTabContent({
             const errorMessage = getErrorMessage(error, 'Regeneration failed')
             const mappedError = mapErrorToUserMessage(errorMessage)
             setPageError(page.id, mappedError)
-            toast.error('Regeneration failed', { description: mappedError.message })
+            console.error(error)
+        } finally {
+            setGeneratingPageIds(prev => {
+                const next = new Set(prev)
+                next.delete(page.id)
+                return next
+            })
+            setLoadingState(prev => ({ ...prev, [page.id]: { illustration: false, sketch: false } }))
+        }
+    }
+
+    const handleAutoTune = async (page: Page, settings: ImageTuneSettings) => {
+        if (!page.illustration_url) return
+
+        try {
+            setPageError(page.id, null)
+            setGeneratingPageIds(prev => new Set(prev).add(page.id))
+            setLoadingState(prev => ({ ...prev, [page.id]: { ...prev[page.id], illustration: true } }))
+            const response = await fetch('/api/illustrations/auto-tune', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'apply',
+                    projectId,
+                    pageId: page.id,
+                    settings,
+                }),
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.error || 'Auto tune failed')
+            }
+
+            const data = await response.json()
+
+            await preloadComparisonImages(page.illustration_url!, data.illustrationUrl)
+            setComparisonStates(prev => ({
+                ...prev,
+                [page.id]: {
+                    oldUrl: page.illustration_url!,
+                    newUrl: data.illustrationUrl,
+                    isRefresh: true,
+                    isAutoTune: true,
+                },
+            }))
+        } catch (error: unknown) {
+            const errorMessage = getErrorMessage(error, 'Auto tune failed')
+            const mappedError = mapErrorToUserMessage(errorMessage)
+            setPageError(page.id, mappedError)
             console.error(error)
         } finally {
             setGeneratingPageIds(prev => {
@@ -517,9 +604,6 @@ export function IllustrationsTabContent({
 
             const data = await response.json()
             
-            const layoutLabel = newType === 'spread' ? 'Spread' : newType === 'spot' ? 'Spot' : 'Single Page'
-            toast.success(`Layout changed to ${layoutLabel}`, { description: 'Generating sketch...' })
-
             // Unlock Illustration, Lock Sketch
             setLoadingState(prev => ({ ...prev, [page.id]: { illustration: false, sketch: true } }))
 
@@ -531,16 +615,11 @@ export function IllustrationsTabContent({
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ projectId, pageId: page.id, illustrationUrl: data.illustrationUrl })
                     })
-                    if (sketchRes.ok) {
-                        toast.success('Sketch Updated')
-                    } else {
+                    if (sketchRes.ok) {                    } else {
                         const errData = await sketchRes.json().catch(() => ({}))
-                        console.error("Sketch generation failed:", errData)
-                        toast.error('Sketch update failed')
-                    }
+                        console.error("Sketch generation failed:", errData)                    }
                 } catch (e) {
                     console.error("Sketch trigger failed", e)
-                    toast.error('Sketch update failed')
                 }
             }
             
@@ -549,7 +628,6 @@ export function IllustrationsTabContent({
             const errorMessage = getErrorMessage(error, 'Layout change failed')
             const mappedError = mapErrorToUserMessage(errorMessage)
             setPageError(page.id, mappedError)
-            toast.error('Layout change failed', { description: mappedError.message })
             console.error(error)
         } finally {
             setGeneratingPageIds(prev => {
@@ -562,11 +640,15 @@ export function IllustrationsTabContent({
     }
 
     // Handle comparison decision (Keep New or Revert Old)
-    const handleComparisonDecision = async (pageId: string, decision: 'keep_new' | 'revert_old') => {
+    const handleComparisonDecision = async (pageId: string, decision: 'keep_new' | 'revert_old' | 'keep_editing') => {
         const comparison = comparisonStates[pageId]
         if (!comparison) return
         
-        const { oldUrl, newUrl } = comparison
+        const { oldUrl, newUrl, isRefresh } = comparison
+        if (decision === 'keep_new') {
+            setOptimisticIllustrationUrls(prev => ({ ...prev, [pageId]: newUrl }))
+        }
+
         // Exit comparison mode IMMEDIATELY so UI switches back to normal view
         setComparisonStates(prev => {
             const next = { ...prev }
@@ -575,22 +657,30 @@ export function IllustrationsTabContent({
         })
         
         // Set loading state for sketch if keeping new (user sees animation right away)
-        if (decision === 'keep_new') {
+        if (decision === 'keep_new' && !isRefresh) {
             setLoadingState(prev => ({ ...prev, [pageId]: { illustration: false, sketch: true } }))
         }
         
         try {
+            const apiDecision = decision === 'keep_editing' ? 'revert_old' : decision
             const response = await fetch('/api/illustrations/confirm', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ decision, pageId, projectId, oldUrl, newUrl })
+                body: JSON.stringify({ decision: apiDecision, pageId, projectId, oldUrl, newUrl, isRefresh })
             })
             
             if (!response.ok) throw new Error('Failed to confirm')
+
+            if (decision === 'keep_editing') {
+                return
+            }
             
             if (decision === 'keep_new') {
-                toast.success('New illustration confirmed', { description: 'Generating sketch...' })
-                
+                if (isRefresh) {
+                    router.refresh()
+                    return
+                }
+
                 router.refresh()
                 
                 // Clear admin reply since we're regenerating (addressing feedback with action)
@@ -607,31 +697,33 @@ export function IllustrationsTabContent({
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ projectId, pageId, illustrationUrl: newUrl })
                     })
-                    if (sketchRes.ok) {
-                        toast.success('Sketch Updated')
-                    } else {
-                        toast.error('Sketch update failed')
+                    if (!sketchRes.ok) {
+                        console.error('Failed to generate sketch for confirmed illustration:', sketchRes.statusText)
                     }
-                } catch {
-                    toast.error('Sketch update failed')
+                } catch (error) {
+                    console.error('Failed to generate sketch for confirmed illustration:', error)
                 }
-            } else {
-                toast.success('Reverted to previous illustration')
             }
             
             router.refresh()
         } catch (error: unknown) {
+            if (decision === 'keep_new') {
+                setOptimisticIllustrationUrls(prev => {
+                    const next = { ...prev }
+                    delete next[pageId]
+                    return next
+                })
+            }
             const errorMessage = getErrorMessage(error, 'Failed to confirm decision')
             const mappedError = mapErrorToUserMessage(errorMessage)
             setPageError(pageId, mappedError)
-            toast.error('Failed to confirm decision', { description: mappedError.message })
             console.error(error)
         } finally {
             setLoadingState(prev => ({ ...prev, [pageId]: { illustration: false, sketch: false } }))
         }
     }
 
-    const handleUpload = async (page: Page, type: 'sketch' | 'illustration', file: File) => {
+    const executeUpload = async (page: Page, type: 'sketch' | 'illustration', file: File, regenerateSketch: boolean) => {
         try {
             // Clear any previous error for this page
             setPageError(page.id, null)
@@ -655,17 +747,12 @@ export function IllustrationsTabContent({
             const response = await fetch('/api/illustrations/upload', { method: 'POST', body: formData })
             const result = await response.json()
             if (!result.success) throw new Error(result.error || 'Upload failed')
-
-            toast.success('Image uploaded successfully')
-            
             // Always refresh after successful upload to update is_resolved state
             router.refresh()
 
-            // --- CHAIN: Auto-Generate Sketch if Illustration Uploaded ---
-            if (type === 'illustration' && result.url) {
+            // Optional sketch regeneration after a colored illustration upload.
+            if (type === 'illustration' && regenerateSketch && result.url) {
                 try {
-                    toast.info('Generating matching sketch...')
-
                     // Switch loading state: Illustration done (upload), Sketch start (gen)
                     setLoadingState(prev => ({
                         ...prev,
@@ -686,8 +773,6 @@ export function IllustrationsTabContent({
                     })
 
                     if (!sketchRes.ok) throw new Error('Sketch auto-generation failed')
-
-                    toast.success('Sketch generated from upload')
                     router.refresh()
 
                 } catch (sketchError: unknown) {
@@ -695,7 +780,6 @@ export function IllustrationsTabContent({
                     const mappedError = mapErrorToUserMessage(errorMessage)
                     setPageError(page.id, mappedError)
                     console.error("Auto-sketch failed", sketchError)
-                    toast.error('Failed to auto-generate sketch', { description: mappedError.message })
                 }
             }
 
@@ -703,7 +787,6 @@ export function IllustrationsTabContent({
             const errorMessage = getErrorMessage(error, 'Upload failed')
             const mappedError = mapErrorToUserMessage(errorMessage)
             setPageError(page.id, mappedError)
-            toast.error('Upload failed', { description: mappedError.message })
             console.error(error)
         } finally {
             // Clear ALL loading states for this page to be safe
@@ -715,6 +798,24 @@ export function IllustrationsTabContent({
                 }
             }))
         }
+    }
+
+    const handleUpload = async (page: Page, type: 'sketch' | 'illustration', file: File) => {
+        if (type === 'illustration') {
+            setRegenerateSketchAfterUpload(false)
+            setPendingIllustrationUpload({ page, file })
+            return
+        }
+
+        await executeUpload(page, type, file, false)
+    }
+
+    const handleConfirmIllustrationUpload = async (regenerateSketch: boolean) => {
+        if (!pendingIllustrationUpload) return
+        const upload = pendingIllustrationUpload
+        setPendingIllustrationUpload(null)
+        setRegenerateSketchAfterUpload(false)
+        await executeUpload(upload.page, 'illustration', upload.file, regenerateSketch)
     }
 
     // Generate a single page (for batch use) - returns promise
@@ -777,7 +878,6 @@ export function IllustrationsTabContent({
         )
 
         if (pagesToGenerate.length === 0) {
-            toast.info('No pages to generate')
             return
         }
 
@@ -847,13 +947,6 @@ export function IllustrationsTabContent({
         // Refresh UI
         router.refresh()
 
-        // Show completion toast
-        if (batchCancelledRef.current) {
-            toast.info(`Batch cancelled. Completed: ${completed}, Failed: ${failed}`)
-        } else {
-            toast.success(`Batch complete! Generated: ${completed}, Failed: ${failed}`)
-        }
-
         setBatchState({
             isRunning: false,
             total: 0,
@@ -865,9 +958,7 @@ export function IllustrationsTabContent({
 
     // Cancel batch generation
     const handleCancelBatch = useCallback(() => {
-        batchCancelledRef.current = true
-        toast.info('Cancelling batch generation...')
-    }, [])
+        batchCancelledRef.current = true    }, [])
 
     // Handle admin reply to customer feedback
     const handleSaveAdminReply = useCallback(async (pageId: string, reply: string) => {
@@ -960,7 +1051,6 @@ export function IllustrationsTabContent({
             }
 
             const result = await response.json()
-            const storyText = result.storyText || ''
             const deletedNumber = result.deletedPageNumber
 
             setDeleteTargetPage(null)
@@ -974,42 +1064,10 @@ export function IllustrationsTabContent({
                 if (prevPage) onPageChange(prevPage.id)
             }
 
-            // Show persistent toast with story text and copy button
-            const cleanText = storyText.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
-            if (cleanText) {
-                const truncated = cleanText.length > 120 ? cleanText.substring(0, 120) + '...' : cleanText
-                toast.success(`Page ${deletedNumber} deleted`, {
-                    duration: 15000,
-                    description: (
-                        <div className="mt-2">
-                            <p className="text-xs text-slate-500 bg-slate-50 p-2 rounded border border-slate-200 line-clamp-3 italic mb-2">
-                                &ldquo;{truncated}&rdquo;
-                            </p>
-                            <button
-                                onClick={() => {
-                                    navigator.clipboard.writeText(cleanText).then(() => {
-                                        toast.success('Story text copied to clipboard')
-                                    }).catch(() => {
-                                        toast.error('Failed to copy — select the text manually')
-                                    })
-                                }}
-                                className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
-                            >
-                                <Copy className="w-3 h-3" />
-                                Copy story text
-                            </button>
-                        </div>
-                    ),
-                })
-            } else {
-                toast.success(`Page ${deletedNumber} deleted`)
-            }
-
             router.refresh()
         } catch (error: unknown) {
             const errorMessage = getErrorMessage(error, 'Failed to delete page')
-            toast.error('Delete failed', { description: errorMessage })
-            console.error('[Page Delete]', error)
+            console.error('[Page Delete]', errorMessage, error)
         } finally {
             setIsDeleting(false)
         }
@@ -1066,6 +1124,7 @@ export function IllustrationsTabContent({
                 // Handlers
                 onGenerate={handleGenerate}
                 onRegenerate={handleRegenerate}
+                onAutoTune={handleAutoTune}
                 onLayoutChange={handleLayoutChange}
                 onUpload={handleUpload}
 
@@ -1082,7 +1141,7 @@ export function IllustrationsTabContent({
                 setPageIllustrationType={handleSetPageIllustrationType}
                 
                 // Batch Generation
-                allPages={pages}
+                allPages={pagesWithOptimisticIllustrations}
                 onGenerateAllRemaining={handleGenerateAllRemaining}
                 onCancelBatch={handleCancelBatch}
                 batchState={batchState}
@@ -1101,10 +1160,6 @@ export function IllustrationsTabContent({
                 onRemoveComment={handleRemoveComment}
                 onManualResolve={handleManualResolve}
 
-                // Page Delete Feature
-                onDeletePage={handleDeletePageRequest}
-                isDeleteDisabled={isDeleteDisabled}
-
                 // Sketch/Story Toggle "All Pages"
                 globalSketchViewMode={globalSketchViewMode}
                 onToggleAllSketchView={handleToggleAllSketchView}
@@ -1113,6 +1168,45 @@ export function IllustrationsTabContent({
                 hasCover={hasCover}
                 onCoverCreated={onCoverCreated}
             />
+
+            {/* COLORED ILLUSTRATION UPLOAD OPTIONS */}
+            <Dialog
+                open={!!pendingIllustrationUpload}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setPendingIllustrationUpload(null)
+                        setRegenerateSketchAfterUpload(false)
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-[430px]">
+                    <DialogHeader>
+                        <DialogTitle>Upload Colored Illustration</DialogTitle>
+                        <DialogDescription>
+                            Page {pendingIllustrationUpload?.page.page_number}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-medium text-slate-800">
+                        <input
+                            type="checkbox"
+                            checked={regenerateSketchAfterUpload}
+                            onChange={(event) => setRegenerateSketchAfterUpload(event.target.checked)}
+                            className="h-4 w-4 rounded border-slate-300 accent-slate-900"
+                        />
+                        Regenerate sketch too
+                    </label>
+
+                    <DialogFooter>
+                        <Button
+                            className="w-full"
+                            onClick={() => handleConfirmIllustrationUpload(regenerateSketchAfterUpload)}
+                        >
+                            Upload Illustration
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* PAGE DELETE CONFIRMATION DIALOG */}
             <Dialog open={!!deleteTargetPage} onOpenChange={(open) => { if (!open) setDeleteTargetPage(null) }}>

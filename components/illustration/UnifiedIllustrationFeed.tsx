@@ -6,6 +6,7 @@ import { Character } from '@/types/character'
 import { SharedIllustrationBoard, SceneCharacter } from './SharedIllustrationBoard'
 import { Loader2 } from 'lucide-react'
 import { useIllustrationLock } from '@/hooks/use-illustration-lock'
+import type { ImageTuneSettings } from '@/types/image-tune'
 
 type IllustrationStatus = 'draft' | 'illustration_approved' | 'completed'
 
@@ -33,6 +34,7 @@ interface UnifiedIllustrationFeedProps {
     loadingState?: { sketch: boolean; illustration: boolean }
     onGenerate?: (page: Page, referenceImageUrl?: string) => void
     onRegenerate?: (page: Page, prompt: string, referenceImages?: string[], referenceImageUrl?: string, sceneCharacters?: SceneCharacter[], useThinking?: boolean, modelId?: string, isRefresh?: boolean) => void
+    onAutoTune?: (page: Page, settings: ImageTuneSettings) => void
     onLayoutChange?: (page: Page, newType: 'spread' | 'spot' | null) => void // For changing layout type (triggers regeneration)
     onUpload?: (page: Page, type: 'sketch' | 'illustration', file: File) => void
 
@@ -69,8 +71,10 @@ interface UnifiedIllustrationFeedProps {
     comparisonStates?: Record<string, {
         oldUrl: string
         newUrl: string
+        isRefresh?: boolean
+        isAutoTune?: boolean
     }>
-    onComparisonDecision?: (pageId: string, decision: 'keep_new' | 'revert_old') => void
+    onComparisonDecision?: (pageId: string, decision: 'keep_new' | 'revert_old' | 'keep_editing') => void
     
     // Admin Reply Feature
     onSaveAdminReply?: (pageId: string, reply: string) => Promise<void>
@@ -91,9 +95,6 @@ interface UnifiedIllustrationFeedProps {
     onRemoveComment?: (pageId: string) => Promise<void>
     // Admin Manual Resolve Feature
     onManualResolve?: (pageId: string) => Promise<void>
-    // Page Delete Feature (Admin only)
-    onDeletePage?: (pageId: string) => void
-    isDeleteDisabled?: boolean
     // Sketch/Story Toggle "All Pages" (Admin only)
     globalSketchViewMode?: { mode: 'sketch' | 'text'; version: number }
     onToggleAllSketchView?: (mode: 'sketch' | 'text') => void
@@ -117,6 +118,7 @@ export function UnifiedIllustrationFeed({
     characters = [],
     onGenerate,
     onRegenerate,
+    onAutoTune,
     onLayoutChange,
     onUpload,
     aspectRatio,
@@ -152,9 +154,6 @@ export function UnifiedIllustrationFeed({
     approvalTotalCount = 0,
     approvalAllApproved = false,
     onApprovePage,
-    // Page Delete Feature
-    onDeletePage,
-    isDeleteDisabled = false,
     // Sketch/Story Toggle "All Pages"
     globalSketchViewMode,
     onToggleAllSketchView,
@@ -344,6 +343,7 @@ export function UnifiedIllustrationFeed({
                             }}
                             onGenerate={onGenerate ? ((refUrl?: string) => onGenerate(page, refUrl)) : undefined}
                             onRegenerate={onRegenerate ? (prompt, referenceImages, referenceImageUrl, sceneCharacters, useThinking, modelId, isRefresh) => onRegenerate(page, prompt, referenceImages, referenceImageUrl, sceneCharacters, useThinking, modelId, isRefresh) : undefined}
+                            onAutoTune={onAutoTune ? (settings) => onAutoTune(page, settings) : undefined}
                             onLayoutChange={onLayoutChange ? (newType) => onLayoutChange(page, newType) : undefined}
                             onUpload={async (type, file) => {
                                 if (onUpload) await onUpload(page, type, file)
@@ -394,9 +394,6 @@ export function UnifiedIllustrationFeed({
                             approvalTotalCount={approvalTotalCount}
                             approvalAllApproved={approvalAllApproved}
                             onApprovePage={onApprovePage ? () => onApprovePage(page.id) : undefined}
-                            // Page Delete Feature
-                            onDeletePage={onDeletePage ? () => onDeletePage(page.id) : undefined}
-                            isDeleteDisabled={isDeleteDisabled}
                             // Sketch/Story Toggle "All Pages"
                             globalSketchViewMode={globalSketchViewMode}
                             onToggleAllSketchView={onToggleAllSketchView}

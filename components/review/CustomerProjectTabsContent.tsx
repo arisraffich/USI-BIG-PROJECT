@@ -17,7 +17,6 @@ import { ProjectStatus } from '@/types/project'
 import { CharacterFormData } from '@/components/shared/UniversalCharacterCard'
 import { Button } from '@/components/ui/button'
 import { Check, PartyPopper } from 'lucide-react'
-import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { UnifiedProjectLayout } from '@/components/layout/UnifiedProjectLayout'
 type IllustrationApprovalStage = 'sketch' | 'illustration'
@@ -159,20 +158,12 @@ export function CustomerProjectTabsContent({
               oldPage.admin_reply === updatedPage.admin_reply
             const approvalOnlyUpdate = approvalChanged && visibleContentUnchanged
 
-            if (!approvalOnlyUpdate) {
-              toast.info('Page content updated', {
-                description: 'The author has modified the manuscript.'
-              })
-            }
+            if (!approvalOnlyUpdate) {            }
           } else if (payload.eventType === 'INSERT' && payload.new) {
             setLocalPages(prev => [...prev, payload.new as Page])
           } else if (payload.eventType === 'DELETE' && payload.old) {
             const deletedId = (payload.old as { id: string }).id
-            setLocalPages(prev => prev.filter(p => p.id !== deletedId))
-            toast.info('A page has been removed', {
-              description: 'The illustrator has updated the page structure.'
-            })
-          }
+            setLocalPages(prev => prev.filter(p => p.id !== deletedId))          }
         }
       )
       .subscribe()
@@ -216,11 +207,7 @@ export function CustomerProjectTabsContent({
           const wasHidden = ['character_generation', 'character_generation_complete'].includes(currentStatus)
           const isNowVisible = ['character_review', 'character_revision_needed', 'characters_approved'].includes(newProject.status)
 
-          if (wasHidden && isNowVisible) {
-            toast.success("New Updates Available!", {
-              description: "The author has shared new updates with you."
-            })
-          }
+          if (wasHidden && isNowVisible) {          }
 
           router.refresh()
         }
@@ -284,11 +271,7 @@ export function CustomerProjectTabsContent({
             
             // If character has customer_image_url, trigger notification and refresh
             if (updatedChar.customer_image_url) {
-              console.log('[Customer Characters] Customer image URL detected, refreshing...')
-              toast.success('Character illustrations updated!', {
-                description: 'Gallery is now available.'
-              })
-              // Delay refresh slightly to ensure state updates propagate
+              console.log('[Customer Characters] Customer image URL detected, refreshing...')              // Delay refresh slightly to ensure state updates propagate
               setTimeout(() => {
                 router.refresh()
               }, 500)
@@ -540,7 +523,6 @@ export function CustomerProjectTabsContent({
       }
     } catch (error) {
       console.error(error)
-      toast.error('Failed to save feedback')
       throw error
     }
   }, [reviewToken])
@@ -563,11 +545,8 @@ export function CustomerProjectTabsContent({
       setLocalPages(prev => prev.map(p =>
         p.id === pageId ? { ...p, ...updatedPage } : p
       ))
-
-      toast.success('Response accepted')
     } catch (error) {
       console.error(error)
-      toast.error('Failed to accept response')
       throw error
     }
   }, [reviewToken])
@@ -591,11 +570,8 @@ export function CustomerProjectTabsContent({
       setLocalPages(prev => prev.map(p =>
         p.id === pageId ? { ...p, ...updatedPage } : p
       ))
-
-      toast.success('Follow-up saved')
     } catch (error) {
       console.error(error)
-      toast.error('Failed to save follow-up')
       throw error
     }
   }, [reviewToken])
@@ -619,11 +595,8 @@ export function CustomerProjectTabsContent({
       setLocalPages(prev => prev.map(p =>
         p.id === pageId ? { ...p, ...updatedPage } : p
       ))
-
-      toast.success('Follow-up updated')
     } catch (error) {
       console.error(error)
-      toast.error('Failed to edit follow-up')
       throw error
     }
   }, [reviewToken])
@@ -678,7 +651,6 @@ export function CustomerProjectTabsContent({
 
   const handleSubmitChanges = async () => {
     if (isLocked) {
-      toast.error('This project has already been submitted')
       return
     }
 
@@ -722,7 +694,6 @@ export function CustomerProjectTabsContent({
 
     } catch (error: unknown) {
       console.error('Error submitting changes:', error)
-      toast.error('Failed to submit changes')
       setSubmissionStatus('idle')
       setIsSubmitting(false)
     }
@@ -758,7 +729,6 @@ export function CustomerProjectTabsContent({
 
     } catch (error: unknown) {
       console.error('Error approving:', error)
-      toast.error('Failed to approve characters')
       setSubmissionStatus('idle')
       setIsApproving(false)
     }
@@ -820,7 +790,6 @@ export function CustomerProjectTabsContent({
       }
     } catch (error) {
       console.error('Failed to approve illustration page:', error)
-      toast.error('Failed to approve')
       throw error
     }
   }, [reviewToken])
@@ -1081,5 +1050,3 @@ export function CustomerProjectTabsContent({
     </>
   )
 }
-
-

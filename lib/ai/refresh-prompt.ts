@@ -1,27 +1,82 @@
-export const REFRESH_PROMPT = `TASK: QUALITY REFRESH (RE-RENDER AT MAXIMUM FIDELITY)
+export const REFRESH_PROMPT_LEGACY = `TASK: REMASTER THE ORIGINAL ILLUSTRATION
 
-You are given ONE reference image. Your job is to produce a clean, crisp, high-quality re-render of this EXACT image — nothing more, nothing less.
+You are given two images:
 
-ABSOLUTE PRESERVATION RULES (CRITICAL):
-- Keep the EXACT SAME composition, framing, camera angle, and zoom level
-- Keep the EXACT SAME characters, in the EXACT SAME positions, with the EXACT SAME poses, gestures, and body language
-- Keep the EXACT SAME facial expressions, eye direction, and mouth shapes
-- Keep the EXACT SAME clothing, hair, hairstyles, colors, and accessories on every character
-- Keep the EXACT SAME background elements (trees, fences, buildings, sky, ground, props) in the EXACT SAME positions
-- Keep the EXACT SAME lighting direction, shadows, and color palette
-- Keep the EXACT SAME art style (same medium, brushwork, line quality, shading)
+IMAGE 1: ORIGINAL ILLUSTRATION
+This is the exact illustration to remaster.
+Preserve its composition, framing, characters, poses, facial expressions, clothing, objects, background, perspective, and scene layout exactly.
 
-WHAT TO IMPROVE (ONLY):
-- Sharpen lines and edges
-- Clean up any softness, blur, or compression artifacts
-- Enhance detail clarity without adding new details
-- Render the same scene at a crisper, higher-fidelity quality
+IMAGE 2: STYLE REFERENCE
+Use this image only for visual quality guidance:
+color palette, shades, tone, warmth/coolness, saturation, contrast, shading style, texture, line cleanliness, and rendering finish.
+
+The final image must be the ORIGINAL ILLUSTRATION remastered with the STYLE REFERENCE'S visual quality.
+
+Do not copy the STYLE REFERENCE'S characters, objects, scene, background, composition, poses, or story content.
+
+PRESERVE FROM IMAGE 1:
+- Exact composition and camera angle
+- Exact character positions, poses, gestures, and expressions
+- Exact clothing, hairstyles, accessories, and character identities
+- Exact background elements, props, and object placement
+- Exact scene meaning and layout
+
+APPLY FROM IMAGE 2:
+- Color palette
+- Shade range
+- Tonal mood
+- Warmth/coolness
+- Saturation and contrast
+- Shading softness or hardness
+- Texture quality
+- Cleaner line/rendering finish
+- Overall polished children's book illustration quality
+
+FIX IN IMAGE 1:
+- Blurry or soft edges
+- Muddy colors
+- Noisy or smeared texture
+- Compression artifacts
+- Inconsistent shading
+- Dull or degraded rendering
 
 DO NOT:
-- Change the composition
-- Change character positions, poses, or expressions
-- Add, remove, or reposition any element
-- Change the art style or rendering technique
-- Add any text, letters, symbols, or typography
+- Change the scene
+- Move, add, or remove characters
+- Move, add, or remove objects
+- Change facial expressions or poses
+- Copy any content from IMAGE 2
+- Add text, symbols, letters, or typography
 
-OUTPUT: The same illustration, re-rendered cleanly at maximum quality.`
+OUTPUT:
+The same illustration as IMAGE 1, with only the color, texture, tone, shading, and rendering quality improved using IMAGE 2 as the visual quality reference.`
+
+export const REFRESH_PROMPT_QUALITY_REPAIR_COLOR_CORRECTION = `TASK: QUALITY REPAIR + COLOR CORRECTION
+
+IMAGE 1 is the source illustration.
+Preserve its composition, characters, poses, expressions, objects, background, perspective, and layout exactly.
+
+IMAGE 2 is the color and quality reference.
+Use it only to guide color balance, tone, texture cleanliness, shading quality, line polish, and rendering finish.
+
+First repair IMAGE 1:
+- Remove noisy or muddy texture
+- Clean smeared color areas
+- Sharpen soft edges
+- Improve line clarity
+- Make the illustration look freshly rendered and polished
+
+Then color-correct IMAGE 1 toward IMAGE 2:
+- Match color balance
+- Match warmth/coolness without adding a global yellow, orange, or sepia cast
+- Match saturation and contrast level
+- Match shadow softness and highlight behavior
+- Preserve natural local color relationships
+
+Keep IMAGE 1's scene content and layout unchanged.
+Do not copy IMAGE 2's characters, objects, background, poses, or composition.
+Only transfer IMAGE 2's color correction, texture cleanliness, shading finish, and tonal quality.
+
+Output the same illustration as IMAGE 1, repaired and color-corrected using IMAGE 2 as the quality/color target.`
+
+export const REFRESH_PROMPT = REFRESH_PROMPT_QUALITY_REPAIR_COLOR_CORRECTION

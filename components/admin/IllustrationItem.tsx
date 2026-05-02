@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Page } from '@/types/page'
-import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { SharedIllustrationBoard } from '@/components/illustration/SharedIllustrationBoard'
 
@@ -50,8 +49,6 @@ export function IllustrationItem({
                 body: JSON.stringify({ projectId, aspect_ratio: aspectRatio, text_integration: textIntegration })
             })
 
-            // 2. Trigger Generation
-            toast.loading(`Painting Page ${page.page_number}...`, { id: `painting-${page.id}` })
             const response = await fetch('/api/illustrations/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -64,16 +61,12 @@ export function IllustrationItem({
             }
 
             const data = await response.json()
-            toast.dismiss(`painting-${page.id}`)
-            toast.success('Illustration Generated!', { description: 'Creating sketch now...' })
-
             if (data.illustrationUrl) {
                 handleGenerateSketch(data.illustrationUrl)
             }
             router.refresh()
         } catch (error: unknown) {
-            toast.dismiss(`painting-${page.id}`)
-            toast.error('Process Failed', { description: error instanceof Error ? error.message : 'Generation failed' })
+            console.error('Failed to generate illustration:', error)
         } finally {
             setIsGenerating(false)
         }
@@ -101,7 +94,6 @@ export function IllustrationItem({
         setLoadingState(prev => ({ ...prev, illustration: true }))
 
         try {
-            toast.loading('Regenerating...', { id: 'regen-wait' })
             const response = await fetch('/api/illustrations/regenerate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -116,16 +108,12 @@ export function IllustrationItem({
             if (!response.ok) throw new Error('Regeneration failed')
 
             const data = await response.json()
-            toast.dismiss('regen-wait')
-            toast.success('Regenerated!')
-
             if (data.illustrationUrl) {
                 handleGenerateSketch(data.illustrationUrl)
             }
             router.refresh()
         } catch (error: unknown) {
-            toast.dismiss('regen-wait')
-            toast.error('Failed', { description: error instanceof Error ? error.message : 'Regeneration failed' })
+            console.error('Failed to regenerate illustration:', error)
         } finally {
             setIsGenerating(false)
             setLoadingState(prev => ({ ...prev, illustration: false }))
@@ -135,8 +123,6 @@ export function IllustrationItem({
     const handleUpload = async (type: 'sketch' | 'illustration', file: File) => {
         setIsUploading(true)
         setLoadingState(prev => ({ ...prev, [type]: true }))
-        const toastId = toast.loading(`Uploading ${type}...`)
-
         try {
             const formData = new FormData()
             formData.append('file', file)
@@ -148,15 +134,12 @@ export function IllustrationItem({
             const response = await fetch('/api/illustrations/upload', { method: 'POST', body: formData })
             const result = await response.json()
             if (!result.success) throw new Error(result.error || 'Upload failed')
-
-            toast.success("Upload Successful", { id: toastId })
-
             if (type === 'illustration' && result.url) {
                 handleGenerateSketch(result.url)
             }
             router.refresh()
         } catch (error: unknown) {
-            toast.error("Upload Failed", { id: toastId, description: error instanceof Error ? error.message : 'Upload failed' })
+            console.error('Failed to upload illustration asset:', error)
         } finally {
             setIsUploading(false)
             setLoadingState(prev => ({ ...prev, [type]: false }))
@@ -171,11 +154,9 @@ export function IllustrationItem({
             .eq('id', page.id)
 
         if (error) {
-            toast.error('Failed to save notes')
             throw error
         }
 
-        toast.success('Notes saved')
         router.refresh()
     }
 
@@ -183,9 +164,6 @@ export function IllustrationItem({
     // -------------------------------------------------------------------------
     // RENDER (Unified via SharedIllustrationBoard)
     // -------------------------------------------------------------------------
-
-    // We import the SharedIllustrationBoard dynamically or directly.
-    // Ensure to add import at top (I will handle imports in a separate block if needed, but here assuming imports exist).
 
     return (
         <SharedIllustrationBoard

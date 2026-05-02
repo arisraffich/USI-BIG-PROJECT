@@ -2,7 +2,6 @@
 
 import { useMemo, useEffect, useState, useRef, startTransition } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
-import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { CharacterCard } from '@/components/project/CharacterCard'
 import { AddCharacterButton } from '@/components/admin/AddCharacterButton'
@@ -21,7 +20,6 @@ import { Character } from '@/types/character'
 import { Cover } from '@/types/cover'
 import { Project, ProjectStatus } from '@/types/project'
 import { CharacterFormData } from '@/components/shared/UniversalCharacterCard'
-import { getErrorMessage } from '@/lib/utils/error'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -130,9 +128,7 @@ export function ProjectTabsContent({
     const isApprovalTransition = prevStatusRef.current !== 'characters_approved' && localProjectStatus === 'characters_approved'
     const isCharactersTab = searchParams?.get('tab') === 'characters' || (!searchParams?.get('tab') && (localProjectStatus === 'character_review' || localProjectStatus === 'character_generation' || localProjectStatus === 'character_generation_failed'))
 
-    if (isApprovalTransition && isCharactersTab) {
-      toast.success('Characters Approved! Switching to Illustrations...')
-      const params = new URLSearchParams(searchParams?.toString() || '')
+    if (isApprovalTransition && isCharactersTab) {      const params = new URLSearchParams(searchParams?.toString() || '')
       params.set('tab', 'illustrations')
       router.replace(`${pathname}?${params.toString()}`)
     }
@@ -265,12 +261,10 @@ export function ProjectTabsContent({
       })
 
       if (!response.ok) throw new Error('Submission failed')
-
-      toast.success('Manual submission successful')
       setIsManualMode(false)
       router.refresh()
-    } catch {
-      toast.error('Failed to submit')
+    } catch (error) {
+      console.error('Failed to submit character forms manually:', error)
     } finally {
       setIsSubmitting(false)
     }
@@ -285,11 +279,10 @@ export function ProjectTabsContent({
         body: JSON.stringify({ characterEdits: {} }) // No edits, just proceed
       })
       if (!response.ok) throw new Error('Approval failed')
-      toast.success('Characters manually approved')
       setIsManualMode(false)
       router.refresh()
-    } catch {
-      toast.error('Failed to approve')
+    } catch (error) {
+      console.error('Failed to approve character forms manually:', error)
     } finally {
       setIsSubmitting(false)
     }
@@ -305,10 +298,9 @@ export function ProjectTabsContent({
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Failed to generate scenes')
-      toast.success(`Updated ${data.updated_pages}/${data.total_pages} scenes`)
       router.refresh()
     } catch (e) {
-      toast.error(getErrorMessage(e, 'Scene generation failed'))
+      console.error('Failed to generate scenes:', e)
     } finally {
       setIsGeneratingScenes(false)
     }
@@ -324,8 +316,6 @@ export function ProjectTabsContent({
         .eq('id', projectId)
 
       if (error) throw error
-
-      toast.success('Skipped to illustrations stage')
       setLocalProjectStatus('characters_approved')
       
       // Switch to illustrations tab
@@ -335,7 +325,6 @@ export function ProjectTabsContent({
       router.refresh()
     } catch (e) {
       console.error('Failed to skip to illustrations:', e)
-      toast.error('Failed to skip to illustrations')
     }
   }
 
@@ -351,12 +340,11 @@ export function ProjectTabsContent({
         const err = await response.json()
         throw new Error(err.error || 'Failed to retry')
       }
-      toast.success('Retrying character generation...')
+
       setLocalProjectStatus('character_generation')
       router.refresh()
     } catch (e) {
       console.error('Failed to retry generation:', e)
-      toast.error(getErrorMessage(e, 'Failed to retry generation'))
     } finally {
       setIsRetrying(false)
     }
@@ -430,19 +418,13 @@ export function ProjectTabsContent({
           
           // Toast for new image generation
           const oldChar = payload.old as Partial<Character>
-          if (updatedChar.image_url && !oldChar.image_url) {
-            toast.success('New character illustration ready', { description: `${updatedChar.name || updatedChar.role} has been generated.` })
-          }
+          if (updatedChar.image_url && !oldChar.image_url) {          }
           
           // Toast for new customer feedback
-          if (updatedChar.feedback_notes && !oldChar.feedback_notes) {
-            toast.info('Customer feedback received', { description: `${updatedChar.name || updatedChar.role} has feedback.` })
-          }
+          if (updatedChar.feedback_notes && !oldChar.feedback_notes) {          }
         }
         if (payload.eventType === 'INSERT' && payload.new) {
-          setLocalCharacters(prev => [...prev, payload.new as Character])
-          toast.info('New character added')
-        }
+          setLocalCharacters(prev => [...prev, payload.new as Character])        }
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
@@ -459,14 +441,10 @@ export function ProjectTabsContent({
           setLocalPages(prev => prev.map(p => p.id === updatedPage.id ? { ...p, ...updatedPage } : p))
 
           // Debug Realtime
-          if (updatedPage.feedback_notes) {
-            toast.info('New Feedback Received')
-          }
+          if (updatedPage.feedback_notes) {          }
 
           const now = Date.now()
-          if (now - lastToastTimeRef.current > 2000) {
-            toast.info('Manuscript updated')
-            lastToastTimeRef.current = now
+          if (now - lastToastTimeRef.current > 2000) {            lastToastTimeRef.current = now
           }
         } else if (payload.eventType === 'INSERT' && payload.new) {
           setLocalPages(prev => [...prev, payload.new as Page])

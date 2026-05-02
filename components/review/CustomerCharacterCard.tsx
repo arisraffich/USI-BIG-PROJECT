@@ -1,7 +1,6 @@
 'use client'
 
 import { memo } from 'react'
-import { toast } from 'sonner'
 import { Character } from '@/types/character'
 import { UniversalCharacterCard, CharacterFormData } from '@/components/shared/UniversalCharacterCard'
 
@@ -37,13 +36,9 @@ export const CustomerCharacterCard = memo(function CustomerCharacterCard({
         throw new Error('Failed to save character')
       }
 
-      if (showSaveToast) {
-        toast.success('Character updated')
-      }
+      if (showSaveToast) {      }
       onSaved?.(character.id)
-    } catch (error) {
-      toast.error('Failed to save changes')
-      throw error
+    } catch (error) {      throw error
     }
   }
 
@@ -72,7 +67,6 @@ export const CustomerCharacterCard = memo(function CustomerCharacterCard({
     />
   )
 })
-
 
 
 

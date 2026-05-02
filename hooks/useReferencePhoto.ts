@@ -1,8 +1,6 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { toast } from 'sonner'
-
 const MIN_PHOTO_DIMENSION = 300
 const MAX_PHOTO_SIZE = 10 * 1024 * 1024
 const MAX_UPLOAD_DIMENSION = 1200
@@ -100,7 +98,6 @@ export function useReferencePhoto({ characterId, initialUrl, onValidityChange, r
     const handleSelect = useCallback(async (file: File) => {
         const validation = await validatePhotoFile(file)
         if (!validation.valid) {
-            toast.error(validation.error)
             return
         }
 
@@ -127,13 +124,11 @@ export function useReferencePhoto({ characterId, initialUrl, onValidityChange, r
 
             const { url } = await response.json()
             setPhotoUrl(url)
-            toast.success('Photo uploaded — text fields are now optional')
         } catch (error: unknown) {
             // Revert optimistic state
             setLocalPreview(null)
             onValidityChange?.(false)
-            const msg = error instanceof Error ? error.message : 'Upload failed'
-            toast.error(msg)
+            console.error('Reference photo upload failed:', error)
         } finally {
             URL.revokeObjectURL(previewUrl)
             setLocalPreview(null)
@@ -150,9 +145,8 @@ export function useReferencePhoto({ characterId, initialUrl, onValidityChange, r
             setPhotoUrl(null)
             setLocalPreview(null)
             onValidityChange?.(false)
-            toast('Photo removed')
-        } catch {
-            toast.error('Failed to remove photo')
+        } catch (error) {
+            console.error('Reference photo removal failed:', error)
         }
     }, [characterId, onValidityChange, reviewToken])
 

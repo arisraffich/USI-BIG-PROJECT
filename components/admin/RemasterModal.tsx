@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react'
 import JSZip from 'jszip'
-import { toast } from 'sonner'
 import { Check, Download, Loader2, RotateCw, Sparkles, Upload, X } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -26,12 +25,6 @@ interface RemasterItem {
     status: RemasterStatus
     error: string | null
     resultDataUrl: string | null
-}
-
-const MODEL_LABELS: Record<RemasterModel, string> = {
-    'nb2': 'Nano Banana 2',
-    'nb-pro': 'Nano Banana Pro',
-    'gpt-2': 'GPT 2',
 }
 
 const RATIO_OPTIONS = [
@@ -177,8 +170,8 @@ export function RemasterModal({ open, onOpenChange }: RemasterModalProps) {
                     error: null,
                     resultDataUrl: null,
                 })
-            } catch {
-                toast.error(`Could not read ${file.name}`)
+            } catch (error) {
+                console.error('Failed to prepare remaster file:', error)
             }
         }
 
@@ -231,11 +224,6 @@ export function RemasterModal({ open, onOpenChange }: RemasterModalProps) {
     const processItems = useCallback(async (targetItems: RemasterItem[]) => {
         if (targetItems.length === 0) return
         setIsRemastering(true)
-        toast.loading(`Remastering ${targetItems.length} image${targetItems.length === 1 ? '' : 's'} with ${MODEL_LABELS[model]}...`, {
-            id: 'remaster-tool',
-            duration: 300_000,
-        })
-
         const successes: Array<{ name: string, dataUrl: string }> = []
         let index = 0
         const workerCount = Math.min(3, targetItems.length)
@@ -251,13 +239,10 @@ export function RemasterModal({ open, onOpenChange }: RemasterModalProps) {
 
         if (successes.length > 0) {
             await zipAndDownload(successes)
-            toast.success(`Downloaded ${successes.length} remastered image${successes.length === 1 ? '' : 's'}`, { id: 'remaster-tool' })
-        } else {
-            toast.error('No images were remastered successfully', { id: 'remaster-tool' })
         }
 
         setIsRemastering(false)
-    }, [model, remasterOne])
+    }, [remasterOne])
 
     const handleRemasterAll = useCallback(() => {
         const targets = items.filter(item => item.status !== 'processing')

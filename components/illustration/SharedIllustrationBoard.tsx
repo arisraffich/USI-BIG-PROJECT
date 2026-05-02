@@ -10,18 +10,20 @@ import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, Bookmark, X, ChevronDown, ChevronUp, Users, Plus, Minus, Pencil, Check, Layers, CornerDownRight, AlertCircle, ChevronRight, Trash2, BookImage } from 'lucide-react'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { MessageSquarePlus, CheckCircle2, Download, Upload, Loader2, Sparkles, Bookmark, X, ChevronDown, ChevronUp, Users, Plus, Minus, Pencil, Check, Layers, CornerDownRight, AlertCircle, ChevronLeft, ChevronRight, BookImage, SlidersHorizontal, RotateCcw, Undo2, Redo2 } from 'lucide-react'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { getErrorMessage } from '@/lib/utils/error'
 
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from '@/components/ui/dialog'
-import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { EmptyStateBoard } from '@/components/illustration/EmptyStateBoard'
 import { ReviewHistoryDialog } from '@/components/project/ReviewHistoryDialog'
 import { useIllustrationLock } from '@/hooks/use-illustration-lock'
 import { CoverModal } from '@/components/illustration/CoverModal'
+import { REFRESH_PROMPT } from '@/lib/ai/refresh-prompt'
+import { DEFAULT_IMAGE_TUNE_SETTINGS, IMAGE_TUNE_LIMITS } from '@/types/image-tune'
+import type { ImageTuneSettings } from '@/types/image-tune'
 
 // Type for scene character with action/emotion
 export interface SceneCharacter {
@@ -35,6 +37,7 @@ export interface SceneCharacter {
 }
 
 type FeedbackHistoryItem = NonNullable<NonNullable<Page['feedback_history']>[number]>
+type FullscreenImageItem = { url: string; label?: string }
 
 // Helper for the beautiful animation
 const AnimatedOverlay = ({ label }: { label: string }) => (
@@ -52,6 +55,282 @@ const AnimatedOverlay = ({ label }: { label: string }) => (
         </div>
     </div>
 )
+
+function readFileAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+    })
+}
+
+type IllustrationModelId = 'nb2' | 'nb-pro' | 'gpt-2'
+
+const DEFAULT_REMASTER_MODEL: IllustrationModelId = 'gpt-2'
+
+type TuneControl = { key: keyof ImageTuneSettings; label: string }
+type TuneControlGroupId = 'tone' | 'color' | 'detail'
+
+const TUNE_CONTROL_GROUPS: Array<{ id: TuneControlGroupId; label: string; controls: TuneControl[] }> = [
+    {
+        id: 'tone',
+        label: 'Light & Tone',
+        controls: [
+            { key: 'exposure', label: 'Exposure' },
+            { key: 'brightness', label: 'Brightness' },
+            { key: 'contrast', label: 'Contrast' },
+            { key: 'midtones', label: 'Midtones' },
+            { key: 'shadows', label: 'Shadows' },
+            { key: 'highlights', label: 'Highlights' },
+        ],
+    },
+    {
+        id: 'color',
+        label: 'Color',
+        controls: [
+            { key: 'saturation', label: 'Saturation' },
+            { key: 'vibrance', label: 'Vibrance' },
+            { key: 'warmth', label: 'Temperature' },
+            { key: 'red', label: 'Red' },
+            { key: 'green', label: 'Green' },
+            { key: 'blue', label: 'Blue' },
+        ],
+    },
+    {
+        id: 'detail',
+        label: 'Detail',
+        controls: [
+            { key: 'clarity', label: 'Clarity' },
+            { key: 'dehaze', label: 'Dehaze' },
+            { key: 'sharpness', label: 'Sharpness' },
+        ],
+    },
+]
+
+const DEFAULT_TUNE_GROUPS_OPEN: Record<TuneControlGroupId, boolean> = {
+    tone: true,
+    color: true,
+    detail: true,
+}
+
+const TUNE_GROUP_HELP_TEXT: Record<TuneControlGroupId, string> = {
+    tone: 'light',
+    color: 'cast',
+    detail: 'texture',
+}
+
+const TUNE_GROUP_ACTIVE_CLASS: Record<TuneControlGroupId, string> = {
+    tone: 'bg-slate-100 text-slate-700',
+    color: 'bg-purple-50 text-purple-700',
+    detail: 'bg-blue-50 text-blue-700',
+}
+
+const TUNE_SLIDER_ACCENTS: Partial<Record<keyof ImageTuneSettings, string>> = {
+    red: '#ef4444',
+    green: '#22c55e',
+    blue: '#3b82f6',
+}
+
+const TUNE_PREVIEW_MAX_EDGE = 1100
+
+function clampByte(value: number): number {
+    return Math.min(255, Math.max(0, Math.round(value)))
+}
+
+function clampUnit(value: number): number {
+    return Math.min(1, Math.max(0, value))
+}
+
+function applyGamma(value: number, gamma: number): number {
+    return Math.pow(clampUnit(value / 255), gamma) * 255
+}
+
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+    const red = r / 255
+    const green = g / 255
+    const blue = b / 255
+    const max = Math.max(red, green, blue)
+    const min = Math.min(red, green, blue)
+    const lightness = (max + min) / 2
+
+    if (max === min) return [0, 0, lightness]
+
+    const delta = max - min
+    const saturation = lightness > 0.5
+        ? delta / (2 - max - min)
+        : delta / (max + min)
+    let hue = 0
+
+    if (max === red) {
+        hue = ((green - blue) / delta + (green < blue ? 6 : 0)) * 60
+    } else if (max === green) {
+        hue = ((blue - red) / delta + 2) * 60
+    } else {
+        hue = ((red - green) / delta + 4) * 60
+    }
+
+    return [hue, saturation, lightness]
+}
+
+function hueToRgb(p: number, q: number, t: number): number {
+    let value = t
+    if (value < 0) value += 1
+    if (value > 1) value -= 1
+    if (value < 1 / 6) return p + (q - p) * 6 * value
+    if (value < 1 / 2) return q
+    if (value < 2 / 3) return p + (q - p) * (2 / 3 - value) * 6
+    return p
+}
+
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+    const hue = (((h % 360) + 360) % 360) / 360
+    if (s === 0) {
+        const gray = l * 255
+        return [gray, gray, gray]
+    }
+
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+    const p = 2 * l - q
+    return [
+        hueToRgb(p, q, hue + 1 / 3) * 255,
+        hueToRgb(p, q, hue) * 255,
+        hueToRgb(p, q, hue - 1 / 3) * 255,
+    ]
+}
+
+function applyTuneSettingsToPreview(imageData: ImageData, settings: ImageTuneSettings): ImageData {
+    const { data, width, height } = imageData
+    const output = new Uint8ClampedArray(data.length)
+    const exposureFactor = Math.pow(2, settings.exposure / 60)
+    const contrastFactor = 1 + settings.contrast / 100 + settings.dehaze / 160
+    const saturationFactor = 1 + settings.saturation / 100 + settings.dehaze / 180
+    const gamma = Math.pow(2, -settings.midtones / 60)
+    const clarityStrength = settings.clarity / 100
+
+    for (let index = 0; index < data.length; index += 4) {
+        let r = data[index] * exposureFactor
+        let g = data[index + 1] * exposureFactor
+        let b = data[index + 2] * exposureFactor
+        const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+        const shadowMask = Math.pow(Math.min(1, Math.max(0, (0.58 - luminance) / 0.58)), 1.25)
+        const highlightMask = Math.pow(Math.min(1, Math.max(0, (luminance - 0.42) / 0.58)), 1.25)
+        const lightnessOffset = settings.brightness * 1.35
+            + settings.shadows * 1.2 * shadowMask
+            + settings.highlights * 1.05 * highlightMask
+            - settings.dehaze * 0.22
+
+        r += lightnessOffset
+        g += lightnessOffset
+        b += lightnessOffset
+
+        if (settings.midtones !== 0) {
+            r = applyGamma(r, gamma)
+            g = applyGamma(g, gamma)
+            b = applyGamma(b, gamma)
+        }
+
+        r = (r - 128) * contrastFactor + 128
+        g = (g - 128) * contrastFactor + 128
+        b = (b - 128) * contrastFactor + 128
+
+        if (settings.clarity !== 0) {
+            const clarityLuminance = clampUnit((0.2126 * r + 0.7152 * g + 0.0722 * b) / 255)
+            const midtoneMask = Math.pow(1 - Math.min(1, Math.abs(clarityLuminance - 0.5) * 2), 0.8)
+            const clarityFactor = 1 + clarityStrength * midtoneMask
+            r = (r - 128) * clarityFactor + 128
+            g = (g - 128) * clarityFactor + 128
+            b = (b - 128) * clarityFactor + 128
+        }
+
+        const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        r = gray + (r - gray) * saturationFactor
+        g = gray + (g - gray) * saturationFactor
+        b = gray + (b - gray) * saturationFactor
+
+        if (settings.vibrance !== 0) {
+            const [h, s, l] = rgbToHsl(
+                Math.min(255, Math.max(0, r)),
+                Math.min(255, Math.max(0, g)),
+                Math.min(255, Math.max(0, b))
+            )
+            const vibranceAmount = settings.vibrance / 100
+            const nextS = settings.vibrance > 0
+                ? clampUnit(s * (1 + vibranceAmount * (1 - s)))
+                : clampUnit(s * (1 + vibranceAmount))
+            const vibrant = hslToRgb(h, nextS, l)
+            r = vibrant[0]
+            g = vibrant[1]
+            b = vibrant[2]
+        }
+
+        r += settings.warmth * 0.8
+        g += settings.warmth * 0.12
+        b -= settings.warmth * 0.75
+
+        r += settings.red * 1.2
+        g += settings.green * 1.2
+        b += settings.blue * 1.2
+
+        output[index] = clampByte(r)
+        output[index + 1] = clampByte(g)
+        output[index + 2] = clampByte(b)
+        output[index + 3] = data[index + 3]
+    }
+
+    if (settings.sharpness > 0) {
+        const sharpened = new Uint8ClampedArray(output)
+        const amount = (settings.sharpness / 30) * 1.65
+
+        for (let y = 1; y < height - 1; y++) {
+            for (let x = 1; x < width - 1; x++) {
+                const index = (y * width + x) * 4
+                for (let channel = 0; channel < 3; channel++) {
+                    const center = output[index + channel]
+                    const blur = (
+                        output[index - width * 4 + channel] +
+                        output[index + width * 4 + channel] +
+                        output[index - 4 + channel] +
+                        output[index + 4 + channel] +
+                        output[index - width * 4 - 4 + channel] +
+                        output[index - width * 4 + 4 + channel] +
+                        output[index + width * 4 - 4 + channel] +
+                        output[index + width * 4 + 4 + channel]
+                    ) / 8
+                    sharpened[index + channel] = clampByte(center + (center - blur) * amount)
+                }
+            }
+        }
+
+        imageData.data.set(sharpened)
+        return imageData
+    }
+
+    imageData.data.set(output)
+    return imageData
+}
+
+function drawTunedPreview(canvas: HTMLCanvasElement, image: HTMLImageElement, settings: ImageTuneSettings): void {
+    const context = canvas.getContext('2d', { willReadFrequently: true })
+    if (!context) throw new Error('Preview canvas is not available')
+
+    const sourceWidth = image.naturalWidth || image.width
+    const sourceHeight = image.naturalHeight || image.height
+    const scale = Math.min(1, TUNE_PREVIEW_MAX_EDGE / Math.max(sourceWidth, sourceHeight))
+    const width = Math.max(1, Math.round(sourceWidth * scale))
+    const height = Math.max(1, Math.round(sourceHeight * scale))
+
+    canvas.width = width
+    canvas.height = height
+    context.clearRect(0, 0, width, height)
+    context.drawImage(image, 0, 0, width, height)
+    const imageData = context.getImageData(0, 0, width, height)
+    context.putImageData(applyTuneSettingsToPreview(imageData, settings), 0, 0)
+}
+
+function areTuneSettingsEqual(a: ImageTuneSettings, b: ImageTuneSettings): boolean {
+    return Object.keys(IMAGE_TUNE_LIMITS).every(key => a[key as keyof ImageTuneSettings] === b[key as keyof ImageTuneSettings])
+}
 
 export interface SharedIllustrationBoardProps {
     page: Page
@@ -72,6 +351,7 @@ export interface SharedIllustrationBoardProps {
     setIllustrationType?: (type: 'spread' | 'spot' | null) => void
     onGenerate?: () => void
     onRegenerate?: (prompt: string, referenceImages?: string[], referenceImageUrl?: string, sceneCharacters?: SceneCharacter[], useThinking?: boolean, modelId?: string, isRefresh?: boolean) => void
+    onAutoTune?: (settings: ImageTuneSettings) => void
     onLayoutChange?: (newType: 'spread' | 'spot' | null) => void // For changing layout type (triggers regeneration)
     onUpload?: (type: 'sketch' | 'illustration', file: File) => Promise<void>
     illustratedPages?: Page[] // All pages with illustrations (for environment reference)
@@ -97,8 +377,9 @@ export interface SharedIllustrationBoardProps {
         pageId: string
         oldUrl: string
         newUrl: string
+        isAutoTune?: boolean
     }
-    onComparisonDecision?: (decision: 'keep_new' | 'revert_old') => void
+    onComparisonDecision?: (decision: 'keep_new' | 'revert_old' | 'keep_editing') => void
     
     // Admin Reply Feature
     onSaveAdminReply?: (reply: string) => Promise<void>
@@ -118,9 +399,6 @@ export interface SharedIllustrationBoardProps {
     approvalTotalCount?: number
     approvalAllApproved?: boolean
     onApprovePage?: () => Promise<void>
-    // Page Delete Feature (Admin only)
-    onDeletePage?: () => void
-    isDeleteDisabled?: boolean
     // Sketch/Story Toggle "All Pages" (Admin only)
     globalSketchViewMode?: { mode: 'sketch' | 'text'; version: number }
     onToggleAllSketchView?: (mode: 'sketch' | 'text') => void
@@ -148,6 +426,7 @@ export function SharedIllustrationBoard({
     setIllustrationType,
     onGenerate,
     onRegenerate,
+    onAutoTune,
     onLayoutChange,
     onUpload,
     illustratedPages = [],
@@ -176,9 +455,6 @@ export function SharedIllustrationBoard({
     approvalApprovedCount = 0,
     approvalTotalCount = 0,
     onApprovePage,
-    // Page Delete Feature
-    onDeletePage,
-    isDeleteDisabled = false,
     // Sketch/Story Toggle "All Pages"
     globalSketchViewMode,
     onToggleAllSketchView,
@@ -201,7 +477,8 @@ export function SharedIllustrationBoard({
     const [notes, setNotes] = useState(page.feedback_notes || '')
     const [isEditing, setIsEditing] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
-    const [showImage, setShowImage] = useState<string | null>(null)
+    const [fullscreenImages, setFullscreenImages] = useState<FullscreenImageItem[]>([])
+    const [fullscreenImageIndex, setFullscreenImageIndex] = useState(0)
     const [historyOpen, setHistoryOpen] = useState(false) // For mobile popup
     const [inlineHistoryExpanded, setInlineHistoryExpanded] = useState(false) // For desktop inline collapsible
     
@@ -264,6 +541,26 @@ export function SharedIllustrationBoard({
     const [isRegenerateDialogOpen, setIsRegenerateDialogOpen] = useState(false)
     const [regenerationPrompt, setRegenerationPrompt] = useState('')
     const [referenceImages, setReferenceImages] = useState<{ file: File; preview: string }[]>([])
+    const [isRemasterDialogOpen, setIsRemasterDialogOpen] = useState(false)
+    const [remasterModel, setRemasterModel] = useState<IllustrationModelId>(DEFAULT_REMASTER_MODEL)
+    const [remasterPrompt, setRemasterPrompt] = useState(REFRESH_PROMPT)
+    const [remasterReferencePageId, setRemasterReferencePageId] = useState<string | null>(null)
+    const [remasterUpload, setRemasterUpload] = useState<{ file: File; preview: string } | null>(null)
+    const [isTuneMode, setIsTuneMode] = useState(false)
+    const [tuneSettings, setTuneSettings] = useState<ImageTuneSettings>(DEFAULT_IMAGE_TUNE_SETTINGS)
+    const [isTunePreviewLoading, setIsTunePreviewLoading] = useState(false)
+    const [tunePreviewError, setTunePreviewError] = useState<string | null>(null)
+    const [tuneUndoCount, setTuneUndoCount] = useState(0)
+    const [tuneRedoCount, setTuneRedoCount] = useState(0)
+    const [tuneSourceVersion, setTuneSourceVersion] = useState(0)
+    const [openTuneGroups, setOpenTuneGroups] = useState<Record<TuneControlGroupId, boolean>>(DEFAULT_TUNE_GROUPS_OPEN)
+    const tuneCanvasRef = useRef<HTMLCanvasElement>(null)
+    const tuneSourceImageRef = useRef<HTMLImageElement | null>(null)
+    const tuneSettingsRef = useRef<ImageTuneSettings>(DEFAULT_IMAGE_TUNE_SETTINGS)
+    const tuneUndoStackRef = useRef<ImageTuneSettings[]>([])
+    const tuneRedoStackRef = useRef<ImageTuneSettings[]>([])
+    const tuneSliderInteractionRef = useRef<{ key: keyof ImageTuneSettings; before: ImageTuneSettings } | null>(null)
+    const tuneSliderCommitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     
     // Admin: Layout Change Dialog
     const [isLayoutDialogOpen, setIsLayoutDialogOpen] = useState(false)
@@ -291,7 +588,7 @@ export function SharedIllustrationBoard({
     const [editEmotion, setEditEmotion] = useState('')
     const [promptWasAutoPopulated, setPromptWasAutoPopulated] = useState(false)
     const [useThinkingMode, setUseThinkingMode] = useState(false)
-    const [illustrationModel, setIllustrationModel] = useState<'nb2' | 'nb-pro' | 'gpt-2'>('nb2')
+    const [illustrationModel, setIllustrationModel] = useState<IllustrationModelId>('nb2')
     
     const ENV_AUTO_PROMPT = 'Use the same environment as in the reference image. Keep all characters and composition the same.'
     
@@ -339,17 +636,40 @@ export function SharedIllustrationBoard({
         return () => ro.disconnect()
     }, [])
 
-    // Handler for quality refresh — bypasses modal, skips prompt/refs/instructions.
-    // User picks the engine directly from the submenu at click time.
-    const handleRefreshQuality = (engine: 'nb2' | 'nb-pro' | 'gpt-2') => {
+    const remasterFileInputRef = useRef<HTMLInputElement>(null)
+
+    const resetRemasterOptions = useCallback(() => {
+        setRemasterModel(DEFAULT_REMASTER_MODEL)
+        setRemasterPrompt(REFRESH_PROMPT)
+        setRemasterReferencePageId(null)
+        setRemasterUpload(null)
+        if (remasterFileInputRef.current) remasterFileInputRef.current.value = ''
+    }, [])
+
+    const handleOpenRemasterDialog = useCallback(() => {
         if (!onRegenerate || !page.illustration_url) return
-        const resolvedModelId = engine === 'nb-pro'
-            ? 'gemini-3-pro-image-preview'
-            : engine === 'gpt-2'
-                ? 'gpt-image-2'
-                : undefined
-        onRegenerate('', undefined, undefined, undefined, false, resolvedModelId, true)
-    }
+        resetRemasterOptions()
+        setIsRemasterDialogOpen(true)
+    }, [onRegenerate, page.illustration_url, resetRemasterOptions])
+
+    const handleOpenTuneMode = useCallback(() => {
+        if (!onAutoTune || !page.illustration_url) return
+        setTuneSettings(DEFAULT_IMAGE_TUNE_SETTINGS)
+        setTunePreviewError(null)
+        tuneSettingsRef.current = DEFAULT_IMAGE_TUNE_SETTINGS
+        tuneUndoStackRef.current = []
+        tuneRedoStackRef.current = []
+        tuneSliderInteractionRef.current = null
+        if (tuneSliderCommitTimeoutRef.current) {
+            clearTimeout(tuneSliderCommitTimeoutRef.current)
+            tuneSliderCommitTimeoutRef.current = null
+        }
+        setTuneUndoCount(0)
+        setTuneRedoCount(0)
+        setOpenTuneGroups(DEFAULT_TUNE_GROUPS_OPEN)
+        setIsTunePreviewLoading(true)
+        setIsTuneMode(true)
+    }, [onAutoTune, page.illustration_url])
 
     // Handler to open regenerate dialog with saved prompt or customer feedback pre-populated
     const handleOpenRegenerateDialog = () => {
@@ -398,6 +718,496 @@ export function SharedIllustrationBoard({
 
     const isAdmin = mode === 'admin'
     const isCustomer = mode === 'customer'
+
+    const selectedRemasterReferencePage = remasterReferencePageId
+        ? illustratedPages.find(p => p.id === remasterReferencePageId)
+        : undefined
+
+    const currentFullscreenImage = fullscreenImages[fullscreenImageIndex] || null
+    const canNavigateFullscreenImages = fullscreenImages.length > 1
+
+    const openFullscreenImage = useCallback((items: FullscreenImageItem[], index = 0) => {
+        const validItems = items.filter(item => item.url)
+        if (validItems.length === 0) return
+        setFullscreenImages(validItems)
+        setFullscreenImageIndex(Math.min(Math.max(index, 0), validItems.length - 1))
+    }, [])
+
+    const closeFullscreenImage = useCallback(() => {
+        setFullscreenImages([])
+        setFullscreenImageIndex(0)
+    }, [])
+
+    const showPreviousFullscreenImage = useCallback(() => {
+        setFullscreenImageIndex(index => Math.max(0, index - 1))
+    }, [])
+
+    const showNextFullscreenImage = useCallback(() => {
+        setFullscreenImageIndex(index => Math.min(fullscreenImages.length - 1, index + 1))
+    }, [fullscreenImages.length])
+
+    const tunePreviewFilter = useMemo(() => {
+        const brightness = 1
+            + tuneSettings.exposure / 90
+            + tuneSettings.brightness / 120
+            + tuneSettings.midtones / 250
+            + tuneSettings.shadows / 350
+            + tuneSettings.highlights / 500
+            - tuneSettings.dehaze / 450
+        const contrast = 1 + tuneSettings.contrast / 120 + tuneSettings.clarity / 180 + tuneSettings.dehaze / 160
+        const saturation = 1 + tuneSettings.saturation / 100 + tuneSettings.vibrance / 140 + tuneSettings.dehaze / 180
+        const warmth = tuneSettings.warmth
+        const sepia = Math.max(0, warmth) / 160
+        const warmthHueRotate = warmth < 0 ? warmth / 2 : warmth / 8
+
+        return `brightness(${Math.max(0.5, brightness)}) contrast(${Math.max(0.5, contrast)}) saturate(${Math.max(0.2, saturation)}) sepia(${sepia}) hue-rotate(${warmthHueRotate}deg)`
+    }, [tuneSettings])
+
+    const setTuneSettingsSynced = useCallback((nextSettings: ImageTuneSettings) => {
+        tuneSettingsRef.current = nextSettings
+        setTuneSettings(nextSettings)
+    }, [])
+
+    const pushTuneUndoState = useCallback((previousSettings: ImageTuneSettings, nextSettings: ImageTuneSettings) => {
+        if (areTuneSettingsEqual(previousSettings, nextSettings)) return
+
+        tuneUndoStackRef.current = [...tuneUndoStackRef.current.slice(-49), previousSettings]
+        tuneRedoStackRef.current = []
+        setTuneUndoCount(tuneUndoStackRef.current.length)
+        setTuneRedoCount(0)
+    }, [])
+
+    const clearTuneSliderCommitTimer = useCallback(() => {
+        if (!tuneSliderCommitTimeoutRef.current) return
+        clearTimeout(tuneSliderCommitTimeoutRef.current)
+        tuneSliderCommitTimeoutRef.current = null
+    }, [])
+
+    const beginTuneSliderInteraction = useCallback((key: keyof ImageTuneSettings) => {
+        const currentInteraction = tuneSliderInteractionRef.current
+        if (currentInteraction?.key === key) return
+
+        if (currentInteraction) {
+            pushTuneUndoState(currentInteraction.before, tuneSettingsRef.current)
+        }
+
+        tuneSliderInteractionRef.current = { key, before: tuneSettingsRef.current }
+    }, [pushTuneUndoState])
+
+    const commitTuneSliderInteraction = useCallback(() => {
+        clearTuneSliderCommitTimer()
+
+        const interaction = tuneSliderInteractionRef.current
+        if (!interaction) return
+
+        tuneSliderInteractionRef.current = null
+        pushTuneUndoState(interaction.before, tuneSettingsRef.current)
+    }, [clearTuneSliderCommitTimer, pushTuneUndoState])
+
+    const scheduleTuneSliderCommit = useCallback(() => {
+        clearTuneSliderCommitTimer()
+        tuneSliderCommitTimeoutRef.current = setTimeout(() => {
+            tuneSliderCommitTimeoutRef.current = null
+
+            const interaction = tuneSliderInteractionRef.current
+            if (!interaction) return
+
+            tuneSliderInteractionRef.current = null
+            pushTuneUndoState(interaction.before, tuneSettingsRef.current)
+        }, 350)
+    }, [clearTuneSliderCommitTimer, pushTuneUndoState])
+
+    const applyTuneSettingsChange = useCallback((nextSettings: ImageTuneSettings) => {
+        commitTuneSliderInteraction()
+
+        const currentSettings = tuneSettingsRef.current
+        if (areTuneSettingsEqual(currentSettings, nextSettings)) return
+
+        pushTuneUndoState(currentSettings, nextSettings)
+        setTuneSettingsSynced(nextSettings)
+    }, [commitTuneSliderInteraction, pushTuneUndoState, setTuneSettingsSynced])
+
+    const undoTuneChange = useCallback(() => {
+        commitTuneSliderInteraction()
+
+        const previousSettings = tuneUndoStackRef.current.at(-1)
+        if (!previousSettings) return
+
+        const currentSettings = tuneSettingsRef.current
+        tuneUndoStackRef.current = tuneUndoStackRef.current.slice(0, -1)
+        tuneRedoStackRef.current = [...tuneRedoStackRef.current.slice(-49), currentSettings]
+        setTuneUndoCount(tuneUndoStackRef.current.length)
+        setTuneRedoCount(tuneRedoStackRef.current.length)
+        setTuneSettingsSynced(previousSettings)
+    }, [commitTuneSliderInteraction, setTuneSettingsSynced])
+
+    const redoTuneChange = useCallback(() => {
+        commitTuneSliderInteraction()
+
+        const nextSettings = tuneRedoStackRef.current.at(-1)
+        if (!nextSettings) return
+
+        const currentSettings = tuneSettingsRef.current
+        tuneRedoStackRef.current = tuneRedoStackRef.current.slice(0, -1)
+        tuneUndoStackRef.current = [...tuneUndoStackRef.current.slice(-49), currentSettings]
+        setTuneRedoCount(tuneRedoStackRef.current.length)
+        setTuneUndoCount(tuneUndoStackRef.current.length)
+        setTuneSettingsSynced(nextSettings)
+    }, [commitTuneSliderInteraction, setTuneSettingsSynced])
+
+    const resetTuneSettings = useCallback(() => {
+        applyTuneSettingsChange(DEFAULT_IMAGE_TUNE_SETTINGS)
+    }, [applyTuneSettingsChange])
+
+    const updateTuneSetting = useCallback((key: keyof ImageTuneSettings, value: number) => {
+        const limit = IMAGE_TUNE_LIMITS[key]
+        const nextValue = Math.min(limit.max, Math.max(limit.min, value))
+        beginTuneSliderInteraction(key)
+
+        const currentSettings = tuneSettingsRef.current
+        const nextSettings = { ...currentSettings, [key]: nextValue }
+        if (areTuneSettingsEqual(currentSettings, nextSettings)) return
+
+        setTuneSettingsSynced(nextSettings)
+        scheduleTuneSliderCommit()
+    }, [beginTuneSliderInteraction, scheduleTuneSliderCommit, setTuneSettingsSynced])
+
+    useEffect(() => {
+        if (!isTuneMode) return
+
+        const handleTuneUndoShortcut = (event: KeyboardEvent) => {
+            if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z') return
+            event.preventDefault()
+            if (event.shiftKey) {
+                redoTuneChange()
+            } else {
+                undoTuneChange()
+            }
+        }
+
+        window.addEventListener('keydown', handleTuneUndoShortcut)
+        return () => window.removeEventListener('keydown', handleTuneUndoShortcut)
+    }, [isTuneMode, redoTuneChange, undoTuneChange])
+
+    useEffect(() => {
+        return () => clearTuneSliderCommitTimer()
+    }, [clearTuneSliderCommitTimer])
+
+    useEffect(() => {
+        if (!isTuneMode || !page.illustration_url) {
+            tuneSourceImageRef.current = null
+            return
+        }
+
+        let cancelled = false
+        const image = new Image()
+        image.crossOrigin = 'anonymous'
+        setIsTunePreviewLoading(true)
+        setTunePreviewError(null)
+
+        image.onload = () => {
+            if (cancelled) return
+            tuneSourceImageRef.current = image
+            setTuneSourceVersion(version => version + 1)
+            setIsTunePreviewLoading(false)
+        }
+        image.onerror = () => {
+            if (cancelled) return
+            tuneSourceImageRef.current = null
+            setTunePreviewError('Preview image could not be loaded. Compare can still create the tuned image.')
+            setIsTunePreviewLoading(false)
+        }
+        image.src = page.illustration_url
+
+        return () => {
+            cancelled = true
+        }
+    }, [isTuneMode, page.illustration_url])
+
+    useEffect(() => {
+        if (!isTuneMode || !tuneCanvasRef.current || !tuneSourceImageRef.current) return
+
+        const frameId = window.requestAnimationFrame(() => {
+            try {
+                drawTunedPreview(tuneCanvasRef.current!, tuneSourceImageRef.current!, tuneSettings)
+                setTunePreviewError(null)
+            } catch (error: unknown) {
+                setTunePreviewError(getErrorMessage(error, 'Preview failed'))
+            }
+        })
+
+        return () => window.cancelAnimationFrame(frameId)
+    }, [isTuneMode, tuneSettings, tuneSourceVersion])
+
+    useEffect(() => {
+        if (!currentFullscreenImage || !canNavigateFullscreenImages) return
+
+        const handleFullscreenNavigation = (event: KeyboardEvent) => {
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault()
+                showPreviousFullscreenImage()
+            } else if (event.key === 'ArrowRight') {
+                event.preventDefault()
+                showNextFullscreenImage()
+            }
+        }
+
+        window.addEventListener('keydown', handleFullscreenNavigation)
+        return () => window.removeEventListener('keydown', handleFullscreenNavigation)
+    }, [canNavigateFullscreenImages, currentFullscreenImage, showNextFullscreenImage, showPreviousFullscreenImage])
+
+    const handleCompareTune = useCallback(() => {
+        if (!onAutoTune || !page.illustration_url) return
+        commitTuneSliderInteraction()
+        setIsTuneMode(false)
+        onAutoTune(tuneSettingsRef.current)
+    }, [commitTuneSliderInteraction, onAutoTune, page.illustration_url])
+
+    const renderTuneControls = () => {
+        const renderTuneSlider = (control: TuneControl) => {
+            const limit = IMAGE_TUNE_LIMITS[control.key]
+            const value = tuneSettings[control.key]
+
+            return (
+                <div key={control.key} className="grid grid-cols-[78px_minmax(0,1fr)_30px] items-center gap-x-2">
+                    <Label htmlFor={`inline-tune-${control.key}-${page.id}`} className="truncate text-xs font-medium text-slate-700">
+                        {control.label}
+                    </Label>
+                    <input
+                        id={`inline-tune-${control.key}-${page.id}`}
+                        type="range"
+                        min={limit.min}
+                        max={limit.max}
+                        step={limit.step}
+                        value={value}
+                        onPointerDown={(event) => {
+                            event.currentTarget.setPointerCapture?.(event.pointerId)
+                            beginTuneSliderInteraction(control.key)
+                        }}
+                        onPointerUp={(event) => {
+                            event.currentTarget.releasePointerCapture?.(event.pointerId)
+                            commitTuneSliderInteraction()
+                        }}
+                        onPointerCancel={commitTuneSliderInteraction}
+                        onBlur={commitTuneSliderInteraction}
+                        onChange={(event) => updateTuneSetting(control.key, Number(event.target.value))}
+                        className="w-full min-w-0 accent-purple-600"
+                        style={{ accentColor: TUNE_SLIDER_ACCENTS[control.key] }}
+                    />
+                    <span className="text-right text-xs font-medium text-slate-500">
+                        {value > 0 ? `+${value}` : value}
+                    </span>
+                </div>
+            )
+        }
+
+        const renderTuneGroup = (group: typeof TUNE_CONTROL_GROUPS[number]) => {
+            const isOpen = openTuneGroups[group.id]
+            const activeCount = group.controls.filter(control => tuneSettings[control.key] !== DEFAULT_IMAGE_TUNE_SETTINGS[control.key]).length
+
+            return (
+                <section key={group.id} className="rounded-lg border border-slate-200 bg-white">
+                    <button
+                        type="button"
+                        onClick={() => setOpenTuneGroups(prev => ({ ...prev, [group.id]: !prev[group.id] }))}
+                        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-slate-50"
+                    >
+                        <span className="flex min-w-0 items-center gap-2">
+                            {isOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" /> : <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />}
+                            <span className="truncate text-xs font-semibold uppercase tracking-wide text-slate-700">
+                                {group.label}
+                            </span>
+                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${TUNE_GROUP_ACTIVE_CLASS[group.id]}`}>
+                                {TUNE_GROUP_HELP_TEXT[group.id]}
+                            </span>
+                        </span>
+                        <span className="shrink-0 text-xs font-medium text-slate-400">
+                            {activeCount > 0 ? `${activeCount} changed` : `${group.controls.length}`}
+                        </span>
+                    </button>
+
+                    {isOpen && (
+                        <div className="space-y-4 border-t border-slate-100 px-3 py-3">
+                            {group.controls.map(renderTuneSlider)}
+                        </div>
+                    )}
+                </section>
+            )
+        }
+
+        return (
+            <div className="h-full w-full overflow-y-auto bg-white p-4">
+                <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-slate-200 pb-4">
+                    <Button type="button" variant="outline" className="h-9 min-w-[92px] flex-1" onClick={resetTuneSettings}>
+                        <RotateCcw className="w-4 h-4 mr-2" />
+                        Reset
+                    </Button>
+                    <Button
+                        type="button"
+                        className="h-9 min-w-[92px] flex-1 border-red-600 bg-red-600 text-white hover:bg-red-700 hover:text-white"
+                        onClick={() => setIsTuneMode(false)}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="button"
+                        className="h-9 min-w-[112px] flex-[1.15] bg-purple-600 text-white hover:bg-purple-700"
+                        onClick={handleCompareTune}
+                        disabled={isGenerating || !page.illustration_url}
+                    >
+                        <SlidersHorizontal className="w-4 h-4 mr-2" />
+                        Compare
+                    </Button>
+                    <div className="ml-auto flex items-center gap-1">
+                        <button
+                            type="button"
+                            onClick={undoTuneChange}
+                            disabled={tuneUndoCount === 0}
+                            className="rounded-full p-1.5 text-slate-500 hover:bg-slate-100 hover:text-purple-700 disabled:cursor-not-allowed disabled:opacity-35"
+                            title="Undo (Cmd/Ctrl+Z)"
+                            aria-label="Undo last tune change"
+                        >
+                            <Undo2 className="h-4 w-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={redoTuneChange}
+                            disabled={tuneRedoCount === 0}
+                            className="rounded-full p-1.5 text-slate-500 hover:bg-slate-100 hover:text-purple-700 disabled:cursor-not-allowed disabled:opacity-35"
+                            title="Redo (Cmd/Ctrl+Shift+Z)"
+                            aria-label="Redo last tune change"
+                        >
+                            <Redo2 className="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+
+                <div className="space-y-2.5">
+                    {TUNE_CONTROL_GROUPS.map(renderTuneGroup)}
+                </div>
+
+                {tunePreviewError && (
+                    <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                        {tunePreviewError}
+                    </div>
+                )}
+
+            </div>
+        )
+    }
+
+    const handleTunePreviewClick = useCallback(() => {
+        const canvas = tuneCanvasRef.current
+        if (canvas && canvas.width > 0 && canvas.height > 0) {
+            try {
+                openFullscreenImage([{ url: canvas.toDataURL('image/jpeg', 0.92), label: 'Preview' }])
+                return
+            } catch {
+                // Fall back to the source image when the canvas cannot export.
+            }
+        }
+        if (page.illustration_url) openFullscreenImage([{ url: page.illustration_url, label: 'Preview' }])
+    }, [openFullscreenImage, page.illustration_url])
+
+    const renderTunePreview = () => (
+        <div
+            className="relative flex h-full min-h-[300px] w-full cursor-pointer items-center justify-center bg-slate-50"
+            onClick={handleTunePreviewClick}
+        >
+            {isTunePreviewLoading && (
+                <div className="absolute right-3 top-3 z-20 rounded-full bg-white/90 p-2 text-purple-600 shadow-sm ring-1 ring-slate-200">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+            )}
+            {page.illustration_url ? (
+                tunePreviewError ? (
+                    <img
+                        src={page.illustration_url}
+                        alt="Tuned Preview"
+                        className="block h-auto w-full object-contain"
+                        style={{ filter: tunePreviewFilter }}
+                    />
+                ) : (
+                    <canvas
+                        ref={tuneCanvasRef}
+                        aria-label="Tuned Preview"
+                        className="block h-auto w-full object-contain"
+                    />
+                )
+            ) : (
+                <span className="text-sm text-slate-300">No illustration available</span>
+            )}
+        </div>
+    )
+
+    useEffect(() => {
+        return () => {
+            if (remasterUpload) URL.revokeObjectURL(remasterUpload.preview)
+        }
+    }, [remasterUpload])
+
+    const handleRemasterReferenceFile = useCallback((file: File) => {
+        if (!file.type.startsWith('image/')) {
+            return
+        }
+
+        if (file.size > 10 * 1024 * 1024) {
+            return
+        }
+
+        setRemasterUpload({ file, preview: URL.createObjectURL(file) })
+        setRemasterReferencePageId(null)
+    }, [])
+
+    const handleRemasterReferenceSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0]
+        if (file) handleRemasterReferenceFile(file)
+        event.target.value = ''
+    }, [handleRemasterReferenceFile])
+
+    const handleRemasterReferenceDrop = useCallback((event: React.DragEvent<HTMLButtonElement>) => {
+        event.preventDefault()
+        const file = event.dataTransfer.files?.[0]
+        if (file) handleRemasterReferenceFile(file)
+    }, [handleRemasterReferenceFile])
+
+    const handleRemasterSubmit = useCallback(async () => {
+        if (!onRegenerate || !page.illustration_url) return
+
+        let qualityReferenceImages: string[] | undefined
+        let referenceImageUrl: string | undefined
+
+        if (selectedRemasterReferencePage?.illustration_url) {
+            referenceImageUrl = selectedRemasterReferencePage?.illustration_url || undefined
+        }
+
+        if (remasterUpload) {
+            try {
+                qualityReferenceImages = [await readFileAsDataUrl(remasterUpload.file)]
+            } catch (error) {
+                console.error('Failed to read remaster quality reference:', error)
+                return
+            }
+        }
+
+        const resolvedModelId = remasterModel === 'nb-pro'
+            ? 'gemini-3-pro-image-preview'
+            : remasterModel === 'gpt-2'
+                ? 'gpt-image-2'
+                : undefined
+
+        setIsRemasterDialogOpen(false)
+        resetRemasterOptions()
+        onRegenerate(remasterPrompt.trim() || REFRESH_PROMPT, qualityReferenceImages, referenceImageUrl, undefined, false, resolvedModelId, true)
+    }, [
+        onRegenerate,
+        page.illustration_url,
+        remasterModel,
+        remasterPrompt,
+        remasterUpload,
+        resetRemasterOptions,
+        selectedRemasterReferencePage?.illustration_url,
+    ])
 
     const handleSketchToggleClick = useCallback((newMode: 'sketch' | 'text') => {
         if (!isAdmin || !onToggleAllSketchView) {
@@ -511,12 +1321,7 @@ export function SharedIllustrationBoard({
                 .update({ scene_description: editedSceneNotes })
                 .eq('id', page.id)
             
-            if (error) throw error
-            
-            toast.success('Illustration notes saved')
-        } catch (error: unknown) {
-            toast.error('Failed to save notes')
-            console.error(error)
+            if (error) throw error        } catch (error: unknown) {            console.error(error)
         } finally {
             setIsSavingSceneNotes(false)
         }
@@ -542,15 +1347,13 @@ export function SharedIllustrationBoard({
         if (imageFiles.length === 0) return
 
         const validFiles = imageFiles.filter(file => {
-            if (file.size > 10 * 1024 * 1024) { // 10MB limit
-                toast.error(`"${file.name}" is too large (max 10MB).`)
+            if (file.size > 10 * 1024 * 1024) {
                 return false
             }
             return true
         })
 
         if (referenceImages.length + validFiles.length > 5) {
-            toast.error("Max 5 reference images allowed.")
             return
         }
 
@@ -601,9 +1404,7 @@ export function SharedIllustrationBoard({
 
             if (imageFiles.length > 0) {
                 e.preventDefault()
-                addReferenceFiles(imageFiles)
-                toast.success('Image pasted as reference')
-            }
+                addReferenceFiles(imageFiles)            }
         }
 
         document.addEventListener('paste', handlePaste)
@@ -632,13 +1433,10 @@ export function SharedIllustrationBoard({
     // Line Art Generation Handler (Admin only)
     const handleGenerateLineArt = useCallback(async () => {
         if (!page.illustration_url) {
-            toast.error('No illustration available')
             return
         }
 
         setIsGeneratingLineArt(true)
-        toast.info('Generating line art...', { duration: 60000, id: 'lineart-progress' })
-
         try {
             const response = await fetch('/api/line-art/generate', {
                 method: 'POST',
@@ -664,7 +1462,8 @@ export function SharedIllustrationBoard({
                         // Ignore
                     }
                 }
-                toast.error(errorMessage, { id: 'lineart-progress' })
+
+                console.error('Line art generation failed:', errorMessage)
                 return
             }
 
@@ -678,15 +1477,8 @@ export function SharedIllustrationBoard({
             link.click()
             document.body.removeChild(link)
             URL.revokeObjectURL(url)
-
-            toast.success('Line art downloaded!', { id: 'lineart-progress' })
-
         } catch (err) {
             console.error('Line art generation error:', err)
-            const message = err && typeof err === 'object' && 'message' in err 
-                ? String(err.message) 
-                : 'Failed to generate line art'
-            toast.error(message, { id: 'lineart-progress' })
         } finally {
             setIsGeneratingLineArt(false)
         }
@@ -707,10 +1499,8 @@ export function SharedIllustrationBoard({
             await onSaveFeedback(textToSave)
             setNotes(textToSave) // Sync local state
             setIsEditing(false)
-            toast.success('Feedback saved successfully')
         } catch (e) {
             console.error(e)
-            toast.error('Failed to save feedback')
         } finally {
             setIsSaving(false)
         }
@@ -726,12 +1516,8 @@ export function SharedIllustrationBoard({
         try {
             await onSaveAdminReply(adminReplyText.trim())
             setAdminReplyText('')
-            setIsAdminReplying(false)
-            toast.success('Reply saved')
-        } catch (e) {
-            console.error(e)
-            toast.error('Failed to save reply')
-        } finally {
+            setIsAdminReplying(false)        } catch (e) {
+            console.error(e)        } finally {
             setIsSavingAdminReply(false)
         }
     }, [onSaveAdminReply, adminReplyText])
@@ -741,12 +1527,8 @@ export function SharedIllustrationBoard({
         if (!onAcceptAdminReply) return
         setIsAccepting(true)
         try {
-            await onAcceptAdminReply()
-            toast.success('Response accepted')
-        } catch (e) {
-            console.error(e)
-            toast.error('Failed to accept response')
-        } finally {
+            await onAcceptAdminReply()        } catch (e) {
+            console.error(e)        } finally {
             setIsAccepting(false)
         }
     }, [onAcceptAdminReply])
@@ -761,12 +1543,8 @@ export function SharedIllustrationBoard({
         try {
             await onCustomerFollowUp(followUpText.trim())
             setFollowUpText('')
-            setIsCustomerFollowingUp(false)
-            toast.success('Follow-up saved')
-        } catch (e) {
-            console.error(e)
-            toast.error('Failed to save follow-up')
-        } finally {
+            setIsCustomerFollowingUp(false)        } catch (e) {
+            console.error(e)        } finally {
             setIsSavingFollowUp(false)
         }
     }, [onCustomerFollowUp, followUpText])
@@ -780,12 +1558,8 @@ export function SharedIllustrationBoard({
         setIsSavingAdminReply(true)
         try {
             await onEditAdminReply(adminReplyText.trim())
-            setIsEditingAdminReply(false)
-            toast.success('Reply updated')
-        } catch (e) {
-            console.error(e)
-            toast.error('Failed to update reply')
-        } finally {
+            setIsEditingAdminReply(false)        } catch (e) {
+            console.error(e)        } finally {
             setIsSavingAdminReply(false)
         }
     }, [onEditAdminReply, adminReplyText])
@@ -799,12 +1573,8 @@ export function SharedIllustrationBoard({
         setIsSavingFollowUp(true)
         try {
             await onEditFollowUp(followUpText.trim())
-            setIsEditingFollowUp(false)
-            toast.success('Follow-up updated')
-        } catch (e) {
-            console.error(e)
-            toast.error('Failed to update follow-up')
-        } finally {
+            setIsEditingFollowUp(false)        } catch (e) {
+            console.error(e)        } finally {
             setIsSavingFollowUp(false)
         }
     }, [onEditFollowUp, followUpText])
@@ -819,12 +1589,8 @@ export function SharedIllustrationBoard({
         try {
             await onAddComment(adminReplyText.trim())
             setAdminReplyText('')
-            setIsAddingComment(false)
-            toast.success('Comment added')
-        } catch (e) {
-            console.error(e)
-            toast.error('Failed to add comment')
-        } finally {
+            setIsAddingComment(false)        } catch (e) {
+            console.error(e)        } finally {
             setIsSavingAdminReply(false)
         }
     }, [onAddComment, adminReplyText])
@@ -834,12 +1600,8 @@ export function SharedIllustrationBoard({
         if (!onRemoveComment) return
         setIsDeletingComment(true)
         try {
-            await onRemoveComment()
-            toast.success('Comment removed')
-        } catch (e) {
-            console.error(e)
-            toast.error('Failed to remove comment')
-        } finally {
+            await onRemoveComment()        } catch (e) {
+            console.error(e)        } finally {
             setIsDeletingComment(false)
         }
     }, [onRemoveComment])
@@ -850,12 +1612,8 @@ export function SharedIllustrationBoard({
         setIsResolving(true)
         try {
             await onManualResolve()
-            setShowResolveDialog(false)
-            toast.success('Revision resolved')
-        } catch (e) {
-            console.error(e)
-            toast.error('Failed to resolve revision')
-        } finally {
+            setShowResolveDialog(false)        } catch (e) {
+            console.error(e)        } finally {
             setIsResolving(false)
         }
     }, [onManualResolve])
@@ -919,6 +1677,10 @@ export function SharedIllustrationBoard({
     // Use correct URLs based on role
     const sketchUrl = isAdmin ? page.sketch_url : page.customer_sketch_url
     const illustrationUrl = isAdmin ? page.illustration_url : page.customer_illustration_url
+    const remasterSubmitDisabled = Boolean(
+        isGenerating ||
+        !page.illustration_url
+    )
 
     return (
         <div className="max-w-[1600px] mx-auto w-full h-full snap-start">
@@ -935,21 +1697,8 @@ export function SharedIllustrationBoard({
                         {/* ADMIN ONLY: DELETE + LAYOUT + REGEN BUTTONS */}
                         {isAdmin && onRegenerate ? (
                             <>
-                                {/* Left group: Delete + Layout */}
+                                {/* Left group: Layout */}
                                 <div className="flex items-center gap-1">
-                                    {/* Delete Button */}
-                                    {onDeletePage && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={onDeletePage}
-                                            disabled={isGenerating || isDeleteDisabled}
-                                            title="Delete page"
-                                            className="text-slate-400 hover:text-red-500 hover:bg-red-50 px-2"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
-                                    )}
                                     {/* Layout Button */}
                                     {onLayoutChange && page.illustration_url ? (
                                         <Button 
@@ -993,19 +1742,9 @@ export function SharedIllustrationBoard({
                                             align="end"
                                             style={regenerateSplitWidth ? { width: regenerateSplitWidth } : undefined}
                                         >
-                                            <DropdownMenuLabel className="flex items-center whitespace-nowrap text-sm font-semibold text-slate-700 py-1.5">
-                                                <Sparkles className="w-4 h-4 mr-2 shrink-0 text-purple-500" />
+                                            <DropdownMenuItem onClick={handleOpenRemasterDialog} className="cursor-pointer">
+                                                <Sparkles className="w-4 h-4 mr-2 text-purple-500" />
                                                 Remaster
-                                            </DropdownMenuLabel>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => handleRefreshQuality('nb2')} className="cursor-pointer pl-8">
-                                                NB2
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => handleRefreshQuality('nb-pro')} className="cursor-pointer pl-8">
-                                                NB Pro
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => handleRefreshQuality('gpt-2')} className="cursor-pointer pl-8">
-                                                GPT 2
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
@@ -1565,17 +2304,6 @@ export function SharedIllustrationBoard({
                             {isCustomer ? `Page ${page.page_number}` : page.page_number}
                         </span>
 
-                        {isAdmin && onDeletePage && (
-                            <button
-                                onClick={onDeletePage}
-                                disabled={isGenerating || isDeleteDisabled}
-                                className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-red-500/80 text-white/70 hover:text-white transition-colors disabled:opacity-30 z-10 shrink-0"
-                                title="Delete page"
-                            >
-                                <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                        )}
-
                         {isAdmin && onLayoutChange && page.illustration_url && (
                             <button
                                 onClick={handleOpenLayoutDialog}
@@ -1615,19 +2343,9 @@ export function SharedIllustrationBoard({
                                         align="end"
                                         style={regenerateSplitMobileWidth ? { width: regenerateSplitMobileWidth } : undefined}
                                     >
-                                        <DropdownMenuLabel className="flex items-center whitespace-nowrap text-sm font-semibold text-slate-700 py-1.5">
-                                            <Sparkles className="w-4 h-4 mr-2 shrink-0 text-purple-500" />
+                                        <DropdownMenuItem onClick={handleOpenRemasterDialog} className="cursor-pointer">
+                                            <Sparkles className="w-4 h-4 mr-2 text-purple-500" />
                                             Remaster
-                                        </DropdownMenuLabel>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => handleRefreshQuality('nb2')} className="cursor-pointer pl-8">
-                                            NB2
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleRefreshQuality('nb-pro')} className="cursor-pointer pl-8">
-                                            NB Pro
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleRefreshQuality('gpt-2')} className="cursor-pointer pl-8">
-                                            GPT 2
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
@@ -1701,6 +2419,7 @@ export function SharedIllustrationBoard({
                     )}
 
                     {/* DESKTOP HEADER (73px) */}
+                    {!isTuneMode && (
                     <div className="hidden md:grid grid-cols-2 divide-x border-b border-slate-100 h-[73px] bg-white text-sm">
 
                         {/* SKETCH HEADER */}
@@ -1710,8 +2429,12 @@ export function SharedIllustrationBoard({
                             </div>
 
                             {/* CENTER: Sketch/Story Toggle */}
-                            {(isAdmin || showColoredToCustomer) ? (
-                                <div className="relative" ref={sketchPopoverDesktopRef}>
+	                            {isTuneMode ? (
+	                                <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase">
+	                                    Tune Tools
+	                                </h4>
+	                            ) : (isAdmin || showColoredToCustomer) ? (
+	                                <div className="relative" ref={sketchPopoverDesktopRef}>
                                     <div className="flex items-center gap-2">
                                         <button
                                             onClick={() => handleSketchToggleClick('sketch')}
@@ -1756,16 +2479,16 @@ export function SharedIllustrationBoard({
 
                             {/* RIGHT: Buttons */}
                             <div className="flex items-center gap-2 min-w-[80px] justify-end">
-                                {isAdmin && onUpload && (
-                                    <div className={`transition-opacity ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`}>
+	                                {isAdmin && onUpload && !isTuneMode && (
+	                                    <div className={`transition-opacity ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`}>
                                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700" onClick={() => sketchInputRef.current?.click()} title="Upload Sketch">
                                             <Upload className="w-4 h-4" />
                                         </Button>
                                         <input type="file" ref={sketchInputRef} className="hidden" accept="image/*" onChange={handleAdminUploadSelect('sketch')} />
                                     </div>
                                 )}
-                                {sketchUrl && (
-                                    <button onClick={() => handleDownload(sketchUrl!, `Page-${page.page_number}-Sketch.jpg`)} className={`h-8 w-8 rounded-full bg-black/5 text-slate-500 hover:bg-black/10 hover:text-purple-600 transition-colors flex items-center justify-center ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`} title="Download Sketch">
+	                                {sketchUrl && !isTuneMode && (
+	                                    <button onClick={() => handleDownload(sketchUrl!, `Page-${page.page_number}-Sketch.jpg`)} className={`h-8 w-8 rounded-full bg-black/5 text-slate-500 hover:bg-black/10 hover:text-purple-600 transition-colors flex items-center justify-center ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`} title="Download Sketch">
                                         <Download className="w-4 h-4" />
                                     </button>
                                 )}
@@ -1776,7 +2499,7 @@ export function SharedIllustrationBoard({
                         <div className="flex items-center justify-between gap-2 px-3 bg-slate-50/30">
                             {/* LEFT: Create LineArt + Create Cover Buttons (Admin only, when illustration exists) */}
                             <div className="flex items-center gap-2 min-w-[80px]">
-                                {isAdmin && illustrationUrl && (
+	                                {isAdmin && illustrationUrl && !isTuneMode && (
                                     <>
                                         <Button
                                             variant="outline"
@@ -1816,12 +2539,12 @@ export function SharedIllustrationBoard({
 
                             {/* CENTER: Title */}
                             <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase">
-                                {isCustomer && page.page_number > 1 && !showColoredToCustomer ? 'Page Text' : isAdmin ? 'Illustration' : 'Final Illustration'}
+	                                {isTuneMode ? 'Preview' : isCustomer && page.page_number > 1 && !showColoredToCustomer ? 'Page Text' : isAdmin ? 'Illustration' : 'Final Illustration'}
                             </h4>
 
                             {/* RIGHT: Buttons */}
                             <div className="flex items-center gap-2 min-w-[80px] justify-end">
-                                {isAdmin && onUpload && (
+	                                {isAdmin && onUpload && !isTuneMode && (
                                     <>
                                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700" onClick={() => illustrationInputRef.current?.click()} title="Upload Illustration">
                                             <Upload className="w-4 h-4" />
@@ -1829,7 +2552,7 @@ export function SharedIllustrationBoard({
                                         <input type="file" ref={illustrationInputRef} className="hidden" accept="image/*" onChange={handleAdminUploadSelect('illustration')} />
                                     </>
                                 )}
-                                {!(isCustomer && page.page_number > 1 && !showColoredToCustomer) && illustrationUrl && (
+	                                {!(isCustomer && page.page_number > 1 && !showColoredToCustomer) && illustrationUrl && !isTuneMode && (
                                     <button onClick={() => handleDownload(illustrationUrl!, `Page-${page.page_number}-Illustration.jpg`)} className="h-8 w-8 rounded-full bg-black/5 text-slate-500 hover:bg-black/10 hover:text-purple-600 transition-colors flex items-center justify-center" title="Download Illustration">
                                         <Download className="w-4 h-4" />
                                     </button>
@@ -1837,57 +2560,135 @@ export function SharedIllustrationBoard({
                             </div>
                         </div>
                     </div>
+                    )}
 
                     {/* IMAGES GRID (The Core Layout) */}
                     {/* COMPARISON MODE: Show OLD vs NEW side by side */}
-                    {comparisonState && onComparisonDecision ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 flex-1 divide-y md:divide-y-0 md:divide-x divide-slate-100 h-full overflow-y-auto md:overflow-hidden">
-                            {/* OLD ILLUSTRATION (Left) */}
-                            <div className="flex flex-col items-center bg-white relative min-h-[300px] md:min-h-0">
-                                <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-3 bg-gradient-to-b from-black/60 to-transparent">
-                                    <span className="text-sm font-bold tracking-wider text-white uppercase px-3 py-1 bg-slate-700/80 rounded">OLD</span>
-                                </div>
-                                <div className="relative w-full h-full cursor-pointer hover:opacity-95 transition-opacity" onClick={() => setShowImage(comparisonState.oldUrl)}>
-                                    <img
-                                        src={comparisonState.oldUrl}
-                                        alt="Previous Illustration"
-                                        className="w-full h-full object-contain block"
-                                    />
-                                </div>
-                                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
-                                    <Button
-                                        onClick={() => onComparisonDecision('revert_old')}
-                                        variant="outline"
-                                        className="w-full bg-white/90 hover:bg-white text-slate-800 border-slate-300"
-                                    >
-                                        Revert Old
-                                    </Button>
-                                </div>
-                            </div>
+	                    {comparisonState && onComparisonDecision ? (
+	                        comparisonState.isAutoTune ? (
+	                            <div className="grid grid-cols-1 md:grid-cols-2 flex-1 divide-y md:divide-y-0 md:divide-x divide-slate-100 h-full overflow-y-auto md:overflow-hidden">
+	                                {/* NEW TUNED ILLUSTRATION (Left) */}
+	                                <div className="flex flex-col items-center bg-slate-50/10 relative min-h-[300px] md:min-h-0">
+	                                    <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-3 bg-gradient-to-b from-black/60 to-transparent">
+	                                        <span className="text-sm font-bold tracking-wider text-white uppercase px-3 py-1 bg-green-600/90 rounded">NEW</span>
+	                                    </div>
+		                                    <div className="relative w-full h-full cursor-pointer" onClick={() => openFullscreenImage([
+		                                        { url: comparisonState.newUrl, label: 'New' },
+		                                        { url: comparisonState.oldUrl, label: 'Old' },
+		                                    ], 0)}>
+		                                        <img
+		                                            key={`auto-tune-new-${comparisonState.newUrl}`}
+		                                            src={comparisonState.newUrl}
+		                                            alt="Tuned Illustration"
+		                                            className="w-full h-full object-contain block"
+	                                        />
+	                                    </div>
+	                                    <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+	                                        <div className="grid grid-cols-2 gap-2">
+		                                            <Button
+		                                                onClick={() => {
+		                                                    setIsTuneMode(true)
+		                                                    onComparisonDecision('keep_editing')
+		                                                }}
+	                                                variant="outline"
+	                                                className="bg-white/90 hover:bg-white text-slate-800 border-slate-300"
+	                                            >
+	                                                Keep Editing
+	                                            </Button>
+	                                            <Button
+	                                                onClick={() => onComparisonDecision('keep_new')}
+	                                                className="bg-green-600 hover:bg-green-700 text-white"
+	                                            >
+	                                                Keep New
+	                                            </Button>
+	                                        </div>
+	                                    </div>
+	                                </div>
 
-                            {/* NEW ILLUSTRATION (Right) */}
-                            <div className="flex flex-col items-center bg-slate-50/10 relative min-h-[300px] md:min-h-0">
-                                <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-3 bg-gradient-to-b from-black/60 to-transparent">
-                                    <span className="text-sm font-bold tracking-wider text-white uppercase px-3 py-1 bg-green-600/90 rounded">NEW</span>
-                                </div>
-                                <div className="relative w-full h-full cursor-pointer hover:opacity-95 transition-opacity" onClick={() => setShowImage(comparisonState.newUrl)}>
-                                    <img
-                                        src={comparisonState.newUrl}
-                                        alt="New Illustration"
-                                        className="w-full h-full object-contain block"
-                                    />
-                                </div>
-                                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
-                                    <Button
-                                        onClick={() => onComparisonDecision('keep_new')}
-                                        className="w-full bg-green-600 hover:bg-green-700 text-white"
-                                    >
-                                        Keep New
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
+	                                {/* OLD ILLUSTRATION (Right) */}
+	                                <div className="flex flex-col items-center bg-white relative min-h-[300px] md:min-h-0">
+	                                    <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-3 bg-gradient-to-b from-black/60 to-transparent">
+	                                        <span className="text-sm font-bold tracking-wider text-white uppercase px-3 py-1 bg-slate-700/80 rounded">OLD</span>
+	                                    </div>
+		                                    <div className="relative w-full h-full cursor-pointer" onClick={() => openFullscreenImage([
+		                                        { url: comparisonState.newUrl, label: 'New' },
+		                                        { url: comparisonState.oldUrl, label: 'Old' },
+		                                    ], 1)}>
+		                                        <img
+		                                            key={`auto-tune-old-${comparisonState.oldUrl}`}
+		                                            src={comparisonState.oldUrl}
+		                                            alt="Previous Illustration"
+		                                            className="w-full h-full object-contain block"
+	                                        />
+	                                    </div>
+	                                    <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+	                                        <Button
+	                                            onClick={() => onComparisonDecision('revert_old')}
+	                                            variant="outline"
+	                                            className="w-full bg-white/90 hover:bg-white text-slate-800 border-slate-300"
+	                                        >
+	                                            Revert Old
+	                                        </Button>
+	                                    </div>
+	                                </div>
+	                            </div>
+	                        ) : (
+	                            <div className="grid grid-cols-1 md:grid-cols-2 flex-1 divide-y md:divide-y-0 md:divide-x divide-slate-100 h-full overflow-y-auto md:overflow-hidden">
+	                                {/* OLD ILLUSTRATION (Left) */}
+	                                <div className="flex flex-col items-center bg-white relative min-h-[300px] md:min-h-0">
+	                                    <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-3 bg-gradient-to-b from-black/60 to-transparent">
+	                                        <span className="text-sm font-bold tracking-wider text-white uppercase px-3 py-1 bg-slate-700/80 rounded">OLD</span>
+	                                    </div>
+		                                    <div className="relative w-full h-full cursor-pointer" onClick={() => openFullscreenImage([
+		                                        { url: comparisonState.oldUrl, label: 'Old' },
+		                                        { url: comparisonState.newUrl, label: 'New' },
+		                                    ], 0)}>
+		                                        <img
+		                                            key={`comparison-old-${comparisonState.oldUrl}`}
+		                                            src={comparisonState.oldUrl}
+		                                            alt="Previous Illustration"
+		                                            className="w-full h-full object-contain block"
+	                                        />
+	                                    </div>
+	                                    <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+	                                        <Button
+	                                            onClick={() => onComparisonDecision('revert_old')}
+	                                            variant="outline"
+	                                            className="w-full bg-white/90 hover:bg-white text-slate-800 border-slate-300"
+	                                        >
+	                                            Revert Old
+	                                        </Button>
+	                                    </div>
+	                                </div>
+
+	                                {/* NEW ILLUSTRATION (Right) */}
+	                                <div className="flex flex-col items-center bg-slate-50/10 relative min-h-[300px] md:min-h-0">
+	                                    <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-3 bg-gradient-to-b from-black/60 to-transparent">
+	                                        <span className="text-sm font-bold tracking-wider text-white uppercase px-3 py-1 bg-green-600/90 rounded">NEW</span>
+	                                    </div>
+		                                    <div className="relative w-full h-full cursor-pointer" onClick={() => openFullscreenImage([
+		                                        { url: comparisonState.oldUrl, label: 'Old' },
+		                                        { url: comparisonState.newUrl, label: 'New' },
+		                                    ], 1)}>
+		                                        <img
+		                                            key={`comparison-new-${comparisonState.newUrl}`}
+		                                            src={comparisonState.newUrl}
+		                                            alt="New Illustration"
+		                                            className="w-full h-full object-contain block"
+	                                        />
+	                                    </div>
+	                                    <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+	                                        <Button
+	                                            onClick={() => onComparisonDecision('keep_new')}
+	                                            className="w-full bg-green-600 hover:bg-green-700 text-white"
+	                                        >
+	                                            Keep New
+	                                        </Button>
+	                                    </div>
+	                                </div>
+	                            </div>
+	                        )
+	                    ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 flex-1 divide-y md:divide-y-0 md:divide-x divide-slate-100 h-full overflow-y-auto md:overflow-hidden">
 
                         {/* 1. SKETCH BLOCK */}
@@ -1956,8 +2757,10 @@ export function SharedIllustrationBoard({
                             </div>
 
                             {/* MAIN CONTENT: IMAGE or TEXT */}
-                            {sketchViewMode === 'sketch' ? (
-                                <div className="relative w-full h-full cursor-pointer hover:opacity-95 transition-opacity bg-white" onClick={() => setShowImage(sketchUrl || null)}>
+	                            {isTuneMode ? (
+	                                renderTuneControls()
+	                            ) : sketchViewMode === 'sketch' ? (
+	                                <div className="relative w-full h-full cursor-pointer bg-white" onClick={() => sketchUrl && openFullscreenImage([{ url: sketchUrl, label: 'Sketch' }])}>
                                     {loadingState.sketch && <AnimatedOverlay label="Tracing Sketch..." />}
                                     {sketchUrl ? (
                                         <img
@@ -2026,10 +2829,10 @@ export function SharedIllustrationBoard({
                             {/* MOBILE HEADER FOR ILLUSTRATION (Overlay) - Only for admin or customer page 1 (or all pages if showColoredToCustomer) */}
                             {!(isCustomer && page.page_number > 1 && !showColoredToCustomer) && (
                                 <div className="absolute top-0 left-0 right-0 z-10 flex items-center gap-2 md:hidden p-3 bg-gradient-to-b from-black/40 to-transparent">
-                                    <span className="text-xs font-bold tracking-wider text-white/90 uppercase shadow-sm">Colored</span>
+	                                    <span className="text-xs font-bold tracking-wider text-white/90 uppercase shadow-sm">{isTuneMode ? 'Preview' : 'Colored'}</span>
 
                                     {/* CREATE COVER (Admin, when illustration exists & no cover yet) */}
-                                    {isAdmin && illustrationUrl && !hasCover && (
+	                                    {isAdmin && illustrationUrl && !hasCover && !isTuneMode && (
                                         <button
                                             onClick={() => setIsCoverModalOpen(true)}
                                             className="h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm ml-auto"
@@ -2040,14 +2843,30 @@ export function SharedIllustrationBoard({
                                     )}
 
                                     {/* UPLOAD (Admin) */}
-                                    {isAdmin && onUpload && (
+	                                    {isAdmin && onUpload && !isTuneMode && (
                                         <Button variant="ghost" size="icon" className={`h-8 w-8 rounded-full bg-black/40 text-red-500 hover:bg-black/60 backdrop-blur-sm ${isAdmin && illustrationUrl && !hasCover ? 'ml-1' : 'ml-auto'}`} onClick={() => illustrationInputRef.current?.click()}>
                                             <Upload className="w-4 h-4" />
                                         </Button>
                                     )}
 
+                                    {/* AUTO TUNE (Admin) */}
+	                                    {isAdmin && illustrationUrl && onAutoTune && !isTuneMode && (
+                                        <button
+                                            type="button"
+                                            onClick={(event) => {
+                                                event.stopPropagation()
+                                                handleOpenTuneMode()
+                                            }}
+                                            disabled={isGenerating || loadingState.illustration}
+                                            className="h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm ml-1"
+                                            title="Tune Image"
+                                        >
+                                            {loadingState.illustration ? <Loader2 className="w-4 h-4 animate-spin" /> : <SlidersHorizontal className="w-4 h-4" />}
+                                        </button>
+                                    )}
+
                                     {/* DOWNLOAD */}
-                                    {illustrationUrl && (
+	                                    {illustrationUrl && !isTuneMode && (
                                         <button onClick={() => handleDownload(illustrationUrl!, `Page-${page.page_number}-Final.jpg`)} className={`h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm ${(isAdmin && onUpload) || (isAdmin && illustrationUrl) ? 'ml-1' : 'ml-auto'}`}>
                                             <Download className="w-4 h-4" />
                                         </button>
@@ -2063,8 +2882,10 @@ export function SharedIllustrationBoard({
                             )}
 
                             {/* CONTENT: Page Text for customer pages 2+ (when showColoredToCustomer is off), Illustration otherwise */}
-                            {isCustomer && page.page_number > 1 && !showColoredToCustomer ? (
-                                /* PAGE TEXT VIEW for customer pages 2+ */
+	                            {isTuneMode ? (
+	                                renderTunePreview()
+	                            ) : isCustomer && page.page_number > 1 && !showColoredToCustomer ? (
+	                                /* PAGE TEXT VIEW for customer pages 2+ */
                                 <div className="w-full h-full p-8 bg-white text-slate-900 overflow-y-auto">
                                     <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">Page {page.page_number}</span>
                                     <p className="text-lg md:text-xl font-serif leading-relaxed text-slate-800" style={{ whiteSpace: 'pre-wrap' }}>
@@ -2073,7 +2894,21 @@ export function SharedIllustrationBoard({
                                 </div>
                             ) : (
                                 /* ILLUSTRATION VIEW for admin and customer page 1 */
-                                <div className="relative w-full cursor-pointer hover:opacity-95 transition-opacity" onClick={() => setShowImage(illustrationUrl || null)}>
+	                                <div className="relative w-full cursor-pointer" onClick={() => illustrationUrl && openFullscreenImage([{ url: illustrationUrl, label: 'Illustration' }])}>
+                                    {isAdmin && illustrationUrl && onAutoTune && (
+                                        <button
+                                            type="button"
+                                            onClick={(event) => {
+                                                event.stopPropagation()
+                                                handleOpenTuneMode()
+                                            }}
+                                            disabled={isGenerating || loadingState.illustration}
+                                            className="absolute right-3 top-3 z-20 hidden h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-white hover:text-purple-700 disabled:cursor-not-allowed disabled:opacity-50 md:flex"
+                                            title="Tune Image"
+                                        >
+                                            {loadingState.illustration ? <Loader2 className="w-4 h-4 animate-spin" /> : <SlidersHorizontal className="w-4 h-4" />}
+                                        </button>
+                                    )}
                                     {/* Show overlay if specific granular loading is active OR if generating and we already have an image (regeneration case) */}
                                     {(loadingState.illustration || (isGenerating && illustrationUrl)) && (
                                         <AnimatedOverlay label="Painting Illustration..." />
@@ -2102,29 +2937,62 @@ export function SharedIllustrationBoard({
             </div>
 
             {/* Lightbox */}
-            <Dialog open={!!showImage} onOpenChange={(open) => !open && setShowImage(null)}>
+            <Dialog open={!!currentFullscreenImage} onOpenChange={(open) => !open && closeFullscreenImage()}>
                 <DialogContent
                     showCloseButton={false}
                     className="!max-w-none !w-screen !h-screen !p-0 !m-0 !translate-x-0 !translate-y-0 !top-0 !left-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none"
                     aria-describedby={undefined}
                 >
-                    <DialogTitle className="sr-only">Full Size View</DialogTitle>
+                    <DialogTitle className="sr-only">{currentFullscreenImage?.label || 'Full Size View'}</DialogTitle>
                     <DialogDescription className="sr-only">Review the illustration in full detail</DialogDescription>
 
-                    <div className="relative w-full h-full flex items-center justify-center p-4" onClick={() => setShowImage(null)}>
-                        {showImage && (
+                    <div className="relative w-full h-full flex items-center justify-center p-4" onClick={closeFullscreenImage}>
+                        {currentFullscreenImage && (
                             <img
-                                src={showImage}
-                                alt="Full view"
+                                src={currentFullscreenImage.url}
+                                alt={currentFullscreenImage.label || 'Full view'}
                                 className="max-w-full max-h-full object-contain rounded-md shadow-2xl"
                                 onClick={(e) => e.stopPropagation()}
                             />
+                        )}
+                        {canNavigateFullscreenImages && currentFullscreenImage && (
+                            <>
+                                <button
+                                    type="button"
+                                    disabled={fullscreenImageIndex === 0}
+                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-white/90 bg-black/50 hover:bg-black/70 rounded-full p-3 z-50 pointer-events-auto transition-colors disabled:opacity-30 disabled:pointer-events-none disabled:hover:bg-black/50"
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        showPreviousFullscreenImage()
+                                    }}
+                                    aria-label="View previous image"
+                                >
+                                    <ChevronLeft className="w-7 h-7" strokeWidth={2.5} />
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={fullscreenImageIndex >= fullscreenImages.length - 1}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-white/90 bg-black/50 hover:bg-black/70 rounded-full p-3 z-50 pointer-events-auto transition-colors disabled:opacity-30 disabled:pointer-events-none disabled:hover:bg-black/50"
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        showNextFullscreenImage()
+                                    }}
+                                    aria-label="View next image"
+                                >
+                                    <ChevronRight className="w-7 h-7" strokeWidth={2.5} />
+                                </button>
+                            </>
+                        )}
+                        {canNavigateFullscreenImages && currentFullscreenImage?.label && (
+                            <div className="absolute left-1/2 top-6 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-sm font-semibold uppercase tracking-wide text-white">
+                                {currentFullscreenImage.label}
+                            </div>
                         )}
                         <button
                             className="absolute top-6 right-6 text-white hover:text-white/80 transition-colors bg-black/50 hover:bg-black/70 rounded-full p-2 z-50 pointer-events-auto cursor-pointer"
                             onClick={(e) => {
                                 e.stopPropagation();
-                                setShowImage(null);
+                                closeFullscreenImage();
                             }}
                         >
                             <span className="sr-only">Close</span>
@@ -2182,7 +3050,7 @@ export function SharedIllustrationBoard({
                         <DialogHeader>
                             <DialogTitle className="flex items-center gap-1.5">
                                 <span>Regenerate with</span>
-                                <Select value={illustrationModel} onValueChange={(v) => { setIllustrationModel(v as 'nb2' | 'nb-pro' | 'gpt-2'); if (v !== 'nb2') setUseThinkingMode(false) }}>
+                                <Select value={illustrationModel} onValueChange={(v) => { setIllustrationModel(v as IllustrationModelId); if (v !== 'nb2') setUseThinkingMode(false) }}>
                                     <SelectTrigger className="w-[100px] h-7 text-sm font-semibold">
                                         <SelectValue />
                                     </SelectTrigger>
@@ -2532,11 +3400,11 @@ export function SharedIllustrationBoard({
                                                 const data = await res.json().catch(() => ({}))
                                                 throw new Error(data.error || 'Failed to reset')
                                             }
-                                            toast.success('Restored to original illustration')
+
                                             // Force page refresh to update the UI
                                             window.location.reload()
                                         } catch (err) {
-                                            toast.error(getErrorMessage(err, 'Failed to reset to original'))
+                                            console.error('Failed to reset illustration to original:', err)
                                         } finally {
                                             setIsResettingToOriginal(false)
                                         }
@@ -2606,6 +3474,176 @@ export function SharedIllustrationBoard({
                                     ? "Recreate Scene"
                                     : "Regenerate"}
                             </Button>
+                            </div>
+                        </DialogFooter>
+                    </DialogContent>
+	                </Dialog>
+	            )}
+
+		            {/* ADMIN REMASTER DIALOG */}
+	            {isAdmin && onRegenerate && (
+	                <Dialog open={isRemasterDialogOpen} onOpenChange={(open) => {
+                    setIsRemasterDialogOpen(open)
+                    if (!open) resetRemasterOptions()
+                }}>
+                    <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pr-8">
+                                <DialogTitle className="flex items-center gap-2">
+                                    <Sparkles className="w-5 h-5 text-purple-600" />
+                                    Remaster Illustration
+                                </DialogTitle>
+                                <Select value={remasterModel} onValueChange={(value) => setRemasterModel(value as IllustrationModelId)}>
+                                    <SelectTrigger className="w-full sm:w-[150px]">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="nb2">NB2</SelectItem>
+                                        <SelectItem value="nb-pro">NB Pro</SelectItem>
+                                        <SelectItem value="gpt-2">GPT 2</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </DialogHeader>
+
+                        <div className="space-y-5 py-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 overflow-hidden flex flex-col">
+                                    <div className="px-3 py-2 text-sm font-medium text-slate-700 bg-white border-b border-slate-200">
+                                        Current Image
+                                    </div>
+                                    <div className="min-h-48 flex-1 flex items-center justify-center p-2">
+                                        {page.illustration_url ? (
+                                            <img src={page.illustration_url} alt={`Page ${page.page_number}`} className="max-w-full max-h-full object-contain rounded" />
+                                        ) : (
+                                            <BookImage className="w-8 h-8 text-slate-300" />
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 overflow-hidden flex flex-col">
+                                    <div className="px-3 py-2 text-sm font-medium text-slate-700 bg-white border-b border-slate-200">
+                                        <div className="flex items-center justify-between gap-2">
+                                            Quality Reference
+                                            {(selectedRemasterReferencePage?.illustration_url || remasterUpload) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setRemasterReferencePageId(null)
+                                                        setRemasterUpload(null)
+                                                    }}
+                                                    className="text-slate-400 hover:text-red-500"
+                                                    aria-label="Clear quality reference"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <input
+                                        ref={remasterFileInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={handleRemasterReferenceSelect}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => remasterFileInputRef.current?.click()}
+                                        onDragOver={(event) => event.preventDefault()}
+                                        onDrop={handleRemasterReferenceDrop}
+                                        className={`m-2 min-h-44 flex-1 flex items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 ${
+                                            selectedRemasterReferencePage?.illustration_url || remasterUpload
+                                                ? 'border border-slate-200 bg-white hover:bg-slate-50 p-2'
+                                                : 'border-2 border-dashed border-purple-300 bg-purple-50/20 hover:bg-purple-50 p-4'
+                                        }`}
+                                    >
+                                        {selectedRemasterReferencePage?.illustration_url ? (
+                                            <img
+                                                src={selectedRemasterReferencePage.illustration_url}
+                                                alt={`Page ${selectedRemasterReferencePage.page_number} reference`}
+                                                className="max-w-full max-h-full object-contain rounded"
+                                            />
+                                        ) : remasterUpload ? (
+                                            <img src={remasterUpload.preview} alt="Uploaded quality reference" className="max-w-full max-h-full object-contain rounded" />
+                                        ) : (
+                                            <span className="flex flex-col items-center gap-2 text-center text-sm text-slate-500">
+                                                <Upload className="w-8 h-8 text-slate-400" />
+                                                <span className="font-medium text-slate-700">Upload quality reference</span>
+                                                <span className="text-xs text-slate-400">Drop image or click to browse</span>
+                                            </span>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor={`remaster-prompt-${page.id}`}>Prompt</Label>
+                                <Textarea
+                                    id={`remaster-prompt-${page.id}`}
+                                    value={remasterPrompt}
+                                    onChange={(event) => setRemasterPrompt(event.target.value)}
+                                    className="min-h-[160px] resize-y text-sm"
+                                />
+                            </div>
+                        </div>
+
+                        <DialogFooter className="flex-col gap-3 sm:flex-row sm:items-center">
+                            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" className="w-full justify-between sm:w-auto sm:justify-center" disabled={illustratedPages.length === 0}>
+                                            <span className="flex items-center gap-2 min-w-0">
+                                                {selectedRemasterReferencePage?.illustration_url ? (
+                                                    <img
+                                                        src={selectedRemasterReferencePage.illustration_url}
+                                                        alt={`Page ${selectedRemasterReferencePage.page_number}`}
+                                                        className="w-7 h-7 rounded object-cover border border-slate-200"
+                                                    />
+                                                ) : null}
+                                                <span className="whitespace-nowrap">
+                                                    {selectedRemasterReferencePage
+                                                        ? `Page ${selectedRemasterReferencePage.page_number}`
+                                                        : illustratedPages.length > 0 ? 'Select a reference page' : 'No pages available'}
+                                                </span>
+                                            </span>
+                                            <ChevronDown className="w-4 h-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="w-[calc(100vw-3rem)] sm:w-[260px] max-h-[260px] overflow-y-auto" align="start">
+                                        {illustratedPages.map(refPage => (
+                                            <DropdownMenuItem
+                                                key={refPage.id}
+                                                onClick={() => {
+                                                    setRemasterReferencePageId(refPage.id)
+                                                    setRemasterUpload(null)
+                                                }}
+                                                className="cursor-pointer flex items-center gap-2.5 py-2"
+                                            >
+                                                {refPage.illustration_url ? (
+                                                    <img
+                                                        src={refPage.illustration_url}
+                                                        alt={`Page ${refPage.page_number}`}
+                                                        className="w-10 h-10 rounded object-cover border border-slate-200 flex-shrink-0"
+                                                    />
+                                                ) : null}
+                                                <span>Page {refPage.page_number}</span>
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+
+                            </div>
+
+                            <div className="flex w-full justify-end gap-3 sm:ml-auto sm:w-auto">
+                                <Button
+                                    onClick={handleRemasterSubmit}
+                                    disabled={remasterSubmitDisabled}
+                                    className="w-full bg-purple-600 hover:bg-purple-700 text-white sm:w-auto"
+                                >
+                                    <Sparkles className="w-4 h-4 mr-2" />
+                                    Remaster
+                                </Button>
                             </div>
                         </DialogFooter>
                     </DialogContent>

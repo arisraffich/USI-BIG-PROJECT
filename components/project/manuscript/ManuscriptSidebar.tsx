@@ -1,8 +1,6 @@
 'use client'
 
 import { Download } from 'lucide-react'
-import { toast } from 'sonner'
-
 interface Page {
   id: string
   page_number: number
@@ -19,9 +17,7 @@ export function ManuscriptSidebar({
   activePageId,
   onPageClick,
 }: ManuscriptSidebarProps) {
-  const handleDownloadClick = () => {
-    toast.info('Download feature coming soon!')
-  }
+  const handleDownloadClick = () => {  }
 
   return (
     <div className="hidden md:block fixed left-0 top-[64px] h-[calc(100vh-4rem)] w-[250px] bg-white border-r border-gray-200 overflow-y-auto z-40">

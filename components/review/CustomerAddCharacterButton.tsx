@@ -13,7 +13,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Plus } from 'lucide-react'
-import { toast } from 'sonner'
 import { useState } from 'react'
 
 
@@ -48,7 +47,6 @@ export function CustomerAddCharacterButton({
     if (!projectId) return
 
     if (!nameRole.trim()) {
-      toast.error('Name/Role is required')
       return
     }
 
@@ -70,13 +68,12 @@ export function CustomerAddCharacterButton({
         throw new Error(error.error || 'Failed to create character')
       }
 
-      toast.success('Character added successfully')
       setIsOpen(false)
       setNameRole('')
       setDescription('')
       onCharacterAdded()
-    } catch {
-      toast.error('Failed to add character')
+    } catch (error) {
+      console.error('Failed to create customer character:', error)
     } finally {
       setIsAddingCharacter(false)
     }
@@ -176,9 +173,6 @@ export function CustomerAddCharacterButton({
     </>
   )
 }
-
-
-
 
 
 

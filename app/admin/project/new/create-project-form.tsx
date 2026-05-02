@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
-import { toast } from 'sonner'
 import { Upload, X, File, Image as ImageIcon, Loader2, Send, BookOpen } from 'lucide-react'
 import {
   Dialog,
@@ -105,23 +104,18 @@ export default function CreateProjectForm() {
   // Validate required fields (common to both paths)
   function validateCommonFields(): boolean {
     if (!formData.author_fullname.trim()) {
-      toast.error('Please enter the author\'s full name')
       return false
     }
     if (!formData.author_email.trim()) {
-      toast.error('Please enter the author\'s email')
       return false
     }
     if (!formData.main_character_name.trim()) {
-      toast.error('Please enter the main character name')
       return false
     }
     if (!mainCharacterImage) {
-      toast.error('Please upload the main character image')
       return false
     }
     if (mainCharacterImage.size > 10 * 1024 * 1024) {
-      toast.error('Main character image must be less than 10MB')
       return false
     }
     return true
@@ -143,11 +137,9 @@ export default function CreateProjectForm() {
   async function handleCreateManuallySubmit() {
     if (!validateCommonFields()) return
     if (!storyFile) {
-      toast.error('Please upload a story file')
       return
     }
     if (storyFile.size > 10 * 1024 * 1024) {
-      toast.error('Story file must be less than 10MB')
       return
     }
 
@@ -216,7 +208,6 @@ export default function CreateProjectForm() {
         }
 
         setProcessingStep('Project ready! Redirecting...')
-        toast.success('Project created successfully!')
         setIsSubmitting(false)
         setProcessingStep('')
         window.location.href = `/admin/project/${result.project_id}?tab=characters`
@@ -227,9 +218,7 @@ export default function CreateProjectForm() {
       }
     } catch (error) {
       if (!isCancelled) {
-        const errorMessage = error instanceof Error ? error.message : 'Failed to create project'
         console.error('Project creation error:', error)
-        toast.error(errorMessage)
       }
       setIsSubmitting(false)
       setProcessingStep('')
@@ -241,7 +230,6 @@ export default function CreateProjectForm() {
     e.preventDefault()
     if (!validateCommonFields()) return
     if (formData.number_of_illustrations < 1) {
-      toast.error('Number of illustrations must be at least 1')
       return
     }
 
@@ -286,7 +274,6 @@ export default function CreateProjectForm() {
 
       if (result.project_id) {
         setProcessingStep('Sending link to customer...')
-        toast.success('Project created! Link sent to customer.')
         setIsSubmitting(false)
         setProcessingStep('')
         window.location.href = `/admin/project/${result.project_id}?tab=pages`
@@ -297,9 +284,7 @@ export default function CreateProjectForm() {
       }
     } catch (error) {
       if (!isCancelled) {
-        const errorMessage = error instanceof Error ? error.message : 'Failed to create project'
         console.error('Project creation error:', error)
-        toast.error(errorMessage)
       }
       setIsSubmitting(false)
       setProcessingStep('')

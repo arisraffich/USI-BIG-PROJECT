@@ -5,10 +5,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Sparkles, Loader2, Bookmark, ChevronDown, ImagePlus, X, Info, Layers, Square, AlertCircle, ChevronRight, Save } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
-import { getErrorMessage } from '@/lib/utils/error'
 
 interface BatchState {
     isRunning: boolean
@@ -92,13 +90,8 @@ export function EmptyStateBoard({
                 .update({ scene_description: editedNotes })
                 .eq('id', page.id)
             
-            if (error) throw error
-            
-            toast.success('Illustration notes saved')
-            // Update the local page reference (will be refreshed on next render)
-        } catch (error: unknown) {
-            toast.error('Failed to save notes')
-            console.error(error)
+            if (error) throw error            // Update the local page reference (will be refreshed on next render)
+        } catch (error: unknown) {            console.error(error)
         } finally {
             setIsSavingNotes(false)
         }
@@ -131,7 +124,6 @@ export function EmptyStateBoard({
         const remainingSlots = 3 - currentCount
         
         if (remainingSlots === 0) {
-            toast.error('Maximum 3 style references allowed')
             return
         }
 
@@ -156,9 +148,8 @@ export function EmptyStateBoard({
 
             const data = await response.json()
             setStyleRefs(data.urls)
-            toast.success(`Uploaded ${filesToUpload.length} style reference(s)`)
         } catch (error: unknown) {
-            toast.error(getErrorMessage(error, 'Failed to upload style references'))
+            console.error('Failed to upload style references:', error)
         } finally {
             setIsUploadingStyleRef(false)
             if (fileInputRef.current) fileInputRef.current.value = ''
@@ -180,9 +171,8 @@ export function EmptyStateBoard({
             }
 
             setStyleRefs([])
-            toast.success('Style references removed')
         } catch (error: unknown) {
-            toast.error(getErrorMessage(error, 'Failed to remove style references'))
+            console.error('Failed to remove style references:', error)
         }
     }, [projectId])
 
@@ -514,10 +504,10 @@ export function EmptyStateBoard({
                                 if (!onGenerate) return
                                 // VALIDATION
                                 if (page.page_number === 1) {
-                                    if (!aspectRatio) return toast.error('Please select an Aspect Ratio first')
-                                    if (!textIntegration) return toast.error('Please select Text Placement first')
+                                    if (!aspectRatio) return
+                                    if (!textIntegration) return
                                 } else {
-                                    if (!textIntegration) return toast.error('Please select Text Placement first')
+                                    if (!textIntegration) return
                                 }
 
                                 const refUrl = selectedRefPageId

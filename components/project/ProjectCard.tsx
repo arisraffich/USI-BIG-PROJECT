@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Trash2, Loader2, Clock, UserRound } from 'lucide-react'
-import { toast } from 'sonner'
 import { FollowUpButton } from './FollowUpButton'
 import {
   AlertDialog,
@@ -132,13 +131,11 @@ export const ProjectCard = memo(function ProjectCard({ project, pageCount = 0, s
         throw new Error(errorData.error || 'Failed to delete project')
       }
 
-      toast.success('Project deleted successfully')
       setIsDialogOpen(false)
       router.push('/admin/dashboard')
       router.refresh()
     } catch (error) {
       console.error('Delete error:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to delete project')
       setIsDialogOpen(false)
     } finally {
       setIsDeleting(false)

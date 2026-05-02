@@ -255,7 +255,7 @@ export async function generateIllustration({
             let anchorLabel: string
             
             if (isRefresh) {
-                anchorLabel = "REFERENCE IMAGE TO REFRESH (preserve every detail exactly):"
+                anchorLabel = "IMAGE 1: ORIGINAL ILLUSTRATION. This is the exact illustration to remaster. Preserve its composition, characters, poses, expressions, objects, background, perspective, and layout exactly:"
             } else if (isSceneRecreation) {
                 anchorLabel = "SCENE BASE IMAGE (Edit this scene - preserve environment, change characters):"
             } else if (totalStyleRefs > 1) {
@@ -281,7 +281,10 @@ Extract and match: Art medium, color palette, line quality, shading technique, t
             if (imgData) {
                 let refLabel: string
                 
-                if (totalStyleRefs > 1) {
+                if (isRefresh) {
+                    refLabel = `IMAGE 2: STYLE REFERENCE. Use this image only for visual quality guidance: color palette, shades, tone, warmth/coolness, saturation, contrast, shading style, texture, line cleanliness, and rendering finish.
+Do not copy its characters, objects, scene, background, composition, poses, typography, or story content.`
+                } else if (totalStyleRefs > 1) {
                     refLabel = `STYLE REFERENCE IMAGE ${i + 2} of ${totalStyleRefs}:
 This image contributes to the TARGET ARTISTIC STYLE. Match its stylistic qualities along with the other reference(s).`
                 } else {
@@ -299,7 +302,12 @@ This image contributes to the TARGET ARTISTIC STYLE. Match its stylistic qualiti
         }
         
         // 3.5 Style binding instruction (when using multiple custom style refs)
-        if (totalStyleRefs > 1 && !isSceneRecreation) {
+        if (isRefresh && styleReferenceImages.length > 0) {
+            parts.push({
+                text: `IMAGE ROLE INSTRUCTION: IMAGE 1 controls the illustration content and layout. IMAGE 2 controls only the color, texture, tone, shading, and rendering quality.
+The final result must be IMAGE 1 remastered with IMAGE 2's visual quality. Do not borrow content from IMAGE 2.`
+            })
+        } else if (totalStyleRefs > 1 && !isSceneRecreation) {
             parts.push({ 
                 text: `STYLE INSTRUCTION: The generated illustration MUST match the combined artistic style of the ${totalStyleRefs} style reference image(s) above.
 The CHARACTER REFERENCES define WHO appears (identity). The STYLE REFERENCES define HOW everything is rendered (artistic style).

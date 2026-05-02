@@ -8,8 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { ArrowLeft, Save } from 'lucide-react'
-import { toast } from 'sonner'
-
 interface Page {
   id: string
   page_number: number
@@ -54,9 +52,7 @@ export default function EditPagePage({
         setPage(data)
         setStoryText(data.story_text || '')
         setSceneDescription(data.scene_description || '')
-      } catch {
-        toast.error('Failed to load page')
-        if (projectId) {
+      } catch {        if (projectId) {
           router.push(`/admin/project/${projectId}/pages`)
         }
       } finally {
@@ -85,12 +81,11 @@ export default function EditPagePage({
         throw new Error('Failed to save page')
       }
 
-      toast.success('Page saved successfully')
       if (projectId) {
         router.push(`/admin/project/${projectId}/pages`)
       }
-    } catch {
-      toast.error('Failed to save page')
+    } catch (error) {
+      console.error('Failed to save page:', error)
     } finally {
       setSaving(false)
     }
