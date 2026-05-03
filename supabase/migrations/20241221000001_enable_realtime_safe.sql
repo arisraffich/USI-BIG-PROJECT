@@ -10,38 +10,32 @@ ALTER TABLE "projects" REPLICA IDENTITY FULL;
 -- We use DO blocks to check first
 
 DO $$
+DECLARE
+  target_table TEXT;
 BEGIN
-  -- Add pages if not already in publication
   IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables 
-    WHERE pubname = 'supabase_realtime' 
-    AND schemaname = 'public' 
-    AND tablename = 'pages'
+    SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime'
   ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE "pages";
-    RAISE NOTICE 'Added pages to publication';
-  ELSE
-    RAISE NOTICE 'pages already in publication';
+    RAISE NOTICE 'Skipping realtime publication setup because supabase_realtime does not exist.';
+    RETURN;
   END IF;
 
-  -- Add projects if not already in publication
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables 
-    WHERE pubname = 'supabase_realtime' 
-    AND schemaname = 'public' 
-    AND tablename = 'projects'
-  ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE "projects";
-    RAISE NOTICE 'Added projects to publication';
-  ELSE
-    RAISE NOTICE 'projects already in publication';
-  END IF;
-
-  -- characters is already there, so we skip it
-  RAISE NOTICE 'characters already in publication (skipped)';
+  FOREACH target_table IN ARRAY ARRAY['characters', 'pages', 'projects']
+  LOOP
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime'
+        AND schemaname = 'public'
+        AND tablename = target_table
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', target_table);
+      RAISE NOTICE 'Added % to publication', target_table;
+    ELSE
+      RAISE NOTICE '% already in publication', target_table;
+    END IF;
+  END LOOP;
 END $$;
-
-
 
 
 

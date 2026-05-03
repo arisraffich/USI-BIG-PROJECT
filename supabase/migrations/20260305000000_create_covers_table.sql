@@ -1,9 +1,12 @@
 -- Cover Module: single-cover-per-project table
 -- Spec: usi-platform/docs/COVER_MODULE_PLAN.md
 
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
+
 -- 1. Create covers table
 CREATE TABLE IF NOT EXISTS covers (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
   project_id      UUID NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE,
 
   title           TEXT NOT NULL,
@@ -21,13 +24,30 @@ CREATE TABLE IF NOT EXISTS covers (
 
 -- 2. Status check constraints
 -- v1 writes only 'pending' | 'completed' | 'failed'; 'generating' kept for future async compatibility.
-ALTER TABLE covers
-  ADD CONSTRAINT covers_front_status_check
-  CHECK (front_status IN ('pending', 'generating', 'completed', 'failed'));
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'covers_front_status_check'
+      AND conrelid = 'public.covers'::regclass
+  ) THEN
+    ALTER TABLE covers
+      ADD CONSTRAINT covers_front_status_check
+      CHECK (front_status IN ('pending', 'generating', 'completed', 'failed'));
+  END IF;
 
-ALTER TABLE covers
-  ADD CONSTRAINT covers_back_status_check
-  CHECK (back_status IN ('pending', 'generating', 'completed', 'failed'));
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'covers_back_status_check'
+      AND conrelid = 'public.covers'::regclass
+  ) THEN
+    ALTER TABLE covers
+      ADD CONSTRAINT covers_back_status_check
+      CHECK (back_status IN ('pending', 'generating', 'completed', 'failed'));
+  END IF;
+END $$;
 
 -- 3. Index for lookups by project_id (UNIQUE already indexes, but explicit for clarity)
 -- UNIQUE constraint auto-creates the index; nothing to add here.

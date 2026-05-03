@@ -43,10 +43,21 @@ CREATE TRIGGER set_project_followups_updated_at
 
 ALTER TABLE project_followups ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Service role has full access to project_followups"
-  ON project_followups
-  FOR ALL
-  USING (auth.role() = 'service_role')
-  WITH CHECK (auth.role() = 'service_role');
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'project_followups'
+      AND policyname = 'Service role has full access to project_followups'
+  ) THEN
+    CREATE POLICY "Service role has full access to project_followups"
+      ON project_followups
+      FOR ALL
+      USING (auth.role() = 'service_role')
+      WITH CHECK (auth.role() = 'service_role');
+  END IF;
+END $$;
 
 COMMENT ON TABLE project_followups IS 'History of admin-sent customer follow-up emails per waiting round.';
