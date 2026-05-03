@@ -68,6 +68,7 @@ export async function POST(
                 admin_reply_at: null
             })
             .eq('id', pageId)
+            .eq('project_id', page.project_id)
             .select()
             .single()
 
@@ -206,6 +207,7 @@ export async function PUT(
                 conversation_thread: updatedThread
             })
             .eq('id', pageId)
+            .eq('project_id', page.project_id)
             .select()
             .single()
 

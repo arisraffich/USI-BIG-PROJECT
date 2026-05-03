@@ -138,9 +138,13 @@ CRON_SECRET=your-cron-secret
 
 # Cloudflare R2 (for large email attachments)
 R2_ACCOUNT_ID=...
+# Optional alternative to R2_ACCOUNT_ID:
+# R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
 R2_ACCESS_KEY_ID=...
 R2_SECRET_ACCESS_KEY=...
 R2_BUCKET_NAME=...
+# Optional alias for R2_BUCKET_NAME:
+# R2_BUCKET=lineart-zips
 R2_PUBLIC_URL=https://your-r2-domain.com
 
 # Direct DB access - for migration scripts only (optional)
@@ -250,7 +254,8 @@ Database extensions:
 Storage buckets:
 - `character-images` - Generated character illustrations
 - `character-sketches` - Character sketch images
-- `illustrations` - Page illustrations and sketches
+- `illustrations` - Colored page illustrations and covers
+- `sketches` - Page sketch images
 - `lineart` - Generated line art PNGs (per project)
 - `project-files` - Uploaded manuscripts
 

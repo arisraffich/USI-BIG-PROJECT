@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, memo } from 'react'
+import { useState, useEffect, useRef, memo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -100,6 +100,11 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
 
     const [, setInitialData] = useState<InternalCharacterFormData | null>(null)
     const [focusedField, setFocusedField] = useState<string | null>(null)
+    const onChangeRef = useRef(onChange)
+
+    useEffect(() => {
+        onChangeRef.current = onChange
+    }, [onChange])
 
     const {
         photoUrl: referencePhotoUrl,
@@ -154,9 +159,9 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
             setIsEditing(true)
         }
 
-        if (onChange) {
+        if (onChangeRef.current) {
             const isValid = hasPhoto || validateForm(savedData)
-            onChange({
+            onChangeRef.current({
                 age: savedData.age || null,
                 gender: savedData.gender || null,
                 skin_color: savedData.skin_color || null,
@@ -168,7 +173,7 @@ export const UniversalCharacterCard = memo(function UniversalCharacterCard({
                 special_features: null,
             }, isValid)
         }
-    }, [character, isGenerating, readOnly, alwaysEditing])
+    }, [character, isGenerating, readOnly, alwaysEditing, hasPhoto])
 
     const notifyChange = (newData: InternalCharacterFormData) => {
         if (!onChange) return

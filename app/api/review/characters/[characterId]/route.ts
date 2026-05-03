@@ -69,6 +69,7 @@ export async function PATCH(
         is_resolved: false,
       })
       .eq('id', characterId)
+      .eq('project_id', character.project_id)
       .select()
       .single()
 
@@ -116,7 +117,6 @@ export async function PATCH(
     )
   }
 }
-
 
 
 

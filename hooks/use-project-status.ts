@@ -25,12 +25,21 @@ export function useProjectStatus(projectId: string, initialStatus: ProjectStatus
   useEffect(() => {
     isMountedRef.current = true
     consecutiveFailuresRef.current = 0
-    setError(null)
+
+    queueMicrotask(() => {
+      if (!isMountedRef.current) return
+      setError(null)
+
+      if (initialStatus === 'draft') {
+        setIsLoading(true)
+      } else {
+        setStatus(initialStatus)
+        setIsLoading(false)
+      }
+    })
 
     // Only poll if status is 'draft' (character identification in progress)
     if (initialStatus === 'draft') {
-      setIsLoading(true)
-
       const pollStatus = async () => {
         if (!isMountedRef.current) return
 
@@ -100,11 +109,6 @@ export function useProjectStatus(projectId: string, initialStatus: ProjectStatus
       // Poll immediately, then every 2.5 seconds
       pollStatus()
       pollingIntervalRef.current = setInterval(pollStatus, 2500)
-    } else {
-      // Status is already past 'draft', no need to poll
-      setStatus(initialStatus)
-      setIsLoading(false)
-      setError(null)
     }
 
     return () => {
@@ -113,8 +117,7 @@ export function useProjectStatus(projectId: string, initialStatus: ProjectStatus
         clearInterval(pollingIntervalRef.current)
       }
     }
-  }, [projectId, initialStatus])
+  }, [projectId, initialStatus, router])
 
   return { status, isLoading, error }
 }
-

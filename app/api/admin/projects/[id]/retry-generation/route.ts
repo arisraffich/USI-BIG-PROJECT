@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getErrorMessage } from '@/lib/utils/error'
+import type { Character } from '@/types/character'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -72,7 +73,7 @@ export async function POST(
 
         const results = await Promise.all(
           charactersToGenerate.map((char) =>
-            generateCharacterImage(char as any, mainCharImage, projectId)
+            generateCharacterImage(char as Character, mainCharImage, projectId)
               .then(result => ({ ...result, charId: char.id, charName: char.name }))
               .catch(err => {
                 console.error(`[Retry Generation] Character ${char.name} ERROR:`, err)

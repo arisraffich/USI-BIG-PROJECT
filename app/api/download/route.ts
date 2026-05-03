@@ -1,23 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-function getAllowedDownloadHosts(): Set<string> {
-    const hosts = new Set<string>()
-
-    for (const value of [process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.R2_PUBLIC_URL]) {
-        if (!value) continue
-        try {
-            hosts.add(new URL(value).hostname)
-        } catch {
-            // Ignore invalid optional URLs.
-        }
-    }
-
-    return hosts
-}
-
-function sanitizeDownloadFilename(filename: string): string {
-    return filename.replace(/[\r\n"\\]/g, '').replace(/[^a-zA-Z0-9._ -]/g, '_').trim() || 'download'
-}
+import { getAllowedDownloadHosts, sanitizeDownloadFilename } from '@/lib/download'
 
 export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams

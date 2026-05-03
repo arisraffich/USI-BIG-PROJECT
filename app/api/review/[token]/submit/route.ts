@@ -105,7 +105,9 @@ export async function POST(
             await supabase.from('pages').update({
               feedback_notes: hasNotes ? edit : null,
               is_resolved: !hasNotes
-            }).eq('id', p.id)
+            })
+              .eq('id', p.id)
+              .eq('project_id', project.id)
           }
           // If user didn't edit in submit form, leave the page as-is
           // (preserves feedback_notes saved via individual save buttons)
@@ -138,7 +140,9 @@ export async function POST(
             admin_reply: null,
             admin_reply_at: null,
             is_resolved: true
-          }).eq('id', page.id)
+          })
+            .eq('id', page.id)
+            .eq('project_id', project.id)
         }
       }
 
@@ -230,6 +234,7 @@ export async function POST(
             is_customer_edited_scene_description: update.is_customer_edited_scene_description,
           })
           .eq('id', update.id)
+          .eq('project_id', project.id)
 
         if (updateError) {
           console.error(`Error updating page ${update.id}:`, updateError)
@@ -262,6 +267,7 @@ export async function POST(
             special_features: update.data.special_features,
           })
           .eq('id', update.id)
+          .eq('project_id', project.id)
 
         if (updateError) {
           console.error(`Error updating character ${update.id}:`, updateError)
@@ -489,7 +495,6 @@ export async function POST(
     )
   }
 }
-
 
 
 

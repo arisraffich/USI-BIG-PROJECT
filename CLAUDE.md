@@ -96,7 +96,7 @@ Reusable for admin (with regeneration + deep thinking toggle) and customer views
 - `pg_net` — HTTP calls from Postgres (authenticated with `CRON_SECRET`)
 
 ### Storage Buckets
-`character-images`, `character-sketches`, `illustrations`, `lineart`, `project-files`
+`character-images`, `character-sketches`, `illustrations`, `sketches`, `lineart`, `project-files`
 
 ## Scheduled Sends System
 
@@ -117,7 +117,7 @@ All `notify*` functions in `lib/notifications/index.ts`:
 
 **Required:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `OPENAI_API_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `RESEND_API_KEY`, `CRON_SECRET`
 
-**Optional:** `NEXT_PUBLIC_BASE_URL`, `SLACK_WEBHOOK_URL`, `QUO_API_KEY`, `QUO_PHONE_NUMBER`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`, `DATABASE_URL`
+**Optional:** `NEXT_PUBLIC_BASE_URL`, `SLACK_WEBHOOK_URL`, `QUO_API_KEY`, `QUO_PHONE_NUMBER`, `R2_ACCOUNT_ID`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_BUCKET`, `R2_PUBLIC_URL`, `DATABASE_URL`
 
 Validated on startup via `instrumentation.ts` → `lib/env.ts`.
 

@@ -286,7 +286,7 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEd
       console.error('Error saving changes:', error)    } finally {
       setIsSaving(false)
     }
-  }, [pageEdits, displayedPages, reviewToken])
+  }, [pageEdits, displayedPages, reviewToken, onEditModeChange])
 
   // Scroll spy: Highlight active page based on scroll position
   useEffect(() => {
@@ -447,7 +447,6 @@ export function CustomerManuscriptEditor({ pages, projectId, onEditsChange, isEd
     </div>
   )
 }
-
 
 
 

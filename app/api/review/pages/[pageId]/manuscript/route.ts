@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getErrorMessage } from '@/lib/utils/error'
-import { getReviewToken, reviewUnauthorized, verifyReviewTokenForPage } from '@/lib/auth/review-token'
+import { getReviewToken, reviewUnauthorized, verifyReviewTokenForPage, verifyReviewTokenForProject } from '@/lib/auth/review-token'
 
 function sanitize(value: string) {
   return value.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ')
@@ -47,7 +47,17 @@ export async function PATCH(
     const body = await request.json()
     const supabase = await createAdminClient()
 
-    const isAuthorized = await verifyReviewTokenForPage(supabase, pageId, getReviewToken(request, body))
+    const { data: existingPage, error: pageError } = await supabase
+      .from('pages')
+      .select('id, project_id')
+      .eq('id', pageId)
+      .maybeSingle()
+
+    if (pageError || !existingPage?.project_id) {
+      return NextResponse.json({ error: 'Page not found' }, { status: 404 })
+    }
+
+    const isAuthorized = await verifyReviewTokenForProject(supabase, existingPage.project_id, getReviewToken(request, body))
     if (!isAuthorized) return reviewUnauthorized()
 
     const updateData: {
@@ -81,6 +91,7 @@ export async function PATCH(
       .from('pages')
       .update(updateData)
       .eq('id', pageId)
+      .eq('project_id', existingPage.project_id)
       .select()
       .single()
 

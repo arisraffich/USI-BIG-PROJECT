@@ -98,7 +98,7 @@ export function ProjectTabsContent({
     if (characters) {
       setLocalCharacters(characters)
     }
-  }, [characters])
+  }, [characters, localCharacters])
   
   // Sync local project status when server props update
   useEffect(() => {
@@ -231,7 +231,7 @@ export function ProjectTabsContent({
         return prev
       })
     }
-  }, [characters])
+  }, [characters, localCharacters])
 
   const handleCharacterFormChange = (id: string, data: CharacterFormData, isValid: boolean) => {
     setCharacterForms(prev => ({ ...prev, [id]: { data, isValid } }))

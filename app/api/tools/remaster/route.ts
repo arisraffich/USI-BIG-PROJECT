@@ -20,6 +20,33 @@ const GEMINI_SAFETY_SETTINGS = [
 ]
 
 type RemasterModel = 'nb2' | 'nb-pro' | 'gpt-2'
+type OpenAIContentPart =
+    | { type: 'input_text', text: string }
+    | { type: 'input_image', image_url: string, detail: 'auto' }
+type OpenAIImageSize = 'auto' | '1024x1536' | '1024x1024' | '1536x1024'
+
+interface ImageGenerationOutput {
+    type?: string
+    result?: string
+}
+
+interface GeminiResponsePart {
+    inline_data?: { data?: string }
+    inlineData?: { data?: string }
+    thought?: unknown
+}
+
+interface GeminiResponse {
+    candidates?: Array<{
+        content?: {
+            parts?: GeminiResponsePart[]
+        }
+        finishReason?: string
+    }>
+    promptFeedback?: {
+        blockReason?: string
+    }
+}
 
 function normalizeModel(value: FormDataEntryValue | null): RemasterModel {
     return value === 'nb-pro' || value === 'gpt-2' ? value : 'nb2'
@@ -71,12 +98,12 @@ function geminiModelId(model: RemasterModel): string {
     return model === 'nb-pro' ? 'gemini-3-pro-image-preview' : 'gemini-3.1-flash-image-preview'
 }
 
-function extractGeminiImage(result: any): Buffer {
+function extractGeminiImage(result: GeminiResponse): Buffer {
     const parts = result.candidates?.[0]?.content?.parts || []
-    const imagePart = parts.find((part: Record<string, unknown>) => {
+    const imagePart = parts.find((part) => {
         const inline = (part.inline_data || part.inlineData) as { data?: string } | undefined
         return Boolean(inline?.data && !part.thought)
-    }) || parts.find((part: Record<string, unknown>) => {
+    }) || parts.find((part) => {
         const inline = (part.inline_data || part.inlineData) as { data?: string } | undefined
         return Boolean(inline?.data)
     })
@@ -147,9 +174,9 @@ async function generateGpt2Remaster(inputBuffer: Buffer, width: number, height: 
     const imageUrl = `data:image/jpeg;base64,${sourceJpeg.toString('base64')}`
     const size = fitGpt2SizeToInputRatio(width, height)
 
-    const content = [
+    const content: OpenAIContentPart[] = [
         { type: 'input_text', text: 'REFERENCE IMAGE TO REFRESH (preserve every detail exactly):' },
-        { type: 'input_image', image_url: imageUrl },
+        { type: 'input_image', image_url: imageUrl, detail: 'auto' },
         { type: 'input_text', text: REFRESH_PROMPT },
     ]
 
@@ -158,16 +185,18 @@ async function generateGpt2Remaster(inputBuffer: Buffer, width: number, height: 
         try {
             const response = await openai.responses.create({
                 model: 'gpt-5.4',
-                input: [{ role: 'user', content: content as any }],
+                input: [{ role: 'user', content }],
                 tools: [{
                     type: 'image_generation',
                     model: 'gpt-image-2',
                     quality: 'high',
-                    size,
-                } as any],
+                    size: size as OpenAIImageSize,
+                }],
             })
 
-            const imageOutput = (response.output as any[]).find(output => output?.type === 'image_generation_call')
+            const imageOutput = response.output
+                .map((output) => output as ImageGenerationOutput)
+                .find((output) => output.type === 'image_generation_call')
             if (imageOutput?.result) {
                 return removeMetadata(Buffer.from(imageOutput.result, 'base64'))
             }

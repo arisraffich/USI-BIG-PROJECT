@@ -61,6 +61,7 @@ export async function POST(
       .from('pages')
       .update({ [approvalColumn]: approvedAt })
       .eq('id', pageId)
+      .eq('project_id', page.project_id)
       .select()
       .single()
 

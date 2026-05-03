@@ -638,16 +638,16 @@ export function CustomerProjectTabsContent({
   }, [])
 
   // Handle completion popup actions
-  const handlePopupSubmit = useCallback(() => {
+  const handlePopupSubmit = () => {
     sessionStorage.setItem(popupDismissedKey, 'true')
     setShowCompletionPopup(false)
     handleSubmitChanges() // Same as navbar button
-  }, [popupDismissedKey])
+  }
 
-  const handlePopupCancel = useCallback(() => {
+  const handlePopupCancel = () => {
     sessionStorage.setItem(popupDismissedKey, 'true')
     setShowCompletionPopup(false)
-  }, [popupDismissedKey])
+  }
 
   const handleSubmitChanges = async () => {
     if (isLocked) {

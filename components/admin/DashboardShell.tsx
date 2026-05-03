@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import { DashboardActions, MobileHeader } from '@/components/admin/DashboardActions'
 import { AIStatusDot } from '@/components/admin/AIStatusDot'
 import { ProjectTabs, type ProjectDashboardTab } from '@/components/project/ProjectTabs'
-import { isFollowUp, isWorking } from '@/lib/constants/statusBadgeConfig'
 
 interface DashboardProject {
   id: string

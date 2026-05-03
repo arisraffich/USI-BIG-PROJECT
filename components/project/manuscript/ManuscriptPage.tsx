@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, ClipboardEvent } from 'react'
+import { ClipboardEvent } from 'react'
 
 function stripHtml(html: string): string {
   if (!html) return ''
@@ -45,23 +45,14 @@ export function ManuscriptPage({
   onStoryTextChange,
   onSceneDescriptionChange,
 }: ManuscriptPageProps) {
-  const [localStoryText, setLocalStoryText] = useState(stripHtml(page.story_text || ''))
-  const [localSceneDescription, setLocalSceneDescription] = useState(
-    stripHtml(page.scene_description || '')
-  )
-
-  useEffect(() => {
-    setLocalStoryText(stripHtml(page.story_text || ''))
-    setLocalSceneDescription(stripHtml(page.scene_description || ''))
-  }, [page.story_text, page.scene_description])
+  const localStoryText = stripHtml(page.story_text || '')
+  const localSceneDescription = stripHtml(page.scene_description || '')
 
   const handleStoryTextChange = (value: string) => {
-    setLocalStoryText(value)
     onStoryTextChange(page.id, value)
   }
 
   const handleSceneDescriptionChange = (value: string) => {
-    setLocalSceneDescription(value)
     onSceneDescriptionChange(page.id, value)
   }
 

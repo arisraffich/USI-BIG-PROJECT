@@ -35,8 +35,16 @@ export function ManuscriptToolbar({
       ? 'mobile-header-portal-right'
       : 'mobile-header-portal'
 
-    const element = document.getElementById(targetId)
-    setPortalContainer(element)
+    let cancelled = false
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setPortalContainer(document.getElementById(targetId))
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
   }, [isCustomerView, isEditMode])
 
   // If not visible, do not render anything (prevents portal button from appearing)

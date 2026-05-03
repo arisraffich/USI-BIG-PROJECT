@@ -16,6 +16,38 @@ const SAFETY_SETTINGS = [
     { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
 ]
 
+type GeminiRequestPart =
+    | { text: string }
+    | { inline_data: { mime_type: string, data: string } }
+
+interface GeminiGenerationConfig {
+    responseModalities: string[]
+    imageConfig: {
+        imageSize: string
+        aspectRatio?: string
+    }
+    thinkingConfig?: {
+        thinkingLevel: 'HIGH'
+    }
+}
+
+interface GeminiResponsePart {
+    inline_data?: { data?: string }
+    inlineData?: { data?: string }
+}
+
+interface GeminiResponse {
+    candidates?: Array<{
+        content?: {
+            parts?: GeminiResponsePart[]
+        }
+        finishReason?: string
+    }>
+    promptFeedback?: {
+        blockReason?: string
+    }
+}
+
 // Retry configuration
 const MAX_RETRIES = 1 // 2 total attempts (1 initial + 1 retry)
 const INITIAL_DELAY_MS = 2000 // 2 seconds
@@ -68,9 +100,9 @@ async function retryWithBackoff<T>(
  * both camelCase and snake_case field names. Throws descriptive errors
  * for safety blocks and empty responses.
  */
-function extractImageFromResponse(result: any, context: string): Buffer {
+function extractImageFromResponse(result: GeminiResponse, context: string): Buffer {
     const parts = result.candidates?.[0]?.content?.parts || []
-    const imagePart = parts.find((p: Record<string, unknown>) => p.inline_data || p.inlineData)
+    const imagePart = parts.find((p) => p.inline_data || p.inlineData)
     const base64 = imagePart?.inline_data?.data || imagePart?.inlineData?.data
 
     if (base64) return Buffer.from(base64, 'base64')
@@ -195,7 +227,7 @@ export async function generateIllustration({
     console.log(`[GoogleAI] processing ${characterReferences.length} chars + anchor: ${!!anchorImage} + sceneRecreation: ${isSceneRecreation} + customStyleRefs: ${hasCustomStyleRefs}`)
 
     try {
-        const parts: any[] = []
+        const parts: GeminiRequestPart[] = []
 
         // Fetch all images in parallel for speed
         const charFetches = characterReferences.map(c =>
@@ -323,7 +355,7 @@ Apply the style uniformly to characters, backgrounds, props, and all scene eleme
             console.log('[GoogleAI] 🎬 Scene Recreation Mode active')
         }
         
-        const generationConfig: Record<string, any> = {
+        const generationConfig: GeminiGenerationConfig = {
             responseModalities: ['IMAGE'],
             imageConfig: {
                 imageSize: '4K'
@@ -370,7 +402,7 @@ Apply the style uniformly to characters, backgrounds, props, and all scene eleme
                     continue
                 }
 
-                const result = await response.json()
+                const result = await response.json() as GeminiResponse
                 const rawBuffer = extractImageFromResponse(result, 'Illustration')
                 const cleanBuffer = await removeMetadata(rawBuffer)
                 return { success: true, imageBuffer: cleanBuffer, error: null }
@@ -399,7 +431,7 @@ export async function generateSketch(
 
     try {
         console.log(`[generateSketch] Downloading source image: ${sourceImageUrl.substring(0, 80)}...`)
-        const parts: any[] = [{ text: prompt }]
+        const parts: GeminiRequestPart[] = [{ text: prompt }]
 
         const img = await fetchImageAsBase64(sourceImageUrl)
         if (img) {
@@ -454,7 +486,7 @@ export async function generateSketch(
                 continue
             }
 
-            const result = await response.json()
+            const result = await response.json() as GeminiResponse
 
             try {
                 const rawBuffer = extractImageFromResponse(result, 'Sketch')
@@ -494,7 +526,7 @@ export async function generateLineArt(
     if (!API_KEY) throw new Error('Google API Key missing')
 
     try {
-        const parts: any[] = [{ text: prompt }]
+        const parts: GeminiRequestPart[] = [{ text: prompt }]
 
         // Attach Source Image (The Illustration)
         const img = await fetchImageAsBase64(sourceImageUrl)
@@ -533,7 +565,7 @@ export async function generateLineArt(
                 throw new Error(`Google API Error (Line Art): ${response.status} - ${txt}`)
             }
 
-            return await response.json()
+            return await response.json() as GeminiResponse
         }, 'Generate Line Art')
 
         const rawBuffer = extractImageFromResponse(result, 'Line Art')

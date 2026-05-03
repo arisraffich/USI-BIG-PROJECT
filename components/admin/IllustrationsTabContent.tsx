@@ -819,7 +819,7 @@ export function IllustrationsTabContent({
     }
 
     // Generate a single page (for batch use) - returns promise
-    const generateSinglePage = async (page: Page): Promise<boolean> => {
+    const generateSinglePage = useCallback(async (page: Page): Promise<boolean> => {
         try {
             // Clear any previous error for this page
             setPageError(page.id, null)
@@ -868,7 +868,7 @@ export function IllustrationsTabContent({
             })
             setLoadingState(prev => ({ ...prev, [page.id]: { illustration: false, sketch: false } }))
         }
-    }
+    }, [projectId, setPageError])
 
     // Batch generate all remaining pages from a starting page
     const handleGenerateAllRemaining = useCallback(async (startingPage: Page) => {
@@ -954,7 +954,7 @@ export function IllustrationsTabContent({
             failed: 0,
             currentPageIds: new Set()
         })
-    }, [pages, projectId, router])
+    }, [pages, router, generateSinglePage])
 
     // Cancel batch generation
     const handleCancelBatch = useCallback(() => {

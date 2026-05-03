@@ -85,6 +85,7 @@ export async function POST(
                 conversation_thread: null
             })
             .eq('id', pageId)
+            .eq('project_id', page.project_id)
             .select()
             .single()
 

@@ -108,13 +108,22 @@ async function fetchImageAsBase64(url: string): Promise<{ mimeType: string, data
 }
 
 type GenResult = { success: boolean, imageBuffer: Buffer | null, error: string | null }
+type OpenAIContentPart =
+    | { type: 'input_text', text: string }
+    | { type: 'input_image', image_url: string, detail: 'auto' }
+type OpenAIImageSize = 'auto' | '1024x1536' | '1024x1024' | '1536x1024'
+
+interface ImageGenerationOutput {
+    type?: string
+    result?: string
+}
 
 /**
  * Core GPT-2 image call. Used by both front and back cover generators.
  * `content` is the fully built multimodal payload; `tag` is a short label
  * for logs (e.g., "Front", "Back").
  */
-async function runGpt2ImageCall(content: unknown[], size: string, tag: string): Promise<GenResult> {
+async function runGpt2ImageCall(content: OpenAIContentPart[], size: string, tag: string): Promise<GenResult> {
     if (!openai) {
         return { success: false, imageBuffer: null, error: 'OpenAI API Key not configured' }
     }
@@ -127,16 +136,18 @@ async function runGpt2ImageCall(content: unknown[], size: string, tag: string): 
         try {
             const response = await openai.responses.create({
                 model: 'gpt-5.4',
-                input: [{ role: 'user', content: content as any }],
+                input: [{ role: 'user', content }],
                 tools: [{
                     type: 'image_generation',
                     model: 'gpt-image-2',
                     quality: 'high',
-                    size,
-                } as any],
+                    size: size as OpenAIImageSize,
+                }],
             })
 
-            const imgOut = (response.output as any[]).find(o => o?.type === 'image_generation_call')
+            const imgOut = response.output
+                .map((output) => output as ImageGenerationOutput)
+                .find((output) => output.type === 'image_generation_call')
             if (imgOut?.result) {
                 console.log(`[GPT2 ${tag}] ✅ Image received (attempt ${attempt})`)
                 return {
@@ -190,15 +201,15 @@ export async function generateCover(opts: CoverGenerateOptions): Promise<GenResu
             ? 'CURRENT FRONT COVER (the target image to edit — preserve composition, subjects, background, and style exactly; only apply the changes described in the prompt):'
             : 'REFERENCE ILLUSTRATION (from the book\'s interior — match this art style exactly):'
 
-        const content: any[] = [
+        const content: OpenAIContentPart[] = [
             { type: 'input_text', text: referencePreamble },
-            { type: 'input_image', image_url: `data:${refImg.mimeType};base64,${refImg.data}` },
+            { type: 'input_image', image_url: `data:${refImg.mimeType};base64,${refImg.data}`, detail: 'auto' },
         ]
 
         if (extras.length > 0) {
             content.push({ type: 'input_text', text: 'ADDITIONAL REFERENCE IMAGES (supplementary inspiration only — the primary illustration above is the style anchor):' })
             for (const img of extras) {
-                content.push({ type: 'input_image', image_url: `data:${img.mimeType};base64,${img.data}` })
+                content.push({ type: 'input_image', image_url: `data:${img.mimeType};base64,${img.data}`, detail: 'auto' })
             }
         }
 
@@ -228,15 +239,15 @@ export async function generateBackCover(opts: BackCoverGenerateOptions): Promise
 
         const extras = await fetchAdditionalReferences(additionalImageUrls)
 
-        const content: any[] = [
+        const content: OpenAIContentPart[] = [
             { type: 'input_text', text: 'FRONT COVER (the primary reference — the back cover must match this style and visual world exactly):' },
-            { type: 'input_image', image_url: `data:${frontImg.mimeType};base64,${frontImg.data}` },
+            { type: 'input_image', image_url: `data:${frontImg.mimeType};base64,${frontImg.data}`, detail: 'auto' },
         ]
 
         if (extras.length > 0) {
             content.push({ type: 'input_text', text: 'ADDITIONAL REFERENCE IMAGES (supplementary inspiration only):' })
             for (const img of extras) {
-                content.push({ type: 'input_image', image_url: `data:${img.mimeType};base64,${img.data}` })
+                content.push({ type: 'input_image', image_url: `data:${img.mimeType};base64,${img.data}`, detail: 'auto' })
             }
         }
 

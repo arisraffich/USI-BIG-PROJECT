@@ -29,15 +29,26 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
     let processed = 0
     let failed = 0
+    let skipped = 0
 
     for (const send of dueSends) {
       try {
-        // Mark as in-progress to prevent double-execution
-        await supabase
+        // Claim the send before calling the customer email route. If another
+        // cron request already claimed it, do not send it again.
+        const { data: claimedSend, error: claimError } = await supabase
           .from('scheduled_sends')
           .update({ status: 'completed', completed_at: new Date().toISOString() })
           .eq('id', send.id)
           .eq('status', 'pending')
+          .select('id')
+          .maybeSingle()
+
+        if (claimError) throw claimError
+        if (!claimedSend) {
+          skipped++
+          console.log(`Scheduled send skipped because it was already claimed: ${send.id}`)
+          continue
+        }
 
         const res = await fetch(`${baseUrl}/api/projects/${send.project_id}/send-to-customer`, {
           method: 'POST',
@@ -72,7 +83,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ processed, failed, total: dueSends.length })
+    return NextResponse.json({ processed, failed, skipped, total: dueSends.length })
   } catch (error) {
     console.error('Scheduled sends execute error:', error)
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })

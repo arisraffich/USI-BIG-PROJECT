@@ -22,6 +22,16 @@ interface GPT2GenerateOptions {
     currentImageUrl?: string | null
 }
 
+type OpenAIContentPart =
+    | { type: 'input_text', text: string }
+    | { type: 'input_image', image_url: string, detail: 'auto' }
+type OpenAIImageSize = 'auto' | '1024x1536' | '1024x1024' | '1536x1024'
+
+interface ImageGenerationOutput {
+    type?: string
+    result?: string
+}
+
 // Safe GPT Image 2 size helper for arbitrary uploaded images.
 // Constraints: max edge <= 3840, ratio <= 3:1, total pixels <= 8,294,400, dimensions divisible by 16.
 function fitGpt2SizeToInputRatio(width: number, height: number): string {
@@ -137,7 +147,7 @@ export async function generateIllustrationGPT2(
     console.log(`[GPT2 Illustration] 📸 size=${size} refresh=${isRefresh} chars=${characterReferences.length} anchor=${!!anchorImage} refs=${styleReferenceImages.length}`)
 
     try {
-        const content: any[] = []
+        const content: OpenAIContentPart[] = []
 
         if (isRefresh) {
             const refImageUrl = currentImageUrl || anchorImage
@@ -149,7 +159,7 @@ export async function generateIllustrationGPT2(
                 return { success: false, imageBuffer: null, error: 'Failed to fetch current illustration for refresh' }
             }
             content.push({ type: 'input_text', text: 'IMAGE 1: ORIGINAL ILLUSTRATION. This is the exact illustration to remaster. Preserve its composition, characters, poses, expressions, objects, background, perspective, and layout exactly:' })
-            content.push({ type: 'input_image', image_url: `data:${img.mimeType};base64,${img.data}` })
+            content.push({ type: 'input_image', image_url: `data:${img.mimeType};base64,${img.data}`, detail: 'auto' })
 
             for (let i = 0; i < styleReferenceImages.length; i++) {
                 const styleImg = await fetchImageAsBase64(styleReferenceImages[i])
@@ -159,7 +169,7 @@ export async function generateIllustrationGPT2(
                     text: `IMAGE 2: STYLE REFERENCE. Use this image only for visual quality guidance: color palette, shades, tone, warmth/coolness, saturation, contrast, shading style, texture, line cleanliness, and rendering finish.
 Do not copy its characters, objects, scene, background, composition, poses, typography, or story content.`
                 })
-                content.push({ type: 'input_image', image_url: `data:${styleImg.mimeType};base64,${styleImg.data}` })
+                content.push({ type: 'input_image', image_url: `data:${styleImg.mimeType};base64,${styleImg.data}`, detail: 'auto' })
             }
 
             if (styleReferenceImages.length > 0) {
@@ -191,7 +201,7 @@ The final result must be IMAGE 1 remastered with IMAGE 2's visual quality. Do no
                 }
                 label += ':'
                 content.push({ type: 'input_text', text: label })
-                content.push({ type: 'input_image', image_url: `data:${img.mimeType};base64,${img.data}` })
+                content.push({ type: 'input_image', image_url: `data:${img.mimeType};base64,${img.data}`, detail: 'auto' })
             }
 
             if (anchorImage) {
@@ -203,7 +213,8 @@ The final result must be IMAGE 1 remastered with IMAGE 2's visual quality. Do no
                     })
                     content.push({
                         type: 'input_image',
-                        image_url: `data:${anchorImg.mimeType};base64,${anchorImg.data}`
+                        image_url: `data:${anchorImg.mimeType};base64,${anchorImg.data}`,
+                        detail: 'auto'
                     })
                 }
             }
@@ -214,7 +225,8 @@ The final result must be IMAGE 1 remastered with IMAGE 2's visual quality. Do no
                 content.push({ type: 'input_text', text: 'Additional Visual Reference:' })
                 content.push({
                     type: 'input_image',
-                    image_url: `data:${styleImg.mimeType};base64,${styleImg.data}`
+                    image_url: `data:${styleImg.mimeType};base64,${styleImg.data}`,
+                    detail: 'auto'
                 })
             }
 
@@ -234,11 +246,13 @@ The final result must be IMAGE 1 remastered with IMAGE 2's visual quality. Do no
                         type: 'image_generation',
                         model: 'gpt-image-2',
                         quality: 'high',
-                        size,
-                    } as any],
+                        size: size as OpenAIImageSize,
+                    }],
                 })
 
-                const imgOut = (response.output as any[]).find(o => o?.type === 'image_generation_call')
+                const imgOut = response.output
+                    .map((output) => output as ImageGenerationOutput)
+                    .find((output) => output.type === 'image_generation_call')
                 if (imgOut?.result) {
                     console.log(`[GPT2 Illustration] ✅ Image received (attempt ${attempt})`)
                     return {

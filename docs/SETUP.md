@@ -44,9 +44,13 @@ CRON_SECRET=your-cron-secret
 
 # Cloudflare R2 (for large email attachments)
 R2_ACCOUNT_ID=...
+# Optional alternative to R2_ACCOUNT_ID:
+# R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
 R2_ACCESS_KEY_ID=...
 R2_SECRET_ACCESS_KEY=...
 R2_BUCKET_NAME=...
+# Optional alias for R2_BUCKET_NAME:
+# R2_BUCKET=lineart-zips
 R2_PUBLIC_URL=https://your-r2-domain.com
 
 # Optional: Direct DB access (for migration scripts only)
@@ -74,9 +78,11 @@ DATABASE_URL=postgresql://...
 | `QUO_API_KEY` | No | SMS notifications |
 | `QUO_PHONE_NUMBER` | No | SMS sender number |
 | `R2_ACCOUNT_ID` | No | Cloudflare R2 for large email attachments |
+| `R2_ENDPOINT` | No | Alternative R2 S3 endpoint if not using `R2_ACCOUNT_ID` |
 | `R2_ACCESS_KEY_ID` | No | R2 access credentials |
 | `R2_SECRET_ACCESS_KEY` | No | R2 secret credentials |
 | `R2_BUCKET_NAME` | No | R2 bucket name |
+| `R2_BUCKET` | No | Alias for `R2_BUCKET_NAME` |
 | `R2_PUBLIC_URL` | No | R2 public URL for download links |
 | `DATABASE_URL` | No | Only for migration scripts |
 
@@ -100,14 +106,15 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 4. Supabase Storage Buckets
 
-The app uses these Supabase Storage buckets (create them in Supabase Dashboard > Storage):
+The app uses these public Supabase Storage buckets. The migration `20260503000000_create_storage_buckets.sql` creates missing buckets idempotently; you can also create them manually in Supabase Dashboard > Storage:
 
 | Bucket | Access | Purpose |
 |--------|--------|---------|
 | `project-files` | Public | Uploaded manuscripts |
 | `character-images` | Public | Generated character illustrations |
 | `character-sketches` | Public | Character sketch images |
-| `illustrations` | Public | Page illustrations and sketches |
+| `illustrations` | Public | Colored page illustrations and covers |
+| `sketches` | Public | Page sketch images |
 | `lineart` | Public | Generated line art PNGs |
 
 ## 5. Supabase Realtime

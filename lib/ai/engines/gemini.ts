@@ -11,6 +11,39 @@ const SAFETY_SETTINGS = [
   { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
 ]
 
+type GeminiRequestPart =
+  | { text: string }
+  | { inlineData: { mimeType: string, data: string } }
+
+interface GeminiGenerationConfig {
+  responseModalities: string[]
+  imageConfig: {
+    aspectRatio: string
+    imageSize: string
+  }
+  thinkingConfig?: {
+    thinkingLevel: 'HIGH'
+  }
+}
+
+interface GeminiResponsePart {
+  inlineData?: { data?: string }
+  inline_data?: { data?: string }
+}
+
+interface GeminiResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: GeminiResponsePart[]
+    }
+    finishReason?: string
+    finishMessage?: string
+  }>
+  promptFeedback?: {
+    blockReason?: string
+  }
+}
+
 function createGeminiEngine(modelId: string): CharacterEngine {
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`
   const isPro = modelId.includes('-pro-')
@@ -21,7 +54,7 @@ function createGeminiEngine(modelId: string): CharacterEngine {
       throw new Error('Google Generative AI API Key not configured')
     }
 
-    const parts: any[] = []
+    const parts: GeminiRequestPart[] = []
 
     if (input.isEditMode) {
       if (input.styleReference) {
@@ -54,7 +87,7 @@ function createGeminiEngine(modelId: string): CharacterEngine {
       parts.push({ text: `TARGET CHARACTER DESCRIPTION:\n${input.prompt}` })
     }
 
-    const generationConfig: Record<string, any> = {
+    const generationConfig: GeminiGenerationConfig = {
       responseModalities: ['IMAGE'],
       imageConfig: { aspectRatio: '9:16', imageSize: '4K' }
     }
@@ -94,7 +127,7 @@ function createGeminiEngine(modelId: string): CharacterEngine {
         continue
       }
 
-      const result = await response.json()
+      const result = await response.json() as GeminiResponse
 
       if (result.candidates?.[0]?.content?.parts) {
         for (const part of result.candidates[0].content.parts) {

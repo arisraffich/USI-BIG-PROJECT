@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
             )
         }
 
-        const supabase = await createClient()
+        const supabase = createAdminClient()
 
         const { data: project, error } = await supabase
             .from('projects')

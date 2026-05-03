@@ -45,6 +45,19 @@ interface SceneCharacterInput {
     isModified: boolean
 }
 
+interface CharacterReferenceInput {
+    name: string
+    imageUrl: string
+    role?: string
+    isMain?: boolean
+}
+
+interface CharacterActionDetails {
+    action?: unknown
+    pose?: unknown
+    emotion?: unknown
+}
+
 export async function POST(request: Request) {
     try {
         const body = await request.json()
@@ -202,7 +215,7 @@ export async function POST(request: Request) {
             console.log(`[Illustration Generate] 🔵 SPOT MODE - Page ${pageData.page_number} (children's book spot illustration)`)
         }
         let fullPrompt = ''
-        let characterReferences: any[] = []
+        let characterReferences: CharacterReferenceInput[] = []
         let anchorImage: string | null = null
         let styleReferenceImages: string[] = []
         let hasCustomStyleRefs = false // Declared at outer scope, set in Standard Mode
@@ -348,13 +361,13 @@ IMAGE CONTEXT:
             } else {
                 const characterActions = pageData.character_actions || {}
                 if (characterActions) {
-                    Object.entries(characterActions).forEach(([charName, action]: [string, any]) => {
+                    Object.entries(characterActions as Record<string, string | CharacterActionDetails>).forEach(([charName, action]) => {
                         if (typeof action === 'string') {
                             actionDescription += `${charName}: ${action}. `
                         } else if (typeof action === 'object' && action) {
-                            if (action.action) actionDescription += `${charName} Action: ${action.action}. `
-                            if (action.pose) actionDescription += `${charName} Pose: ${action.pose}. `
-                            if (action.emotion) actionDescription += `${charName} Emotion: ${action.emotion}. `
+                            if (typeof action.action === 'string') actionDescription += `${charName} Action: ${action.action}. `
+                            if (typeof action.pose === 'string') actionDescription += `${charName} Pose: ${action.pose}. `
+                            if (typeof action.emotion === 'string') actionDescription += `${charName} Emotion: ${action.emotion}. `
                         }
                     })
                 }

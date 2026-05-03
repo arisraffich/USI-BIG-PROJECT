@@ -1,8 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/server'
 import { openai } from '@/lib/ai/openai'
 import { getErrorMessage } from '@/lib/utils/error'
 import { CharacterIdentificationSchema, zodToResponsesFormat, extractResponseContent } from '@/lib/ai/schemas'
+
+type CharacterIdentificationResult = z.infer<typeof CharacterIdentificationSchema>
+
+interface StoryPageRow {
+  id: string
+  page_number: number
+  story_text: string | null
+}
+
+interface CharacterRow {
+  id: string
+  name: string | null
+  role: string | null
+  story_role?: string | null
+  age?: string | null
+  gender?: string | null
+  is_main?: boolean
+  appears_in?: string[] | null
+}
 
 // Exported function for direct calls (e.g., from project creation)
 export async function identifyCharactersForProject(project_id: string) {
@@ -13,7 +34,7 @@ export async function identifyCharactersForProject(project_id: string) {
 }
 
 // Core logic extracted for reusability
-async function runCharacterIdentification(project_id: string, supabase: any) {
+async function runCharacterIdentification(project_id: string, supabase: SupabaseClient) {
 
     // STEP 1: Fetch main character FIRST (before building prompt)
     // Use maybeSingle() instead of single() to avoid throwing on no results
@@ -54,11 +75,12 @@ async function runCharacterIdentification(project_id: string, supabase: any) {
       )
     }
 
-    const maxPageNumber = pages.length
+    const storyPages = pages as StoryPageRow[]
+    const maxPageNumber = storyPages.length
 
     // Build full story text
-    const fullStory = pages
-      .map((p: any) => `Page ${p.page_number}: ${p.story_text}`)
+    const fullStory = storyPages
+      .map((p) => `Page ${p.page_number}: ${p.story_text}`)
       .join('\n\n')
 
     // STEP 3: Build prompt for character identification
@@ -174,7 +196,7 @@ CONSTRAINTS
     }
 
     // STEP 4: Call AI with GPT-5.4 (structured outputs for guaranteed schema)
-    let identified
+    let identified: CharacterIdentificationResult
     try {
       console.log('[Character ID] Calling GPT-5.4 for analysis...')
       const completion = await openai.responses.create({
@@ -193,7 +215,7 @@ CONSTRAINTS
       if (!responseContent) throw new Error('Empty response from GPT-5.4')
 
       console.log('[Character ID] Raw AI response length:', responseContent.length)
-      identified = JSON.parse(responseContent)
+      identified = CharacterIdentificationSchema.parse(JSON.parse(responseContent))
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error)
       console.error('OpenAI API Error in identify-characters:', errorMessage)
@@ -209,7 +231,7 @@ CONSTRAINTS
     
     if (mainCharacter) {
       // Main character typically appears on all or most pages
-      const allPageNumbers = pages.map((p: any) => p.page_number.toString())
+      const allPageNumbers = storyPages.map((p) => p.page_number.toString())
       mainCharAppearances = allPageNumbers
       
       await supabase
@@ -230,7 +252,7 @@ CONSTRAINTS
     // Create sets for quick lookup
     const existingNames = new Set<string>()
     const existingRoles = new Set<string>()
-    existingCharacters?.forEach((c: any) => {
+    ;((existingCharacters || []) as CharacterRow[]).forEach((c) => {
       const nameKey = c.name?.toLowerCase().trim()
       const roleKey = c.role?.toLowerCase().trim()
       if (nameKey) existingNames.add(nameKey)
@@ -238,7 +260,7 @@ CONSTRAINTS
     })
 
     // Filter characters - only remove DB duplicates (trust AI reasoning for everything else)
-    const newCharacters = identified.characters.filter((char: any) => {
+    const newCharacters = identified.characters.filter((char) => {
       const charName = char.name?.toLowerCase().trim() || null
       const charRole = char.role?.toLowerCase().trim() || null
 
@@ -273,7 +295,7 @@ CONSTRAINTS
     // STEP 9: Create secondary character records
     let charactersCreated = 0
     if (newCharacters.length > 0) {
-      const charactersToCreate = newCharacters.map((char: any) => {
+      const charactersToCreate = newCharacters.map((char) => {
         // Validate and sanitize page numbers
         const validAppearances = (char.appears_in || [])
           .map((p: number) => {
@@ -317,7 +339,9 @@ CONSTRAINTS
     const characterMap = new Map<string, string>()
     const characterAppearancesMap = new Map<string, string[]>()
 
-    allCharacters?.forEach((c: any) => {
+    const projectCharacters = (allCharacters || []) as CharacterRow[]
+
+    projectCharacters.forEach((c) => {
       const nameKey = c.name?.toLowerCase().trim()
       const roleKey = c.role?.toLowerCase().trim()
       if (nameKey) {
@@ -331,7 +355,7 @@ CONSTRAINTS
     })
 
     // Update each page with character_ids
-    const pageUpdates = pages.map((page: any) => {
+    const pageUpdates = storyPages.map((page) => {
       const characterIds: string[] = []
       const pageNumberStr = page.page_number.toString()
 
@@ -342,7 +366,7 @@ CONSTRAINTS
 
       // Add secondary characters that appear on this page
       // Use validated appears_in from database (not AI response)
-      allCharacters?.forEach((char: any) => {
+      projectCharacters.forEach((char) => {
         // Skip main character (already added above)
         if (char.id === mainCharacter?.id) return
 

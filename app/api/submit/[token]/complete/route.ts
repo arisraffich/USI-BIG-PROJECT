@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getErrorMessage } from '@/lib/utils/error'
+import type { Character } from '@/types/character'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300 // 5 minutes for character generation
@@ -70,6 +71,7 @@ export async function POST(
               special_features: formData.special_features || null,
             })
             .eq('id', charId)
+            .eq('project_id', project.id)
 
           if (updateError) {
             console.error(`[Submission Complete] Error updating character ${charId}:`, updateError)
@@ -150,7 +152,9 @@ export async function POST(
                 background_elements: page.background_elements || null,
                 atmosphere: page.atmosphere || null,
                 description_auto_generated: page.description_auto_generated,
-              }).eq('id', original!.id)
+              })
+                .eq('id', original!.id)
+                .eq('project_id', projectSnapshot.id)
             }
             console.log(`[Bg] Scene descriptions generated for ${projectSnapshot.id}`)
           } catch (genError: unknown) {
@@ -181,7 +185,7 @@ export async function POST(
 
           const results = await Promise.all(
             charactersToGenerate.map((char) =>
-              generateCharacterImage(char as any, mainCharImage, projectSnapshot.id)
+              generateCharacterImage(char as Character, mainCharImage, projectSnapshot.id)
                 .then(result => ({ ...result, charId: char.id, charName: char.name }))
                 .catch(err => {
                   console.error(`[Bg Generation] Character ${char.name} ERROR:`, err)

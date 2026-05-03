@@ -24,6 +24,13 @@ const OPTIONAL_VARS = [
   'QUO_PHONE_NUMBER',
   'MIGRATION_SECRET_TOKEN',
   'DATABASE_URL',
+  'R2_ACCOUNT_ID',
+  'R2_ENDPOINT',
+  'R2_ACCESS_KEY_ID',
+  'R2_SECRET_ACCESS_KEY',
+  'R2_BUCKET_NAME',
+  'R2_BUCKET',
+  'R2_PUBLIC_URL',
 ] as const
 
 export function validateEnv() {

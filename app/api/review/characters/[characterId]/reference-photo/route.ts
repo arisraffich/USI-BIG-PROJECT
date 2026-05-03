@@ -100,6 +100,7 @@ export async function POST(
       .from('characters')
       .update({ reference_photo_url: urlData.publicUrl })
       .eq('id', characterId)
+      .eq('project_id', character.project_id)
 
     if (updateError) {
       return NextResponse.json({ error: 'Failed to save reference photo URL' }, { status: 500 })
@@ -147,10 +148,15 @@ export async function DELETE(
       }
     }
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('characters')
       .update({ reference_photo_url: null })
       .eq('id', characterId)
+      .eq('project_id', character.project_id)
+
+    if (updateError) {
+      return NextResponse.json({ error: 'Failed to delete reference photo URL' }, { status: 500 })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error: unknown) {

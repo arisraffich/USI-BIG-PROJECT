@@ -3610,7 +3610,7 @@ export function SharedIllustrationBoard({
                                         {(selectedRemasterReferencePage?.illustration_url || remasterUpload) && (
                                             <button
                                                 type="button"
-                                                onClick={(event) => {
+                                                onClick={() => {
                                                     setRemasterReferencePageId(null)
                                                     setRemasterUpload(null)
                                                 }}

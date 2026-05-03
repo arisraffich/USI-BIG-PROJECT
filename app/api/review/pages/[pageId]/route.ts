@@ -118,6 +118,7 @@ export async function PATCH(
             .from('pages')
             .update(updateData)
             .eq('id', pageId)
+            .eq('project_id', page.project_id)
             .select()
             .single()
 
