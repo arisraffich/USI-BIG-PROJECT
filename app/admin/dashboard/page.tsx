@@ -172,8 +172,8 @@ async function loadDashboardProjects(): Promise<DashboardLoadResult> {
 function DashboardErrorLayout({ message }: { message: string }) {
   return (
     <div className="flex h-screen overflow-hidden">
-      <aside className="w-64 shrink-0 border-r border-gray-200 bg-gray-50 p-6 flex flex-col">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Projects</h1>
+      <aside className="w-44 shrink-0 border-r border-gray-200 bg-gray-50 p-3 flex flex-col">
+        <h1 className="text-xl font-bold text-gray-900 mb-5">Projects</h1>
         <nav className="flex flex-col gap-3"><DashboardActions /></nav>
         <div className="mt-auto pt-6">
           <Link href="/admin/settings" className="flex items-center gap-2 text-gray-400 hover:text-gray-600 transition-colors text-sm">
@@ -196,17 +196,17 @@ function DashboardContent({ projectsWithCounts }: { projectsWithCounts: Dashboar
       <MobileHeader />
 
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-64 shrink-0 border-r border-gray-200 bg-gray-50 p-6 flex-col">
-        <div className="flex items-center gap-2 mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
+      <aside className="hidden md:flex w-44 shrink-0 border-r border-gray-200 bg-gray-50 p-3 flex-col">
+        <div className="flex items-center gap-2 mb-5">
+          <h1 className="text-xl font-bold text-gray-900">Projects</h1>
           <AIStatusDot />
         </div>
         <nav className="flex flex-col gap-3">
           <DashboardActions />
         </nav>
         <div className="mt-auto pb-6">
-          <Link href="/admin/settings" className="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors text-base font-medium">
-            <Settings className="w-5 h-5" />
+          <Link href="/admin/settings" className="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors text-sm font-medium">
+            <Settings className="w-4 h-4" />
             Settings
           </Link>
         </div>

@@ -68,9 +68,10 @@ function GroupedProjectList({
     stage,
     config: STAGE_CONFIG[stage],
     projects: projects.filter(p => getProjectStage(p.status) === stage),
-  })).filter(g => g.projects.length > 0)
+  }))
+  const visibleGrouped = grouped.filter(g => g.projects.length > 0)
 
-  if (grouped.length === 0) {
+  if (visibleGrouped.length === 0) {
     return (
       <div className="text-center py-12">
         <p className="text-gray-400 text-sm">No projects in this category.</p>
@@ -78,31 +79,45 @@ function GroupedProjectList({
     )
   }
 
-  return (
-    <div className="space-y-8">
-      {grouped.map(({ stage, config, projects }) => {
-        const Icon = config.icon
-        return (
-          <div key={stage}>
-            <div className="flex items-center gap-2 px-3 py-2.5 mb-3 bg-gray-200 rounded-lg">
-              <Icon className="w-4 h-4 text-gray-600" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700">{config.label}</h3>
-              <span className="text-sm font-bold text-gray-900">{projects.length}</span>
-            </div>
-            <div className="space-y-4">
-              {projects.map((project) => (
-                <ProjectCard
-                  key={project.id}
-                  project={project}
-                  pageCount={project.pageCount}
-                  showFollowUpAction={showFollowUpActions}
-                />
-              ))}
-            </div>
+  const renderStageGroup = ({ stage, config, projects }: typeof grouped[number], showEmptyState = false) => {
+    const Icon = config.icon
+    return (
+      <div key={stage}>
+        <div className="flex items-center gap-2 px-3 py-2.5 mb-3 bg-gray-200 rounded-lg">
+          <Icon className="w-4 h-4 text-gray-600" />
+          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700">{config.label}</h3>
+          <span className="text-sm font-bold text-gray-900">{projects.length}</span>
+        </div>
+        {projects.length > 0 ? (
+          <div className="space-y-4">
+            {projects.map((project) => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                pageCount={project.pageCount}
+                showFollowUpAction={showFollowUpActions}
+              />
+            ))}
           </div>
-        )
-      })}
-    </div>
+        ) : showEmptyState ? (
+          <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 py-8 text-center">
+            <p className="text-sm text-gray-400">No projects</p>
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <div className="space-y-8 xl:hidden">
+        {visibleGrouped.map(group => renderStageGroup(group))}
+      </div>
+
+      <div className="hidden xl:grid xl:grid-cols-3 gap-4 items-start">
+        {grouped.map(group => renderStageGroup(group, true))}
+      </div>
+    </>
   )
 }
 

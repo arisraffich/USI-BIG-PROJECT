@@ -18,21 +18,21 @@ export function DashboardActions() {
         <>
             <div className="flex flex-col gap-2">
                 <Link href="/admin/project/new">
-                    <Button className="w-full">
-                        <Plus className="w-4 h-4 mr-2" />
+                    <Button className="w-full justify-start px-3">
+                        <Plus className="w-4 h-4" />
                         New Project
                     </Button>
                 </Link>
-                <Button variant="outline" className="w-full" onClick={() => setLineArtOpen(true)}>
-                    <Pencil className="w-4 h-4 mr-2" />
+                <Button variant="outline" className="w-full justify-start px-3" onClick={() => setLineArtOpen(true)}>
+                    <Pencil className="w-4 h-4" />
                     Line Art
                 </Button>
-                <Button variant="outline" className="w-full" onClick={() => setCoverDesignOpen(true)}>
-                    <BookImage className="w-4 h-4 mr-2" />
+                <Button variant="outline" className="w-full justify-start px-3" onClick={() => setCoverDesignOpen(true)}>
+                    <BookImage className="w-4 h-4" />
                     Cover Design
                 </Button>
-                <Button variant="outline" className="w-full" onClick={() => setRemasterOpen(true)}>
-                    <Sparkles className="w-4 h-4 mr-2" />
+                <Button variant="outline" className="w-full justify-start px-3" onClick={() => setRemasterOpen(true)}>
+                    <Sparkles className="w-4 h-4" />
                     Remaster
                 </Button>
             </div>
