@@ -24,7 +24,7 @@ function isCronAuthorizedInternalApi(request: NextRequest) {
   return canRunScheduledSend && request.headers.get('authorization') === `Bearer ${cronSecret}`
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Protect all /admin routes (except login-related)
