@@ -5,7 +5,7 @@ import { ProjectCard } from './ProjectCard'
 import { isFollowUp, isWorking } from '@/lib/constants/statusBadgeConfig'
 import { UserRound, Wrench, CheckCircle2, FileText, Users, Palette, FlaskConical } from 'lucide-react'
 
-type Tab = 'follow_up' | 'working' | 'finished' | 'test'
+export type ProjectDashboardTab = 'follow_up' | 'working' | 'finished' | 'test'
 
 interface DashboardProject {
   id: string
@@ -31,6 +31,8 @@ function isTestProject(project: DashboardProject): boolean {
 
 interface ProjectTabsProps {
   projects: DashboardProject[]
+  activeTab?: ProjectDashboardTab
+  onActiveTabChange?: (tab: ProjectDashboardTab) => void
 }
 
 function isFinished(status: string): boolean {
@@ -121,8 +123,10 @@ function GroupedProjectList({
   )
 }
 
-export function ProjectTabs({ projects }: ProjectTabsProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('follow_up')
+export function ProjectTabs({ projects, activeTab: controlledActiveTab, onActiveTabChange }: ProjectTabsProps) {
+  const [internalActiveTab, setInternalActiveTab] = useState<ProjectDashboardTab>('follow_up')
+  const activeTab = controlledActiveTab ?? internalActiveTab
+  const setActiveTab = onActiveTabChange ?? setInternalActiveTab
 
   const testProjects = projects.filter(p => isTestProject(p))
   const realProjects = projects.filter(p => !isTestProject(p))
@@ -131,7 +135,7 @@ export function ProjectTabs({ projects }: ProjectTabsProps) {
   const workingProjects = realProjects.filter(p => isWorking(p.status))
   const finishedProjects = realProjects.filter(p => isFinished(p.status))
 
-  const tabs: { id: Tab; label: string; icon: typeof UserRound; count: number }[] = [
+  const tabs: { id: ProjectDashboardTab; label: string; icon: typeof UserRound; count: number }[] = [
     { id: 'follow_up', label: 'Follow Up', icon: UserRound, count: followUpProjects.length },
     { id: 'working', label: 'Working', icon: Wrench, count: workingProjects.length },
     { id: 'finished', label: 'Finished', icon: CheckCircle2, count: finishedProjects.length },
@@ -152,11 +156,16 @@ export function ProjectTabs({ projects }: ProjectTabsProps) {
         {tabs.map(tab => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id
+          const visibilityClass = tab.id === 'test'
+            ? 'hidden'
+            : tab.id === 'finished'
+              ? 'flex md:hidden'
+              : 'flex'
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`${tab.id === 'test' ? 'hidden md:flex' : 'flex'} items-center justify-center md:justify-start gap-1.5 px-2 md:px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              className={`${visibilityClass} items-center justify-center md:justify-start gap-1.5 px-2 md:px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                 isActive
                   ? 'border-gray-900 text-gray-900'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
