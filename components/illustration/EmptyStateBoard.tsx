@@ -485,6 +485,8 @@ export function EmptyStateBoard({
                                                 <img
                                                     src={prevPage.illustration_url}
                                                     alt={`Page ${prevPage.page_number}`}
+                                                    loading="lazy"
+                                                    decoding="async"
                                                     className="w-8 h-8 rounded object-cover border border-slate-200 flex-shrink-0"
                                                 />
                                             ) : (

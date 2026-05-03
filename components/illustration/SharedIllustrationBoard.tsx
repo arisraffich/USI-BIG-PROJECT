@@ -1126,6 +1126,8 @@ export function SharedIllustrationBoard({
                     <img
                         src={page.illustration_url}
                         alt="Tuned Preview"
+                        loading={feedImageLoading}
+                        decoding="async"
                         className="block h-auto w-full object-contain"
                         style={{ filter: tunePreviewFilter }}
                     />
@@ -1679,6 +1681,7 @@ export function SharedIllustrationBoard({
     // Use correct URLs based on role
     const sketchUrl = isAdmin ? page.sketch_url : page.customer_sketch_url
     const illustrationUrl = isAdmin ? page.illustration_url : page.customer_illustration_url
+    const feedImageLoading = page.page_number === 1 ? 'eager' : 'lazy'
     const remasterSubmitDisabled = Boolean(
         isGenerating ||
         !page.illustration_url
@@ -2582,6 +2585,8 @@ export function SharedIllustrationBoard({
 		                                            key={`auto-tune-new-${comparisonState.newUrl}`}
 		                                            src={comparisonState.newUrl}
 		                                            alt="Tuned Illustration"
+		                                            loading={feedImageLoading}
+		                                            decoding="async"
 		                                            className="w-full h-full object-contain block"
 	                                        />
 	                                    </div>
@@ -2622,6 +2627,8 @@ export function SharedIllustrationBoard({
 		                                            key={`auto-tune-old-${comparisonState.oldUrl}`}
 		                                            src={comparisonState.oldUrl}
 		                                            alt="Previous Illustration"
+		                                            loading={feedImageLoading}
+		                                            decoding="async"
 		                                            className="w-full h-full object-contain block"
 	                                        />
 	                                    </div>
@@ -2651,6 +2658,8 @@ export function SharedIllustrationBoard({
 		                                            key={`comparison-old-${comparisonState.oldUrl}`}
 		                                            src={comparisonState.oldUrl}
 		                                            alt="Previous Illustration"
+		                                            loading={feedImageLoading}
+		                                            decoding="async"
 		                                            className="w-full h-full object-contain block"
 	                                        />
 	                                    </div>
@@ -2678,6 +2687,8 @@ export function SharedIllustrationBoard({
 		                                            key={`comparison-new-${comparisonState.newUrl}`}
 		                                            src={comparisonState.newUrl}
 		                                            alt="New Illustration"
+		                                            loading={feedImageLoading}
+		                                            decoding="async"
 		                                            className="w-full h-full object-contain block"
 	                                        />
 	                                    </div>
@@ -2771,6 +2782,8 @@ export function SharedIllustrationBoard({
                                         <img
                                             src={sketchUrl}
                                             alt="Sketch"
+                                            loading={feedImageLoading}
+                                            decoding="async"
                                             className="w-full h-full object-contain grayscale contrast-125 block"
                                         />
                                     ) : (
@@ -2923,6 +2936,8 @@ export function SharedIllustrationBoard({
                                         <img
                                             src={illustrationUrl}
                                             alt="Final"
+                                            loading={feedImageLoading}
+                                            decoding="async"
                                             className={`w-full h-auto object-contain block ${isGenerating ? 'blur-sm scale-95 opacity-50' : ''} transition-all duration-700`}
                                         />
                                     ) : (
@@ -3110,6 +3125,8 @@ export function SharedIllustrationBoard({
                                                         <img
                                                             src={prevPage.illustration_url}
                                                             alt={`Page ${prevPage.page_number}`}
+                                                            loading="lazy"
+                                                            decoding="async"
                                                             className="w-8 h-8 rounded object-cover border border-slate-200 flex-shrink-0"
                                                         />
                                                     ) : (
@@ -3168,7 +3185,7 @@ export function SharedIllustrationBoard({
                                         <div className="flex flex-wrap gap-2 mb-2">
                                             {referenceImages.map((img, idx) => (
                                                 <div key={idx} className="relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 group">
-                                                    <img src={img.preview} alt="Ref" className="w-full h-full object-cover" />
+                                                    <img src={img.preview} alt="Ref" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                                                     <button
                                                         onClick={() => removeReference(idx)}
                                                         className="absolute top-0.5 right-0.5 bg-black/50 hover:bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -3242,6 +3259,8 @@ export function SharedIllustrationBoard({
                                                                     <img 
                                                                         src={char.imageUrl} 
                                                                         alt={char.name} 
+                                                                        loading="lazy"
+                                                                        decoding="async"
                                                                         className="w-full h-full object-cover"
                                                                     />
                                                                 ) : (
@@ -3282,7 +3301,7 @@ export function SharedIllustrationBoard({
                                                         <div className="flex items-center gap-2 pb-2 border-b">
                                                             <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-200">
                                                                 {char.imageUrl ? (
-                                                                    <img src={char.imageUrl} alt={char.name} className="w-full h-full object-cover" />
+                                                                    <img src={char.imageUrl} alt={char.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                                                                 ) : (
                                                                     <Users className="w-4 h-4 text-slate-400 m-2" />
                                                                 )}
@@ -3519,7 +3538,7 @@ export function SharedIllustrationBoard({
                                     </div>
                                     <div className="m-2 flex h-72 items-center justify-center rounded-lg bg-white p-2 sm:h-[360px]">
                                         {page.illustration_url ? (
-                                            <img src={page.illustration_url} alt={`Page ${page.page_number}`} className="h-full w-full object-contain rounded" />
+                                            <img src={page.illustration_url} alt={`Page ${page.page_number}`} loading={feedImageLoading} decoding="async" className="h-full w-full object-contain rounded" />
                                         ) : (
                                             <BookImage className="w-8 h-8 text-slate-300" />
                                         )}
@@ -3560,6 +3579,8 @@ export function SharedIllustrationBoard({
                                                                 <img
                                                                     src={refPage.illustration_url}
                                                                     alt={`Page ${refPage.page_number}`}
+                                                                    loading="lazy"
+                                                                    decoding="async"
                                                                     className="w-10 h-10 rounded object-cover border border-slate-200 flex-shrink-0"
                                                                 />
                                                             ) : null}
@@ -3595,10 +3616,12 @@ export function SharedIllustrationBoard({
                                                 <img
                                                     src={selectedRemasterReferencePage.illustration_url}
                                                     alt={`Page ${selectedRemasterReferencePage.page_number} reference`}
+                                                    loading="lazy"
+                                                    decoding="async"
                                                     className="h-full w-full object-contain rounded"
                                                 />
                                             ) : remasterUpload ? (
-                                                <img src={remasterUpload.preview} alt="Uploaded quality reference" className="h-full w-full object-contain rounded" />
+                                                <img src={remasterUpload.preview} alt="Uploaded quality reference" loading="lazy" decoding="async" className="h-full w-full object-contain rounded" />
                                             ) : (
                                                 <span className="flex flex-col items-center gap-2 text-center text-sm text-slate-500">
                                                     <Upload className="w-8 h-8 text-slate-400" />

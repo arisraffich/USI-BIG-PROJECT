@@ -43,6 +43,8 @@ function SubCard({ title, imageUrl, onClick, characterName }: SubCardProps) {
                     <img 
                         src={actualImageUrl} 
                         alt={`${characterName} - ${title}`} 
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover"
                     />
                 ) : (
