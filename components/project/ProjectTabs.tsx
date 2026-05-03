@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ProjectCard } from './ProjectCard'
 import { isFollowUp, isWorking } from '@/lib/constants/statusBadgeConfig'
+import { isCharacterModeStatus, isIllustrationModeStatus } from '@/lib/constants/projectStatuses'
 import { UserRound, Wrench, CheckCircle2, FileText, Users, Palette, FlaskConical } from 'lucide-react'
 
 export type ProjectDashboardTab = 'follow_up' | 'working' | 'finished' | 'test'
@@ -43,11 +44,8 @@ type Stage = 'input' | 'characters' | 'sketches'
 
 function getProjectStage(status: string): Stage {
   if (status === 'awaiting_customer_input' || status === 'draft') return 'input'
-  if (
-    status.includes('character') ||
-    status === 'characters_approved' ||
-    status === 'characters_regenerated'
-  ) return 'characters'
+  if (isIllustrationModeStatus(status)) return 'sketches'
+  if (isCharacterModeStatus(status) || status === 'characters_regenerated' || status.includes('character')) return 'characters'
   return 'sketches'
 }
 
