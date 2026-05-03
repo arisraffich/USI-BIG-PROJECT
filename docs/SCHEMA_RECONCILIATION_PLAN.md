@@ -137,11 +137,13 @@ The goal is to prove: a fresh database can be created from repo migrations only.
 
 Status: the migration set has been run twice successfully on a disposable local Postgres database in Docker.
 
-The dry-run schema comparison found one app-used column that exists in repo migrations but is missing from production:
+The dry-run schema comparison found one app-used column that existed in repo migrations but was missing from production:
 
 - `characters.generation_error`
 
-Production has not been changed.
+Production fix status: `characters.generation_error` has been added to production as a nullable `text` column.
+
+Plain meaning: character generation failures now have a safe place to store the error message. This does not change existing projects, customer links, images, Slack, or normal admin/customer workflows.
 
 ### Step 5: Production reconciliation decision
 
@@ -174,10 +176,10 @@ This makes later riskier fixes safer because we will know exactly what schema th
 
 ## Recommended Next Action
 
-Review and implement Step 4: run the migration set on a temporary database.
+Stop database repair here unless there is a separate reason to reconcile production migration history.
 
-No production database changes should happen in that step.
+The important low-risk production schema gap has been fixed.
 
-Risk for the next step: 5/100 if done on a temporary database.
+Risk for deeper production migration-history reconciliation: 35-55/100.
 
-Plain meaning: we test the database instructions somewhere disposable first, so the real app and real customer projects are not touched.
+Plain meaning: the app is now safer, and the remaining database-history work is advanced bookkeeping with no immediate customer/admin benefit.
