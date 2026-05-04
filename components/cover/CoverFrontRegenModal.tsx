@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import {
@@ -165,6 +165,9 @@ export function CoverFrontRegenModal({
                         <Sparkles className="w-5 h-5 text-purple-600" />
                         Regenerate Front Cover
                     </DialogTitle>
+                    <DialogDescription className="sr-only">
+                        Regenerate the front cover using the current cover or an illustrated page as the reference.
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4 py-2">

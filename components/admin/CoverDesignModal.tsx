@@ -306,6 +306,9 @@ export function CoverDesignModal({ open, onOpenChange }: CoverDesignModalProps) 
                             <BookImage className="w-5 h-5 text-purple-600" />
                             Cover Design
                         </DialogTitle>
+                        <DialogDescription className="sr-only">
+                            Upload a reference image, enter cover details, generate cover options, and download the selected files.
+                        </DialogDescription>
                     </DialogHeader>
 
                     <div className="flex-1 overflow-y-auto space-y-5 pr-1">
@@ -542,6 +545,9 @@ export function CoverDesignModal({ open, onOpenChange }: CoverDesignModalProps) 
                 <DialogContent className="sm:max-w-sm">
                     <DialogHeader>
                         <DialogTitle>Download cover files</DialogTitle>
+                        <DialogDescription className="sr-only">
+                            Choose whether to include front cover line art in the downloaded cover files.
+                        </DialogDescription>
                     </DialogHeader>
 
                     <label className="flex items-start gap-2 text-sm text-slate-700">

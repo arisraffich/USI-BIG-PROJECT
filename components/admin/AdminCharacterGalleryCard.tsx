@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
 import { Loader2, RefreshCw, MessageSquare, CheckCircle2, Info, X, AlertTriangle } from 'lucide-react'
 import { Character } from '@/types/character'
 
@@ -163,6 +163,9 @@ export function AdminCharacterGalleryCard({ character, projectId, isGenerating =
                                     <DialogContent>
                                         <DialogHeader>
                                             <DialogTitle>Regenerate {displayName}</DialogTitle>
+                                            <DialogDescription className="sr-only">
+                                                Edit the generation prompt and regenerate this character image.
+                                            </DialogDescription>
                                         </DialogHeader>
                                         <div className="py-4 space-y-4">
                                             <div className="space-y-2">
@@ -256,6 +259,9 @@ export function AdminCharacterGalleryCard({ character, projectId, isGenerating =
                     className="!max-w-none !w-screen !h-screen !p-0 !m-0 !translate-x-0 !translate-y-0 !top-0 !left-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none"
                 >
                     <DialogTitle className="sr-only">{displayName}</DialogTitle>
+                    <DialogDescription className="sr-only">
+                        View {displayName} at full size.
+                    </DialogDescription>
                     <div className="relative w-full h-full flex items-center justify-center p-4" onClick={() => setShowImage(false)}>
                         {displayImageUrl && (
                             <img

@@ -3528,6 +3528,9 @@ export function SharedIllustrationBoard({
                                     </SelectContent>
                                 </Select>
                             </div>
+                            <DialogDescription className="sr-only">
+                                Compare the current illustration with a quality reference and remaster this page.
+                            </DialogDescription>
                         </DialogHeader>
 
                         <div className="space-y-5 py-2">

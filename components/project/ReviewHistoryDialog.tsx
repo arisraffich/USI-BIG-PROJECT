@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { CheckCircle2, MessageSquare, Loader2, Save } from 'lucide-react'
@@ -49,6 +49,9 @@ export function ReviewHistoryDialog({ open, onOpenChange, page, onSave, canEdit 
             <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-md transition-all duration-300">
                 <DialogHeader className="border-b pb-4 mb-4">
                     <DialogTitle>Review History</DialogTitle>
+                    <DialogDescription className="sr-only">
+                        View and update the revision request history for this page.
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4">

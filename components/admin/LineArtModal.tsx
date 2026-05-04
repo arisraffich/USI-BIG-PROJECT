@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Pencil, Upload, Download, X, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 
@@ -145,6 +145,9 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
                         <Pencil className="w-5 h-5" />
                         Line Art Generator
                     </DialogTitle>
+                    <DialogDescription className="sr-only">
+                        Upload colored illustrations, generate line art versions, and download the finished files.
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex-1 overflow-y-auto space-y-4">

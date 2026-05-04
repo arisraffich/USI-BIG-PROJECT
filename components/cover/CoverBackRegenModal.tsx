@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Loader2, Sparkles, ImagePlus, X } from 'lucide-react'
@@ -146,6 +146,9 @@ export function CoverBackRegenModal({
                         <Sparkles className="w-5 h-5 text-purple-600" />
                         {primaryLabel}
                     </DialogTitle>
+                    <DialogDescription className="sr-only">
+                        Generate or regenerate the back cover using optional instructions and reference images.
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4 py-2">

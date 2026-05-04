@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import JSZip from 'jszip'
 import { Check, Download, Loader2, RotateCw, Sparkles, Upload, X } from 'lucide-react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -284,6 +284,9 @@ export function RemasterModal({ open, onOpenChange }: RemasterModalProps) {
                             </SelectContent>
                         </Select>
                     </div>
+                    <DialogDescription className="sr-only">
+                        Upload one or more images, choose a model, and download the remastered results.
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex-1 overflow-y-auto space-y-4 pr-1">

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -178,6 +179,9 @@ export function FollowUpButton({
             <DialogTitle>
               {draft ? `${draft.stageLabel} ${draft.sequence}/${draft.max}` : 'Follow-Up Email'}
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Review and send a follow-up email to the customer.
+            </DialogDescription>
           </DialogHeader>
 
           {loading ? (
