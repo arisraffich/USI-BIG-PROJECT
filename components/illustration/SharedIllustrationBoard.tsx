@@ -3672,7 +3672,7 @@ export function SharedIllustrationBoard({
                         </div>
 
                         <DialogFooter className="flex-col gap-3 sm:flex-row sm:items-center">
-                            <div className="flex w-full gap-3 sm:ml-auto sm:w-auto sm:justify-end">
+                            <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:justify-end sm:gap-3">
                                 <Button
                                     type="button"
                                     variant="destructive"
