@@ -3510,8 +3510,8 @@ export function SharedIllustrationBoard({
                     setIsRemasterDialogOpen(open)
                     if (!open) resetRemasterOptions()
                 }}>
-                    <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
+                    <DialogContent className="left-3 right-3 top-[calc(env(safe-area-inset-top)+1rem)] bottom-[calc(env(safe-area-inset-bottom)+1rem)] flex max-h-none w-auto max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-xl p-0 sm:left-[50%] sm:right-auto sm:top-[50%] sm:bottom-auto sm:grid sm:w-full sm:max-w-[640px] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:gap-4 sm:max-h-[90vh] sm:overflow-y-auto sm:p-6">
+                        <DialogHeader className="shrink-0 border-b border-slate-100 px-4 pb-3 pt-4 text-left sm:border-0 sm:p-0">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pr-8">
                                 <DialogTitle className="flex items-center gap-2">
                                     <Sparkles className="w-5 h-5 text-purple-600" />
@@ -3533,7 +3533,7 @@ export function SharedIllustrationBoard({
                             </DialogDescription>
                         </DialogHeader>
 
-                        <div className="space-y-5 py-2">
+                        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:space-y-5 sm:overflow-visible sm:px-0 sm:py-2">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 overflow-hidden flex flex-col">
                                     <div className="flex h-9 items-center px-3 text-sm font-medium text-slate-700 bg-white border-b border-slate-200">
@@ -3674,7 +3674,7 @@ export function SharedIllustrationBoard({
                             </div>
                         </div>
 
-                        <DialogFooter className="flex-col gap-3 sm:flex-row sm:items-center">
+                        <DialogFooter className="shrink-0 border-t border-slate-100 bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 sm:border-0 sm:bg-transparent sm:p-0 sm:flex-row sm:items-center">
                             <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:justify-end sm:gap-3">
                                 <Button
                                     type="button"
