@@ -3,16 +3,18 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Plus, Pencil, Menu, X, Settings, BookImage, Sparkles } from 'lucide-react'
+import { Plus, Pencil, Menu, X, Settings, BookImage, Sparkles, PencilRuler } from 'lucide-react'
 import { LineArtModal } from './LineArtModal'
 import { CoverDesignModal } from './CoverDesignModal'
 import { RemasterModal } from './RemasterModal'
+import { CreateSketchModal } from './CreateSketchModal'
 import { AIStatusDot } from './AIStatusDot'
 
 export function DashboardActions() {
     const [lineArtOpen, setLineArtOpen] = useState(false)
     const [coverDesignOpen, setCoverDesignOpen] = useState(false)
     const [remasterOpen, setRemasterOpen] = useState(false)
+    const [createSketchOpen, setCreateSketchOpen] = useState(false)
 
     return (
         <>
@@ -35,10 +37,15 @@ export function DashboardActions() {
                     <Sparkles className="w-4 h-4" />
                     Remaster
                 </Button>
+                <Button variant="outline" className="w-full justify-start px-3" onClick={() => setCreateSketchOpen(true)}>
+                    <PencilRuler className="w-4 h-4" />
+                    Create Sketch
+                </Button>
             </div>
             <LineArtModal open={lineArtOpen} onOpenChange={setLineArtOpen} />
             <CoverDesignModal open={coverDesignOpen} onOpenChange={setCoverDesignOpen} />
             <RemasterModal open={remasterOpen} onOpenChange={setRemasterOpen} />
+            <CreateSketchModal open={createSketchOpen} onOpenChange={setCreateSketchOpen} />
         </>
     )
 }
@@ -48,6 +55,7 @@ export function MobileHeader() {
     const [lineArtOpen, setLineArtOpen] = useState(false)
     const [coverDesignOpen, setCoverDesignOpen] = useState(false)
     const [remasterOpen, setRemasterOpen] = useState(false)
+    const [createSketchOpen, setCreateSketchOpen] = useState(false)
 
     return (
         <>
@@ -80,6 +88,10 @@ export function MobileHeader() {
                             <Sparkles className="w-4 h-4 mr-2" />
                             Remaster
                         </Button>
+                        <Button variant="outline" className="w-full" onClick={() => { setCreateSketchOpen(true); setMenuOpen(false) }}>
+                            <PencilRuler className="w-4 h-4 mr-2" />
+                            Create Sketch
+                        </Button>
                         <Link href="/admin/settings" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors text-base font-medium mt-4">
                             <Settings className="w-5 h-5" />
                             Settings
@@ -91,6 +103,7 @@ export function MobileHeader() {
             <LineArtModal open={lineArtOpen} onOpenChange={setLineArtOpen} />
             <CoverDesignModal open={coverDesignOpen} onOpenChange={setCoverDesignOpen} />
             <RemasterModal open={remasterOpen} onOpenChange={setRemasterOpen} />
+            <CreateSketchModal open={createSketchOpen} onOpenChange={setCreateSketchOpen} />
         </>
     )
 }
