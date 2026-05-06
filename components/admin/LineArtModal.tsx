@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Pencil, Upload, Download, X, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { Pencil, Upload, Download, X, CheckCircle2, AlertCircle, Loader2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 
 type FileStatus = 'pending' | 'generating' | 'done' | 'error'
 
@@ -11,27 +11,39 @@ interface FileEntry {
     file: File
     status: FileStatus
     error?: string
+    previewUrl?: string
     blobUrl?: string
 }
 
 interface LightboxImage {
     url: string
     label: string
+    fileIndex?: number
+}
+
+interface LightboxState {
+    items: LightboxImage[]
+    index: number
 }
 
 const MAX_CONCURRENT = 3
 
+function revokeEntryUrls(entry: FileEntry) {
+    if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl)
+    if (entry.blobUrl) URL.revokeObjectURL(entry.blobUrl)
+}
+
 export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
     const [files, setFiles] = useState<FileEntry[]>([])
     const [isProcessing, setIsProcessing] = useState(false)
-    const [lightbox, setLightbox] = useState<LightboxImage | null>(null)
+    const [lightbox, setLightbox] = useState<LightboxState | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const abortControllerRef = useRef<AbortController | null>(null)
 
     const reset = useCallback(() => {
         // Revoke any object URLs to prevent memory leaks
         setFiles(prev => {
-            prev.forEach(f => { if (f.blobUrl) URL.revokeObjectURL(f.blobUrl) })
+            prev.forEach(revokeEntryUrls)
             return []
         })
         setIsProcessing(false)
@@ -52,8 +64,11 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
         if (!selectedFiles || selectedFiles.length === 0) return
         const entries: FileEntry[] = Array.from(selectedFiles)
             .filter(f => f.type.startsWith('image/'))
-            .map(f => ({ file: f, status: 'pending' as FileStatus }))
-        setFiles(entries)
+            .map(f => ({ file: f, status: 'pending' as FileStatus, previewUrl: URL.createObjectURL(f) }))
+        setFiles(prev => {
+            prev.forEach(revokeEntryUrls)
+            return entries
+        })
     }, [])
 
     const handleDrop = useCallback((e: React.DragEvent) => {
@@ -64,7 +79,11 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
     const generateLineArt = useCallback(async (entry: FileEntry, index: number, signal: AbortSignal): Promise<void> => {
         if (signal.aborted) return
 
-        setFiles(prev => prev.map((f, i) => i === index ? { ...f, status: 'generating' } : f))
+        setFiles(prev => prev.map((f, i) => {
+            if (i !== index) return f
+            if (f.blobUrl) URL.revokeObjectURL(f.blobUrl)
+            return { ...f, status: 'generating', error: undefined, blobUrl: undefined }
+        }))
 
         try {
             const formData = new FormData()
@@ -122,6 +141,22 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
         setIsProcessing(false)
     }, [files, generateLineArt])
 
+    const regenerateOne = useCallback(async (index: number) => {
+        const entry = files[index]
+        if (!entry || isProcessing) return
+
+        setIsProcessing(true)
+        const controller = new AbortController()
+        abortControllerRef.current = controller
+
+        await generateLineArt(entry, index, controller.signal)
+
+        if (abortControllerRef.current === controller) {
+            abortControllerRef.current = null
+        }
+        setIsProcessing(false)
+    }, [files, generateLineArt, isProcessing])
+
     const downloadOne = useCallback((blobUrl: string, index: number) => {
         const link = document.createElement('a')
         link.href = blobUrl
@@ -137,11 +172,60 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
         })
     }, [files, downloadOne])
 
+    const openGeneratedPreview = useCallback((fileIndex: number) => {
+        const items: LightboxImage[] = []
+        files.forEach((entry, index) => {
+            if (entry.status === 'done' && entry.blobUrl) {
+                items.push({ url: entry.blobUrl, label: `${entry.file.name} line art preview`, fileIndex: index })
+            }
+        })
+
+        if (items.length === 0) return
+
+        setLightbox({
+            items,
+            index: Math.max(0, items.findIndex(item => item.fileIndex === fileIndex)),
+        })
+    }, [files])
+
+    const showPreviousLightboxImage = useCallback(() => {
+        setLightbox(prev => {
+            if (!prev || prev.items.length <= 1) return prev
+            return { ...prev, index: (prev.index - 1 + prev.items.length) % prev.items.length }
+        })
+    }, [])
+
+    const showNextLightboxImage = useCallback(() => {
+        setLightbox(prev => {
+            if (!prev || prev.items.length <= 1) return prev
+            return { ...prev, index: (prev.index + 1) % prev.items.length }
+        })
+    }, [])
+
+    useEffect(() => {
+        if (!lightbox || lightbox.items.length <= 1) return
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault()
+                showPreviousLightboxImage()
+            } else if (event.key === 'ArrowRight') {
+                event.preventDefault()
+                showNextLightboxImage()
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [lightbox, showNextLightboxImage, showPreviousLightboxImage])
+
     const completedCount = files.filter(f => f.status === 'done').length
     const failedCount = files.filter(f => f.status === 'error').length
     const totalCount = files.length
     const hasResults = completedCount > 0
     const allDone = !isProcessing && totalCount > 0 && (completedCount + failedCount) === totalCount
+    const currentLightboxImage = lightbox?.items[lightbox.index] || null
+    const canNavigateLightbox = Boolean(lightbox && lightbox.items.length > 1)
 
     return (
         <>
@@ -195,42 +279,81 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
                     )}
 
                     {files.length > 0 && (
-                        <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                            {files.map((entry, i) => (
-                                <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-md bg-gray-50 text-sm">
-                                    <span className="flex-shrink-0">
-                                        {entry.status === 'pending' && <span className="w-4 h-4 block rounded-full bg-gray-300" />}
-                                        {entry.status === 'generating' && <Loader2 className="w-4 h-4 text-gray-600 animate-spin" />}
-                                        {entry.status === 'done' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
-                                        {entry.status === 'error' && <AlertCircle className="w-4 h-4 text-red-500" />}
-                                    </span>
-                                    <span className="flex-1 truncate text-gray-700">
-                                        {entry.file.name}
-                                    </span>
-                                    {entry.status === 'done' && entry.blobUrl && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setLightbox({ url: entry.blobUrl!, label: `${entry.file.name} line art preview` })}
-                                            className="flex h-10 w-10 flex-shrink-0 cursor-zoom-in items-center justify-center overflow-hidden rounded border border-gray-200 bg-white bg-[linear-gradient(45deg,#f8fafc_25%,transparent_25%),linear-gradient(-45deg,#f8fafc_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#f8fafc_75%),linear-gradient(-45deg,transparent_75%,#f8fafc_75%)] bg-[length:12px_12px] bg-[position:0_0,0_6px,6px_-6px,-6px_0] p-1 hover:border-gray-400"
-                                            title="Open full preview"
-                                        >
-                                            <img src={entry.blobUrl} alt={`${entry.file.name} line art preview`} className="max-h-full max-w-full object-contain" />
-                                        </button>
-                                    )}
-                                    <span className="flex-shrink-0 text-xs text-gray-400 w-20 text-right">
-                                        → LineArt{i + 1}.png
-                                    </span>
-                                    {entry.status === 'done' && entry.blobUrl && (
-                                        <button
-                                            onClick={() => downloadOne(entry.blobUrl!, i)}
-                                            className="flex-shrink-0 text-gray-500 hover:text-gray-800"
-                                            title="Download"
-                                        >
-                                            <Download className="w-4 h-4" />
-                                        </button>
-                                    )}
-                                </div>
-                            ))}
+                        <div className="grid max-h-72 grid-cols-2 gap-4 overflow-y-auto sm:grid-cols-4">
+                            {files.map((entry, i) => {
+                                const thumbnailUrl = entry.status === 'done' && entry.blobUrl ? entry.blobUrl : entry.previewUrl
+                                const thumbnailLabel = entry.status === 'done'
+                                    ? `${entry.file.name} line art preview`
+                                    : `${entry.file.name} source preview`
+
+                                return (
+                                    <div
+                                        key={i}
+                                        className={`rounded-lg border bg-gray-50 p-2 ${
+                                            entry.status === 'done'
+                                                ? 'border-green-200'
+                                                : entry.status === 'error'
+                                                    ? 'border-red-200'
+                                                    : 'border-gray-200'
+                                        }`}
+                                    >
+                                        <div className="relative aspect-square overflow-hidden rounded-md border border-gray-200 bg-white">
+                                            {thumbnailUrl && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (entry.status === 'done' && entry.blobUrl) {
+                                                            openGeneratedPreview(i)
+                                                        } else {
+                                                            setLightbox({ items: [{ url: thumbnailUrl, label: thumbnailLabel }], index: 0 })
+                                                        }
+                                                    }}
+                                                    className="flex h-full w-full cursor-zoom-in items-center justify-center bg-white bg-[linear-gradient(45deg,#f8fafc_25%,transparent_25%),linear-gradient(-45deg,#f8fafc_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#f8fafc_75%),linear-gradient(-45deg,transparent_75%,#f8fafc_75%)] bg-[length:12px_12px] bg-[position:0_0,0_6px,6px_-6px,-6px_0] p-1"
+                                                    title="Open full preview"
+                                                >
+                                                    <img src={thumbnailUrl} alt={thumbnailLabel} className="max-h-full max-w-full object-contain" />
+                                                </button>
+                                            )}
+                                            {entry.status === 'generating' && (
+                                                <div className="absolute inset-0 flex items-center justify-center bg-white/55">
+                                                    <Loader2 className="w-5 h-5 text-gray-700 animate-spin" />
+                                                </div>
+                                            )}
+                                            {entry.status === 'error' && (
+                                                <div className="absolute inset-0 flex items-center justify-center bg-red-50/80">
+                                                    <AlertCircle className="w-5 h-5 text-red-500" />
+                                                </div>
+                                            )}
+                                            {entry.status === 'done' && (
+                                                <CheckCircle2 className="absolute left-1.5 top-1.5 h-4 w-4 rounded-full bg-white text-green-500" />
+                                            )}
+                                        </div>
+                                        {entry.status === 'done' && entry.blobUrl && (
+                                            <div className="mt-2 grid grid-cols-2 gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => regenerateOne(i)}
+                                                    disabled={isProcessing}
+                                                    className="flex h-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
+                                                    title="Regenerate"
+                                                    aria-label={`Regenerate line art ${i + 1}`}
+                                                >
+                                                    <RefreshCw className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => downloadOne(entry.blobUrl!, i)}
+                                                    className="flex h-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                                                    title="Download"
+                                                    aria-label={`Download line art ${i + 1}`}
+                                                >
+                                                    <Download className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })}
                         </div>
                     )}
 
@@ -282,27 +405,56 @@ export function LineArtModal({ open, onOpenChange }: { open: boolean, onOpenChan
                 </div>
             </DialogContent>
         </Dialog>
-        <Dialog open={!!lightbox} onOpenChange={(open) => { if (!open) setLightbox(null) }}>
+        <Dialog open={!!currentLightboxImage} onOpenChange={(open) => { if (!open) setLightbox(null) }}>
             <DialogContent
                 showCloseButton={false}
                 className="!max-w-none !w-screen !h-screen !p-0 !m-0 !translate-x-0 !translate-y-0 !top-0 !left-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none"
             >
-                <DialogTitle className="sr-only">{lightbox?.label || 'Line art preview'}</DialogTitle>
+                <DialogTitle className="sr-only">{currentLightboxImage?.label || 'Line art preview'}</DialogTitle>
                 <DialogDescription className="sr-only">
                     View the generated line art preview at full size.
                 </DialogDescription>
                 <div className="relative w-full h-full flex items-center justify-center p-4 bg-black/80" onClick={() => setLightbox(null)}>
-                    {lightbox && (
+                    {currentLightboxImage && (
                         <div
                             className="max-w-full max-h-full rounded-md bg-white bg-[linear-gradient(45deg,#f8fafc_25%,transparent_25%),linear-gradient(-45deg,#f8fafc_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#f8fafc_75%),linear-gradient(-45deg,transparent_75%,#f8fafc_75%)] bg-[length:24px_24px] bg-[position:0_0,0_12px,12px_-12px,-12px_0] p-4 shadow-2xl"
                             onClick={(event) => event.stopPropagation()}
                         >
                             <img
-                                src={lightbox.url}
-                                alt={lightbox.label}
+                                src={currentLightboxImage.url}
+                                alt={currentLightboxImage.label}
                                 className="max-w-[calc(100vw-4rem)] max-h-[calc(100vh-4rem)] object-contain"
                             />
                         </div>
+                    )}
+                    {canNavigateLightbox && (
+                        <>
+                            <button
+                                type="button"
+                                className="absolute left-4 top-1/2 z-50 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white transition-colors hover:bg-black/70 hover:text-white/90"
+                                onClick={(event) => {
+                                    event.stopPropagation()
+                                    showPreviousLightboxImage()
+                                }}
+                                aria-label="View previous line art"
+                            >
+                                <ChevronLeft className="w-7 h-7" strokeWidth={2.5} />
+                            </button>
+                            <button
+                                type="button"
+                                className="absolute right-4 top-1/2 z-50 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white transition-colors hover:bg-black/70 hover:text-white/90"
+                                onClick={(event) => {
+                                    event.stopPropagation()
+                                    showNextLightboxImage()
+                                }}
+                                aria-label="View next line art"
+                            >
+                                <ChevronRight className="w-7 h-7" strokeWidth={2.5} />
+                            </button>
+                            <div className="absolute left-1/2 top-6 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-sm font-semibold text-white">
+                                {lightbox ? `${lightbox.index + 1} / ${lightbox.items.length}` : ''}
+                            </div>
+                        </>
                     )}
                     <button
                         type="button"

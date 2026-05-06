@@ -2,6 +2,7 @@ export const SKETCH_PROMPT = `Convert the illustration into a loose, natural pen
 Black and white only. Use rough graphite lines with visible grain, uneven pressure, slight wobble, and broken strokes. 
 Include light construction lines, faint smudges, and subtle overlapping marks. 
 No digital-looking smooth lines. No fills or gradients.
+The final image must appear on clean pure white paper only. Do not use beige, cream, yellow, gray, aged, textured, stained, warm-toned, or colored paper backgrounds.
 
 Preserve every character, pose, expression, and composition exactly, but make the linework look hand-drawn with a physical pencil on paper.
 

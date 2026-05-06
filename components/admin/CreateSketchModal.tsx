@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import JSZip from 'jszip'
-import { Check, Download, ImagePlus, Loader2, PencilRuler, RotateCw, Upload, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Download, Loader2, PencilRuler, RotateCw, Upload, X } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -27,6 +27,12 @@ interface SketchItem {
 interface LightboxImage {
     url: string
     label: string
+    itemId?: string
+}
+
+interface LightboxState {
+    items: LightboxImage[]
+    index: number
 }
 
 const MAX_FILES = 5
@@ -83,9 +89,10 @@ export function CreateSketchModal({ open, onOpenChange }: CreateSketchModalProps
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [items, setItems] = useState<SketchItem[]>([])
     const [model, setModel] = useState<SketchModel>('nb2')
-    const [isProcessing, setIsProcessing] = useState(false)
-    const [lightbox, setLightbox] = useState<LightboxImage | null>(null)
+    const [activeRequestCount, setActiveRequestCount] = useState(0)
+    const [lightbox, setLightbox] = useState<LightboxState | null>(null)
 
+    const isProcessing = activeRequestCount > 0
     const queuedCount = items.filter(item => item.status === 'queued').length
     const readyItems = useMemo(
         () => items.filter(item => item.status === 'ready' && item.resultDataUrl),
@@ -94,7 +101,10 @@ export function CreateSketchModal({ open, onOpenChange }: CreateSketchModalProps
     const readyCount = readyItems.length
     const failedCount = items.filter(item => item.status === 'failed').length
     const canUploadMore = items.length < MAX_FILES && !isProcessing
-    const canCreate = queuedCount > 0 && !isProcessing
+    const canStartAnotherRequest = activeRequestCount < MAX_CONCURRENT
+    const canCreate = queuedCount > 0 && canStartAnotherRequest
+    const currentLightboxImage = lightbox?.items[lightbox.index] || null
+    const canNavigateLightbox = Boolean(lightbox && lightbox.items.length > 1)
 
     const updateItem = useCallback((id: string, patch: Partial<SketchItem>) => {
         setItems(current => current.map(item => item.id === id ? { ...item, ...patch } : item))
@@ -106,7 +116,7 @@ export function CreateSketchModal({ open, onOpenChange }: CreateSketchModalProps
             return []
         })
         setModel('nb2')
-        setIsProcessing(false)
+        setActiveRequestCount(0)
         if (fileInputRef.current) fileInputRef.current.value = ''
     }, [])
 
@@ -152,6 +162,7 @@ export function CreateSketchModal({ open, onOpenChange }: CreateSketchModalProps
     }, [])
 
     const createOne = useCallback(async (item: SketchItem): Promise<void> => {
+        setActiveRequestCount(count => count + 1)
         updateItem(item.id, { status: 'processing', error: null, resultDataUrl: null })
 
         try {
@@ -174,14 +185,18 @@ export function CreateSketchModal({ open, onOpenChange }: CreateSketchModalProps
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Sketch generation failed'
             updateItem(item.id, { status: 'failed', error: message })
+        } finally {
+            setActiveRequestCount(count => Math.max(0, count - 1))
         }
     }, [model, updateItem])
 
     const processItems = useCallback(async (targetItems: SketchItem[]) => {
         if (targetItems.length === 0) return
-        setIsProcessing(true)
+        const availableSlots = Math.max(0, MAX_CONCURRENT - activeRequestCount)
+        if (availableSlots === 0) return
+
         let index = 0
-        const workerCount = Math.min(MAX_CONCURRENT, targetItems.length)
+        const workerCount = Math.min(availableSlots, targetItems.length)
 
         await Promise.all(Array.from({ length: workerCount }, async () => {
             while (index < targetItems.length) {
@@ -190,9 +205,7 @@ export function CreateSketchModal({ open, onOpenChange }: CreateSketchModalProps
                 await createOne(item)
             }
         }))
-
-        setIsProcessing(false)
-    }, [createOne])
+    }, [activeRequestCount, createOne])
 
     const handleCreateSketches = useCallback(() => {
         processItems(items.filter(item => item.status === 'queued'))
@@ -201,6 +214,16 @@ export function CreateSketchModal({ open, onOpenChange }: CreateSketchModalProps
     const handleRetryFailed = useCallback(() => {
         processItems(items.filter(item => item.status === 'failed'))
     }, [items, processItems])
+
+    const handleRegenerateOne = useCallback(async (item: SketchItem) => {
+        if (item.status === 'processing' || activeRequestCount >= MAX_CONCURRENT) return
+        await createOne(item)
+    }, [activeRequestCount, createOne])
+
+    const handleDownloadOne = useCallback((item: SketchItem) => {
+        if (!item.resultDataUrl) return
+        downloadBlob(dataUrlToBlob(item.resultDataUrl), sketchFileName(item.file.name))
+    }, [])
 
     const handleDownload = useCallback(async () => {
         const files = readyItems.map(item => ({
@@ -216,6 +239,54 @@ export function CreateSketchModal({ open, onOpenChange }: CreateSketchModalProps
 
         await zipAndDownload(files)
     }, [readyItems])
+
+    const openGeneratedPreview = useCallback((itemId: string) => {
+        const lightboxItems = items
+            .filter(item => item.status === 'ready' && item.resultDataUrl)
+            .map(item => ({
+                url: item.resultDataUrl!,
+                label: `${item.file.name} sketch preview`,
+                itemId: item.id,
+            }))
+
+        if (lightboxItems.length === 0) return
+
+        setLightbox({
+            items: lightboxItems,
+            index: Math.max(0, lightboxItems.findIndex(item => item.itemId === itemId)),
+        })
+    }, [items])
+
+    const showPreviousLightboxImage = useCallback(() => {
+        setLightbox(prev => {
+            if (!prev || prev.items.length <= 1) return prev
+            return { ...prev, index: (prev.index - 1 + prev.items.length) % prev.items.length }
+        })
+    }, [])
+
+    const showNextLightboxImage = useCallback(() => {
+        setLightbox(prev => {
+            if (!prev || prev.items.length <= 1) return prev
+            return { ...prev, index: (prev.index + 1) % prev.items.length }
+        })
+    }, [])
+
+    useEffect(() => {
+        if (!lightbox || lightbox.items.length <= 1) return
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault()
+                showPreviousLightboxImage()
+            } else if (event.key === 'ArrowRight') {
+                event.preventDefault()
+                showNextLightboxImage()
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [lightbox, showNextLightboxImage, showPreviousLightboxImage])
 
     const statusText = useMemo(() => {
         if (items.length === 0) return `Upload up to ${MAX_FILES} images.`
@@ -278,18 +349,25 @@ export function CreateSketchModal({ open, onOpenChange }: CreateSketchModalProps
                     )}
 
                     {items.length > 0 && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                             {items.map(item => {
                                 const imageUrl = item.resultDataUrl || item.previewUrl
                                 const imageLabel = item.resultDataUrl ? `${item.file.name} sketch preview` : item.file.name
+                                const isReady = item.status === 'ready' && item.resultDataUrl
 
                                 return (
-                                    <div key={item.id} className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-                                        <div className="relative h-44 bg-slate-50 flex items-center justify-center">
+                                    <div
+                                        key={item.id}
+                                        className={`rounded-lg border bg-slate-50 p-2 ${
+                                            item.status === 'failed' ? 'border-red-200' : 'border-slate-200'
+                                        }`}
+                                        title={item.error || imageLabel}
+                                    >
+                                        <div className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-md bg-white">
                                             {item.resultDataUrl ? (
                                                 <button
                                                     type="button"
-                                                    onClick={() => setLightbox({ url: item.resultDataUrl!, label: imageLabel })}
+                                                    onClick={() => openGeneratedPreview(item.id)}
                                                     className="flex h-full w-full cursor-zoom-in items-center justify-center"
                                                     title="Open full preview"
                                                 >
@@ -303,32 +381,44 @@ export function CreateSketchModal({ open, onOpenChange }: CreateSketchModalProps
                                                     <Loader2 className="w-8 h-8 animate-spin text-slate-700" />
                                                 </div>
                                             )}
-                                        </div>
-                                        <div className="p-3 space-y-2">
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-medium text-slate-800 truncate" title={item.file.name}>{item.file.name}</p>
-                                                    <p className="text-xs text-slate-500">{sketchFileName(item.file.name)}</p>
+                                            {item.status === 'ready' && (
+                                                <div className="absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-white text-green-600 shadow-sm">
+                                                    <Check className="h-4 w-4" />
                                                 </div>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => removeItem(item.id)}
+                                                disabled={item.status === 'processing'}
+                                                className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-slate-500 shadow-sm hover:bg-white hover:text-red-500 disabled:opacity-40"
+                                                title="Remove"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                        {isReady && (
+                                            <div className="mt-2 grid grid-cols-2 gap-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() => removeItem(item.id)}
-                                                    disabled={isProcessing}
-                                                    className="text-slate-400 hover:text-red-500 disabled:opacity-40 shrink-0"
-                                                    title="Remove"
+                                                    onClick={() => handleRegenerateOne(item)}
+                                                    disabled={item.status === 'processing' || activeRequestCount >= MAX_CONCURRENT}
+                                                    className="flex h-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+                                                    title="Regenerate"
+                                                    aria-label={`Regenerate sketch for ${item.file.name}`}
                                                 >
-                                                    <X className="w-4 h-4" />
+                                                    <RotateCw className="h-4 w-4" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDownloadOne(item)}
+                                                    className="flex h-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                                                    title="Download"
+                                                    aria-label={`Download sketch for ${item.file.name}`}
+                                                >
+                                                    <Download className="h-4 w-4" />
                                                 </button>
                                             </div>
-
-                                            <div className="flex items-center gap-2 text-xs font-medium">
-                                                {item.status === 'queued' && <span className="text-slate-500 flex items-center gap-1"><ImagePlus className="w-3.5 h-3.5" /> Queued</span>}
-                                                {item.status === 'processing' && <span className="text-slate-700 flex items-center gap-1"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Creating</span>}
-                                                {item.status === 'ready' && <span className="text-green-700 flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Ready</span>}
-                                                {item.status === 'failed' && <span className="text-red-600">Failed</span>}
-                                            </div>
-                                            {item.error && <p className="text-xs text-red-600 line-clamp-2">{item.error}</p>}
-                                        </div>
+                                        )}
                                     </div>
                                 )
                             })}
@@ -341,7 +431,7 @@ export function CreateSketchModal({ open, onOpenChange }: CreateSketchModalProps
                         {statusText}
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2">
-                        {failedCount > 0 && !isProcessing && (
+                        {failedCount > 0 && canStartAnotherRequest && (
                             <Button variant="outline" onClick={handleRetryFailed}>
                                 <RotateCw className="w-4 h-4 mr-2" />
                                 Retry Failed
@@ -357,30 +447,59 @@ export function CreateSketchModal({ open, onOpenChange }: CreateSketchModalProps
                             </Button>
                         )}
                         <Button onClick={handleCreateSketches} disabled={!canCreate} className="bg-slate-900 hover:bg-slate-800 text-white">
-                            {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <PencilRuler className="w-4 h-4 mr-2" />}
-                            {isProcessing ? 'Creating...' : 'Create Sketch'}
+                            {isProcessing && !canCreate ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <PencilRuler className="w-4 h-4 mr-2" />}
+                            {isProcessing && !canCreate ? 'Creating...' : 'Create Sketch'}
                         </Button>
                     </div>
                 </div>
             </DialogContent>
         </Dialog>
-        <Dialog open={!!lightbox} onOpenChange={(open) => { if (!open) setLightbox(null) }}>
+        <Dialog open={!!currentLightboxImage} onOpenChange={(open) => { if (!open) setLightbox(null) }}>
             <DialogContent
                 showCloseButton={false}
                 className="!max-w-none !w-screen !h-screen !p-0 !m-0 !translate-x-0 !translate-y-0 !top-0 !left-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none"
             >
-                <DialogTitle className="sr-only">{lightbox?.label || 'Sketch preview'}</DialogTitle>
+                <DialogTitle className="sr-only">{currentLightboxImage?.label || 'Sketch preview'}</DialogTitle>
                 <DialogDescription className="sr-only">
                     View the generated sketch preview at full size.
                 </DialogDescription>
                 <div className="relative w-full h-full flex items-center justify-center p-4 bg-black/80" onClick={() => setLightbox(null)}>
-                    {lightbox && (
+                    {currentLightboxImage && (
                         <img
-                            src={lightbox.url}
-                            alt={lightbox.label}
+                            src={currentLightboxImage.url}
+                            alt={currentLightboxImage.label}
                             className="max-w-full max-h-full object-contain rounded-md shadow-2xl"
                             onClick={(event) => event.stopPropagation()}
                         />
+                    )}
+                    {canNavigateLightbox && (
+                        <>
+                            <button
+                                type="button"
+                                className="absolute left-4 top-1/2 z-50 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white transition-colors hover:bg-black/70 hover:text-white/90"
+                                onClick={(event) => {
+                                    event.stopPropagation()
+                                    showPreviousLightboxImage()
+                                }}
+                                aria-label="View previous sketch"
+                            >
+                                <ChevronLeft className="w-7 h-7" strokeWidth={2.5} />
+                            </button>
+                            <button
+                                type="button"
+                                className="absolute right-4 top-1/2 z-50 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white transition-colors hover:bg-black/70 hover:text-white/90"
+                                onClick={(event) => {
+                                    event.stopPropagation()
+                                    showNextLightboxImage()
+                                }}
+                                aria-label="View next sketch"
+                            >
+                                <ChevronRight className="w-7 h-7" strokeWidth={2.5} />
+                            </button>
+                            <div className="absolute left-1/2 top-6 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-sm font-semibold text-white">
+                                {lightbox ? `${lightbox.index + 1} / ${lightbox.items.length}` : ''}
+                            </div>
+                        </>
                     )}
                     <button
                         type="button"
