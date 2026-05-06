@@ -71,6 +71,7 @@ const DEFAULT_REMASTER_MODEL: IllustrationModelId = 'gpt-2'
 
 type TuneControl = { key: keyof ImageTuneSettings; label: string }
 type TuneControlGroupId = 'tone' | 'color' | 'detail'
+type TunePreviewView = 'adjusted' | 'reference'
 
 const TUNE_CONTROL_GROUPS: Array<{ id: TuneControlGroupId; label: string; controls: TuneControl[] }> = [
     {
@@ -548,6 +549,8 @@ export function SharedIllustrationBoard({
     const [remasterReferencePageId, setRemasterReferencePageId] = useState<string | null>(null)
     const [remasterUpload, setRemasterUpload] = useState<{ file: File; preview: string } | null>(null)
     const [isTuneMode, setIsTuneMode] = useState(false)
+    const [tunePreviewView, setTunePreviewView] = useState<TunePreviewView>('adjusted')
+    const [tuneReferencePageId, setTuneReferencePageId] = useState<string | null>(null)
     const [tuneSettings, setTuneSettings] = useState<ImageTuneSettings>(DEFAULT_IMAGE_TUNE_SETTINGS)
     const [isTunePreviewLoading, setIsTunePreviewLoading] = useState(false)
     const [tunePreviewError, setTunePreviewError] = useState<string | null>(null)
@@ -724,6 +727,25 @@ export function SharedIllustrationBoard({
     const selectedRemasterReferencePage = remasterReferencePageId
         ? illustratedPages.find(p => p.id === remasterReferencePageId)
         : undefined
+
+    const tuneReferenceOptions = useMemo(() => {
+        const optionsById = new Map<string, Page>()
+        const addPage = (candidate?: Page | null) => {
+            if (!candidate?.id || !candidate.illustration_url || optionsById.has(candidate.id)) return
+            optionsById.set(candidate.id, candidate)
+        }
+
+        addPage(page)
+        allPages?.forEach(addPage)
+        illustratedPages.forEach(addPage)
+
+        return Array.from(optionsById.values()).sort((a, b) => a.page_number - b.page_number)
+    }, [allPages, illustratedPages, page])
+
+    const selectedTuneReferencePage = tuneReferencePageId
+        ? tuneReferenceOptions.find(option => option.id === tuneReferencePageId) || page
+        : page
+    const tuneReferenceUrl = selectedTuneReferencePage.illustration_url || page.illustration_url || ''
 
     const currentFullscreenImage = fullscreenImages[fullscreenImageIndex] || null
     const canNavigateFullscreenImages = fullscreenImages.length > 1
@@ -1039,17 +1061,10 @@ export function SharedIllustrationBoard({
 
         return (
             <div className="h-full w-full overflow-y-auto bg-white p-4">
-                <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-slate-200 pb-4">
+                <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-slate-200 pb-4 md:hidden">
                     <Button type="button" variant="outline" className="h-9 min-w-[92px] flex-1" onClick={resetTuneSettings}>
                         <RotateCcw className="w-4 h-4 mr-2" />
                         Reset
-                    </Button>
-                    <Button
-                        type="button"
-                        className="h-9 min-w-[92px] flex-1 border-red-600 bg-red-600 text-white hover:bg-red-700 hover:text-white"
-                        onClick={() => setIsTuneMode(false)}
-                    >
-                        Cancel
                     </Button>
                     <Button
                         type="button"
@@ -1098,7 +1113,70 @@ export function SharedIllustrationBoard({
         )
     }
 
+    const renderTuneAdjustedCheckbox = () => (
+        <label className="flex cursor-pointer items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-900">
+            <input
+                type="checkbox"
+                checked={tunePreviewView === 'adjusted'}
+                onChange={(event) => setTunePreviewView(event.target.checked ? 'adjusted' : 'reference')}
+                className="h-4 w-4 rounded border-slate-300 accent-purple-600"
+                aria-label="Show adjusted preview"
+            />
+            Preview
+        </label>
+    )
+
+    const renderTuneReferencePicker = () => {
+        if (tuneReferenceOptions.length === 0) return null
+
+        return (
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <button
+                        type="button"
+                        className="flex h-8 max-w-[170px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                    >
+                        <span className="truncate">Page {selectedTuneReferencePage.page_number}</span>
+                        <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+                    </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="max-h-[300px] w-64 overflow-y-auto" align="end">
+                    {tuneReferenceOptions.map(option => {
+                        const isSelected = selectedTuneReferencePage.id === option.id
+
+                        return (
+                            <DropdownMenuItem
+                                key={option.id}
+                                onClick={() => setTuneReferencePageId(option.id === page.id ? null : option.id)}
+                                className="flex cursor-pointer items-center gap-3"
+                            >
+                                <img
+                                    src={option.illustration_url!}
+                                    alt=""
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="h-10 w-10 shrink-0 rounded bg-slate-100 object-cover"
+                                />
+                                <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                                    Page {option.page_number}{option.id === page.id ? ' (current)' : ''}
+                                </span>
+                                {isSelected && <Check className="h-4 w-4 shrink-0 text-purple-600" />}
+                            </DropdownMenuItem>
+                        )
+                    })}
+                </DropdownMenuContent>
+            </DropdownMenu>
+        )
+    }
+
     const handleTunePreviewClick = useCallback(() => {
+        if (tunePreviewView === 'reference') {
+            if (tuneReferenceUrl) {
+                openFullscreenImage([{ url: tuneReferenceUrl, label: `Page ${selectedTuneReferencePage.page_number} Reference` }])
+            }
+            return
+        }
+
         const canvas = tuneCanvasRef.current
         if (canvas && canvas.width > 0 && canvas.height > 0) {
             try {
@@ -1109,37 +1187,82 @@ export function SharedIllustrationBoard({
             }
         }
         if (page.illustration_url) openFullscreenImage([{ url: page.illustration_url, label: 'Preview' }])
-    }, [openFullscreenImage, page.illustration_url])
+    }, [openFullscreenImage, page.illustration_url, selectedTuneReferencePage.page_number, tunePreviewView, tuneReferenceUrl])
 
     const renderTunePreview = () => (
         <div
-            className="relative flex h-full min-h-[300px] w-full cursor-pointer items-center justify-center bg-slate-50"
+            className="relative w-full cursor-pointer bg-slate-50"
             onClick={handleTunePreviewClick}
         >
-            {isTunePreviewLoading && (
-                <div className="absolute right-3 top-3 z-20 rounded-full bg-white/90 p-2 text-purple-600 shadow-sm ring-1 ring-slate-200">
+            <div
+                className="absolute left-3 top-3 z-20 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur md:hidden"
+                onClick={(event) => event.stopPropagation()}
+            >
+                {renderTuneAdjustedCheckbox()}
+            </div>
+
+            {tunePreviewView === 'reference' && (
+                <div
+                    className="absolute left-3 top-14 z-20 md:hidden"
+                    onClick={(event) => event.stopPropagation()}
+                >
+                    {renderTuneReferencePicker()}
+                </div>
+            )}
+
+            <button
+                type="button"
+                onClick={(event) => {
+                    event.stopPropagation()
+                    setIsTuneMode(false)
+                }}
+                disabled={isGenerating}
+                className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-white hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                title="Cancel adjustment"
+                aria-label="Cancel adjustment"
+            >
+                <X className="h-4 w-4" />
+            </button>
+
+            {isTunePreviewLoading && tunePreviewView === 'adjusted' && (
+                <div className="absolute right-14 top-3 z-20 rounded-full bg-white/90 p-2 text-purple-600 shadow-sm ring-1 ring-slate-200">
                     <Loader2 className="h-4 w-4 animate-spin" />
                 </div>
             )}
+
             {page.illustration_url ? (
-                tunePreviewError ? (
-                    <img
-                        src={page.illustration_url}
-                        alt="Tuned Preview"
-                        loading={feedImageLoading}
-                        decoding="async"
-                        className="block h-auto w-full object-contain"
-                        style={{ filter: tunePreviewFilter }}
-                    />
-                ) : (
-                    <canvas
-                        ref={tuneCanvasRef}
-                        aria-label="Tuned Preview"
-                        className="block h-auto w-full object-contain"
-                    />
-                )
+                <>
+                    {tunePreviewError ? (
+                        <img
+                            src={page.illustration_url}
+                            alt="Tuned Preview"
+                            loading={feedImageLoading}
+                            decoding="async"
+                            className={`${tunePreviewView === 'adjusted' ? 'block' : 'hidden'} h-auto w-full object-contain`}
+                            style={{ filter: tunePreviewFilter }}
+                        />
+                    ) : (
+                        <canvas
+                            ref={tuneCanvasRef}
+                            aria-label="Tuned Preview"
+                            className={`${tunePreviewView === 'adjusted' ? 'block' : 'hidden'} h-auto w-full object-contain`}
+                        />
+                    )}
+
+                    {tuneReferenceUrl && (
+                        <img
+                            src={tuneReferenceUrl}
+                            alt={`Page ${selectedTuneReferencePage.page_number} Reference`}
+                            loading={feedImageLoading}
+                            decoding="async"
+                            className={`${tunePreviewView === 'reference' ? 'block' : 'hidden'} h-auto w-full object-contain`}
+                        />
+                    )}
+                </>
             ) : (
-                <span className="text-sm text-slate-300">No illustration available</span>
+                <div className="flex min-h-[300px] items-center justify-center">
+                    <span className="text-sm text-slate-300">No illustration available</span>
+                </div>
             )}
         </div>
     )
@@ -2424,22 +2547,43 @@ export function SharedIllustrationBoard({
                     )}
 
                     {/* DESKTOP HEADER (73px) */}
-                    {!isTuneMode && (
-                    <div className="hidden md:grid grid-cols-2 divide-x border-b border-slate-100 h-[73px] bg-white text-sm">
+                    <div className="hidden h-[73px] min-h-[73px] max-h-[73px] shrink-0 grid-cols-2 divide-x overflow-visible border-b border-slate-100 bg-white text-sm md:grid">
 
                         {/* SKETCH HEADER */}
-                        <div className="flex items-center justify-between gap-2 px-3">
-                            {/* LEFT: Badge */}
+                        <div className="grid h-full min-h-0 grid-cols-[max-content_minmax(0,1fr)_max-content] items-center gap-2 overflow-visible px-3">
+                            {/* LEFT: Tune undo/redo */}
                             <div className="flex items-center gap-2 min-w-[80px]">
+                                {isTuneMode && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={undoTuneChange}
+                                            disabled={tuneUndoCount === 0}
+                                            className="rounded-full p-1.5 text-slate-500 hover:bg-slate-100 hover:text-purple-700 disabled:cursor-not-allowed disabled:opacity-35"
+                                            title="Undo (Cmd/Ctrl+Z)"
+                                            aria-label="Undo last tune change"
+                                        >
+                                            <Undo2 className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={redoTuneChange}
+                                            disabled={tuneRedoCount === 0}
+                                            className="rounded-full p-1.5 text-slate-500 hover:bg-slate-100 hover:text-purple-700 disabled:cursor-not-allowed disabled:opacity-35"
+                                            title="Redo (Cmd/Ctrl+Shift+Z)"
+                                            aria-label="Redo last tune change"
+                                        >
+                                            <Redo2 className="h-4 w-4" />
+                                        </button>
+                                    </>
+                                )}
                             </div>
 
                             {/* CENTER: Sketch/Story Toggle */}
 	                            {isTuneMode ? (
-	                                <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase">
-	                                    Tune Tools
-	                                </h4>
-	                            ) : (isAdmin || showColoredToCustomer) ? (
-	                                <div className="relative" ref={sketchPopoverDesktopRef}>
+                                <div aria-hidden="true" />
+                            ) : (isAdmin || showColoredToCustomer) ? (
+	                                <div className="relative justify-self-center" ref={sketchPopoverDesktopRef}>
                                     <div className="flex items-center gap-2">
                                         <button
                                             onClick={() => handleSketchToggleClick('sketch')}
@@ -2484,7 +2628,26 @@ export function SharedIllustrationBoard({
 
                             {/* RIGHT: Buttons */}
                             <div className="flex items-center gap-2 min-w-[80px] justify-end">
-	                                {isAdmin && onUpload && !isTuneMode && (
+                                {isTuneMode ? (
+                                    <>
+                                        <Button type="button" variant="outline" size="sm" className="h-8 px-3" onClick={resetTuneSettings}>
+                                            <RotateCcw className="w-4 h-4 mr-2" />
+                                            Reset
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            className="h-8 bg-purple-600 px-3 text-white hover:bg-purple-700"
+                                            onClick={handleCompareTune}
+                                            disabled={isGenerating || !page.illustration_url}
+                                        >
+                                            <SlidersHorizontal className="w-4 h-4 mr-2" />
+                                            Compare
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <>
+	                                {isAdmin && onUpload && (
 	                                    <div className={`transition-opacity ${sketchViewMode === 'text' ? 'opacity-0 pointer-events-none' : ''}`}>
                                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700" onClick={() => sketchInputRef.current?.click()} title="Upload Sketch">
                                             <Upload className="w-4 h-4" />
@@ -2497,14 +2660,16 @@ export function SharedIllustrationBoard({
                                         <Download className="w-4 h-4" />
                                     </button>
                                 )}
+                                    </>
+                                )}
                             </div>
                         </div>
 
                         {/* ILLUSTRATION HEADER (or PAGE TEXT for customer pages 2+) */}
-                        <div className="flex items-center justify-between gap-2 px-3 bg-slate-50/30">
+                        <div className="grid h-full min-h-0 grid-cols-[max-content_minmax(0,1fr)_max-content] items-center gap-3 overflow-visible bg-slate-50/30 px-3">
                             {/* LEFT: Create LineArt + Create Cover Buttons (Admin only, when illustration exists) */}
-                            <div className="flex items-center gap-2 min-w-[80px]">
-	                                {isAdmin && illustrationUrl && !isTuneMode && (
+                            <div className={`flex items-center gap-2 ${isTuneMode ? 'w-[180px]' : 'min-w-[80px]'}`}>
+                                {!isTuneMode && isAdmin && illustrationUrl ? (
                                     <>
                                         <Button
                                             variant="outline"
@@ -2539,33 +2704,44 @@ export function SharedIllustrationBoard({
                                             </Button>
                                         )}
                                     </>
-                                )}
+                                ) : null}
                             </div>
 
                             {/* CENTER: Title */}
-                            <h4 className="text-xs font-bold tracking-wider text-slate-900 uppercase">
-	                                {isTuneMode ? 'Preview' : isCustomer && page.page_number > 1 && !showColoredToCustomer ? 'Page Text' : isAdmin ? 'Illustration' : 'Final Illustration'}
-                            </h4>
+                            <div className="flex min-w-0 justify-center">
+                                {isTuneMode ? (
+                                    renderTuneAdjustedCheckbox()
+                                ) : (
+                                    <h4 className="truncate text-xs font-bold tracking-wider text-slate-900 uppercase">
+	                                    {isCustomer && page.page_number > 1 && !showColoredToCustomer ? 'Page Text' : isAdmin ? 'Illustration' : 'Final Illustration'}
+                                    </h4>
+                                )}
+                            </div>
 
                             {/* RIGHT: Buttons */}
-                            <div className="flex items-center gap-2 min-w-[80px] justify-end">
-	                                {isAdmin && onUpload && !isTuneMode && (
+                            <div className={`flex items-center justify-end gap-2 ${isTuneMode ? 'w-[180px]' : 'min-w-[80px]'}`}>
+                                {isTuneMode ? (
+                                    tunePreviewView === 'reference' ? renderTuneReferencePicker() : null
+                                ) : (
                                     <>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700" onClick={() => illustrationInputRef.current?.click()} title="Upload Illustration">
-                                            <Upload className="w-4 h-4" />
-                                        </Button>
-                                        <input type="file" ref={illustrationInputRef} className="hidden" accept="image/*" onChange={handleAdminUploadSelect('illustration')} />
+                                        {isAdmin && onUpload && (
+                                            <>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700" onClick={() => illustrationInputRef.current?.click()} title="Upload Illustration">
+                                                    <Upload className="w-4 h-4" />
+                                                </Button>
+                                                <input type="file" ref={illustrationInputRef} className="hidden" accept="image/*" onChange={handleAdminUploadSelect('illustration')} />
+                                            </>
+                                        )}
+                                        {!(isCustomer && page.page_number > 1 && !showColoredToCustomer) && illustrationUrl && (
+                                            <button onClick={() => handleDownload(illustrationUrl!, `Page-${page.page_number}-Illustration.jpg`)} className="h-8 w-8 rounded-full bg-black/5 text-slate-500 hover:bg-black/10 hover:text-purple-600 transition-colors flex items-center justify-center" title="Download Illustration">
+                                                <Download className="w-4 h-4" />
+                                            </button>
+                                        )}
                                     </>
-                                )}
-	                                {!(isCustomer && page.page_number > 1 && !showColoredToCustomer) && illustrationUrl && !isTuneMode && (
-                                    <button onClick={() => handleDownload(illustrationUrl!, `Page-${page.page_number}-Illustration.jpg`)} className="h-8 w-8 rounded-full bg-black/5 text-slate-500 hover:bg-black/10 hover:text-purple-600 transition-colors flex items-center justify-center" title="Download Illustration">
-                                        <Download className="w-4 h-4" />
-                                    </button>
                                 )}
                             </div>
                         </div>
                     </div>
-                    )}
 
                     {/* IMAGES GRID (The Core Layout) */}
                     {/* COMPARISON MODE: Show OLD vs NEW side by side */}

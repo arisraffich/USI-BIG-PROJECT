@@ -24,6 +24,11 @@ interface SketchItem {
     resultDataUrl: string | null
 }
 
+interface LightboxImage {
+    url: string
+    label: string
+}
+
 const MAX_FILES = 5
 const MAX_CONCURRENT = 2
 
@@ -79,6 +84,7 @@ export function CreateSketchModal({ open, onOpenChange }: CreateSketchModalProps
     const [items, setItems] = useState<SketchItem[]>([])
     const [model, setModel] = useState<SketchModel>('nb2')
     const [isProcessing, setIsProcessing] = useState(false)
+    const [lightbox, setLightbox] = useState<LightboxImage | null>(null)
 
     const queuedCount = items.filter(item => item.status === 'queued').length
     const readyItems = useMemo(
@@ -218,6 +224,7 @@ export function CreateSketchModal({ open, onOpenChange }: CreateSketchModalProps
     }, [failedCount, isProcessing, items.length, readyCount])
 
     return (
+        <>
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent
                 className="sm:max-w-3xl max-h-[90vh] flex flex-col"
@@ -279,7 +286,18 @@ export function CreateSketchModal({ open, onOpenChange }: CreateSketchModalProps
                                 return (
                                     <div key={item.id} className="rounded-lg border border-slate-200 bg-white overflow-hidden">
                                         <div className="relative h-44 bg-slate-50 flex items-center justify-center">
-                                            <img src={imageUrl} alt={imageLabel} className="max-w-full max-h-full object-contain" />
+                                            {item.resultDataUrl ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setLightbox({ url: item.resultDataUrl!, label: imageLabel })}
+                                                    className="flex h-full w-full cursor-zoom-in items-center justify-center"
+                                                    title="Open full preview"
+                                                >
+                                                    <img src={imageUrl} alt={imageLabel} className="max-w-full max-h-full object-contain" />
+                                                </button>
+                                            ) : (
+                                                <img src={imageUrl} alt={imageLabel} className="max-w-full max-h-full object-contain" />
+                                            )}
                                             {item.status === 'processing' && (
                                                 <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
                                                     <Loader2 className="w-8 h-8 animate-spin text-slate-700" />
@@ -346,5 +364,38 @@ export function CreateSketchModal({ open, onOpenChange }: CreateSketchModalProps
                 </div>
             </DialogContent>
         </Dialog>
+        <Dialog open={!!lightbox} onOpenChange={(open) => { if (!open) setLightbox(null) }}>
+            <DialogContent
+                showCloseButton={false}
+                className="!max-w-none !w-screen !h-screen !p-0 !m-0 !translate-x-0 !translate-y-0 !top-0 !left-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none"
+            >
+                <DialogTitle className="sr-only">{lightbox?.label || 'Sketch preview'}</DialogTitle>
+                <DialogDescription className="sr-only">
+                    View the generated sketch preview at full size.
+                </DialogDescription>
+                <div className="relative w-full h-full flex items-center justify-center p-4 bg-black/80" onClick={() => setLightbox(null)}>
+                    {lightbox && (
+                        <img
+                            src={lightbox.url}
+                            alt={lightbox.label}
+                            className="max-w-full max-h-full object-contain rounded-md shadow-2xl"
+                            onClick={(event) => event.stopPropagation()}
+                        />
+                    )}
+                    <button
+                        type="button"
+                        className="absolute top-4 right-4 text-white hover:text-white/80 transition-colors bg-black/50 hover:bg-black/70 rounded-full p-2 z-50"
+                        onClick={(event) => {
+                            event.stopPropagation()
+                            setLightbox(null)
+                        }}
+                        aria-label="Close full preview"
+                    >
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+            </DialogContent>
+        </Dialog>
+        </>
     )
 }
